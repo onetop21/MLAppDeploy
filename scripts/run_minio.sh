@@ -4,11 +4,11 @@ MINIO_CONFIG=$HOME/.mlad/master/minio
 if [ -d /hosthome ]; then
     # In docker-machine
     if [ -z $1 ]; then
-        echo 'HOST USERNAME :' $1
-    else
         echo 'Run script with username of host.'
-        echo "$$ bash $0 [USERNAME]"
+        echo "$ bash $0 [USERNAME]"
         exit 1
+    else
+        echo 'HOST USERNAME :' $1
     fi
 
     if [ -d /hosthome/$1 ]; then
