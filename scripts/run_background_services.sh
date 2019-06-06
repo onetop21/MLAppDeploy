@@ -78,4 +78,18 @@ storage:
         chunksize: 5242880
         rootdirectory: /
 EOL
-docker run -d -p 5000:5000 --restart=always -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
+
+# Generate certificates
+mkdir -p $REGISTRY_CONFIG/certs
+
+openssl req \
+  -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CONFIG/certs/domain.key -x509 -days 365 -out $REGISTRY_CONFIG/certs/domain.crt
+
+# Run docker registry server
+docker run -d -p 5000:5000 --restart=always -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/docker/registry/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/etc/docker/registry/certs/domain.key -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
+
+# Run docker registry server by service(Swarm)
+# docker secret create domain.crt $REGISTRY_CONFIG/certs/domain.crt
+# docker secret create domain.key $REGISTRY_CONFIG/certs/domain.key
+# docker node update --label-add registry=true node01
+# docker service create --name registry --secret domain.crt --secret domain.key --constraint 'node.labels.registry==true' -p 5000:5000 -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/docker/registry/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/etc/docker/registry/certs/domain.key -v $REGISTRY_CONFIG:/etc/docker/registry registry:2
