@@ -36,3 +36,27 @@ docker run -p 9000:9000 --name minio -d -e "MINIO_ACCESS_KEY=$ACCESS_KEY" -e "MI
 #echo $ACCESS_KEY | docker secret create access_key -
 #echo $SECRET_KEY | docker secret create secret_key -
 #docker service create --name="minio" --secret="access_key" --secret="secret_key" -v $MINIO_DATA:/data -v $MINIO_CONFIG:/root/.minio minio/minio server /data
+
+
+# config.yml
+"version: 0.1
+log:
+    fields:
+        service: registry
+http:
+    addr: :5000
+storage:
+    cache:
+        layerinfo: inmemory
+    s3:
+        accesskey: {MINIO_ACCESS_KEY}
+        secretkey: {MINIO_SECRET_KEY}
+        region: {REGION}
+        regionendpoint: {REGION_ENDPOINT}
+        bucket: {BUCKET_NAME}
+        encrypt: false
+        secure: true
+        v4auth: true
+        chunksize: 5242880
+        rootdirectory: /"
+docker run -d -p 5000:5000 --restart=always -v /mnt/registry:/var/lib/registry --name registry registry:2
