@@ -79,14 +79,18 @@ storage:
         rootdirectory: /
 EOL
 
-# Generate certificates
-mkdir -p $REGISTRY_CONFIG/certs
+# Generate certificates to MinIO
+REGISTRY_CERT=$MINIO_DATA/docker-registry/certs
 
-openssl req \
-  -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CONFIG/certs/domain.key -x509 -days 365 -out $REGISTRY_CONFIG/certs/domain.crt
+if [ -d $REGISTRY_CERT ]; then
+    echo "Already generated certificates."
+else
+    mkdir -p $REGISTRY_CERT
+    openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt
+fi
 
 # Run docker registry server
-docker run -d -p 5000:5000 --restart=always -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/docker/registry/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/etc/docker/registry/certs/domain.key -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
+docker run -d -p 5000:5000 --restart=always -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key -v $REGISTRY_CERT:/certs -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
 
 # Run docker registry server by service(Swarm)
 # docker secret create domain.crt $REGISTRY_CONFIG/certs/domain.crt
