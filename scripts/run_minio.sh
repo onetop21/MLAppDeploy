@@ -20,4 +20,19 @@ if [ -d /hosthome ]; then
 fi
 
 mkdir -p $MINIO_DATA $MINIO_CONFIG
-docker run -p 9000:9000 --name minio -d -v $MINIO_DATA:/data -v $MINIO_CONFIG:/root/.minio minio/minio server /data
+
+# Access and secret key
+if [ -z $ACCESS_KEY ]; then
+    ACCESS_KEY=MLAPPDEPLOY
+fi
+if [ -z $SECRET_KEY ]; then
+    SECRET_KEY=MLAPPDEPLOY
+fi
+
+# Run minio server
+docker run -p 9000:9000 --name minio -d -e "MINIO_ACCESS_KEY=$ACCESS_KEY" -e "MINIO_SECRET_KEY=$SECRET_KEY" -v $MINIO_DATA:/data -v $MINIO_CONFIG:/root/.minio minio/minio server /data
+
+# Run minio server by service(Swarm)
+#echo $ACCESS_KEY | docker secret create access_key -
+#echo $SECRET_KEY | docker secret create secret_key -
+#docker service create --name="minio" --secret="access_key" --secret="secret_key" -v $MINIO_DATA:/data -v $MINIO_CONFIG:/root/.minio minio/minio server /data
