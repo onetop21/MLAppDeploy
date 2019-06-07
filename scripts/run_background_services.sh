@@ -39,6 +39,8 @@ if [ -z $SECRET_KEY ]; then
 fi
 
 # Run minio server
+docker stop minio > /dev/null 2>&1
+docker rm minio > /dev/null 2>&1
 docker run -d -p 9000:9000 --restart=always --name minio -e "MINIO_ACCESS_KEY=$ACCESS_KEY" -e "MINIO_SECRET_KEY=$SECRET_KEY" -v $MINIO_DATA:/data -v $MINIO_CONFIG:/root/.minio minio/minio server /data
 
 # Run minio server by service(Swarm)
@@ -80,17 +82,31 @@ storage:
 EOL
 
 # Generate certificates to MinIO
-REGISTRY_CERT=$MINIO_DATA/docker-registry/certs
+read -p "Private docker registry URL: " REGISTRY_URL
+REGISTRY_CERT=$MINIO_DATA/docker-registry/certs/${REGISTRY_URL/:/-}
+echo $REGISTRY_CERT
 
-if [ -d $REGISTRY_CERT ]; then
+if [ 0 ]; then#[ -d $REGISTRY_CERT ]; then
     echo "Already generated certificates."
 else
     mkdir -p $REGISTRY_CERT
-    openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt
+    
+    # Set subjectAltName to openssl.cnf befor generate certificate.
+    sudo cp /etc/ssl/openssl.cnf /etc/ssl/openssl.cnf.bak
+    sudo sed -i -e "s/\[ v3_ca \]$/\[ v3_ca \]\nsubjectAltName = IP:${REGISTRY_URL/:*/}/" /etc/ssl/openssl.cnf
+
+    # Generate certificate.
+    #openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt
+    openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt -subj "/C=US/ST=STATE/L=CITY/O=COMPANY/OU=SECTION/CN=$REGISTRY_URL"
+
+    # Restore openssl configuration.
+    sudo mv /etc/ssl/openssl.cnf.bak /etc/ssl/openssl.cnf
 fi
 
 # Run docker registry server
-docker run -d -p 5000:5000 --restart=always -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key -v $REGISTRY_CERT:/certs -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
+docker stop registry > /dev/null 2>&1
+docker rm registry > /dev/null 2>&1
+docker run -d -p 5000:5000 --restart=always -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key -v "$REGISTRY_CERT":/certs -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
 
 # Run docker registry server by service(Swarm)
 # docker secret create domain.crt $REGISTRY_CONFIG/certs/domain.crt
