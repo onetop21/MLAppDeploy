@@ -12,16 +12,13 @@ WORKDIR /workspace
 
 # Dependencies
 {DEPENDS}
-#RUN apt install -y hello
-#COPY requirements.txt 
-#RUN pip install -r requirements.txt
 
 # Copy projects
 COPY . .
 
 # Entrypoint
-ENTRYPOINT  [{ENTRYPOINT}]
-CMD         [{CMD}]
+ENTRYPOINT  {ENTRYPOINT}
+CMD         {ARGS}
 
 '''
 

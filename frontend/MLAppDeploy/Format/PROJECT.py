@@ -6,6 +6,8 @@ project:
     version: {VERSION}
     author: {AUTHOR}
 workspace:
+    ## Describe base docker image tag
+    #base: python:latest
     ## Describe package manager and dependency list to install pre-required.
     #depends:
     #    pip: requirements.txt

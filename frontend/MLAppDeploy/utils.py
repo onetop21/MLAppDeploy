@@ -37,13 +37,104 @@ def read_project():
         return None
 
 def convert_dockerfile(project, workspace):
-    from MLAppDeploy.Foramt import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_DEPEND_PIP, DOCKERFILE_DEPEND_APT
+    from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_DEPEND_PIP, DOCKERFILE_DEPEND_APT
     project_name = project['name'].lower()
-    image_name = '{OWNER}'
-    pass
+    image_name = '{OWNER}/{NAME}:{VER}'
+    envs = []
+    for key in workspace['env'].keys():
+        envs.append(DOCKERFILE_ENV.format(
+            KEY=key,
+            VALUE=workspace['env'][key]
+        ))
+    depends = []
+    for key in workspace['depends'].keys():
+        if key == 'apt':
+            depends.append(DOCKERFILE_DEPEND_APT.format(
+                SRC=workspace['depends'][key]
+            ))
+        elif key == 'pip':
+            depends.append(DOCKERFILE_DEPEND_PIP.format(
+                SRC=workspace['depends'][key]
+            )) 
 
+    PROJECT_CONFIG_PATH = '%s/%s'%(CONFIG_PATH, project_name)
+    DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
+    DOCKERCOMPOSE_FILE = PROJECT_CONFIG_PATH + '/docker-compose.yml'
+    DOCKERIGNORE_FILE = PROJECT_PATH + '/.dockerignore'
+
+    os.makedirs(PROJECT_CONFIG_PATH, exist_ok=True)
+    with open(DOCKERFILE_FILE, 'w') as f:
+        f.write(DOCKERFILE.format(
+            BASE=workspace['base'],
+            AUTHOR=project['author'],
+            ENVS='\n'.join(envs),
+            DEPENDS='\n'.join(depends),
+            ENTRYPOINT=', '.join(workspace['entrypoint'].split()),
+            ARGS=', '.join(workspace['arguments'].split()),
+        ))
+    with open(DOCKERIGNORE_FILE, 'w') as f:
+        f.write('\n'.join(workspace['ignore']))
+
+    # Docker build
+    ## TODO
+
+    # Remove dockerignore
+    os.unlink(DOCKERIGNORE_FILE)
+    
 def convert_composefile(project, services):
-    pass
+    project_name = project['name'].lower()
+    image_name = '{OWNER}/{NAME}:{VER}'
+    envs = []
+    for key in workspace['env'].keys():
+        envs.append(DOCKERFILE_ENV.format(
+            KEY=key,
+            VALUE=workspace['env'][key]
+        ))
+    depends = []
+    for key in workspace['depends'].keys():
+        if key == 'apt':
+            depends.append(DOCKERFILE_DEPEND_APT.format(
+                SRC=workspace['depends'][key]
+            ))
+        elif key == 'pip':
+            depends.append(DOCKERFILE_DEPEND_PIP.format(
+                SRC=workspace['depends'][key]
+            )) 
+
+    PROJECT_CONFIG_PATH = '%s/%s'%(CONFIG_PATH, project_name)
+    DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
+    DOCKERCOMPOSE_FILE = PROJECT_CONFIG_PATH + '/docker-compose.yml'
+    DOCKERIGNORE_FILE = PROJECT_PATH + '/.dockerignore'
+
+    os.makedirs(PROJECT_CONFIG_PATH, exist_ok=True)
+    with open(DOCKERFILE_FILE, 'w') as f:
+        f.write(DOCKERFILE.format(
+            BASE=workspace['base'],
+            AUTHOR=project['author'],
+            ENVS='\n'.join(envs),
+            DEPENDS='\n'.join(depends),
+            ENTRYPOINT=', '.join(workspace['entrypoint'].split()),
+            ARGS=', '.join(workspace['arguments'].split()),
+        ))
+    with open(DOCKERIGNORE_FILE, 'w') as f:
+        f.write('\n'.join(workspace['ignore']))
+
+    # Docker build
+    ## TODO
+
+    # Remove dockerignore
+    os.unlink(DOCKERIGNORE_FILE)
+    
+
+def merge(source, destination):
+    for key, value in source.items():
+        if isinstance(value, dict):
+            # get node or create one
+            node = destination.setdefault(key, {})
+            merge(value, node)
+        else:
+            destination[key] = value
+    return destination 
 
 def update_obj(base, obj):
     # Remove no child branch
@@ -59,8 +150,5 @@ def update_obj(base, obj):
                     removal_keys.append(key)
             for key in removal_keys:
                 del item[key]
-    new = copy.deepcopy(base)
-    new.update(obj)
-    return new
-
+    return merge(obj, copy.deepcopy(base))
 

@@ -8,9 +8,12 @@ obj = {
         'author': 'Unknown',
     },
     'workspace': {
+        'base': 'python:latest',
         'depends': {},
-        'env': {},
-        'ignore': [],
+        'env': {
+            'PYTHONUNBUFFERED': 1
+        },
+        'ignore': [ '.*', '**/.*' ],
         'entrypoint': 'sh',
         'arguments': '',
     },

@@ -11,7 +11,7 @@ def module(no_build):
         sys.exit(1)
 
     project = default.project(project)
-    utils.convert_dockerfile(project['proejct'], project['workspace'])
-    utils.convert_composefile(project['proejct'], project['services'])
+    utils.convert_dockerfile(project['project'], project['workspace'])
+    utils.convert_composefile(project['project'], project['services'])
 
 sys.modules[__name__] = module
