@@ -1,0 +1,86 @@
+import sys, os, click
+import MLAppDeploy as mlad
+
+@click.command()
+@click.option('--username', '-u', help='Username')
+@click.option('--host', '-o', default='127.0.0.1', help='Host address')
+@click.option('--endpoint', '-e', default='127.0.0.1:9000', help='S3 Endpoint with Port Number')
+@click.option('--accesskey', '-a', help='S3 Object Storage Access Key')
+@click.option('--secretkey', '-s', help='S3 Object Storage Secret Key')
+@click.option('--registry', '-r', default='127.0.0.1:5000', help='Docker Registry Address with Port Number')
+def set(username, host, endpoint, accesskey, secretkey, registry):
+    '''Set Configuration.'''
+    mlad.config.set(username, host, endpoint, accesskey, secretkey, registry) 
+
+@click.command()
+@click.option('--username', '-u', is_flag=True, help='Username')
+@click.option('--host', '-o', is_flag=True, help='Host address')
+@click.option('--endpoint', '-e', is_flag=True, help='S3 Endpoint with Port Number')
+@click.option('--accesskey', '-a', is_flag=True, help='S3 Object Storage Access Key')
+@click.option('--secretkey', '-s', is_flag=True, help='S3 Object Storage Secret Key')
+@click.option('--registry', '-r', is_flag=True, help='Docker Registry Address with Port Number')
+def get(username, host, endpoint, accesskey, secretkey, registry):
+    '''Get Configuration.'''
+    mlad.config.get(username, host, endpoint, accesskey, secretkey, registry) 
+
+@click.group()
+def config():
+    '''Manage Configuration.'''
+
+config.add_command(set)
+config.add_command(get)
+
+@click.command()
+@click.option('--name', '-n', help='Project Name')
+@click.option('--version', '-v', help='Project Version')
+@click.option('--author', '-a', help='Project Author')
+def init(name, version, author):
+    '''Initialize MLAppDeploy Project.'''
+    mlad.init(name, version, author)
+
+@click.command()
+@click.option('--no-build', '-n', is_flag=True, help='Build and Run Project as Test on Local')
+def test(no_build):
+    '''Test Project on Local.'''
+    mlad.test(no_build)
+
+@click.command()
+def list():
+    '''Show Projects Deployed on Cluster.'''
+
+@click.command()
+def up():
+    '''Deploy and Run a Project on Cluster.'''
+
+@click.command()
+def logs():
+    '''Show Current Project Logs Deployed on Cluster.'''
+
+@click.command()
+def update():
+    '''Update Current Project Deployed on Cluster.'''
+
+@click.command()
+def status():
+    '''Show Project Status Deployed on Cluster.'''
+
+@click.command()
+def down():
+    '''Stop and Remove Current Project Deployed on Cluster.'''
+
+@click.group()
+def main():
+    '''Machine Learning Application Deployment Tool.'''
+
+main.add_command(config)
+main.add_command(init)
+main.add_command(test)
+main.add_command(list)
+main.add_command(up)
+main.add_command(logs)
+main.add_command(update)
+main.add_command(status)
+main.add_command(down)
+
+if __name__ == '__main__':
+    main()
