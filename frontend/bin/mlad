@@ -3,11 +3,11 @@ import MLAppDeploy as mlad
 
 @click.command()
 @click.option('--username', '-u', help='Username')
-@click.option('--host', '-o', default='127.0.0.1', help='Host address')
-@click.option('--endpoint', '-e', default='127.0.0.1:9000', help='S3 Endpoint with Port Number')
+@click.option('--host', '-o', help='Host address')
+@click.option('--endpoint', '-e', help='S3 Endpoint with Port Number')
 @click.option('--accesskey', '-a', help='S3 Object Storage Access Key')
 @click.option('--secretkey', '-s', help='S3 Object Storage Secret Key')
-@click.option('--registry', '-r', default='127.0.0.1:5000', help='Docker Registry Address with Port Number')
+@click.option('--registry', '-r', help='Docker Registry Address with Port Number')
 def set(username, host, endpoint, accesskey, secretkey, registry):
     '''Set Configuration.'''
     mlad.config.set(username, host, endpoint, accesskey, secretkey, registry) 

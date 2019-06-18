@@ -1,11 +1,12 @@
 import sys, os
 import MLAppDeploy.utils as utils
+import MLAppDeploy.default as default
 
 def get_value(key, data, default='Unknown'):
         return data[key] if key in data else default
     
 def set(username, host, endpoint, accesskey, secretkey, registry):
-    config = read_config()
+    config = default.config(utils.read_config())
     if not get_value('username', config, None) and not username:
         username = input('Username : ')
     if username: config['username'] = username
@@ -14,10 +15,10 @@ def set(username, host, endpoint, accesskey, secretkey, registry):
     if accesskey: config['accesskey'] = accesskey
     if secretkey: config['secretkey'] = secretkey
     if registry: config['registry'] = registry
-    write_config(config)
+    utils.write_config(config)
 
 def get(username, host, endpoint, accesskey, secretkey, registry):
-    config = read_config()
+    config = utils.read_config()
     printed = False
     if username:  print(get_value('username', config)); printed = True
     if host:      print(get_value('host', config)); printed = True

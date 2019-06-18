@@ -13,8 +13,8 @@ obj = {
         'env': {
             'PYTHONUNBUFFERED': 1
         },
-        'ignore': [ '.*', '**/.*' ],
-        'entrypoint': 'sh',
+        'ignore': [ '**/.*' ],
+        'entrypoint': '',
         'arguments': '',
     },
     'services': {}

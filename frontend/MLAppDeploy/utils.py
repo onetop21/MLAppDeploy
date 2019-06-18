@@ -1,4 +1,4 @@
-import sys, os, copy, time, datetime
+import sys, os, copy, time, datetime, signal
 from pathlib import Path
 from yaml import load, dump
 try:
@@ -68,20 +68,20 @@ def convert_dockerfile(project, workspace):
             AUTHOR=project['author'],
             ENVS='\n'.join(envs),
             DEPENDS='\n'.join(depends),
-            ENTRYPOINT=', '.join(workspace['entrypoint'].split()),
-            ARGS=', '.join(workspace['arguments'].split()),
+            ENTRYPOINT='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['entrypoint'].split()]),
+            ARGS='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['arguments'].split()]),
         ))
 
 def generate_image(project, workspace, is_test=False):
     config = read_config()
     project_name = project['name'].lower()
     project_version=project['version'].lower()
-    image_name = ('{REPO}/{OWNER}/{NAME}:{VER}_{TIMESTAMP}' + '-test' if is_test else '').format(
+    image_name = ('{REPO}/{OWNER}/{NAME}:{VER}' + '-test' if is_test else '').format(
         REPO=config['registry'],
         OWNER=config['username'],
         NAME=project_name,
         VER=project_version,
-        TIMESTAMP=datetime.datetime.now().strftime('%y%m%d.%H%M%S')
+        #TIMESTAMP=datetime.datetime.now().strftime('%y%m%d.%H%M%S')
     )
 
     PROJECT_CONFIG_PATH = '%s/%s'%(CONFIG_PATH, project_name)
@@ -109,7 +109,7 @@ def publish_image(project, services, is_test=False):
     #docker.image    
     pass
     
-def create_services(project_name, image_name, services, local=False):
+def start_project(project_name, image_name, services, local=False):
     import MLAppDeploy.default as default
 
     config = read_config()
@@ -120,23 +120,22 @@ def create_services(project_name, image_name, services, local=False):
     cli = docker.from_env()
 
     # Create Docker Network
-    networks = [ 
-        '%s_backend' % (project_name),
-    ]
-    for network in networks:
-        try:
-            cli.networks.create(network, driver='overlay', ingress='frontend' in network)
-        except docker.errors.APIError as e:
-            print(e, file=sys.stderr)
-            sys.exit(1)
+    if not local:
+        networks = [ 
+            '%s_backend' % (project_name),
+        ]
+        for network in networks:
+            try:
+                cli.networks.create(network, driver='overlay', ingress='frontend' in network)
+            except docker.errors.APIError as e:
+                print(e, file=sys.stderr)
+                sys.exit(1)
 
     # Create Docker Service
     instances = []
     while len(wait_queue):
         service_key = wait_queue.pop(0)
         service = default.project_service(services[service_key])
-
-        print(service_key, service['depends'], wait_queue)
 
         requeued = False
         for depend in service['depends']:
@@ -164,25 +163,60 @@ def create_services(project_name, image_name, services, local=False):
                 service_mode = docker.types.ServiceMode('replicated', replicas=service['deploy']['replicas'])
                 constraints = [ '{KEY}={VALUE}'.format(KEY=key, VALUE=service['deploy']['constraints'][key]) for key in service['deploy']['constraints'] ]
 
-            instance = cli.services.create(
-                name='{PROJECT}_{SERVICE}'.format(PROJECT=project_name, SERVICE=service_name),
-                image=image, 
-                env=env,
-                command=args,
-                container_labels=labels,
-                labels=labels,
-                networks = networks,
-                restart_policy=restart_policy,
-                resources=resources,
-                mode=service_mode,
-                constraints=constraints
-            )
+            if local:
+                instance = cli.containers.run(
+                    image, 
+                    command=args,
+                    name='{PROJECT}_{SERVICE}'.format(PROJECT=project_name, SERVICE=service_name),
+                    environment=env,
+                    labels=labels,
+                    network='bridge',
+                    restart_policy={'Name': 'on-failure', 'MaximumRetryCount': 1},
+                    detach=True,
+                )
+                print(instance)
+            else:
+                instance = cli.services.create(
+                    name='{PROJECT}_{SERVICE}'.format(PROJECT=project_name, SERVICE=service_name),
+                    image=image, 
+                    env=env,
+                    command=args,
+                    container_labels=labels,
+                    labels=labels,
+                    networks = networks,
+                    restart_policy=restart_policy,
+                    resources=resources,
+                    mode=service_mode,
+                    constraints=constraints
+                )
+                print(instance)
             instances.append(instance)
             running_queue.append(service_key)
         #for inst in instances:
         #    print(inst.tasks())
         time.sleep(1)
             
+def show_project_logs(project_name, local=False):
+    cli = docker.from_env()
+    with InterruptHandler() as h:
+        if local:
+            containers = cli.containers.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
+            logs = [ (container.name, container.logs(stream=True)) for container in containers ]
+            while not h.interrupted:
+                for name, log in logs:
+                    print('%s | %s'%(name, next(log).decode('utf8')))
+                time.sleep(0.01)
+        else:
+            services = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
+            print(services)
+
+def stop_project(project_name, local=False):
+    cli = docker.from_env()
+    if local:
+        containers = cli.containers.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
+        for container in containers:
+            container.stop()
+     
 def merge(source, destination):
     if source:
         for key, value in source.items():
@@ -211,3 +245,26 @@ def update_obj(base, obj):
                 del item[key]
     return merge(obj, copy.deepcopy(base))
 
+class InterruptHandler(object):
+    def __init__(self, sig=signal.SIGINT):
+        self.sig = sig
+
+    def __enter__(self):
+        self.interrupted = False
+        self.released = False
+        self.original_handler = signal.getsignal(self.sig)
+        def handler(signum, frmae):
+            self.release()
+            self.interrupted = True
+        signal.signal(self.sig, handler)
+        return self
+
+    def __exit__(self, type, value, tb):
+        self.release()
+
+    def release(self):
+        if self.released:
+            return False
+        signal.signal(self.sig, self.original_handler)
+        self.released = True
+        return True

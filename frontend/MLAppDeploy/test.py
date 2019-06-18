@@ -17,7 +17,13 @@ def module(no_build):
     project_name, image_name = utils.generate_image(project['project'], project['workspace'], True)
 
     print('Deploying test container image to local...')
-    utils.create_services(project_name, image_name, project['services'], True)
+    utils.start_project(project_name, image_name, project['services'], True)
+
+    utils.show_project_logs(project_name, True)
+
+    #utils.networks.prune()
+
+    utils.stop_project(project_name, True)
 
     print('Done.')
 

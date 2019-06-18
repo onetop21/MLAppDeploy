@@ -1,1 +1,1 @@
-from . import project, project_service
+from . import config, project, project_service
