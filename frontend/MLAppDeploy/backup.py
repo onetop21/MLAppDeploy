@@ -1,6 +1,6 @@
 import sys, os
 from pathlib import Path
-import MLAppDeploy.utils as utils
+from MLAppDeploy.libs import utils, docker_controller as docker, interrupt_handler
 import MLAppDeploy.default as default
 
 def module(no_build):
@@ -14,16 +14,16 @@ def module(no_build):
 
     print('Generating container image for test...')
     utils.convert_dockerfile(project['project'], project['workspace'])
-    project_name, image_name = utils.generate_image(project['project'], project['workspace'], True)
+    project_name, image_name = docker.generate_image(project['project'], project['workspace'], True)
 
     print('Deploying test container image to local...')
-    utils.start_project(project_name, image_name, project['services'], True)
+    docker.start_project(project_name, image_name, project['services'], True)
 
-    utils.show_project_logs(project_name, True)
+    docker.show_project_logs(project_name, True)
 
     #utils.networks.prune()
 
-    utils.stop_project(project_name, True)
+    docker.stop_project(project_name, True)
 
     print('Done.')
 

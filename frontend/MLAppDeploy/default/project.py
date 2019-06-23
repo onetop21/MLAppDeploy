@@ -1,5 +1,5 @@
 import sys
-import MLAppDeploy.utils as utils
+import MLAppDeploy.libs.utils as utils
 
 obj = {
     'project': {

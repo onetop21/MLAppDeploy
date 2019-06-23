@@ -1,1 +1,1 @@
-from . import config, init, test 
+from . import config, init, build, images, list, up, down, logs, status

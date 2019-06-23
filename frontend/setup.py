@@ -11,7 +11,8 @@ setup(
     url='',
     zip_safe=False,
     python_requires='>3.5',
-    install_requires=['Click==7.0', 'PyYAML<4.3,>=3.10', 'docker-compose==1.24.0'],
+    install_requires=['Click==7.0', 'PyYAML<4.3,>=3.10'],
+    #install_requires=['Click==7.0', 'PyYAML<4.3,>=3.10', 'docker-compose==1.24.0'],
     scripts=['bin/mlad']
 )
 

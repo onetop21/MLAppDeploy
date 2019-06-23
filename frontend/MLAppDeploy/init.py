@@ -1,5 +1,5 @@
 import sys, os
-import MLAppDeploy.utils as utils
+import MLAppDeploy.libs.utils as utils
 from MLAppDeploy.Format import PROJECT
 
 def module(name, version, author):

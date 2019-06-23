@@ -1,5 +1,5 @@
 import sys, os
-import MLAppDeploy.utils as utils
+import MLAppDeploy.libs.utils as utils
 import MLAppDeploy.default as default
 
 def get_value(key, data, default='Unknown'):
@@ -15,6 +15,9 @@ def set(username, host, endpoint, accesskey, secretkey, registry):
     if accesskey: config['accesskey'] = accesskey
     if secretkey: config['secretkey'] = secretkey
     if registry: config['registry'] = registry
+    # TODO
+    # If change registry. Check registry server to work.
+    # And Change all image repository to new registry address
     utils.write_config(config)
 
 def get(username, host, endpoint, accesskey, secretkey, registry):
