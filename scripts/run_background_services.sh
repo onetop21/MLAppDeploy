@@ -118,7 +118,7 @@ echo $REGISTRY_CERT
 if [ -d $REGISTRY_CERT ]; then
     echo "Already generated certificates."
 else
-    mkdir -p $REGISTRY_CERT
+    sudo mkdir -p $REGISTRY_CERT
     
     # Set subjectAltName to openssl.cnf befor generate certificate.
     sudo cp /etc/ssl/openssl.cnf /etc/ssl/openssl.cnf.bak
@@ -126,7 +126,8 @@ else
 
     # Generate certificate.
     #openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt
-    openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt -subj "/C=US/ST=STATE/L=CITY/O=COMPANY/OU=SECTION/CN=$REGISTRY_URL"
+    openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt -subj "/C=US/ST=STATE/L=CITY/O=COMPANY/OU=SECTION/CN=$REGISTRY_URL"
+    sudo mv domain.key domain.crt $REGISTRY_CERT/
 
     # Restore openssl configuration.
     sudo mv /etc/ssl/openssl.cnf.bak /etc/ssl/openssl.cnf
