@@ -11,7 +11,7 @@ curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.li
 sudo apt-get update
 
 # Install nvidia-docker2 and reload the Docker daemon configuration
-sudo apt-get install -y nvidia-docker2
+sudo apt-get install -y nvidia-docker2 jq
 sudo pkill -SIGHUP dockerd
 
 # Test nvidia-smi with the latest official CUDA image
@@ -19,7 +19,10 @@ docker run --runtime=nvidia --rm nvidia/cuda:9.0-base nvidia-smi
 
 # Enable GPU on docker swarm
 DAEMON_JSON="/etc/docker/daemon.json"
-GPU_IDS=`nvidia-smi -a | grep UUID | awk 'print ${4,0,12}'`
+if [ -z `sudo cat $DAEMON_JSON` ]; then
+    echo '{}' | sudo tee $DAEMON_JSON
+fi
+GPU_IDS=`nvidia-smi -a | grep UUID | awk '{print substr($4,0,12)}'`
 CONFIG=`sudo cat $DAEMON_JSON | jq '."default-runtime"="nvidia"' | jq '."node-generic-resources"=[]'`
 for ID in $GPU_IDS; do
     CONFIG=`echo $CONFIG | jq '."node-generic-resources"=["gpu='$ID'"]+."node-generic-resources"'`
