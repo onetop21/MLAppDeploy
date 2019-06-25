@@ -5,6 +5,7 @@ obj = {
     'image': '',
     'env': {},
     'depends': [],
+    'command': '',
     'arguments': '',
     'deploy': {
         'quotes': {

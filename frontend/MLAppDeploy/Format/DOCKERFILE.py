@@ -17,8 +17,7 @@ WORKDIR /workspace
 COPY . .
 
 # Entrypoint
-COMMAND {COMMAND}
-CMD     {ARGS}
+CMD {COMMAND}
 
 '''
 

@@ -149,16 +149,27 @@ def images_up(project, services, by_service=False):
     cli = docker.from_env()
 
     # Create Docker Network
-    if by_service:
-        networks = [ 
-            '%s_%s_backend' % (config['username'], project_name),
-        ]
-        for network in networks:
-            try:
+    networks = [ 
+        '%s_%s_backend' % (config['username'], project_name),
+    ]
+    for network in networks:
+        try:
+            instance = cli.networks.get(network)
+            if instance: 
+                print('Clear already created network.', file=sys.stderr)
+                instance.remove()
+                time.sleep(1)
+        except docker.errors.APIError as e:
+            pass
+        try:
+            print('Create network...')
+            if by_service:
                 cli.networks.create(network, driver='overlay', ingress='frontend' in network)
-            except docker.errors.APIError as e:
-                print('Network already created.', file=sys.stderr)
-                #print(e, file=sys.stderr)
+            else:
+                cli.networks.create(network, driver='bridge')
+        except docker.errors.APIError as e:
+            print('Failed to create network.', file=sys.stderr)
+            print(e, file=sys.stderr)
 
     # Create Docker Service
     pending_instance = None
@@ -208,8 +219,8 @@ def images_up(project, services, by_service=False):
             service_name = service_key.lower()
             image = service['image'] or image_name
             env = [ '{KEY}={VALUE}'.format(KEY=key, VALUE=service['env'][key]) for key in service['env'].keys() ]
-            command = service['command']
-            args = service['arguments']
+            env += [ 'SERVICE.NAME={}'.format(service_name) ]
+            command = service['command'] + service['arguments']
             labels = {'MLAD.PROJECT': project_name}
             
             restart_policy = docker.types.RestartPolicy()
@@ -239,14 +250,15 @@ def images_up(project, services, by_service=False):
                 instance = cli.containers.run(
                     image, 
                     command=command,
-                    args=args,
                     name=inst_name,
                     environment=env,
                     labels=labels,
-                    network='bridge',
                     restart_policy={'Name': 'on-failure', 'MaximumRetryCount': 1},
                     detach=True,
                 )
+                for network_name in networks:
+                    network = cli.networks.get(network_name)
+                    network.connect(instance, aliases=[service_name])
             else:
                 try:
                     instance = cli.services.get(inst_name)
@@ -259,10 +271,9 @@ def images_up(project, services, by_service=False):
                     image=image, 
                     env=env,
                     command=command,
-                    args=args,
                     container_labels=labels,
                     labels=labels,
-                    networks=networks,
+                    networks=[{'Target': network, 'Aliases': [ service_name ]} for network in networks ],
                     restart_policy=restart_policy,
                     resources=resources,
                     mode=service_mode,
@@ -306,19 +317,8 @@ def images_down(project, by_service=False):
             for service in services:
                 print('Stop %s...'%service.name)
                 service.remove()
-            networks = [ 
-                '%s_%s_backend' % (config['username'], project_name),
-            ]
-            for network in networks:
-                try:
-                    instance = cli.networks.get(network)
-                    instance.remove()
-                    print('Network removed.')
-                except docker.errors.APIError as e:
-                    print('Network already removed.', file=sys.stderr)
         else:
             print('Cannot find running services.', file=sys.stderr)
-            sys.exit(1)
     else:
         containers = cli.containers.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
         if len(containers):
@@ -327,7 +327,16 @@ def images_down(project, by_service=False):
                 container.stop()
         else:
             print('Cannot find running containers.', file=sys.stderr)
-            sys.exit(1)
+    networks = [ 
+        '%s_%s_backend' % (config['username'], project_name),
+    ]
+    for network in networks:
+        try:
+            instance = cli.networks.get(network)
+            instance.remove()
+            print('Network removed.')
+        except docker.errors.APIError as e:
+            print('Network already removed.', file=sys.stderr)
 
 def show_status(project, services):
     project_name = project['name'].lower()

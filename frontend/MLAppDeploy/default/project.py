@@ -14,7 +14,7 @@ obj = {
             'PYTHONUNBUFFERED': 1
         },
         'ignore': [ '**/.*' ],
-        'entrypoint': '',
+        'command': '',
         'arguments': '',
     },
     'services': {}

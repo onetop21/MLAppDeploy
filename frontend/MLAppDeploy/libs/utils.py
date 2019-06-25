@@ -37,6 +37,7 @@ def read_project():
         return None
 
 def convert_dockerfile(project, workspace):
+    config = read_config()
     from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_DEPEND_PIP, DOCKERFILE_DEPEND_APT
     project_name = project['name'].lower()
 
@@ -73,8 +74,10 @@ def convert_dockerfile(project, workspace):
             AUTHOR=project['author'],
             ENVS='\n'.join(envs),
             REQUIRES='\n'.join(requires),
-            COMMAND='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['comimand'].split()]),
-            ARGS='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['arguments'].split()]),
+            COMMAND='[%s]'%', '.join(
+                ['"{}"'.format(item) for item in workspace['command'].split()] + 
+                ['"{}"'.format(item) for item in workspace['arguments'].split()]
+            ),
         ))
 
 def merge(source, destination):
