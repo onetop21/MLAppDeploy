@@ -73,7 +73,7 @@ def convert_dockerfile(project, workspace):
             AUTHOR=project['author'],
             ENVS='\n'.join(envs),
             REQUIRES='\n'.join(requires),
-            ENTRYPOINT='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['entrypoint'].split()]),
+            COMMAND='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['comimand'].split()]),
             ARGS='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['arguments'].split()]),
         ))
 

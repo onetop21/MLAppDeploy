@@ -208,6 +208,7 @@ def images_up(project, services, by_service=False):
             service_name = service_key.lower()
             image = service['image'] or image_name
             env = [ '{KEY}={VALUE}'.format(KEY=key, VALUE=service['env'][key]) for key in service['env'].keys() ]
+            command = service['command']
             args = service['arguments']
             labels = {'MLAD.PROJECT': project_name}
             
@@ -237,7 +238,8 @@ def images_up(project, services, by_service=False):
                     pass
                 instance = cli.containers.run(
                     image, 
-                    command=args,
+                    command=command,
+                    args=args,
                     name=inst_name,
                     environment=env,
                     labels=labels,
@@ -256,7 +258,8 @@ def images_up(project, services, by_service=False):
                     name=inst_name,
                     image=image, 
                     env=env,
-                    command=args,
+                    command=command,
+                    args=args,
                     container_labels=labels,
                     labels=labels,
                     networks=networks,
