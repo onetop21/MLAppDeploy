@@ -40,21 +40,27 @@ def convert_dockerfile(project, workspace):
     from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_DEPEND_PIP, DOCKERFILE_DEPEND_APT
     project_name = project['name'].lower()
 
-    envs = []
+    envs = [
+        DOCKERFILE_ENV.format(KEY='TF_CPP_MIN_LOG_LEVEL', VALUE=3),
+        DOCKERFILE_ENV.format(KEY='S3_ENDPOINT', VALUE=config['endpoint']),
+        DOCKERFILE_ENV.format(KEY='S3_USE_HTTPS', VALUE=0),
+        DOCKERFILE_ENV.format(KEY='AWS_ACCESS_KEY_ID', VALUE=config['accesskey']),
+        DOCKERFILE_ENV.format(KEY='AWS_SECRET_ACCESS_KEY_ID', VALUE=config['secretkey']),
+    ]
     for key in workspace['env'].keys():
         envs.append(DOCKERFILE_ENV.format(
             KEY=key,
             VALUE=workspace['env'][key]
         ))
-    depends = []
-    for key in workspace['depends'].keys():
+    requires = []
+    for key in workspace['requires'].keys():
         if key == 'apt':
-            depends.append(DOCKERFILE_DEPEND_APT.format(
-                SRC=workspace['depends'][key]
+            requires.append(DOCKERFILE_DEPEND_APT.format(
+                SRC=workspace['requires'][key]
             ))
         elif key == 'pip':
-            depends.append(DOCKERFILE_DEPEND_PIP.format(
-                SRC=workspace['depends'][key]
+            requires.append(DOCKERFILE_DEPEND_PIP.format(
+                SRC=workspace['requires'][key]
             )) 
 
     PROJECT_CONFIG_PATH = '%s/%s'%(CONFIG_PATH, project_name)
@@ -66,7 +72,7 @@ def convert_dockerfile(project, workspace):
             BASE=workspace['base'],
             AUTHOR=project['author'],
             ENVS='\n'.join(envs),
-            DEPENDS='\n'.join(depends),
+            REQUIRES='\n'.join(requires),
             ENTRYPOINT='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['entrypoint'].split()]),
             ARGS='[%s]'%', '.join(['"{}"'.format(item) for item in workspace['arguments'].split()]),
         ))

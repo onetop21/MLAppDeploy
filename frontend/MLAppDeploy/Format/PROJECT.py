@@ -9,18 +9,17 @@ workspace:
     ## Describe base docker image tag
     #base: python:latest
     ## Describe package manager and dependency list to install pre-required.
-    #depends:
+    #requires:
     #    pip: requirements.txt
     ## Describe environment variables.
     #env:  
     #    PYTHONUNBUFFERED: 1    
     ## Describe exclude files from project.
     #ignore:
-    #   - .*
-    #   - **/.*
-    ## Describe application to execute (Protected)
-    #entrypoint: python run.py
-    ## Describe arguments for execute application (Overwritable)
+    #   - "**/.*"
+    ## Describe application to execute
+    #command: python run.py
+    ## Describe arguments for execute application
     #arguments: --help
 services:
     #[SERVICENAME]:
@@ -31,6 +30,8 @@ services:
     #        [KEY]: [VALUE]
     ## Describe services before running current service.
     #    depends: [ SERVICENAME, ... ]
+    ## Describe command to need overwrite.
+    #    command:
     ## Describe arguments to need overwrite.
     #    arguments:
     #

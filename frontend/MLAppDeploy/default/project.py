@@ -9,7 +9,7 @@ obj = {
     },
     'workspace': {
         'base': 'python:latest',
-        'depends': {},
+        'requires': {},
         'env': {
             'PYTHONUNBUFFERED': 1
         },

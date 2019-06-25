@@ -10,8 +10,8 @@ MAINTAINER {AUTHOR}
 # Working directory
 WORKDIR /workspace
 
-# Dependencies
-{DEPENDS}
+# Requires
+{REQUIRES}
 
 # Copy projects
 COPY . .
