@@ -1,8 +1,9 @@
 if [ -z $1 ]; then
-    echo "Run script with argument that shareable link of docker registry certificates file [domain.crt] from MinIO."
-    echo "$ $0 [URL]"
-    echo "[WARNING] Need to wrap URL by double qoutes, if you show unknown errors. "
-    exit 1
+    read -p "Shareable link of docker registry certificates : " -r URL
+    #echo "Run script with argument that shareable link of docker registry certificates file [domain.crt] from MinIO."
+    #echo "$ $0 [URL]"
+    #echo "[WARNING] Need to wrap URL by double qoutes, if you show unknown errors. "
+    #exit 1
 else
     URL=$1
 fi
