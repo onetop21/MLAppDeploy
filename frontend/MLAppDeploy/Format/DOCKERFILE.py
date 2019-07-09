@@ -10,11 +10,17 @@ MAINTAINER {AUTHOR}
 # Working directory
 WORKDIR /workspace
 
+# Pre Scripts
+RUN {PRESCRIPTS}
+
 # Requires
 {REQUIRES}
 
 # Copy projects
 COPY . .
+
+#Post Scripts
+RUN {POSTSCRIPTS}
 
 # Entrypoint
 CMD {COMMAND}

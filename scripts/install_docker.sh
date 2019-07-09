@@ -1,11 +1,11 @@
 # Uninstall old version
-sudo apt-get remove docker docker-engine docker.io containerd runc
+sudo apt-get remove -y docker docker-engine docker.io containerd runc
 
 # Update package manager
 sudo apt-get update
 
 # Install package to use repository over HTTPS
-sudo apt-get install \
+sudo apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -28,7 +28,7 @@ sudo add-apt-repository \
 sudo apt-get update
 
 # Install docker community version (latest)
-sudo apt-get install docker-ce docker-ce-cli containerd.io
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 
 # Add user to docker group
 sudo adduser $USER docker

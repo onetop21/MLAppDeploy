@@ -1,104 +1,33 @@
 import sys, os, click
-import MLAppDeploy as mlad
-
-@click.command()
-@click.option('--username', '-u', help='Username')
-@click.option('--host', '-o', help='Host address')
-@click.option('--endpoint', '-e', help='S3 Endpoint with Port Number')
-@click.option('--accesskey', '-a', help='S3 Object Storage Access Key')
-@click.option('--secretkey', '-s', help='S3 Object Storage Secret Key')
-@click.option('--registry', '-r', help='Docker Registry Address with Port Number')
-def set(username, host, endpoint, accesskey, secretkey, registry):
-    '''Set Configuration.'''
-    mlad.config.set(username, host, endpoint, accesskey, secretkey, registry) 
-
-@click.command()
-@click.option('--username', '-u', is_flag=True, help='Username')
-@click.option('--host', '-o', is_flag=True, help='Host address')
-@click.option('--endpoint', '-e', is_flag=True, help='S3 Endpoint with Port Number')
-@click.option('--accesskey', '-a', is_flag=True, help='S3 Object Storage Access Key')
-@click.option('--secretkey', '-s', is_flag=True, help='S3 Object Storage Secret Key')
-@click.option('--registry', '-r', is_flag=True, help='Docker Registry Address with Port Number')
-def get(username, host, endpoint, accesskey, secretkey, registry):
-    '''Get Configuration.'''
-    mlad.config.get(username, host, endpoint, accesskey, secretkey, registry) 
+import bin, MLAppDeploy as mlad
+from bin import __version__
 
 @click.group()
-def config():
-    '''Manage Configuration.'''
-
-config.add_command(set)
-config.add_command(get)
-
-@click.command()
-@click.option('--name', '-n', help='Project Name')
-@click.option('--version', '-v', help='Project Version')
-@click.option('--author', '-a', help='Project Author')
-def init(name, version, author):
-    '''Initialize MLAppDeploy Project.'''
-    mlad.init(name, version, author)
-
-@click.command()
-@click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image')
-def build(tagging):
-    '''Build Project to Image for Deploying on Cluster.'''
-    mlad.build(tagging)
-
-@click.command()
-@click.option('--all', '-a', is_flag=True, help='Show all project images.')
-@click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10")')
-def images(all, tail):
-    '''Show built image list.'''
-    mlad.images(all, tail)
-
-@click.command()
-def list():
-    '''Show Projects Deployed on Cluster.'''
-    mlad.list()
-
-@click.command()
-@click.option('--build', '-b', is_flag=True, help='Build Project Image before Deploy and Run Project')
-@click.option('--as-test', '-t', is_flag=True, help='Run as Test on Local')
-@click.argument('image', required=False)
-def up(build, as_test, image):
-    '''Deploy and Run a Project on Local or Cluster.'''
-    mlad.up(build, as_test, image)
-
-@click.command()
-@click.option('--tail', '-t', default='255', help='Number of lines to show from the end of logs (default "255")')
-@click.option('--follow', '-f', is_flag=True, help='Follow log output')
-def logs(tail, follow):
-    '''Show Current Project Logs Deployed on Cluster.'''
-    mlad.logs(tail, follow)
-
-@click.command()
-def update():
-    '''Update Current Project Deployed on Cluster.'''
-
-@click.command()
-def status():
-    '''Show Project Status Deployed on Cluster.'''
-    mlad.status()
-
-@click.command()
-def down():
-    '''Stop and Remove Current Project Deployed on Cluster.'''
-    mlad.down()
-
-@click.group()
+@click.version_option(version=__version__, prog_name='MLAppDeploy')
 def main():
-    '''Machine Learning Application Deployment Tool.'''
+    '''Machine Learning Application Deployment Tool. (https://github.com/onetop21/MLAppDeploy.git)'''
 
-main.add_command(config)
-main.add_command(init)
-main.add_command(build)
-main.add_command(images)
-main.add_command(list)
-main.add_command(up)
-main.add_command(logs)
-#main.add_command(update)
-main.add_command(status)
-main.add_command(down)
+main.add_command(bin.config.cli, 'config')
+main.add_command(bin.image.cli, 'image')
+main.add_command(bin.project.cli, 'project')
+main.add_command(bin.node.cli, 'node')
+
+# Hidden Command
+import copy
+
+def addHiddenCommand(clazz, name):
+    inst = copy.copy(clazz)
+    inst.hidden = True
+    main.add_command(inst, name)
+
+addHiddenCommand(bin.image.ls, 'images')
+addHiddenCommand(bin.project.build, 'build')
+addHiddenCommand(bin.project.test, 'test')
+addHiddenCommand(bin.project.up, 'up')
+addHiddenCommand(bin.project.down, 'down')
+addHiddenCommand(bin.project.logs, 'logs')
+addHiddenCommand(bin.project.ls, 'ls')
+addHiddenCommand(bin.project.ps, 'ps')
 
 if __name__ == '__main__':
     main()

@@ -2,40 +2,74 @@ import sys, os
 import MLAppDeploy.libs.utils as utils
 import MLAppDeploy.default as default
 
-def get_value(key, data, default='Unknown'):
-        return data[key] if key in data else default
-    
-def set(username, host, endpoint, accesskey, secretkey, registry):
+def dict_to_graph(vars, base={}):
+    config = base
+    for ckeys in vars:
+        keys = ckeys.split('.')
+        head = config
+        for key in keys[:-1]:
+            head[key] = head[key] if key in head else {}
+            head = head[key]
+        if vars[ckeys]:
+            head[keys[-1]] = vars[ckeys] 
+        elif len(keys):
+            if keys[-1] in head: del head[keys[-1]]
+        else:
+            if keys[-1] in config: del config[keys[-1]]
+    return config
+
+def get_value(config, keys, stack=[]):
+    if not keys:
+        data = []
+        for key in config:
+            if isinstance(config[key], dict):
+                data = data + get_value(config[key], keys, stack + [key])
+            else:
+                data.append(('.'.join(stack + [key]), config[key]))
+        return data
+    else:
+        head = config
+        try:
+            for key in keys.split('.'):
+                stack.append(key)
+                head = head[key]
+            if not isinstance(head, dict):
+                return head
+            else:
+                print('Value is expandable.', file=sys.stderr)
+        except KeyError:
+            print('Cannot find config key.', file=sys.stderr)
+        sys.exit(1)
+
+def init(username, address):
+    utils.generate_empty_config()
+    set(*(
+        'account.username=%s'%username, 
+        'docker.host=%s:2375'%address,
+        'docker.registry=%s:5000'%address,
+        's3.endpoint=%s:9000'%address
+    ))
+    get(None)
+
+def set(*args):
+    try:
+        vars = dict([ var.split('=') for var in args ])
+    except ValueError as e:
+        print('Argument format is not valid.', file=sys.stderr)
+        sys.exit(1)
+
     config = default.config(utils.read_config())
-    if not get_value('username', config, None) and not username:
-        username = input('Username : ')
-    if username: config['username'] = username
-    if host: config['host'] = host
-    if endpoint: config['endpoint'] = endpoint
-    if accesskey: config['accesskey'] = accesskey
-    if secretkey: config['secretkey'] = secretkey
-    if registry: config['registry'] = registry
-    # TODO
-    # If change registry. Check registry server to work.
-    # And Change all image repository to new registry address
+    config = dict_to_graph(vars, config)
+
     utils.write_config(config)
 
-def get(username, host, endpoint, accesskey, secretkey, registry):
-    config = utils.read_config()
-    printed = False
-    if username:  print(get_value('username', config)); printed = True
-    if host:      print(get_value('host', config)); printed = True
-    if endpoint:  print(get_value('endpoint', config)); printed = True
-    if accesskey: print(get_value('accesskey', config)); printed = True
-    if secretkey: print(get_value('secretkey', config)); printed = True
-    if registry:  print(get_value('registry', config)); printed = True
-
-    if not printed:
-        print('Username     :', get_value('username', config))
-        print('Host Address :', get_value('host', config))
-        print('S3 Endpoint  :', get_value('endpoint', config))
-        print('- Access Key :', get_value('accesskey', config))
-        print('- Secret Key :', get_value('secretkey', config))
-        print('Registry     :', get_value('registry', config))
-    
-utils.generate_config()
+def get(keys):
+    config = default.config(utils.read_config())
+    data = get_value(config, keys)
+    if isinstance(data, list):
+        print('{:24} {:32}'.format('KEY', 'VALUE'))
+        for key, value in data:
+            #if key and value: print('{}={}'.format(key, value))
+            if key and value: print('{:24} {:32}'.format(key, value))
+    else:
+        print(data)

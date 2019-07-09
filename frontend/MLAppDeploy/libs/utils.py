@@ -12,7 +12,7 @@ CONFIG_FILE = HOME + '/.mlad/config.yml'
 PROJECT_PATH = os.getcwd()
 PROJECT_FILE = os.getcwd() + '/mlad-project.yml'
 
-def generate_config():
+def generate_empty_config():
     if not os.path.exists(CONFIG_PATH):
         os.makedirs(CONFIG_PATH, exist_ok=True)
     if not os.path.exists(CONFIG_FILE):
@@ -20,9 +20,13 @@ def generate_config():
             f.write('')
 
 def read_config():
-    with open(CONFIG_FILE) as f:
-        config = load(f.read(), Loader=Loader)
-    return config or {}
+    try:
+        with open(CONFIG_FILE) as f:
+            config = load(f.read(), Loader=Loader)
+        return config or {}
+    except FileNotFoundError as e:
+        print('Need to initialize configuration before.\nTry to run "mlad config init"', file=sys.stderr)
+        sys.exit(1)
 
 def write_config(config):
     with open(CONFIG_FILE, 'w') as f:
@@ -38,15 +42,15 @@ def read_project():
 
 def convert_dockerfile(project, workspace):
     config = read_config()
-    from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_DEPEND_PIP, DOCKERFILE_DEPEND_APT
+    from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
     project_name = project['name'].lower()
 
     envs = [
         DOCKERFILE_ENV.format(KEY='TF_CPP_MIN_LOG_LEVEL', VALUE=3),
-        DOCKERFILE_ENV.format(KEY='S3_ENDPOINT', VALUE=config['endpoint']),
+        DOCKERFILE_ENV.format(KEY='S3_ENDPOINT', VALUE=config['s3']['endpoint']),
         DOCKERFILE_ENV.format(KEY='S3_USE_HTTPS', VALUE=0),
-        DOCKERFILE_ENV.format(KEY='AWS_ACCESS_KEY_ID', VALUE=config['accesskey']),
-        DOCKERFILE_ENV.format(KEY='AWS_SECRET_ACCESS_KEY_ID', VALUE=config['secretkey']),
+        DOCKERFILE_ENV.format(KEY='AWS_ACCESS_KEY_ID', VALUE=config['s3']['accesskey']),
+        DOCKERFILE_ENV.format(KEY='AWS_SECRET_ACCESS_KEY_ID', VALUE=config['s3']['secretkey']),
     ]
     for key in workspace['env'].keys():
         envs.append(DOCKERFILE_ENV.format(
@@ -56,11 +60,11 @@ def convert_dockerfile(project, workspace):
     requires = []
     for key in workspace['requires'].keys():
         if key == 'apt':
-            requires.append(DOCKERFILE_DEPEND_APT.format(
+            requires.append(DOCKERFILE_REQ_APT.format(
                 SRC=workspace['requires'][key]
             ))
         elif key == 'pip':
-            requires.append(DOCKERFILE_DEPEND_PIP.format(
+            requires.append(DOCKERFILE_REQ_PIP.format(
                 SRC=workspace['requires'][key]
             )) 
 
@@ -73,7 +77,9 @@ def convert_dockerfile(project, workspace):
             BASE=workspace['base'],
             AUTHOR=project['author'],
             ENVS='\n'.join(envs),
+            PRESCRIPTS=';'.join(workspace['prescripts']) if len(workspace['prescripts']) else "echo .",
             REQUIRES='\n'.join(requires),
+            POSTSCRIPTS=';'.join(workspace['postscripts']) if len(workspace['postscripts']) else "echo .",
             COMMAND='[%s]'%', '.join(
                 ['"{}"'.format(item) for item in workspace['command'].split()] + 
                 ['"{}"'.format(item) for item in workspace['arguments'].split()]

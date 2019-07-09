@@ -17,6 +17,9 @@ workspace:
     ## Describe exclude files from project.
     #ignore:
     #   - "**/.*"
+    ## Describe Pre/Post scripts for preparing.
+    #prescripts: []
+    #postscripts: []
     ## Describe application to execute
     #command: python run.py
     ## Describe arguments for execute application

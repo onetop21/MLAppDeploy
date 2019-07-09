@@ -9,6 +9,8 @@ obj = {
     },
     'workspace': {
         'base': 'python:latest',
+        'prescripts': [],
+        'postscripts': [],
         'requires': {},
         'env': {
             'PYTHONUNBUFFERED': 1
