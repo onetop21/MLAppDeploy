@@ -1,6 +1,6 @@
 import sys, os, click
-import bin, MLAppDeploy as mlad
-from bin import __version__
+import mlad as bin
+from mlad import __version__
 
 @click.group()
 @click.version_option(version=__version__, prog_name='MLAppDeploy')
@@ -28,6 +28,3 @@ addHiddenCommand(bin.project.down, 'down')
 addHiddenCommand(bin.project.logs, 'logs')
 addHiddenCommand(bin.project.ls, 'ls')
 addHiddenCommand(bin.project.ps, 'ps')
-
-if __name__ == '__main__':
-    main()

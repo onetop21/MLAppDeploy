@@ -13,6 +13,6 @@ setup(
     zip_safe=False,
     python_requires='>3.5',
     install_requires=['Click==7.0', 'PyYAML<4.3,>=3.10', 'docker==4.0.2'],
-    scripts=['bin/mlad']
+    scripts=['mlad/mlad']
 )
 
