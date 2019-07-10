@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from bin import __version__
+from mlad import __version__
 
 setup(
     name='MLAppDeploy',
