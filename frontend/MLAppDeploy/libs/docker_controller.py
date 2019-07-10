@@ -8,6 +8,11 @@ CONFIG_PATH = HOME + '/.mlad'
 PROJECT_PATH = os.getcwd()
 SHORT_LEN = 10
 
+# Docker CLI from HOST
+def getDockerCLI():
+    config = utils.read_config()
+    return docker.from_env(environment={'DOCKER_HOST':'%s'%config['host']})
+
 # Image
 def image_list(project=None):
     config = utils.read_config()
@@ -15,7 +20,7 @@ def image_list(project=None):
     filters = 'MLAD.PROJECT'
     if project: filters+= '=%s' % project['name'].lower()
 
-    cli = docker.from_env()
+    cli - getDockerCLI()
     images = cli.images.list(filters={ 'label': filters } )
 
     data = []
@@ -48,7 +53,7 @@ def image_build(project, workspace, tagging=False):
     DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
     DOCKERIGNORE_FILE = PROJECT_PATH + '/.dockerignore'
 
-    cli = docker.from_env()
+    cli - getDockerCLI()
 
     # Check latest image
     latest_image = None
@@ -103,7 +108,7 @@ def image_build(project, workspace, tagging=False):
 
 def image_remove(ids, force):
     config = utils.read_config()
-    cli = docker.from_env()
+    cli - getDockerCLI()
     result = [ cli.images.remove(image=id, force=force) for id in ids ]
     return result
 
@@ -113,7 +118,7 @@ def image_prune(project, strong):
     filters = 'MLAD.PROJECT'
     if project: filters+= '=%s' % project['name'].lower()
 
-    cli = docker.from_env()
+    cli - getDockerCLI()
     return cli.images.prune(filters={ 'dangling': not strong, 'label': filters } )
 
 def image_push(project):
@@ -126,7 +131,7 @@ def image_push(project):
         NAME=project_name,
     )
     
-    cli = docker.from_env()
+    cli - getDockerCLI()
     try:
         cli.images.push(repository)
         return True
@@ -142,7 +147,7 @@ def running_projects():
 
     filters = 'MLAD.PROJECT'
 
-    cli = docker.from_env()
+    cli - getDockerCLI()
     services = cli.services.list(filters={'label': filters})
     data = {}
     if len(services):
@@ -177,7 +182,7 @@ def images_up(project, services, by_service=False):
     wait_queue = list(services.keys())
     running_queue = []
 
-    cli = docker.from_env()
+    cli - getDockerCLI()
 
     with InterruptHandler(message='Wait.', blocked=True):
         # Create Docker Network
@@ -252,7 +257,7 @@ def images_up(project, services, by_service=False):
                 service_name = service_key.lower()
                 image = service['image'] or image_name
                 env = [ '{KEY}={VALUE}'.format(KEY=key, VALUE=service['env'][key]) for key in service['env'].keys() ]
-                env += [ 'SERVICE.NAME={}'.format(service_name) ]
+                env += [ 'SERVICENAME={}'.format(service_name) ]
                 command = service['command'] + service['arguments']
                 labels = {'MLAD.PROJECT': project_name}
                 
@@ -322,7 +327,7 @@ def show_logs(project, tail='all', follow=False, by_service=False):
     project_name = project['name'].lower()
     project_version=project['version'].lower()
 
-    cli = docker.from_env()
+    cli - getDockerCLI()
     with InterruptHandler() as h:
         if by_service:
             instances = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
@@ -345,7 +350,7 @@ def images_down(project, by_service=False):
     config = utils.read_config()
     project_name = project['name'].lower()
 
-    cli = docker.from_env()
+    cli - getDockerCLI()
     with InterruptHandler(message='Wait.', blocked=True):
         if by_service:
             services = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
@@ -380,7 +385,7 @@ def show_status(project, services):
     for key in services.keys():
         inst_names.append('{PROJECT}_{SERVICE}'.format(PROJECT=project_name, SERVICE=key.lower()))
     
-    cli = docker.from_env()
+    cli - getDockerCLI()
 
     task_info = []
     for inst_name in inst_names:
