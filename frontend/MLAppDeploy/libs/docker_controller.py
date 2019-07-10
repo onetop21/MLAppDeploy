@@ -11,7 +11,7 @@ SHORT_LEN = 10
 # Docker CLI from HOST
 def getDockerCLI():
     config = utils.read_config()
-    return docker.from_env(environment={'DOCKER_HOST':'%s'%config['host']})
+    return docker.from_env(environment={'DOCKER_HOST':'%s'%config['docker']['host']})
 
 # Image
 def image_list(project=None):
