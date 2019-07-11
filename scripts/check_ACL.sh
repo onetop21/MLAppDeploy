@@ -12,22 +12,37 @@ function PrintResult {
     fi
 }
 
+function CheckPort {
+    RESULT=0
+    for PORT in $@
+    do
+        if [[ -n $TCP && $TCP -eq 1 ]]; then
+            nc -z -v -w 10 $ADDRESS $PORT > /dev/null 2>&1
+            let "RESULT |= $?"
+        fi
+        if [[ -n $UDP && $UDP -eq 1 ]]; then
+            nc -z -v -u -w 10 $ADDRESS $PORT > /dev/null 2>&1
+            let "RESULT |= $?"
+        fi
+    done
+    return $RESULT
+}
+
 printf "Check to $ADDRESS...\n"
 
 printf "Checking Docker Remote Port(HTTP)..."
-nc -z -v $ADDRESS 2375 > /dev/null 2>&1
+TCP=1 CheckPort 2375 
 PrintResult
 printf "Checking Docker Remote Port(HTTPS)..."
-nc -z -v $ADDRESS 2376 > /dev/null 2>&1
+TCP=1 CheckPort 2376 
 PrintResult
 printf "Checking Docker Swarm Port..."
-nc -z -v $ADDRESS 2377 > /dev/null 2>&1
+TCP=1 CheckPort 2377 
 PrintResult
 printf "Checking Docker Discovery Communication Port..."
-nc -z -v $ADDRESS 7946 > /dev/null 2>&1
-nc -z -v -u $ADDRESS 7946 > /dev/null 2>&1
+TCP=1 UDP=1 CheckPort 7946 
 PrintResult
 printf "Checking Docker Overlay Network Port..."
-nc -z -v -u $ADDRESS 4789 > /dev/null 2>&1
+UDP=1 CheckPort 4789 
 PrintResult
 
