@@ -60,7 +60,7 @@ def image_build(project, workspace, tagging=False):
     commit_number = 1
     images = cli.images.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
     if len(images):
-        latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
+        latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]))
         if latest_image and len(latest_image): latest_image = latest_image[0]
         tags = sorted(filter(None, [ tag if not tag.endswith('latest') else None for image in images for tag in image.tags ]))
         if len(tags): commit_number=int(tags[-1].split('.')[-1])+1
@@ -71,16 +71,24 @@ def image_build(project, workspace, tagging=False):
         f.write('\n'.join(workspace['ignore']))
 
     # Docker build
-    image = cli.images.build(
-        path=PROJECT_PATH,
-        tag=latest_name,
-        dockerfile=DOCKERFILE_FILE,
-        labels={
-            'MLAD.PROJECT': project_name,
-            'MLAD.PROJECT.VERSION': project_version
-        },
-        rm=True
-    )
+    try:
+        image = cli.images.build(
+            path=PROJECT_PATH,
+            tag=latest_name,
+            dockerfile=DOCKERFILE_FILE,
+            labels={
+                'MLAD.PROJECT': project_name,
+                'MLAD.PROJECT.VERSION': project_version
+            },
+            rm=True
+        )
+    except docker.errors.BuildError as e:
+        print(e, file=sys.stderr)
+    
+        # Remove dockerignore
+        os.unlink(DOCKERIGNORE_FILE)
+
+        sys.exit(1)
 
     # Remove dockerignore
     os.unlink(DOCKERIGNORE_FILE)
