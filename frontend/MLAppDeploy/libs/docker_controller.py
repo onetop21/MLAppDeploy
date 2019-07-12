@@ -186,11 +186,20 @@ def images_up(project, services, by_service=False):
         NAME=project_name,
     )
     image_name = '{REPOSITORY}:latest'.format(REPOSITORY=repository)
-
+   
     wait_queue = list(services.keys())
     running_queue = []
 
     cli = getDockerCLI()
+ 
+    # Block duplicated running.
+    if by_service:
+        filters = 'MLAD.PROJECT=%s' % project_name
+
+        services = cli.services.list(filters={'label': filters})
+        if len(services):
+            print('Already running project.', file=sys.stderr)
+            sys.exit(1)
 
     with InterruptHandler(message='Wait.', blocked=True):
         # Create Docker Network
