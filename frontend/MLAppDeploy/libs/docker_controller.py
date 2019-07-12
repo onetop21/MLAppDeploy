@@ -452,7 +452,7 @@ def scale_service(project, scale_spec):
         print('Cannot running service.', file=sys.stderr)
         sys.exit(1)
     
-    for srervice_name in scale_spec:
+    for service_name in scale_spec:
         try:
             service = cli.services.get(service_name)
 
