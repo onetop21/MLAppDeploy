@@ -227,7 +227,8 @@ def images_up(project, services, by_service=False):
                 if by_service:
                     instance = cli.services.get(inst_name)
                     tasks = instance.tasks()
-                    running = min([task['Status']['State'] == 'running' for task in tasks ])
+                    #running = min([task['Status']['State'] == 'running' for task in tasks ])
+                    running = min([task['DesiredState' == 'running' for task in tasks ])
                     status = 'running' if running else 'preparing'
                 else:
                     instance = cli.containers.get(inst_name)
@@ -238,7 +239,7 @@ def images_up(project, services, by_service=False):
                     pending_instance = None
                 elif expired < time.time():
                     print('[FAILED]', file=sys.stderr)
-                    show_logs(project, 'all', False, False)
+                    show_logs(project, 'all', False, by_service)
                     sys.exit(1)
                 else:
                     time.sleep(1)
