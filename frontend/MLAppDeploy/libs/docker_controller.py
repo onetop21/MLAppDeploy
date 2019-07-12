@@ -195,9 +195,7 @@ def images_up(project, services, by_service=False):
     # Block duplicated running.
     if by_service:
         filters = 'MLAD.PROJECT=%s' % project_name
-
-        services = cli.services.list(filters={'label': filters})
-        if len(services):
+        if len(cli.services.list(filters={'label': filters})):
             print('Already running project.', file=sys.stderr)
             sys.exit(1)
 
