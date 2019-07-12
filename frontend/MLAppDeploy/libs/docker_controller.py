@@ -412,11 +412,10 @@ def show_status(project, services):
     cli = getDockerCLI()
 
     # Block not running.
-    if by_service:
-        filters = 'MLAD.PROJECT=%s' % project_name
-        if not len(cli.services.list(filters={'label': filters})):
-            print('Cannot running service.', file=sys.stderr)
-            sys.exit(1)
+    filters = 'MLAD.PROJECT=%s' % project_name
+    if not len(cli.services.list(filters={'label': filters})):
+        print('Cannot running service.', file=sys.stderr)
+        sys.exit(1)
 
     task_info = []
     for inst_name in inst_names:
@@ -448,11 +447,10 @@ def scale_service(project, scale_spec):
     cli = getDockerCLI()
     
     # Block not running.
-    if by_service:
-        filters = 'MLAD.PROJECT=%s' % project_name
-        if not len(cli.services.list(filters={'label': filters})):
-            print('Cannot running service.', file=sys.stderr)
-            sys.exit(1)
+    filters = 'MLAD.PROJECT=%s' % project_name
+    if not len(cli.services.list(filters={'label': filters})):
+        print('Cannot running service.', file=sys.stderr)
+        sys.exit(1)
     
     for srervice_name in scale_spec:
         try:
