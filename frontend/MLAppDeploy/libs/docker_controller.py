@@ -237,7 +237,7 @@ def images_up(project, services, by_service=False):
                     instance = cli.services.get(inst_name)
                     tasks = instance.tasks()
                     #running = min([task['Status']['State'] == 'running' for task in tasks ])
-                    running = min([task['DesiredState' == 'running' for task in tasks ])
+                    running = min([task['DesiredState'] == 'running' for task in tasks ])
                     status = 'running' if running else 'preparing'
                 else:
                     instance = cli.containers.get(inst_name)
