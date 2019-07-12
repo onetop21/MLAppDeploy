@@ -9,15 +9,19 @@ import MLAppDeploy as mlad
 @click.command()
 def ls():
     '''Show Connected Nodes.'''
-    mlad.nodes()
+    mlad.node.list()
 
 @click.command()
-def enable():
+@click.argument('ID')
+def enable(id):
     '''Enable to Use Node.'''
+    mlad.node.enable(id)
 
 @click.command()
-def disable():
+@click.argument('ID')
+def disable(id):
     '''Disable to Use Node.'''
+    mlad.node.disable(id)
 
 #@click.group()
 #def label():

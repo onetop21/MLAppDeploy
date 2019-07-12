@@ -426,5 +426,50 @@ def show_status(project, services):
     else:
         print('Project is not running.', file=sys.stderr)
         sys.exit(1)
-           
 
+def scale_service(scale_spec):
+    project_name = project['name'].lower()
+    inst_names = []
+    for key in services.keys():
+        inst_names.append('{PROJECT}_{SERVICE}'.format(PROJECT=project_name, SERVICE=key.lower()))
+    
+    cli = getDockerCLI()
+    
+    for srervice_name in scale_spec:
+        try:
+            service = cli.services.get(service_name)
+
+            if service.scale(scale_spec[service_name]):
+                print('Change scale service [%s].' % service_name)
+            else:
+                print('Failed to change scale service [%s].' % service_name)
+
+        except docker.errors.NotFound:
+            print('Cannot find service [%s].' % service_name, file=sys.stderr)
+
+def node_list():
+    cli = getDockerCLI()
+    return cli.nodes.list()
+
+def node_enable(id):
+    cli = getDockerCLI()
+    try:
+        node = cli.nodes.get(id)
+    except docker.errors.APIError as e:
+        print('Cannot find node "%s"' % name, file=sys.stderr)
+        sys.exit(1)
+    spec = node.attrs['Spec']
+    spec['Availability'] = 'active'
+    node.update(spec)
+    
+def node_disable(id):
+    cli = getDockerCLI()
+    try:
+        node = cli.nodes.get(id)
+    except docker.errors.APIError as e:
+        print('Cannot find node "%s"' % name, file=sys.stderr)
+        sys.exit(1)
+    spec = node.attrs['Spec']
+    spec['Availability'] = 'drain'
+    node.update(spec)
+    

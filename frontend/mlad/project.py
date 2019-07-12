@@ -58,8 +58,11 @@ def logs(tail, follow):
     mlad.project.logs(tail, follow)
 
 @click.command()
-def scale():
+@click.argument('scales', nargs=-1)
+def scale(scales):
     '''Change Replicas Count of Running Service in Deployed on Cluster.'''
+    scale_spec = dict([ scale.split('=') for scale in scales ])
+    mlad.project.scale_service(scale_spec)
 
 @click.command()
 def update():
