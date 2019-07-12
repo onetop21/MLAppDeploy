@@ -444,9 +444,6 @@ def show_status(project, services):
 
 def scale_service(project, scale_spec):
     project_name = project['name'].lower()
-    inst_names = []
-    for key in services.keys():
-        inst_names.append('{PROJECT}_{SERVICE}'.format(PROJECT=project_name, SERVICE=key.lower()))
     
     cli = getDockerCLI()
     
