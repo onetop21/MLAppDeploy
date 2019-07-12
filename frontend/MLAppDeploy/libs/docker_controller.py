@@ -367,6 +367,14 @@ def images_down(project, by_service=False):
     project_name = project['name'].lower()
 
     cli = getDockerCLI()
+
+    # Block not running.
+    if by_service:
+        filters = 'MLAD.PROJECT=%s' % project_name
+        if not len(cli.services.list(filters={'label': filters})):
+            print('Cannot running service.', file=sys.stderr)
+            sys.exit(1)
+
     with InterruptHandler(message='Wait.', blocked=True):
         if by_service:
             services = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
@@ -403,6 +411,13 @@ def show_status(project, services):
     
     cli = getDockerCLI()
 
+    # Block not running.
+    if by_service:
+        filters = 'MLAD.PROJECT=%s' % project_name
+        if not len(cli.services.list(filters={'label': filters})):
+            print('Cannot running service.', file=sys.stderr)
+            sys.exit(1)
+
     task_info = []
     for inst_name in inst_names:
         try:
@@ -427,13 +442,20 @@ def show_status(project, services):
         print('Project is not running.', file=sys.stderr)
         sys.exit(1)
 
-def scale_service(scale_spec):
+def scale_service(project, scale_spec):
     project_name = project['name'].lower()
     inst_names = []
     for key in services.keys():
         inst_names.append('{PROJECT}_{SERVICE}'.format(PROJECT=project_name, SERVICE=key.lower()))
     
     cli = getDockerCLI()
+    
+    # Block not running.
+    if by_service:
+        filters = 'MLAD.PROJECT=%s' % project_name
+        if not len(cli.services.list(filters={'label': filters})):
+            print('Cannot running service.', file=sys.stderr)
+            sys.exit(1)
     
     for srervice_name in scale_spec:
         try:

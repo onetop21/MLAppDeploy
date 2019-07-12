@@ -115,4 +115,15 @@ def logs(tail, follow):
     
     docker.show_logs(project['project'], tail, follow, True)
 
+def scale(scale_spec):
+    project = utils.read_project()
+    if not project:
+        print('Need to generate project file before.', file=sys.stderr)
+        print('$ %s --help' % sys.argv[0], file=sys.stderr)
+        sys.exit(1)
+
+    project = default.project(project)
+    
+    docker.scale_service(project['project'], scale_spec)
+
 
