@@ -19,6 +19,23 @@ def generate_empty_config():
         with open(CONFIG_FILE, 'w') as f:
             f.write('')
 
+def getProjectConfigPath(project):
+    config = read_config()
+    return '%s/%s/%s'%(CONFIG_PATH, config['account']['username'], project['name'].lower())
+
+def getProjectName(project):
+    config = read_config()
+    return '{USERNAME}_{PROJECT}'.format(USERNAME=config['account']['username'], PROJECT=project['name'].lower())
+
+def getRepository(project):
+    config = read_config()
+    repository = '{REPO}/{OWNER}/{NAME}'.format(
+        REPO=config['docker']['registry'],
+        OWNER=config['account']['username'],
+        NAME=project['name'].lower(),
+    )
+    return repository
+
 def read_config():
     try:
         with open(CONFIG_FILE) as f:
@@ -43,7 +60,6 @@ def read_project():
 def convert_dockerfile(project, workspace):
     config = read_config()
     from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
-    project_name = project['name'].lower()
 
     envs = [
         DOCKERFILE_ENV.format(KEY='TF_CPP_MIN_LOG_LEVEL', VALUE=3),
@@ -68,7 +84,7 @@ def convert_dockerfile(project, workspace):
                 SRC=workspace['requires'][key]
             )) 
 
-    PROJECT_CONFIG_PATH = '%s/%s'%(CONFIG_PATH, project_name)
+    PROJECT_CONFIG_PATH = getProjectConfigPath(project)
     DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
 
     os.makedirs(PROJECT_CONFIG_PATH, exist_ok=True)

@@ -24,7 +24,7 @@ def init(name, version, author):
 def list():
     docker.running_projects()
 
-def status():
+def status(all):
     project = utils.read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)
@@ -33,7 +33,7 @@ def status():
 
     project = default.project(project)
     
-    docker.show_status(project['project'], project['services'])
+    docker.show_status(project['project'], project['services'], all)
 
 def build(tagging):
     project = utils.read_project()
@@ -115,7 +115,9 @@ def logs(tail, follow):
     
     docker.show_logs(project['project'], tail, follow, True)
 
-def scale(scale_spec):
+def scale(scales):
+    scale_spec = dict([ scale.split('=') for scale in scales ])
+
     project = utils.read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)

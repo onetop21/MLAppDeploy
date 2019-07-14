@@ -23,9 +23,10 @@ def ls():
     mlad.project.list()
 
 @click.command()
-def ps():
+@click.option('--all', '-a', is_flag=True, help='Show included shutdown service.')
+def ps(all):
     '''Show Project Status Deployed on Cluster.'''
-    mlad.project.status()
+    mlad.project.status(all)
 
 @click.command()
 @click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image')
@@ -61,8 +62,7 @@ def logs(tail, follow):
 @click.argument('scales', nargs=-1)
 def scale(scales):
     '''Change Replicas Count of Running Service in Deployed on Cluster.'''
-    scale_spec = dict([ scale.split('=') for scale in scales ])
-    mlad.project.scale(scale_spec)
+    mlad.project.scale(scales)
 
 @click.command()
 def update():
