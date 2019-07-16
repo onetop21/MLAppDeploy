@@ -261,14 +261,14 @@ def images_up(project, services, by_service=False):
 
             if not requeued:
                 # Define specs and resources
-                BUCKET_PATH = 's3://{}/{}/'.format(config['account']['username'], project['name'].lower())
+                BUCKET_PATH = '{}/{}/'.format(config['account']['username'], project['name'].lower())
                 service_name = service_key.lower()
                 image = service['image'] or image_name
                 env = [ '{KEY}={VALUE}'.format(KEY=key, VALUE=service['env'][key]) for key in service['env'].keys() ]
                 env += [ 'SERVICENAME={}'.format(service_name) ]
-                env += [ 'BUCKET={}'.format(BUCKET_PATH) ]
-                env += [ 'LOGDIR={}logs/'.format(BUCKET_PATH) ]
-                env += [ 'INPUTDIR={}'.format('') ]
+                env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
+                env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
+                env += [ 'DATADIR=s3://data/{}'.format('') ]
                 command = service['command'] + service['arguments']
                 labels = {
                     'MLAD.PROJECT': project_name, 
