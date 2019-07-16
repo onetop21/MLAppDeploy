@@ -55,7 +55,7 @@ def build(tagging):
 
     print('Done.')
 
-def test(build):
+def test(_build):
     project = utils.read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)
@@ -64,7 +64,7 @@ def test(build):
 
     project = default.project(project)
 
-    if build: build(False)
+    if _build: build(False)
 
     print('Deploying test container image to local...')
     project_name = docker.images_up(project['project'], project['services'], False)
