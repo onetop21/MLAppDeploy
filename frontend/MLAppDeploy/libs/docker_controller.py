@@ -397,6 +397,9 @@ def images_down(project, by_service=False):
                 for container in containers:
                     print('Stop %s...'%container.name)
                     container.stop()
+                for container in containers:
+                    container.wait()
+                    container.remove()
             else:
                 print('Cannot find running containers.', file=sys.stderr)
         networks = [ 
