@@ -66,7 +66,7 @@ def convert_dockerfile(project, workspace):
         DOCKERFILE_ENV.format(KEY='S3_ENDPOINT', VALUE=config['s3']['endpoint']),
         DOCKERFILE_ENV.format(KEY='S3_USE_HTTPS', VALUE=0),
         DOCKERFILE_ENV.format(KEY='AWS_ACCESS_KEY_ID', VALUE=config['s3']['accesskey']),
-        DOCKERFILE_ENV.format(KEY='AWS_SECRET_ACCESS_KEY_ID', VALUE=config['s3']['secretkey']),
+        DOCKERFILE_ENV.format(KEY='AWS_SECRET_ACCESS_KEY', VALUE=config['s3']['secretkey']),
     ]
     for key in workspace['env'].keys():
         envs.append(DOCKERFILE_ENV.format(
