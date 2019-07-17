@@ -237,7 +237,7 @@ def images_up(project, services, by_service=False):
                     pending_instance = None
                 elif expired < time.time():
                     print('[FAILED]', file=sys.stderr)
-                    show_logs(project, 'all', False, by_service)
+                    show_logs(project, 'all', False, [], by_service)
                     sys.exit(1)
                 else:
                     time.sleep(1)
@@ -346,7 +346,7 @@ def images_up(project, services, by_service=False):
             return None
     return project_name
             
-def show_logs(project, tail='all', follow=False, by_service=False):
+def show_logs(project, tail='all', follow=False, services=[], by_service=False):
     project_name = utils.getProjectName(project)
     project_version=project['version'].lower()
 
@@ -354,10 +354,10 @@ def show_logs(project, tail='all', follow=False, by_service=False):
     with InterruptHandler() as h:
         if by_service:
             instances = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            logs = [ (instance.name, instance.logs(details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for instance in instances ]
+            logs = [ (instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for instance in instances ]
         else:
             instances = cli.containers.list(all=True, filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            logs = [ (instance.name, instance.logs(follow=follow, tail=tail, stream=True)) for instance in instances ]
+            logs = [ (instance.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(follow=follow, tail=tail, stream=True)) for instance in instances ]
 
         if len(logs):
             name_width = min(32, max([len(inst[0]) for inst in logs]))

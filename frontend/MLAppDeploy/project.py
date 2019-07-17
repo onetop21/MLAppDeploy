@@ -69,7 +69,7 @@ def test(_build):
     print('Deploying test container image to local...')
     project_name = docker.images_up(project['project'], project['services'], False)
     if project_name:
-        docker.show_logs(project['project'], 'all', True, False)
+        docker.show_logs(project['project'], 'all', True, [], False)
     docker.images_down(project['project'], False)
 
     #utils.networks.prune()
@@ -113,7 +113,7 @@ def logs(tail, follow):
 
     project = default.project(project)
     
-    docker.show_logs(project['project'], tail, follow, True)
+    docker.show_logs(project['project'], tail, follow, [], True)
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
