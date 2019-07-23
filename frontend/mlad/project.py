@@ -54,9 +54,10 @@ def down():
 @click.command()
 @click.option('--tail', '-t', default='255', help='Number of lines to show from the end of logs (default "255")')
 @click.option('--follow', '-f', is_flag=True, help='Follow log output')
-def logs(tail, follow):
+@click.argument('SERVICES', nargs=-1)
+def logs(tail, follow, services):
     '''Show Current Project Logs Deployed on Cluster.'''
-    mlad.project.logs(tail, follow)
+    mlad.project.logs(tail, follow, services)
 
 @click.command()
 @click.argument('scales', nargs=-1)

@@ -361,7 +361,7 @@ def show_logs(project, tail='all', follow=False, services=[], by_service=False):
 
         if len(logs):
             name_width = min(32, max([len(inst[0]) for inst in logs]))
-            loggers = [ LoggerThread(name, name_width, log, by_service, SHORT_LEN) for name, log in logs ]
+            loggers = [ LoggerThread(name, name_width, log, services, by_service, SHORT_LEN) for name, log in logs ]
             for logger in loggers: logger.start()
             while not h.interrupted and max([ not logger.interrupted for logger in loggers ]):
                 time.sleep(0.01)

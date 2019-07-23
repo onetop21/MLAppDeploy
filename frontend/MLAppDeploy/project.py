@@ -104,7 +104,7 @@ def down():
 
     print('Done.')
 
-def logs(tail, follow):
+def logs(tail, follow, services):
     project = utils.read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)
@@ -113,7 +113,7 @@ def logs(tail, follow):
 
     project = default.project(project)
     
-    docker.show_logs(project['project'], tail, follow, [], True)
+    docker.show_logs(project['project'], tail, follow, services, True)
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
