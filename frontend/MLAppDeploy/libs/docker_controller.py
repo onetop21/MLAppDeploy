@@ -51,6 +51,12 @@ def image_build(project, workspace, tagging=False):
 
     cli = getDockerCLI()
 
+    # Block duplicated running.
+    filters = 'MLAD.PROJECT=%s' % project_name
+    if len(cli.services.list(filters={'label': filters})):
+        print('Need to down running project.', file=sys.stderr)
+        sys.exit(1)
+
     # Check latest image
     latest_image = None
     commit_number = 1
@@ -184,11 +190,10 @@ def images_up(project, services, by_service=False):
     cli = getDockerCLI()
  
     # Block duplicated running.
-    if by_service:
-        filters = 'MLAD.PROJECT=%s' % project_name
-        if len(cli.services.list(filters={'label': filters})):
-            print('Already running project.', file=sys.stderr)
-            sys.exit(1)
+    filters = 'MLAD.PROJECT=%s' % project_name
+    if len(cli.services.list(filters={'label': filters})):
+        print('Already running project by service.', file=sys.stderr)
+        sys.exit(1)
 
     with InterruptHandler(message='Wait.', blocked=True):
         # Create Docker Network
