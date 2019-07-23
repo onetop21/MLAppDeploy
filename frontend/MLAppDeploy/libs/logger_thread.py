@@ -33,7 +33,7 @@ class LoggerThread(threading.Thread):
             try:
                 name = self.name
                 msg = next(self.log).decode('utf8')[:-1] # Remove line feed
-                is msg.startswith('Error'):
+                if msg.startswith('Error'):
                     print(('%s{LOG}%s' % (ErrColor, NoColor)).format(LOG=msg))
                 else:
                     if self.detail: 
