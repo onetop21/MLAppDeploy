@@ -28,3 +28,6 @@ for ID in $GPU_IDS; do
     CONFIG=`echo $CONFIG | jq '."node-generic-resources"=["gpu='$ID'"]+."node-generic-resources"'`
 done
 echo $CONFIG | jq . | sudo tee $DAEMON_JSON
+
+# Advertise GPU device to swarm.
+sudo sed -i -e 's/#swarm-resource/swarm-resource/' /etc/nvidia-container-runtime/config.toml
