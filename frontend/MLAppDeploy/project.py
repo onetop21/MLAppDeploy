@@ -22,27 +22,24 @@ def init(name, version, author):
         ))
 
 def list():
-    docker.running_projects()
+    data = docker.running_projects()
+
+    columns = [('PROJECT', 'USERNAME', 'IMAGE', 'SERVICES')]
+    for project in data:
+        columns.append((project, data[project]['username'], data[project]['image'], data[project]['services']))
+    utils.print_table(columns, 'Cannot find running project.', 48)
 
 def status(all):
-    project = utils.read_project()
-    if not project:
-        print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-
-    project = default.project(project)
+    project = utils.get_project(default)
     
-    docker.show_status(project['project'], project['services'], all)
+    task_info = docker.show_status(project['project'], project['services'] or {}, all)
+    columns = [('ID', 'USERNAME', 'PROJECT', 'SERVICE', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'ERROR')]
+    for id, name, username, service, node, desired_state, current_state, error in task_info:
+        columns.append((id, username, name, service, node, desired_state, current_state, error))
+    utils.print_table(columns, 'Project is not running.')
 
 def build(tagging):
-    project = utils.read_project()
-    if not project:
-        print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-
-    project = default.project(project)
+    project = utils.get_project(default)
 
     print('Generating project image...')
     utils.convert_dockerfile(project['project'], project['workspace'])
@@ -56,18 +53,12 @@ def build(tagging):
     print('Done.')
 
 def test(_build):
-    project = utils.read_project()
-    if not project:
-        print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-
-    project = default.project(project)
+    project = utils.get_project(default)
 
     if _build: build(False)
 
     print('Deploying test container image to local...')
-    project_name = docker.images_up(project['project'], project['services'], False)
+    project_name = docker.images_up(project['project'], project['services'] or {}, False)
     if project_name:
         docker.show_logs(project['project'], 'all', True, [], False)
     docker.images_down(project['project'], False)
@@ -77,55 +68,26 @@ def test(_build):
     print('Done.')
 
 def up(image):
-    project = utils.read_project()
-    if not project:
-        print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-
-    project = default.project(project)
+    project = utils.get_project(default)
 
     print('Deploying services to cluster...')
-    project_name = docker.images_up(project['project'], project['services'], True)
+    project_name = docker.images_up(project['project'], project['services'] or {}, True)
     if not project_name: docker.images_down(project['project'], True)
-
     #utils.networks.prune()
-
     print('Done.')
 
 def down():
-    project = utils.read_project()
-    if not project:
-        print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-
+    project = utils.get_project(default)
     docker.images_down(project['project'], True)
-
     print('Done.')
 
 def logs(tail, follow, services):
-    project = utils.read_project()
-    if not project:
-        print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-
-    project = default.project(project)
-    
+    project = utils.get_project(default)
     docker.show_logs(project['project'], tail, follow, services, True)
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
-
-    project = utils.read_project()
-    if not project:
-        print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-
-    project = default.project(project)
-    
+    project = utils.get_project(idefault)
     docker.scale_service(project['project'], scale_spec)
 
 

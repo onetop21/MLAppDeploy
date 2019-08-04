@@ -23,20 +23,24 @@ def image_list(project=None):
     cli = getDockerCLI()
     images = cli.images.list(filters={ 'label': filters } )
 
+    dummies = 0
     data = []
     for image in images:
-        head = max([ tag.endswith('latest') for tag in image.tags ])
-        repository, tag = sorted(image.tags)[0].rsplit(':', 1)
-        data.append((
-            image.short_id[-SHORT_LEN:], 
-            repository,
-            tag,
-            head,
-            image.labels['MLAD.PROJECT.NAME'], 
-            image.attrs['Author'], 
-            image.attrs['Created'], 
-        ))
-    return data
+        if image.tags:
+            head = max([ tag.endswith('latest') for tag in image.tags ])
+            repository, tag = sorted(image.tags)[0].rsplit(':', 1)
+            data.append((
+                image.short_id[-SHORT_LEN:], 
+                repository,
+                tag,
+                head,
+                image.labels['MLAD.PROJECT.NAME'], 
+                image.attrs['Author'], 
+                image.attrs['Created'], 
+            ))
+        else:
+            dummies += 1
+    return data, dummies
 
 def image_build(project, workspace, tagging=False):
     config = utils.read_config()
@@ -124,14 +128,24 @@ def image_remove(ids, force):
     result = [ cli.images.remove(image=id, force=force) for id in ids ]
     return result
 
-def image_prune(project, strong):
+def image_prune(project):
     config = utils.read_config()
-    
-    filters = 'MLAD.PROJECT'
-    if project: filters+= '=%s' % project['name'].lower()
 
     cli = getDockerCLI()
-    return cli.images.prune(filters={ 'dangling': not strong, 'label': filters } )
+    if project:
+        filters = 'MLAD.PROJECT'
+        if project: filters+= '=%s' % utils.getProjectName(project)
+
+        images = cli.images.list(filters={ 'label': filters } )
+
+        count = 0
+        for image in images:
+            if not image.tags:
+                cli.images.remove(image=image.id, force=False)
+                count += 1
+        return count 
+    else:
+        return cli.images.prune(filters={ 'dangling': True })
 
 def image_push(project):
     config = utils.read_config()
@@ -148,7 +162,6 @@ def image_push(project):
         print('Please Check Registry Server.', file=sys.stderr)
         return False
     
-
 # Project
 def running_projects():
     config = utils.read_config()
@@ -167,12 +180,7 @@ def running_projects():
             data[project] = data[project] if project in data else { 'username': username,'image': image, 'services': 0 }
             data[project]['services'] += replicas
 
-        print('{:24} {:16} {:48} {:8}'.format('PROJECT', 'USERNAME', 'IMAGE', 'SERVICES'))
-        for project in data:
-            print('{:24} {:16} {:48} {:8}'.format(project, data[project]['username'], data[project]['image'], data[project]['services']))
-    else:
-        print('Cannot find running project.', file=sys.stderr)
-        sys.exit(1)
+    return data
 
 def images_up(project, services, by_service=False):
     import MLAppDeploy.default as default
@@ -420,6 +428,7 @@ def images_down(project, by_service=False):
 
 def show_status(project, services, all=False):
     project_name = utils.getProjectName(project)
+
     inst_names = []
     for key in services.keys():
         inst_names.append('%s_%s' % (project_name, key.lower()))
@@ -455,14 +464,8 @@ def show_status(project, services, all=False):
         except docker.errors.NotFound as e:
             pass
     
-    if len(task_info):
-        print('{:12} {:16} {:24} {:16} {:16} {:16} {:16} {:16}'.format('ID', 'USERNAME', 'PROJECT', 'SERVICE', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'ERROR'))
-        for id, name, username, service, node, desired_state, current_state, error in task_info:
-            print('{:12} {:16} {:24} {:16} {:16} {:16} {:16} {:16}'.format(id, username, name, service, node, desired_state, current_state, error))
-    else:
-        print('Project is not running.', file=sys.stderr)
-        sys.exit(1)
-
+    return task_info
+    
 def scale_service(project, scale_spec):
     project_name = utils.getProjectName(project)
     

@@ -57,6 +57,28 @@ def read_project():
     else:
         return None
 
+def get_project(default):
+    project = read_project()
+    if not project:
+        print('Need to generate project file before.', file=sys.stderr)
+        print('$ %s --help' % sys.argv[0], file=sys.stderr)
+        sys.exit(1)
+
+    return default.project(project)
+
+def print_table(data, no_data_msg=None, max_width=32):
+    widths = [max(_) for _ in zip(*[[min(len(str(value)), max_width) for value in datum] for datum in data])]
+    format = '  '.join([('{:%d}' % _) for _ in widths])
+    titled = False
+    for datum in data:
+        if not titled:
+            print(format.format(*datum).upper())
+            titled = True
+        else:
+            print(format.format(*datum))
+    if len(data) < 2:
+        print(no_data_msg, file=sys.stderr)
+
 def convert_dockerfile(project, workspace):
     config = read_config()
     from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT

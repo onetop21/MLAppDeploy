@@ -27,10 +27,10 @@ def rm(force, id):
     mlad.image.remove(id, force)
 
 @click.command()
-@click.option('--strong', '-s', is_flag=True, help='Remove unused all project images.')
-def prune(strong):
+@click.option('--all', '-a', is_flag=True, help='Remove unused all project images.')
+def prune(all):
     '''Remove unused and untagged project images.'''
-    mlad.image.prune(strong)
+    mlad.image.prune(all)
 
 @click.group()
 def cli():

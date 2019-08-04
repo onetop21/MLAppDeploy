@@ -6,7 +6,7 @@ import MLAppDeploy.default as default
 
 def list():
     nodes = docker.node_list()
-    print('{:12} {:20} {:16} {:9} {:8} {:12} {:10}'.format('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE'))
+    columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE')]
     for node in nodes:
         ID = node.attrs['ID'][:10]
         role = node.attrs['Spec']['Role']
@@ -15,7 +15,8 @@ def list():
         engine = node.attrs['Description']['Engine']['EngineVersion']
         state = node.attrs['Status']['State']
         address = node.attrs['Status']['Addr']
-        print('{:12} {:20} {:16} {:9} {:8} {:12} {:10}'.format(ID, hostname, address, role.title(), state.title(), 'Active' if activate else '-', engine))
+        columns.append((ID, hostname, address, role.title(), state.title(), 'Active' if activate else '-', engine))
+    utils.print_table(columns, 'No attached node.')
 
 def enable(ID):
     docker.node_enable(ID)
