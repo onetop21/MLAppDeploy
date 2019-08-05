@@ -39,7 +39,8 @@ class LoggerThread(threading.Thread):
                     if self.detail: 
                         _, msg = msg.split(' ', 1)
                         name += '.{}'.format(_[_.rfind('=')+1:][:self.short_len])
-                    if not len(self.filters) or sum([name.startswith(filter) for filter in self.filters]): # Need to check performance
+                    #if not len(self.filters) or sum([name.startswith(filter) for filter in self.filters]): # Need to check performance
+                    if not len(self.filters) or sum([filter in name for filter in self.filters]): # Need to check performance
                         self.colorkey[name] = self.colorkey[name] if name in self.colorkey else Colors[colorIndex()]
                         print(('%s{NAME:%d}%s {LOG}' % (self.colorkey[name], self.width, NoColor)).format(NAME=name, LOG=msg))
             except StopIteration as e:
