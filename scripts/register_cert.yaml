@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: register-cert
+  namespace: default
+  labels:
+    k8s-app: register-cert
+spec:
+  selector:
+    matchLabels:
+      name: register-cert
+  template:
+    metadata:
+      labels:
+        name: register-cert
+    spec:
+      containers:
+      - name: register-cert
+        image: python:latest
+        env:
+        - name: URL
+          value: "http://192.168.137.100:9000/docker-registry/certs/192.168.137.100-5000/domain.crt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=MLAPPDEPLOY%2F20190817%2F%2Fs3%2Faws4_request&X-Amz-Date=20190817T162503Z&X-Amz-Expires=432000&X-Amz-SignedHeaders=host&X-Amz-Signature=e2ae915316953365a6d31e6bc6547bece4bcc65509da9533054b7a3b795261c0"
+        - name: ADDR
+          value: "192.168.137.100:5000"
+        command: ["bash", "-c", "--"]
+        args:
+        - "mkdir -p /etc/docker/certs.d/$(ADDR) && curl -XGET \"$(URL)\" -o /etc/docker/certs.d/$(ADDR)/ca.crt"
+        volumeMounts:
+        - name: docker
+          mountPath: /etc/docker/certs.d
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      volumes:
+      - name: docker
+        hostPath:
+          path: /etc/docker/certs.d
