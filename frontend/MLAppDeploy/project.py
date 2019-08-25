@@ -87,7 +87,7 @@ def logs(tail, follow, services):
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
-    project = utils.get_project(idefault)
+    project = utils.get_project(default)
     docker.scale_service(project['project'], scale_spec)
 
 

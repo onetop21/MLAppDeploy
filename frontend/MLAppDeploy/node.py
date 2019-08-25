@@ -6,7 +6,7 @@ import MLAppDeploy.default as default
 
 def list():
     nodes = docker.node_list()
-    columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE')]
+    columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
         ID = node.attrs['ID'][:10]
         role = node.attrs['Spec']['Role']
@@ -15,7 +15,8 @@ def list():
         engine = node.attrs['Description']['Engine']['EngineVersion']
         state = node.attrs['Status']['State']
         address = node.attrs['Status']['Addr']
-        columns.append((ID, hostname, address, role.title(), state.title(), 'Active' if activate else '-', engine))
+        labels = ', '.join(['{}={}'.format(key, value) for key, value in node.attrs['Spec']['Labels'].items()])
+        columns.append((ID, hostname, address, role.title(), state.title(), 'Active' if activate else '-', engine, labels))
     utils.print_table(columns, 'No attached node.')
 
 def enable(ID):
@@ -26,3 +27,10 @@ def disable(ID):
     docker.node_disable(ID)
     print('Updated.')
 
+def label_add(node, **kvs):
+    docker.node_label_add(node, **kvs)
+    print('Added.')
+
+def label_rm(node, *keys):
+    docker.node_label_rm(node, *keys)
+    print('Removed.')

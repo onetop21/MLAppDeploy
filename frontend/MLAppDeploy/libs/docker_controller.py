@@ -1,6 +1,7 @@
 import sys, os, copy, time, datetime
 from pathlib import Path
-import docker
+import docker, requests
+from docker.types import LogConfig
 from MLAppDeploy.libs import utils, interrupt_handler as InterruptHandler, logger_thread as LoggerThread
 
 HOME = str(Path.home())
@@ -244,6 +245,7 @@ def images_up(project, services, by_service=False):
                 else:
                     instance = cli.containers.get(inst_name)
                     status = instance.status
+                #print(status)
                 if status == 'running':
                     print('[RUNNING]')
                     running_queue.append(service_name)
@@ -302,13 +304,33 @@ def images_up(project, services, by_service=False):
                 service_mode = docker.types.ServiceMode('replicated')
                 constraints = []
                 if by_service:
-                    resources = docker.types.Resources(
-                        cpu_limit=service['deploy']['quotes']['cpus'] * 1000000000,
-                        cpu_reservation=service['deploy']['quotes']['cpus'] * 1000000000
-                    )
-                    if service['deploy']['quotes']['gpus']: resources['generic-resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+                    res_spec = {}
+                    if 'cpus' in service['deploy']['quotes']: 
+                        res_spec['cpu_limit'] = service['deploy']['quotes']['cpus'] * 1000000000
+                        res_spec['cpu_reservation'] = service['deploy']['quotes']['cpus'] * 1000000000
+                    if 'mems' in service['deploy']['quotes']: 
+                        data = str(service['deploy']['quotes']['mems'])
+                        size = int(data[:-1])
+                        unit = data.lower()[-1:]
+                        if unit == 'g':
+                            size *= (2**30)
+                        elif unit == 'm':
+                            size *= (2**20)
+                        elif unit == 'k':
+                            size *= (2**10)
+                        res_spec['mem_limit'] = size
+                        res_spec['mem_reservation'] = size
+                    if 'gpus' in service['deploy']['quotes']:
+                        if service['deploy']['quotes']['gpus'] > 0:
+                            res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+                        else: 
+                            #res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+                            env += [ 'NVIDIA_VISIBLE_DEVICES=void' ]
+                    resources = docker.types.Resources(**res_spec)
                     service_mode = docker.types.ServiceMode('replicated', replicas=service['deploy']['replicas'])
-                    constraints = [ '{KEY}={VALUE}'.format(KEY=key, VALUE=service['deploy']['constraints'][key]) for key in service['deploy']['constraints'] ]
+                    constraints = [
+                        'node.{KEY}=={VALUE}'.format(KEY=key, VALUE=str(service['deploy']['constraints'][key])) for key in service['deploy']['constraints']
+                    ]
 
                 # Try to run
                 inst_name = '%s_%s' % (project_name, service_name)
@@ -363,11 +385,19 @@ def show_logs(project, tail='all', follow=False, services=[], by_service=False):
     project_name = utils.getProjectName(project)
     project_version=project['version'].lower()
 
+    def task_logger(id, **params):
+        config = utils.read_config()
+        with requests.get('http://{}/v1.24/tasks/{}/logs'.format(config['docker']['host'], id), params=params, stream=True) as resp:
+            for iter in resp.iter_content(0x7FFFFFFF):
+                yield iter[docker.constants.STREAM_HEADER_SIZE_BYTES:] 
+        return ''
+
     cli = getDockerCLI()
     with InterruptHandler() as h:
         if by_service:
             instances = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            logs = [ (instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for instance in instances ]
+            #logs = [ (instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for instance in instances ]
+            logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
         else:
             instances = cli.containers.list(all=True, filters={'label': 'MLAD.PROJECT=%s'%project_name})
             logs = [ (instance.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(follow=follow, tail=tail, stream=True)) for instance in instances ]
@@ -515,3 +545,27 @@ def node_disable(id):
     spec['Availability'] = 'drain'
     node.update(spec)
     
+def node_label_add(node, **kv):
+    cli = getDockerCLI()
+    try:
+        node = cli.nodes.get(node)
+    except docker.errors.APIError as e:
+        print('Cannot find node "%s"' % name, file=sys.stderr)
+        sys.exit(1)
+    spec = node.attrs['Spec']
+    for key in kv:
+        spec['Labels'][key] = kv[key]
+    node.update(spec)
+
+def node_label_rm(node, *keys):
+    cli = getDockerCLI()
+    try:
+        node = cli.nodes.get(node)
+    except docker.errors.APIError as e:
+        print('Cannot find node "%s"' % name, file=sys.stderr)
+        sys.exit(1)
+    spec = node.attrs['Spec']
+    for key in keys:
+        del spec['Labels'][key]
+    node.update(spec)
+

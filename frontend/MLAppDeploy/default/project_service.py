@@ -8,12 +8,8 @@ obj = {
     'command': '',
     'arguments': '',
     'deploy': {
-        'quotes': {
-            'cpus': 1,
-            'mems': '8G',
-            'gpus': 0,
-        },
-        'constraints': [],
+        'quotes': {},
+        'constraints': {},
         'replicas': 1,
     }
 }

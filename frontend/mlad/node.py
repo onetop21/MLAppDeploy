@@ -23,9 +23,30 @@ def disable(id):
     '''Disable to Use Node.'''
     mlad.node.disable(id)
 
-#@click.group()
-#def label():
-#    '''Manage Docker Image.'''
+@click.command()
+@click.argument('KV', nargs=-1)
+@click.pass_obj
+def add(node, kv):
+    '''Add label to node.'''
+    kvdict = dict([ _.split('=') for _ in kv ])
+    mlad.node.label_add(node, **kvdict)
+
+@click.command()
+@click.argument('KEY', nargs=-1)
+@click.pass_obj
+def rm(node, key):
+    '''Remove label from node.'''
+    mlad.node.label_rm(node, *key)
+
+@click.group()
+@click.argument('NODE')
+@click.pass_context
+def label(context, node):
+    '''Manage Docker Image.'''
+    context.obj = node
+
+label.add_command(add)
+label.add_command(rm)
 
 @click.group()
 def cli():
@@ -34,6 +55,6 @@ def cli():
 cli.add_command(ls)
 cli.add_command(enable)
 cli.add_command(disable)
-#node.add_command(label)
+cli.add_command(label)
 
 #sys.modules[__name__] = node
