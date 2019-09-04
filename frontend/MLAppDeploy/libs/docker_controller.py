@@ -485,7 +485,7 @@ def show_status(project, services, all=False):
             service = instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE']
             tasks = instance.tasks()
             for task in tasks:
-                if all or task['Status']['State'] != 'shutdown':
+                if all or task['Status']['State'] not in ['shutdown', 'failed']:
                     task_info.append((
                         task['ID'][:SHORT_LEN],
                         name, 
