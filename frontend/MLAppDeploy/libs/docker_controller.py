@@ -252,7 +252,7 @@ def images_up(project, services, by_service=False):
                     pending_instance = None
                 elif expired < time.time():
                     print('[FAILED]', file=sys.stderr)
-                    show_logs(project, 'all', False, [], by_service)
+                    show_logs(project, 'all', False, False, [], by_service)
                     sys.exit(1)
                 else:
                     time.sleep(1)
@@ -381,7 +381,7 @@ def images_up(project, services, by_service=False):
             return None
     return project_name
             
-def show_logs(project, tail='all', follow=False, services=[], by_service=False):
+def show_logs(project, tail='all', follow=False, timestamps=False, services=[], by_service=False):
     project_name = utils.getProjectName(project)
     project_version=project['version'].lower()
 
@@ -389,7 +389,12 @@ def show_logs(project, tail='all', follow=False, services=[], by_service=False):
         config = utils.read_config()
         with requests.get('http://{}/v1.24/tasks/{}/logs'.format(config['docker']['host'], id), params=params, stream=True) as resp:
             for iter in resp.iter_content(0x7FFFFFFF):
-                yield iter[docker.constants.STREAM_HEADER_SIZE_BYTES:] 
+                out = iter[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
+                if timestamps:
+                    temp = out.split(' ')
+                    out = ' '.join([temp[1], temp[0]] + temp[2:])
+                yield out.encode('utf8')
+                #yield iter[docker.constants.STREAM_HEADER_SIZE_BYTES:] 
         return ''
 
     cli = getDockerCLI()
@@ -397,10 +402,10 @@ def show_logs(project, tail='all', follow=False, services=[], by_service=False):
         if by_service:
             instances = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
             #logs = [ (instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for instance in instances ]
-            logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
+            logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
         else:
             instances = cli.containers.list(all=True, filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            logs = [ (instance.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(follow=follow, tail=tail, stream=True)) for instance in instances ]
+            logs = [ (instance.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for instance in instances ]
 
         if len(logs):
             name_width = min(32, max([len(inst[0]) for inst in logs]))

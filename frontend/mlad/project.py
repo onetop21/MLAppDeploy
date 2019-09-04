@@ -52,12 +52,13 @@ def down():
     mlad.project.down()
 
 @click.command()
-@click.option('--tail', '-t', default='255', help='Number of lines to show from the end of logs (default "255")')
+@click.option('--tail', default='255', help='Number of lines to show from the end of logs (default "255")')
+@click.option('--timestamps', '-t', is_flags=True, help='Show timestamp with logs.')
 @click.option('--follow', '-f', is_flag=True, help='Follow log output')
 @click.argument('SERVICES', nargs=-1)
-def logs(tail, follow, services):
+def logs(tail, follow, timestamps, services):
     '''Show Current Project Logs Deployed on Cluster.'''
-    mlad.project.logs(tail, follow, services)
+    mlad.project.logs(tail, follow, timestamps, services)
 
 @click.command()
 @click.argument('scales', nargs=-1)
