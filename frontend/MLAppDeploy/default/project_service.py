@@ -10,6 +10,12 @@ obj = {
     'deploy': {
         'quotes': {},
         'constraints': {},
+        'restart_policy': {
+            'condition': 'none',
+            'delay': 0,
+            'max_attempts': 0,
+            'window': 0 
+        },
         'replicas': 1,
     }
 }

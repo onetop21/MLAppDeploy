@@ -299,7 +299,13 @@ def images_up(project, services, by_service=False):
                     'MLAD.PROJECT.USERNAME': config['account']['username']
                 }
                 
-                restart_policy = docker.types.RestartPolicy()
+                policy = service['deploy']['restart_policy']
+                restart_policy = docker.types.RestartPolicy(
+                    condition=policy['condition'], 
+                    delay=policy['delay'], 
+                    max_attempts=policy['max_attempts'], 
+                    window=policy['window']
+                )
                 resources = docker.types.Resources()
                 service_mode = docker.types.ServiceMode('replicated')
                 constraints = []
