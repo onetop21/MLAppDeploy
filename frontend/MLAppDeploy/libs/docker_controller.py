@@ -355,6 +355,7 @@ def images_up(project, services, by_service=False):
                         name=inst_name,
                         environment=env,
                         labels=labels,
+                        runtime='runc',
                         restart_policy={'Name': 'on-failure', 'MaximumRetryCount': 1},
                         detach=True,
                     )
