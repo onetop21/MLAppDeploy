@@ -1,2 +1,3 @@
 import sys
-sys.modules[__name__] = '0.0.2'
+version = '0.0.3'
+sys.modules[__name__] = version

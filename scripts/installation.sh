@@ -6,10 +6,15 @@ DAEMON_JSON="/etc/docker/daemon.json"
 echo "Install Prerequires."
 
 # Check Docker status
+IS_WSL2=`uname -r | grep microsoft-standard | wc -l`
 DOCKER_INSTALLED=`which docker | wc -l`
 if [ "$DOCKER_INSTALLED" != "0" ];
 then
     echo "Installed Docker. (1/3)"
+elif [ "$IS_WSL2" != "0" ];
+then
+    echo "Need to install Docker Desktop yourself on WSL2."
+    exit
 else
     echo "Install Docker. (1/3)"
     # Uninstall old version
@@ -114,55 +119,96 @@ else
 fi
 
 # Intro
-echo "============================="
-echo " Installation of MLAppDeploy"
-echo " "
-echo " 1. MASTER NODE"
-echo " 2. WORKER NODE (Default)"
-echo "============================="
-SHOULD_RUN=1
-while [ "$SHOULD_RUN" == "1" ];
-do
-    read -p "What is node this machine? " NODE_TYPE
-    if [ -z $NODE_TYPE ];
-    then
-        NODE_TYPE=2
-    fi
-
-    if [ "$NODE_TYPE" -lt "1" ] || [ "$NODE_TYPE" -gt "2" ];
-    then
-        echo "Invalid node type."
-        continue
-    fi
-    SHOULD_RUN=0
-done
-
-if [ "$NODE_TYPE" == "1" ];
+if [[ "$IS_WSL2" == "0" ]];
 then
-    # Enable Remote on Master Node
-    if [[ -z `sudo cat $DAEMON_JSON` ]]; then
-        echo '{}' | sudo dd status=none of=$DAEMON_JSON
-    fi
-    
-    CONFIG=`sudo cat $DAEMON_JSON`
-    IS_EXIST_SOCK=`echo $CONFIG | jq '.hosts' | grep "unix:///var/run/docker.sock" | wc -l`
-    IS_EXIST_TCP=`echo $CONFIG | jq '.hosts' | grep "tcp://0.0.0.0" | wc -l`
-    if [ "$IS_EXIST_SOCK" == "0" ];
+    echo "============================="
+    echo " Installation of MLAppDeploy"
+    echo " "
+    echo " 1. MASTER NODE"
+    echo " 2. WORKER NODE (Default)"
+    echo "============================="
+    SHOULD_RUN=1
+    while [ "$SHOULD_RUN" == "1" ];
+    do
+        read -p "What is node this machine? " NODE_TYPE
+        if [ -z $NODE_TYPE ];
+        then
+            NODE_TYPE=2
+        fi
+
+        if [ "$NODE_TYPE" -lt "1" ] || [ "$NODE_TYPE" -gt "2" ];
+        then
+            echo "Invalid node type."
+            continue
+        fi
+        SHOULD_RUN=0
+    done
+
+    if [ "$NODE_TYPE" == "1" ];
     then
-        #CONFIG=`sudo cat $DAEMON_JSON | jq '."hosts"=["unix:///var/run/docker.sock"]+."hosts"'`
-        CONFIG=`echo $CONFIG | jq '."hosts"=["unix:///var/run/docker.sock"]+."hosts"'`
-    fi
-    if [ "$IS_EXIST_TCP" == "0" ];
+        # Enable Remote on Master Node
+        if [[ -z `sudo cat $DAEMON_JSON` ]]; then
+            echo '{}' | sudo dd status=none of=$DAEMON_JSON
+        fi
+        
+        CONFIG=`sudo cat $DAEMON_JSON`
+        IS_EXIST_SOCK=`echo $CONFIG | jq '.hosts' | grep "unix:///var/run/docker.sock" | wc -l`
+        IS_EXIST_TCP=`echo $CONFIG | jq '.hosts' | grep "tcp://0.0.0.0" | wc -l`
+        if [ "$IS_EXIST_SOCK" == "0" ];
+        then
+            CONFIG=`echo $CONFIG | jq '."hosts"=["unix:///var/run/docker.sock"]+."hosts"'`
+        fi
+        if [ "$IS_EXIST_TCP" == "0" ];
+        then
+            CONFIG=`echo $CONFIG | jq '."hosts"=["tcp://0.0.0.0"]+."hosts"'`
+        fi
+        echo $CONFIG | jq . | sudo dd status=none of=$DAEMON_JSON
+
+        sudo sed -i 's/dockerd\ \-H\ fd\:\/\//dockerd/g' /lib/systemd/system/docker.service
+
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker.service
+
+        echo Clear Swarm Setting...
+        docker swarm leave --force >> /dev/null 2>&1
+        docker container prune -f >> /dev/null 2>&1
+        docker network prune -f >> /dev/null 2>&1
+        docker network create --subnet 10.10.0.0/24 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
+        JOIN_RESULT=`docker swarm init $@ 1>/dev/null`
+        if [ "$?" != "0" ];
+        then
+            echo $JOIN_RESULT
+        else
+            echo "Docker Swarm Initialized. (3/3)"
+        fi
+    elif [ "$NODE_TYPE" == "2" ];
     then
-        CONFIG=`echo $CONFIG | jq '."hosts"=["tcp://0.0.0.0"]+."hosts"'`
+        echo Clear Swarm Setting...
+        docker swarm leave --force >> /dev/null 2>&1
+        docker container prune -f >> /dev/null 2>&1
+        docker network prune -f >> /dev/null 2>&1
+
+        # Connect and Join
+        read -p "Master Node Address : " MASTER_ADDR
+        read -p "Account Name : " ACCOUNT
+        JOIN_COMMAND=`ssh $ACCOUNT@$MASTER_ADDR docker swarm join-token worker | grep join`
+        JOIN_RESULT=`$JOIN_COMMAND`
+        if [ "$?" != "0" ];
+        then
+            echo $JOIN_RESULT
+        else
+            echo $JOIN_RESULT
+            echo "Docker Swarm Joined. (3/3)"
+        fi 
     fi
-    echo $CONFIG | jq . | sudo dd status=none of=$DAEMON_JSON
-
-    sudo sed -i 's/dockerd\ \-H\ fd\:\/\//dockerd/g' /lib/systemd/system/docker.service
-
-    sudo systemctl daemon-reload
-    sudo systemctl restart docker.service
-
+else
+    echo "================================="
+    echo " Installation of MLAppDeploy"
+    echo ""
+    echo " Only support master node on WSL2"
+    echo " And not support cluster set"
+    echo " (Cannot join worker node)"
+    echo "================================="
     echo Clear Swarm Setting...
     docker swarm leave --force >> /dev/null 2>&1
     docker container prune -f >> /dev/null 2>&1
@@ -175,23 +221,5 @@ then
     else
         echo "Docker Swarm Initialized. (3/3)"
     fi
-elif [ "$NODE_TYPE" == "2" ];
-then
-    echo Clear Swarm Setting...
-    docker swarm leave --force >> /dev/null 2>&1
-    docker container prune -f >> /dev/null 2>&1
-    docker network prune -f >> /dev/null 2>&1
-
-    # Connect and Join
-    read -p "Master Node Address : " MASTER_ADDR
-    read -p "Account Name : " ACCOUNT
-    JOIN_COMMAND=`ssh $ACCOUNT@$MASTER_ADDR docker swarm join-token worker | grep join`
-    JOIN_RESULT=`$JOIN_COMMAND`
-    if [ "$?" != "0" ];
-    then
-        echo $JOIN_RESULT
-    else
-        echo $JOIN_RESULT
-        echo "Docker Swarm Joined. (3/3)"
-    fi 
 fi
+   

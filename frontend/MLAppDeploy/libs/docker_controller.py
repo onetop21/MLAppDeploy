@@ -12,7 +12,10 @@ SHORT_LEN = 10
 # Docker CLI from HOST
 def getDockerCLI():
     config = utils.read_config()
-    return docker.from_env(environment={'DOCKER_HOST':'%s'%config['docker']['host']})
+    if config['docker']['wsl2']:
+        return docker.from_env(environment={})
+    else:
+        return docker.from_env(environment={'DOCKER_HOST':'%s'%config['docker']['host']})
 
 # Image
 def image_list(project=None):
@@ -408,15 +411,18 @@ def show_logs(project, tail='all', follow=False, timestamps=False, services=[], 
     with InterruptHandler() as h:
         if by_service:
             instances = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            #logs = [ (instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(details=True, follow=follow, tail=tail, stdout=True, stderr=True)) for instance in instances ]
-            logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
+            if not utils.is_wsl2():
+                logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
+            else:
+                logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances ]
         else:
             instances = cli.containers.list(all=True, filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            logs = [ (instance.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], instance.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for instance in instances ]
+            timestamps = True
+            logs = [ (inst.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for inst in instances ]
 
         if len(logs):
-            name_width = min(32, max([len(inst[0]) for inst in logs]))
-            loggers = [ LoggerThread(name, name_width, log, services, by_service, SHORT_LEN) for name, log in logs ]
+            name_width = min(32, max([len(name) for name, _ in logs]))
+            loggers = [ LoggerThread(name, name_width, log, services, by_service, timestamps, SHORT_LEN) for name, log in logs ]
             for logger in loggers: logger.start()
             while not h.interrupted and max([ not logger.interrupted for logger in loggers ]):
                 time.sleep(0.01)

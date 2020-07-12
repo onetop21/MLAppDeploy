@@ -152,3 +152,5 @@ def update_obj(base, obj):
                 del item[key]
     return merge(obj, copy.deepcopy(base))
 
+def is_wsl2():
+   return 'microsoft-standard' in os.uname()[2]

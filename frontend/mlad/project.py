@@ -1,4 +1,4 @@
-import sys, os, click
+import sys, os, getpass, click
 import MLAppDeploy as mlad
 
 # mlad project init
@@ -11,8 +11,8 @@ import MLAppDeploy as mlad
 # mlad prjoect scale [service=num]
 @click.command()
 @click.option('--name', '-n', help='Project Name')
-@click.option('--version', '-v', help='Project Version')
-@click.option('--author', '-a', help='Project Author')
+@click.option('--version', '-v', default='0.0.1', help='Project Version')
+@click.option('--author', '-a', default=getpass.getuser(), help='Project Author')
 def init(name, version, author):
     '''Initialize MLAppDeploy Project.'''
     mlad.project.init(name, version, author)

@@ -1,4 +1,4 @@
-import sys, os, click
+import sys, os, getpass, click
 import MLAppDeploy as mlad
 
 # mlad config init
@@ -6,8 +6,8 @@ import MLAppDeploy as mlad
 # mlad config get [key]
 
 @click.command()
-@click.option('--username', '-u', prompt='Username', help='Set Username.')
-@click.option('--address', '-a', prompt='Master IP Address', help='Set Master IP Address.')
+@click.option('--username', '-u', default=getpass.getuser(), prompt='Username', help='Set Username.')
+@click.option('--address', '-a', default='localhost', prompt='Master IP Address', help='Set Master IP Address.')
 def init(username, address):
     '''Initialize Configurations.'''
     mlad.config.init(username, address)

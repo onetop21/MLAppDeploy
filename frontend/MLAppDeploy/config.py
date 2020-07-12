@@ -47,6 +47,7 @@ def init(username, address):
         'account.username=%s'%username, 
         'docker.host=%s:2375'%address,
         'docker.registry=%s:5000'%address,
+        f'docker.wsl2={("localhost" == address or "127.0.0.1" == address) and utils.is_wsl2()}',
         's3.endpoint=%s:9000'%address
     ))
     get(None)

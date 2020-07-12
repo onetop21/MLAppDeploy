@@ -149,6 +149,6 @@ docker run -d -p 5000:5000 --restart=always -v "$REGISTRY_CERT":/certs -v $REGIS
 # docker service create --name registry --secret domain.crt --secret domain.key --constraint 'node.labels.registry==true' -p 5000:5000 -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/docker/registry/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/etc/docker/registry/certs/domain.key -v $REGISTRY_CONFIG:/etc/docker/registry registry:2
 
 # Run Tensorboard
-docker stop tensorboard > /dev/null 2>&1
-docker rm tensorboard > /dev/null 2>&1
-docker run -d -p 6006:6006 --restart=always -v "$MINIO_DATA/logs":/logs --name tensorboard tensorflow/tensorflow tensorboard --logdir /logs
+#docker stop tensorboard > /dev/null 2>&1
+#docker rm tensorboard > /dev/null 2>&1
+#docker run -d -p 6006:6006 --restart=always -v "$MINIO_DATA/logs":/logs --name tensorboard tensorflow/tensorflow tensorboard --logdir /logs
