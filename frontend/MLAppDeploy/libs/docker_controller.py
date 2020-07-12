@@ -546,7 +546,7 @@ def node_enable(id):
     try:
         node = cli.nodes.get(id)
     except docker.errors.APIError as e:
-        print('Cannot find node "%s"' % name, file=sys.stderr)
+        print('Cannot find node "%s"' % id, file=sys.stderr)
         sys.exit(1)
     spec = node.attrs['Spec']
     spec['Availability'] = 'active'
@@ -557,30 +557,30 @@ def node_disable(id):
     try:
         node = cli.nodes.get(id)
     except docker.errors.APIError as e:
-        print('Cannot find node "%s"' % name, file=sys.stderr)
+        print('Cannot find node "%s"' % id, file=sys.stderr)
         sys.exit(1)
     spec = node.attrs['Spec']
     spec['Availability'] = 'drain'
     node.update(spec)
     
-def node_label_add(node, **kv):
+def node_label_add(id, **kv):
     cli = getDockerCLI()
     try:
-        node = cli.nodes.get(node)
+        node = cli.nodes.get(id)
     except docker.errors.APIError as e:
-        print('Cannot find node "%s"' % name, file=sys.stderr)
+        print('Cannot find node "%s"' % id, file=sys.stderr)
         sys.exit(1)
     spec = node.attrs['Spec']
     for key in kv:
         spec['Labels'][key] = kv[key]
     node.update(spec)
 
-def node_label_rm(node, *keys):
+def node_label_rm(id, *keys):
     cli = getDockerCLI()
     try:
-        node = cli.nodes.get(node)
+        node = cli.nodes.get(id)
     except docker.errors.APIError as e:
-        print('Cannot find node "%s"' % name, file=sys.stderr)
+        print('Cannot find node "%s"' % id, file=sys.stderr)
         sys.exit(1)
     spec = node.attrs['Spec']
     for key in keys:
