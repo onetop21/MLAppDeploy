@@ -5,11 +5,12 @@ MAX_STEP=4
 STEP=0
 
 function Usage {
-    echo "Incorrect option privided."
+    echo "MLAppDeploy Environment Install Script"
     echo "$ $0 [-b,--bind master-address] [-r,--remote ssh-address]"
     echo "    -b, --bind   : Bind to master after install MLAppDeploy node. (Only node mode.)"
     echo "                   If not define *bind* option to install master mode."
     echo "    -r, --remote : Install MLAppDeploy Environment to Remote machine."
+    echo "    -h, --help   : This page"
     exit 1
 }
 
@@ -35,8 +36,19 @@ while true; do
     shift
 done
 
+function RemoteRun {
+    FILENAME=`basename $0`
+    HOST=$1; shift
+    OPEN=`nc -v -z $HOST 22 -w 3 >> /dev/null 2>&1; echo $?`
+    if [[ "$OPEN" == "0" ]]; then
+        SCRIPT="echo '$(base64 -w0 $0)' > /tmp/$FILENAME.b64; base64 -d /tmp/$FILENAME.b64 > /tmp/$FILENAME; bash /tmp/$FILENAME"
+        ssh -t $HOST $SCRIPT $@
+    else
+        echo "Timeout to Connect [$HOST]"
+    fi
+}
+
 if [[ ! -z "$REMOTE" ]]; then
-    SCRIPT="echo '$(base64 -w0 $0)' > /tmp/install-mlad.base64; base64 -d /tmp/install-mlad.base64 > /tmp/install-mlad.sh; bash /tmp/install-mlad.sh"
     ARGS=
     if [[ ! -z "$BIND" ]]; then
         ARGS="-b $BIND"
@@ -44,7 +56,7 @@ if [[ ! -z "$REMOTE" ]]; then
     if [[ ! -z "$@" ]]; then
         ARGS="$ARGS -- $@"
     fi
-    ssh -t $REMOTE $SCRIPT $ARGS
+    RemoteRun $REMOTE $ARGS
     exit 0
 fi
 
