@@ -1,5 +1,46 @@
 #!/bin/bash
 
+options=$(getopt -o r:b: --long remote: --long bind: -- "$@")
+[ $? -eq 0 ] || {
+    echo "Incorrect option privided."
+    echo "$ $0 [-b,--bind master-address] [-r,--remote ssh-address]"
+    echo "    -b, --bind   : Bind to master after install MLAppDeploy node. (Only node mode.)"
+    echo "                   If not define *bind* option to install master mode."
+    echo "    -r, --remote : Install MLAppDeploy Environment to Remote machine."
+    exit 1
+}
+eval set -- "$OPTIONS"
+while true; do
+    echo $1
+    case "$1" in
+    -r) shift
+        REMOTE=$1
+        echo Remote: $REMOTE
+        ;;
+    --remote)
+        shift
+        REMOTE=$1
+        echo Remote: $REMOTE
+        ;;
+    -b) shift
+        BIND=$1
+        echo Bind: $BIND
+        ;;
+    --bind)
+        shift
+        BIND=$1
+        echo Bind: $BIND
+        ;;
+    --)
+        shift
+        break
+        ;;
+    esac
+    shift
+done
+
+exit 1
+
 DAEMON_JSON="/etc/docker/daemon.json"
 MAX_STEP=7
 STEP=0
@@ -7,6 +48,14 @@ STEP=0
 function PrintStep {
     STEP=$((STEP+1))
     echo "[$STEP/$MAX_STEP] $@"
+}
+
+function GetPriveleged {
+    echo "Request sudo privileged."
+    sudo ls >> /dev/null 2>&1
+    if [[ ! "$?" == "0" ]]; then
+        exit 1
+    fi
 }
 
 function IsInstalled {
@@ -148,6 +197,8 @@ function AdvertiseGPUonSwarm {
     sudo sed -i -e 's/#swarm-resource/swarm-resource/' /etc/nvidia-container-runtime/config.toml
 }  
 
+# Start Script
+GetPriveleged
 
 # Step 1: Install Requires
 PrintStep Install Requires Utilities.
