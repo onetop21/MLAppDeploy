@@ -1,7 +1,10 @@
 #!/bin/bash
 
-options=$(getopt -o r:b: --long remote: --long bind: -- "$@")
-[ $? -eq 0 ] || {
+DAEMON_JSON="/etc/docker/daemon.json"
+MAX_STEP=4
+STEP=0
+
+function Usage {
     echo "Incorrect option privided."
     echo "$ $0 [-b,--bind master-address] [-r,--remote ssh-address]"
     echo "    -b, --bind   : Bind to master after install MLAppDeploy node. (Only node mode.)"
@@ -9,27 +12,20 @@ options=$(getopt -o r:b: --long remote: --long bind: -- "$@")
     echo "    -r, --remote : Install MLAppDeploy Environment to Remote machine."
     exit 1
 }
+
+OPTIONS=$(getopt -o hr:b: --long help,remote:,bind: -- "$@")
+[ $? -eq 0 ] || Usage
 eval set -- "$OPTIONS"
 while true; do
-    echo $1
     case "$1" in
-    -r) shift
+    -r|--remote) shift
         REMOTE=$1
-        echo Remote: $REMOTE
         ;;
-    --remote)
-        shift
-        REMOTE=$1
-        echo Remote: $REMOTE
-        ;;
-    -b) shift
+    -b|--bind) shift
         BIND=$1
-        echo Bind: $BIND
         ;;
-    --bind)
-        shift
-        BIND=$1
-        echo Bind: $BIND
+    -h|--help)
+        Usage
         ;;
     --)
         shift
@@ -39,18 +35,28 @@ while true; do
     shift
 done
 
-exit 1
+if [[ ! -z "$REMOTE" ]]; then
+    SCRIPT="echo '$(base64 -w0 $0)' > /tmp/install-mlad.base64; base64 -d /tmp/install-mlad.base64 > /tmp/install-mlad.sh; bash /tmp/install-mlad.sh"
+    ARGS=
+    if [[ ! -z "$BIND" ]]; then
+        ARGS="-b $BIND"
+    fi
+    if [[ ! -z "$@" ]]; then
+        ARGS="$ARGS -- $@"
+    fi
+    ssh -t $REMOTE $SCRIPT $ARGS
+    exit 0
+fi
 
-DAEMON_JSON="/etc/docker/daemon.json"
-MAX_STEP=7
-STEP=0
-
+#################################################################
+# Main Code
+#################################################################
 function PrintStep {
     STEP=$((STEP+1))
     echo "[$STEP/$MAX_STEP] $@"
 }
 
-function GetPriveleged {
+function GetPrivileged {
     echo "Request sudo privileged."
     sudo ls >> /dev/null 2>&1
     if [[ ! "$?" == "0" ]]; then
@@ -163,11 +169,17 @@ function VerifyNVIDIAContainerRuntime {
     echo `sudo docker run -it --rm --gpus hello-world > /dev/null 2>&1; echo $?`
 }
 
-function NVIDIAContainerRuntimeConfiguration {
+function TouchDaemonJSON {
+    # If no file
     if [[ ! -f "$DAEMON_JSON" ]]; then
         echo '{}' | sudo dd status=none of=$DAEMON_JSON
+    elif [[ -z `sudo cat $DAEMON_JSON` ]]; then
+        # If empty file
+        echo '{}' | sudo dd status=none of=$DAEMON_JSON
     fi
+}
 
+function NVIDIAContainerRuntimeConfiguration {
     # Read Daemon.json
     CONFIG=`sudo cat $DAEMON_JSON`
     # Check nvidia runtime in daemon.json
@@ -198,7 +210,7 @@ function AdvertiseGPUonSwarm {
 }  
 
 # Start Script
-GetPriveleged
+GetPrivileged
 
 # Step 1: Install Requires
 PrintStep Install Requires Utilities.
@@ -206,10 +218,12 @@ RequiresFromApt jq
 
 # Step 2: Install Docker
 PrintStep Install Docker.
-if [[ `IsWSL2` == '1' && `IsINstalled docker` == '1' ]]; then
-    echo "Need to install Docker Desktop yourself on WSL2."
-    echo "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
-    exit
+if [[ `IsWSL2` == '1' ]]; then
+    if [[ `IsInstalled docker` == '0' ]]; then
+        echo "Need to install Docker Desktop yourself on WSL2."
+        echo "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
+        exit
+    fi
 else
     UninstallOnSnapWithWarning docker
     if [[ `IsInstalled docker` == '0' ]]; then
@@ -225,6 +239,7 @@ else
         exit 0
     fi
 fi
+TouchDaemonJSON
 
 PrintStep Install NVIDIA Container Runtime.
 # Check Nvidia Driver status
@@ -245,70 +260,9 @@ else
     fi
 fi
 
-# --remote 192.168.0.102
-# --node=master 
-# --node=worker --master=172.20.41.139
-# A POSIX variable
-OPTIND=1         # Reset in case getopts has been used previously in the shell.
-
-# Initialize our own variables:
-output_file=""
-verbose=0
-
-while getopts "h?vf:" opt; do
-    case "$opt" in
-    h|\?)
-        show_help
-        exit 0
-        ;;
-    v)  verbose=1
-        ;;
-    f)  output_file=$OPTARG
-        ;;
-    esac
-done
-
-shift $((OPTIND-1))
-
-[ "${1:-}" = "--" ] && shift
-
-echo "verbose=$verbose, output_file='$output_file', Leftovers: $@"
-
-exit
-
-# Intro
-if [[ "$IS_WSL2" == "0" ]];
-then
-    echo "============================="
-    echo " Installation of MLAppDeploy"
-    echo " "
-    echo " 1. MASTER NODE"
-    echo " 2. WORKER NODE (Default)"
-    echo "============================="
-    SHOULD_RUN=1
-    while [ "$SHOULD_RUN" == "1" ];
-    do
-        read -p "What is node this machine? " NODE_TYPE
-        if [ -z $NODE_TYPE ];
-        then
-            NODE_TYPE=2
-        fi
-
-        if [ "$NODE_TYPE" -lt "1" ] || [ "$NODE_TYPE" -gt "2" ];
-        then
-            echo "Invalid node type."
-            continue
-        fi
-        SHOULD_RUN=0
-    done
-
-    if [ "$NODE_TYPE" == "1" ];
-    then
-        # Enable Remote on Master Node
-        if [[ -z `sudo cat $DAEMON_JSON` ]]; then
-            echo '{}' | sudo dd status=none of=$DAEMON_JSON
-        fi
-        
+if [[ -z $BIND ]]; then
+    if [[ `IsWSL2` == '0' ]]; then
+        PrintStep Setup Master node.
         CONFIG=`sudo cat $DAEMON_JSON`
         IS_EXIST_SOCK=`echo $CONFIG | jq '.hosts' | grep "unix:///var/run/docker.sock" | wc -l`
         IS_EXIST_TCP=`echo $CONFIG | jq '.hosts' | grep "tcp://0.0.0.0" | wc -l`
@@ -326,47 +280,10 @@ then
 
         sudo systemctl daemon-reload
         sudo systemctl restart docker.service
-
-        echo Clear Swarm Setting...
-        docker swarm leave --force >> /dev/null 2>&1
-        docker container prune -f >> /dev/null 2>&1
-        docker network prune -f >> /dev/null 2>&1
-        docker network create --subnet 10.10.0.0/24 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
-        JOIN_RESULT=`docker swarm init $@ 1>/dev/null`
-        if [ "$?" != "0" ];
-        then
-            echo $JOIN_RESULT
-        else
-            echo "Docker Swarm Initialized. (3/3)"
-        fi
-    elif [ "$NODE_TYPE" == "2" ];
-    then
-        echo Clear Swarm Setting...
-        docker swarm leave --force >> /dev/null 2>&1
-        docker container prune -f >> /dev/null 2>&1
-        docker network prune -f >> /dev/null 2>&1
-
-        # Connect and Join
-        read -p "Master Node Address : " MASTER_ADDR
-        read -p "Account Name : " ACCOUNT
-        JOIN_COMMAND=`ssh $ACCOUNT@$MASTER_ADDR docker swarm join-token worker | grep join`
-        JOIN_RESULT=`$JOIN_COMMAND`
-        if [ "$?" != "0" ];
-        then
-            echo $JOIN_RESULT
-        else
-            echo $JOIN_RESULT
-            echo "Docker Swarm Joined. (3/3)"
-        fi 
+    else
+        PrintStep Setup Master node on WSL2.
     fi
-else
-    echo "================================="
-    echo " Installation of MLAppDeploy"
-    echo ""
-    echo " Only support master node on WSL2"
-    echo " And not support cluster set"
-    echo " (Cannot join worker node)"
-    echo "================================="
+
     echo Clear Swarm Setting...
     docker swarm leave --force >> /dev/null 2>&1
     docker container prune -f >> /dev/null 2>&1
@@ -377,7 +294,31 @@ else
     then
         echo $JOIN_RESULT
     else
-        echo "Docker Swarm Initialized. (3/3)"
+        echo "Docker Swarm Initialized."
     fi
-fi
-   
+else
+    if [[ `IsWSL2` == '0' ]]; then
+        PrintStep Setup Worker Node to $BIND
+
+        echo Clear Swarm Setting...
+        docker swarm leave --force >> /dev/null 2>&1
+        docker container prune -f >> /dev/null 2>&1
+        docker network prune -f >> /dev/null 2>&1
+
+        # Connect and Join
+        JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
+        JOIN_RESULT=`$JOIN_COMMAND`
+        if [ "$?" != "0" ];
+        then
+            echo $JOIN_RESULT
+        else
+            echo $JOIN_RESULT
+            echo "Docker Swarm Joined."
+        fi
+    else
+        PrintStep Setup Worker Node to $BIND on WSL2
+        echo "Cannot join to master node from WSL2"
+    fi
+fi 
+echo
+echo Install Complete.
