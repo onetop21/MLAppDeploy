@@ -39,7 +39,12 @@ done
 function RemoteRun {
     FILENAME=`basename $0`
     HOST=$1; shift
-    OPEN=`nc -v -z $HOST 22 -w 3 >> /dev/null 2>&1; echo $?`
+    if [[ "$HOST" == *"@"* ]]; then
+        ADDR=($(echo $HOST | tr "@" "\n"))
+        OPEN=`nc -v -z ${ADDR[1]} 22 -w 3 >> /dev/null 2>&1; echo $?`
+    else
+        OPEN=`nc -v -z $HOST 22 -w 3 >> /dev/null 2>&1; echo $?`
+    fi
     if [[ "$OPEN" == "0" ]]; then
         SCRIPT="echo '$(base64 -w0 $0)' > /tmp/$FILENAME.b64; base64 -d /tmp/$FILENAME.b64 > /tmp/$FILENAME; bash /tmp/$FILENAME"
         ssh -t $HOST $SCRIPT $@

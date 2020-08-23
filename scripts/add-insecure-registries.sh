@@ -5,7 +5,7 @@ MAX_STEP=4
 STEP=0
 
 function Usage {
-    echo "Script for Registration Insecure Registry on Docker Swarm(MLAppDeploy)."
+    echo "Registration Insecure Registry to Docker Swarm(MLAppDeploy)."
     echo "$ $0 [-H,--host docker-host-address] [registry-addresses...]"
     echo "    -H, --host : Address of Docker-Swarm master node."
     echo "    -h, --help : This page"
@@ -37,7 +37,12 @@ done
 function RemoteRun {
     FILENAME=`basename $0`
     HOST=$1; shift
-    OPEN=`nc -v -z $HOST 22 -w 3 >> /dev/null 2>&1; echo $?`
+    if [[ "$HOST" == *"@"* ]]; then
+        ADDR=($(echo $HOST | tr "@" "\n"))
+        OPEN=`nc -v -z ${ADDR[1]} 22 -w 3 >> /dev/null 2>&1; echo $?`
+    else
+        OPEN=`nc -v -z $HOST 22 -w 3 >> /dev/null 2>&1; echo $?`
+    fi
     if [[ "$OPEN" == "0" ]]; then
         SCRIPT="echo '$(base64 -w0 $0)' > /tmp/$FILENAME.b64; base64 -d /tmp/$FILENAME.b64 > /tmp/$FILENAME; bash /tmp/$FILENAME"
         ssh -t $HOST $SCRIPT $@
@@ -105,7 +110,11 @@ if [[ -z "$NODE" ]]; then
         for NODE in $NODE_LIST
         do
             echo "[$NODE] Registering Insecure Registries..."
-            RemoteRun $NODE $SCRIPT "--node $NODE -- $@"
+            read -p "Type administrator username: " USER
+            if [[ ! -z "$USER" ]]; then
+               USER=$USER@ 
+            fi
+            RemoteRun $USER$NODE $SCRIPT "--node $NODE -- $@"
         done
     else
         echo Cannot gather node list from Docker-Swarm.
