@@ -255,8 +255,8 @@ else
         echo "Need to reboot and retry install to continue install docker for MLAppDeploy."
         exit 0
     fi
+    TouchDaemonJSON
 fi
-TouchDaemonJSON
 
 PrintStep Install NVIDIA Container Runtime.
 # Check Nvidia Driver status
@@ -299,6 +299,8 @@ if [[ -z $BIND ]]; then
         sudo systemctl restart docker.service
     else
         PrintStep Setup Master node on WSL2.
+        echo "MLAppDeploy environment works only standalone on WSL2."
+        echo "Not support to bind other nodes."
     fi
 
     echo Clear Swarm Setting...
@@ -314,28 +316,28 @@ if [[ -z $BIND ]]; then
         echo "Docker Swarm Initialized."
     fi
 else
-    if [[ `IsWSL2` == '0' ]]; then
-        PrintStep Setup Worker Node to $BIND
+    #if [[ `IsWSL2` == '0' ]]; then
+    PrintStep Setup Worker Node to $BIND
 
-        echo Clear Swarm Setting...
-        docker swarm leave --force >> /dev/null 2>&1
-        docker container prune -f >> /dev/null 2>&1
-        docker network prune -f >> /dev/null 2>&1
+    echo Clear Swarm Setting...
+    docker swarm leave --force >> /dev/null 2>&1
+    docker container prune -f >> /dev/null 2>&1
+    docker network prune -f >> /dev/null 2>&1
 
-        # Connect and Join
-        JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
-        JOIN_RESULT=`$JOIN_COMMAND`
-        if [ "$?" != "0" ];
-        then
-            echo $JOIN_RESULT
-        else
-            echo $JOIN_RESULT
-            echo "Docker Swarm Joined."
-        fi
+    # Connect and Join
+    JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
+    JOIN_RESULT=`$JOIN_COMMAND`
+    if [ "$?" != "0" ];
+    then
+        echo $JOIN_RESULT
     else
-        PrintStep Setup Worker Node to $BIND on WSL2
-        echo "Cannot join to master node from WSL2"
+        echo $JOIN_RESULT
+        echo "Docker Swarm Joined."
     fi
+    #else
+    #    PrintStep Setup Worker Node to $BIND on WSL2
+    #    echo "Cannot join to master node from WSL2"
+    #fi
 fi 
 echo
 echo Install Complete.
