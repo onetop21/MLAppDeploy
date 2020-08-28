@@ -12,7 +12,7 @@ function Usage {
     exit 1
 }
 
-OPTIONS=$(getopt -o hH: --long help,host:,node: -- "$@")
+OPTIONS=$(getopt -o hH: --long help,host:,node -- "$@")
 [ $? -eq 0 ] || Usage
 eval set -- "$OPTIONS"
 while true; do
@@ -24,7 +24,7 @@ while true; do
         Usage
         ;;
     --node)
-        NODE=$1
+        IS_NODE=1
         ;;
     --)
         shift
@@ -103,7 +103,7 @@ function AppendInsecureRegistries {
 
 GetPrivileged
 RequiresFromApt jq
-if [[ -z "$NODE" ]]; then
+if [[ -z "$IS_NODE" ]]; then
     sudo docker $HOST_ARGS node ls >> /dev/null 2>&1
     if [[ "$?" == "0" ]]; then
         NODE_LIST=`sudo docker $HOST_ARGS node ls -q | xargs docker $HOST_ARGS node inspect | jq '.[].Status.Addr' -r`
@@ -114,7 +114,7 @@ if [[ -z "$NODE" ]]; then
             if [[ ! -z "$USER" ]]; then
                USER=$USER@ 
             fi
-            RemoteRun $USER$NODE $SCRIPT "--node $NODE -- $@"
+            RemoteRun $USER$NODE "--node -- $@"
         done
     else
         echo Cannot gather node list from Docker-Swarm.
