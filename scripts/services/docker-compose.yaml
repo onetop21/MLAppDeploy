@@ -7,8 +7,8 @@ services:
   minio:
     image: minio/minio
     volumes:
-    - ${HOME}/.mlad/_services/minio-data:/data
-    - ${HOME}/.mlad/_services/minio-config:/root/.minio
+    - ${HOME}/.mlad/.services/minio-data:/data
+    - ${HOME}/.mlad/.services/minio-config:/root/.minio
     ports:
     - "9000:9000"
     environment:
