@@ -1,8 +1,5 @@
 version: '3.7'
 
-# starts 4 docker containers running minio server instances. Each
-# minio server's web interface will be accessible on the host at port
-# 9001 through 9004.
 services:
   minio:
     image: minio/minio
@@ -10,7 +7,7 @@ services:
     - ${HOME}/.mlad/.services/minio-data:/data
     - ${HOME}/.mlad/.services/minio-config:/root/.minio
     ports:
-    - "9000:9000"
+    - "9000:80"
     environment:
       MINIO_ACCESS_KEY: ${ACCESS_KEY:-MLAPPDEPLOY}
       MINIO_SECRET_KEY: ${SECRET_KEY:-MLAPPDEPLOY}
@@ -18,7 +15,7 @@ services:
       mlad-net:
         aliases:
         - s3.amazonaws.com
-    command: server /data
+    command: server --address ":443" /data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -37,5 +34,13 @@ services:
     deploy:
       restart_policy:
         condition: always
+
+  test:
+    image: ubuntu
+    networks:
+      mlad-net:
+    command: sleep 10000000
 networks:
   mlad-net:
+    driver: overlay
+
