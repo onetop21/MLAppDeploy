@@ -1,16 +1,13 @@
-# Check in docker-machine
-
-MLAD=$HOME/.mlad
-
+#!/bin/bash
 function Usage {
-    echo "Deployment Services for MLAppDeploy Environment."
+    echo "Registration Insecure Registry to Docker Swarm(MLAppDeploy)."
     echo "$ $0 [-H,--host docker-host-address] [registry-addresses...]"
     echo "    -H, --host : Address of Docker-Swarm master node."
     echo "    -h, --help : This page"
     exit 1
 }
 
-OPTIONS=$(getopt -o hH: --long help,host:,node: -- "$@")
+OPTIONS=$(getopt -o hH: --long help,host: -- "$@")
 [ $? -eq 0 ] || Usage
 eval set -- "$OPTIONS"
 while true; do
@@ -21,9 +18,6 @@ while true; do
     -h|--help)
         Usage
         ;;
-    --node)
-        NODE=$1
-        ;;
     --)
         shift
         break
@@ -32,215 +26,24 @@ while true; do
     shift
 done
 
-
-function DeployMinIO {
-    ################
-    # MinIO Server #
-    ################
-    MINIO_DATA=$MLAD/minio_data
-    MINIO_CONFIG=$MLAD/config/minio
-
-    ACCESS_KEY=$1
-    SECRET_KEY=$2
-
-    #mkdir -p $MINIO_DATA $MINIO_CONFIG
-
-    # Run minio server
-    docker stop minio > /dev/null 2>&1
-    docker rm minio > /dev/null 2>&1
-    docker run $DOCKER_HOST -d -p $MINIO_PORT:9000 --restart=always --name minio -e "MINIO_ACCESS_KEY=$ACCESS_KEY" -e "MINIO_SECRET_KEY=$SECRET_KEY" -v $MINIO_DATA:/data -v $MINIO_CONFIG:/root/.minio minio/minio server /data
-
-    # Run minio server by service(Swarm)
-    #echo $ACCESS_KEY | docker secret create access_key -
-    #echo $SECRET_KEY | docker secret create secret_key -
-    #docker service create --name="minio" --secret="access_key" --secret="secret_key" -v $MINIO_DATA:/data -v $MINIO_CONFIG:/root/.minio minio/minio server /data
-}
-
-function DeployRegistry {
-    ####################
-    # Docker Registery #
-    ####################
-    REGISTRY_URL="$MASTER_ADDRESS:$REGISTRY_PORT"
-    REGISTRY_CONFIG=$MLAD/master/registry
-
-    mkdir -p $REGISTRY_CONFIG
-
-    # config.yml
-    cat > $REGISTRY_CONFIG/config.yml << EOL
-    version: 0.1
-    log:
-        fields:
-            service: registry
-    http:
-        addr: :5000
-        tls:
-            certificate: /certs/domain.crt
-            key: /certs/domain.key
-    storage:
-        s3:
-            accesskey: $ACCESS_KEY
-            secretkey: $SECRET_KEY
-            region: "us-east-1"
-            regionendpoint: "http://$MASTER_ADDRESS:$MINIO_PORT"
-            bucket: "docker-registry"
-            encrypt: false
-            secure: false
-            v4auth: true
-            chunksize: 5242880
-            rootdirectory: /
-    EOL
-
-    # Generate certificates to MinIO
-    REGISTRY_CERT=$MINIO_DATA/docker-registry/certs/${REGISTRY_URL/:/-}
-    echo $REGISTRY_CERT
-
-    if [ -d $REGISTRY_CERT ]; then
-        echo "Already generated certificates."
-    else
-        mkdir -p $REGISTRY_CERT
-        
-        # Set subjectAltName to openssl.cnf befor generate certificate.
-        sudo cp /etc/ssl/openssl.cnf /etc/ssl/openssl.cnf.bak
-        sudo sed -i -e "s/\[ v3_ca \]$/\[ v3_ca \]\nsubjectAltName = IP:${REGISTRY_URL/:*/}/" /etc/ssl/openssl.cnf
-
-        # Generate certificate.
-        #openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt
-        openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt -subj "/C=US/ST=STATE/L=CITY/O=COMPANY/OU=SECTION/CN=$REGISTRY_URL"
-        sudo mv domain.key domain.crt $REGISTRY_CERT/
-
-        # Restore openssl configuration.
-        sudo mv /etc/ssl/openssl.cnf.bak /etc/ssl/openssl.cnf
-    fi
-
-    # Make default S3 bucket
-    mkdir -p $MINIO_DATA/logs 
-    mkdir -p $MINIO_DATA/models 
-
-    # Run docker registry server
-    docker stop registry > /dev/null 2>&1
-    docker rm registry > /dev/null 2>&1
-    docker run -d -p 5000:5000 --restart=always -v "$REGISTRY_CERT":/certs -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
-
-    # Run docker registry server by service(Swarm)
-    # docker secret create domain.crt $REGISTRY_CONFIG/certs/domain.crt
-    # docker secret create domain.key $REGISTRY_CONFIG/certs/domain.key
-    # docker node update --label-add registry=true node01
-    # docker service create --name registry --secret domain.crt --secret domain.key --constraint 'node.labels.registry==true' -p 5000:5000 -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/docker/registry/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/etc/docker/registry/certs/domain.key -v $REGISTRY_CONFIG:/etc/docker/registry registry:2
-
-    #
-}
-
-
-##################
-# Get master URL #
-##################
-if [ -z $MASTER_ADDRESS ]; then
-    read -p "Advertise URL: " MASTER_ADDRESS
-fi
-if [ -z $MINIO_PORT ]; then
-    read -p "MinIO Port (9000): " MINIO_PORT
-    if [ -z $MINIO_PORT ]; then
-        MINIO_PORT=9000
-    fi
-fi
-if [ -z $REGISTRY_PORT ]; then
-    read -p "Registry Port (5000): " REGISTRY_PORT
-    if [ -z $REGISTRY_PORT ]; then
-        REGISTRY_PORT=5000
-    fi
+if [[ ! -z "$HOST" ]]; then
+    export DOCKER_HOST=$HOST
 fi
 
-# Access and secret key
-if [ -z $ACCESS_KEY ]; then
-    read -p "MinIO Access Key (MLAPPDEPLOY): " ACCESS_KEY
-    if [ -z $ACCESS_KEY ]; then
-        ACCESS_KEY=MLAPPDEPLOY
-    elif [ ${#ACCESS_KEY} -lt 3 ]; then
-        echo "Access key length should be between minimum 3 characters in length."
-        exit 1
-    fi
-fi
-if [ -z $SECRET_KEY ]; then
-    read -p "MinIO Secret Key (MLAPPDEPLOY): " SECRET_KEY
-    if [ -z $SECRET_KEY ]; then
-        SECRET_KEY=MLAPPDEPLOY
-    elif [ ${#SECRET_KEY} -lt 8 ]; then
-        echo "Secret key should be in between 8 and 40 characters."
-        exit 1
-    fi
+if [[ "$DOCKER_HOST" != *":"* ]]; then
+    export DOCKER_HOST=$DOCKER_HOST:2375
 fi
 
-####################
-# Docker Registery #
-####################
-REGISTRY_URL="$MASTER_ADDRESS:$REGISTRY_PORT"
-REGISTRY_CONFIG=$MLAD/master/registry
 
-mkdir -p $REGISTRY_CONFIG
-
-# config.yml
-cat > $REGISTRY_CONFIG/config.yml << EOL
-version: 0.1
-log:
-    fields:
-        service: registry
-http:
-    addr: :5000
-    tls:
-        certificate: /certs/domain.crt
-        key: /certs/domain.key
-storage:
-    s3:
-        accesskey: $ACCESS_KEY
-        secretkey: $SECRET_KEY
-        region: "us-east-1"
-        regionendpoint: "http://$MASTER_ADDRESS:$MINIO_PORT"
-        bucket: "docker-registry"
-        encrypt: false
-        secure: false
-        v4auth: true
-        chunksize: 5242880
-        rootdirectory: /
-EOL
-
-# Generate certificates to MinIO
-REGISTRY_CERT=$MINIO_DATA/docker-registry/certs/${REGISTRY_URL/:/-}
-echo $REGISTRY_CERT
-
-if [ -d $REGISTRY_CERT ]; then
-    echo "Already generated certificates."
+if [[ -z "$DOCKER_HOST" ]]; then
+    echo "Deploy default services to localhost."
 else
-    mkdir -p $REGISTRY_CERT
-    
-    # Set subjectAltName to openssl.cnf befor generate certificate.
-    sudo cp /etc/ssl/openssl.cnf /etc/ssl/openssl.cnf.bak
-    sudo sed -i -e "s/\[ v3_ca \]$/\[ v3_ca \]\nsubjectAltName = IP:${REGISTRY_URL/:*/}/" /etc/ssl/openssl.cnf
-
-    # Generate certificate.
-    #openssl req -newkey rsa:4096 -nodes -sha256 -keyout $REGISTRY_CERT/domain.key -x509 -days 365 -out $REGISTRY_CERT/domain.crt
-    openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt -subj "/C=US/ST=STATE/L=CITY/O=COMPANY/OU=SECTION/CN=$REGISTRY_URL"
-    sudo mv domain.key domain.crt $REGISTRY_CERT/
-
-    # Restore openssl configuration.
-    sudo mv /etc/ssl/openssl.cnf.bak /etc/ssl/openssl.cnf
+    echo "Deploy default services to $DOCKER_HOST."
 fi
 
-# Make default S3 bucket
-mkdir -p $MINIO_DATA/logs 
-mkdir -p $MINIO_DATA/models 
+read -p "Type Access Key of MinIO (Default: MLAPPDEPLOY) : " ACCESS_KEY
+export ACCESS_KEY
+read -p "Type Secret Key of MinIO (Default: MLAPPDEPLOY) : " SECRET_KEY
+export SECRET_KEY
 
-# Run docker registry server
-docker stop registry > /dev/null 2>&1
-docker rm registry > /dev/null 2>&1
-docker run -d -p 5000:5000 --restart=always -v "$REGISTRY_CERT":/certs -v $REGISTRY_CONFIG:/etc/docker/registry --name registry registry:2
-
-# Run docker registry server by service(Swarm)
-# docker secret create domain.crt $REGISTRY_CONFIG/certs/domain.crt
-# docker secret create domain.key $REGISTRY_CONFIG/certs/domain.key
-# docker node update --label-add registry=true node01
-# docker service create --name registry --secret domain.crt --secret domain.key --constraint 'node.labels.registry==true' -p 5000:5000 -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 -e REGISTRY_HTTP_TLS_CERTIFICATE=/etc/docker/registry/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/etc/docker/registry/certs/domain.key -v $REGISTRY_CONFIG:/etc/docker/registry registry:2
-
-# Run Tensorboard
-#docker stop tensorboard > /dev/null 2>&1
-#docker rm tensorboard > /dev/null 2>&1
-#docker run -d -p 6006:6006 --restart=always -v "$MINIO_DATA/logs":/logs --name tensorboard tensorflow/tensorflow tensorboard --logdir /logs
+docker-compose -p MLAppDeploy -f services/default-services.yaml up -d

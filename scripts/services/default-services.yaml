@@ -7,22 +7,24 @@ services:
     - ${HOME}/.mlad/.services/minio-data:/data
     - ${HOME}/.mlad/.services/minio-config:/root/.minio
     ports:
-    - "9000:443"
+    - "9000:80"
     environment:
       MINIO_ACCESS_KEY: ${ACCESS_KEY:-MLAPPDEPLOY}
       MINIO_SECRET_KEY: ${SECRET_KEY:-MLAPPDEPLOY}
     networks:
       mlad-net:
-        ipv4_address: 10.0.9.4
-        aliases:
-        - s3.amazonaws.com
-    command: server --address ":443" /data
+    labels:
+      mlappdeploy.type: "base-storage"
+      mlappdeploy.description: "S3 compatible storage for MLAppDeploy"
+    command: server --address ":80" /data
     healthcheck:
-      test: ["CMD", "curl", "-f", "https://localhost:443/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
     deploy:
+      restart_policy:
+        condition: always
       placement:
         constraints:
         - node.role == manager
@@ -34,23 +36,20 @@ services:
     - "5000:5000"
     networks:
       mlad-net:
-        aliases:
-        - hub.docker.com
+    labels:
+      mlappdeploy.type: "base-registry"
+      mlappdeploy.description: "Private docker registry for MLAppDeploy"
     deploy:
       restart_policy:
         condition: always
       placement:
         constraints:
         - node.role == manager
-  test:
-    image: ubuntu
-    networks:
-      mlad-net:
-    command: sleep 10000000
 networks:
   mlad-net:
+    name: mlad-net
     driver: overlay
+    attachable: true
     ipam:
       config:
       - subnet: "10.0.9.0/24"
-
