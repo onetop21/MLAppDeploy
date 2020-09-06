@@ -4,13 +4,32 @@ DAEMON_JSON="/etc/docker/daemon.json"
 MAX_STEP=4
 STEP=0
 
+function ColorEcho {
+    COLOR="\033[0m"
+    if [[ "$1" == "ERROR" ]]; then
+        COLOR="\033[0;31m"
+        shift;
+    elif [[ "$1" == "WARN" ]]; then
+        COLOR="\033[0;33m"
+        shift;
+    elif [[ "$1" == "INFO" ]]; then
+        COLOR="\033[0;32m"
+        shift;
+    elif [[ "$1" == "DEBUG" ]]; then
+        COLOR="\033[0;34m"
+        shift;
+    fi
+
+    echo -e "$COLOR$@\033[0m"
+}
+
 function Usage {
-    echo "MLAppDeploy Environment Install Script"
-    echo "$ $0 [-b,--bind master-address] [-r,--remote ssh-address]"
-    echo "    -b, --bind   : Bind to master after install MLAppDeploy node. (Only node mode.)"
-    echo "                   If not define *bind* option to install master mode."
-    echo "    -r, --remote : Install MLAppDeploy Environment to Remote machine."
-    echo "    -h, --help   : This page"
+    ColorEcho INFO "MLAppDeploy Environment Install Script"
+    ColorEcho "$ $0 [-b,--bind master-address] [-r,--remote ssh-address]"
+    ColorEcho "    -b, --bind   : Bind to master after install MLAppDeploy node. (Only node mode.)"
+    ColorEcho "                   If not define *bind* option to install master mode."
+    ColorEcho "    -r, --remote : Install MLAppDeploy Environment to Remote machine."
+    ColorEcho "    -h, --help   : This page"
     exit 1
 }
 
@@ -49,7 +68,7 @@ function RemoteRun {
         SCRIPT="echo '$(base64 -w0 $0)' > /tmp/$FILENAME.b64; base64 -d /tmp/$FILENAME.b64 > /tmp/$FILENAME; bash /tmp/$FILENAME"
         ssh -t $HOST $SCRIPT $@
     else
-        echo "Timeout to Connect [$HOST]"
+        ColorEcho ERROR "Timeout to Connect [$HOST]"
     fi
 }
 
@@ -70,11 +89,11 @@ fi
 #################################################################
 function PrintStep {
     STEP=$((STEP+1))
-    echo "[$STEP/$MAX_STEP] $@"
+    ColorEcho INFO "[$STEP/$MAX_STEP] $@"
 }
 
 function GetPrivileged {
-    echo "Request sudo privileged."
+    ColorEcho WARN "Request sudo privileged."
     sudo ls >> /dev/null 2>&1
     if [[ ! "$?" == "0" ]]; then
         exit 1
@@ -92,17 +111,17 @@ function IsWSL2 {
 function RequiresFromApt {
     printf "Check requires [$1]... "
     if [[ `IsInstalled $1` == '0' ]]; then
-        echo Need to install $1.
+        ColorEcho WARN Need to install $1.
         sudo apt install -y $1
     else
-        echo Okay
+        ColorEcho DEBUG Okay
     fi
 }
 
 function UninstallOnSnapWithWarning {
     if [[ `IsInstalled snap` != '0' ]]; then
         if [[ `snap list $1 >> /dev/null 2>&1 ; echo $?` == '0' ]]; then
-            echo "Need to remove $1 from Snapcraft."
+            ColorEcho WARN "Need to remove $1 from Snapcraft."
             read -n1 -r -p  "If you want to stop installation, Press CTRL+C to break, otherwise any key to continue."
             sudo snap remove --purge $1
 
@@ -149,7 +168,7 @@ function InstallDocker {
 }
 
 function VerifyDocker {
-    echo `sudo docker run -it --rm $@ hello-world > /dev/null 2>&1; echo $?`
+    echo `sudo docker -H "" run -it --rm $@ hello-world > /dev/null 2>&1; echo $?`
 }
 
 function InstallNVIDIAContainerRuntime2008 {
@@ -162,7 +181,7 @@ function InstallNVIDIAContainerRuntime2001 {
     # Deprecated Method Officialy
 
     # If you have nvidia-docker 1.0 installed: we need to remove it and all existing GPU containers
-    docker volume ls -q -f driver=nvidia-docker | xargs -r -I{} -n1 docker ps -q -a -f volume={} | xargs -r docker rm -f
+    docker -H "" volume ls -q -f driver=nvidia-docker | xargs -r -I{} -n1 sudo docker -H "" ps -q -a -f volume={} | xargs -r sudo docker -H "" rm -f
     sudo apt-get purge -y nvidia-docker
 
     # Add the package repositories
@@ -183,7 +202,7 @@ function InstallNVIDIAContainerRuntime {
 }
 
 function VerifyNVIDIAContainerRuntime {
-    echo `sudo docker run -it --rm --gpus hello-world > /dev/null 2>&1; echo $?`
+    echo `sudo docker -H "" run -it --rm --gpus hello-world > /dev/null 2>&1; echo $?`
 }
 
 function TouchDaemonJSON {
@@ -237,8 +256,8 @@ RequiresFromApt jq
 PrintStep Install Docker.
 if [[ `IsWSL2` == '1' ]]; then
     if [[ `IsInstalled docker` == '0' ]]; then
-        echo "Need to install Docker Desktop yourself on WSL2."
-        echo "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
+        ColorEcho INFO "Need to install Docker Desktop yourself on WSL2."
+        ColorEcho INFO "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
         exit
     fi
 else
@@ -252,7 +271,7 @@ else
 
     if [[ `VerifyDocker` != "0" ]];
     then
-        echo "Need to reboot and retry install to continue install docker for MLAppDeploy."
+        ColorEcho INFO "Need to reboot and retry install to continue install docker for MLAppDeploy."
         exit 0
     fi
     TouchDaemonJSON
@@ -262,13 +281,13 @@ PrintStep Install NVIDIA Container Runtime.
 # Check Nvidia Driver status
 if [ `IsInstalled nvidia-smi` == "0" ];
 then
-    echo "Cannot find NVIDIA Graphic Card."
+    ColorEcho WARN "Cannot find NVIDIA Graphic Card."
 else
     if [ `VerifyDocker --gpus all` == "0" ];
     then
-        echo "Already installed NVIDIA container runtime."
+        ColorEcho INFO "Already installed NVIDIA container runtime."
     else
-        echo "Install NVIDIA container runtime."
+        ColorEcho INFO "Install NVIDIA container runtime."
 
         InstallNVIDIAContainerRuntime
         NVIDIAContainerRuntimeConfiguration
@@ -299,45 +318,44 @@ if [[ -z $BIND ]]; then
         sudo systemctl restart docker.service
     else
         PrintStep Setup Master node on WSL2.
-        echo "MLAppDeploy environment works only standalone on WSL2."
-        echo "Not support to bind other nodes."
+        ColorEcho WARN "MLAppDeploy environment works only standalone on WSL2."
+        ColorEcho WARN "Not support to bind other nodes."
     fi
 
-    echo Clear Swarm Setting...
-    docker swarm leave --force >> /dev/null 2>&1
-    docker container prune -f >> /dev/null 2>&1
-    docker network prune -f >> /dev/null 2>&1
-    docker network create --subnet 10.10.0.0/24 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
-    JOIN_RESULT=`docker swarm init $@ 1>/dev/null`
+    ColorEcho Clear Swarm Setting...
+    sudo docker -H "" swarm leave --force >> /dev/null 2>&1
+    sudo docker -H "" container prune -f >> /dev/null 2>&1
+    sudo docker -H "" network prune -f >> /dev/null 2>&1
+    sudo docker -H "" network create --subnet 10.10.0.0/24 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
+    JOIN_RESULT=`sudo docker -H "" swarm init $@ 1>/dev/null`
     if [ "$?" != "0" ];
     then
-        echo $JOIN_RESULT
+        ColorEcho WARN $JOIN_RESULT
     else
-        echo "Docker Swarm Initialized."
+        ColorEcho "Docker Swarm Initialized."
     fi
 else
-    #if [[ `IsWSL2` == '0' ]]; then
-    PrintStep Setup Worker Node to $BIND
+    if [[ `IsWSL2` == '0' ]]; then
+        PrintStep Setup Worker Node to $BIND
 
-    echo Clear Swarm Setting...
-    docker swarm leave --force >> /dev/null 2>&1
-    docker container prune -f >> /dev/null 2>&1
-    docker network prune -f >> /dev/null 2>&1
+        ColorEcho Clear Swarm Setting...
+        sudo docker -H "" swarm leave --force >> /dev/null 2>&1
+        sudo docker -H "" container prune -f >> /dev/null 2>&1
+        sudo docker -H "" network prune -f >> /dev/null 2>&1
 
-    # Connect and Join
-    JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
-    JOIN_RESULT=`$JOIN_COMMAND`
-    if [ "$?" != "0" ];
-    then
-        echo $JOIN_RESULT
+        # Connect and Join
+        JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
+        JOIN_RESULT=`$JOIN_COMMAND`
+        if [ "$?" != "0" ];
+        then
+            ColorEcho WARN $JOIN_RESULT
+        else
+            ColorEcho INFO $JOIN_RESULT
+            ColorEcho INFO "Docker Swarm Joined."
+        fi
     else
-        echo $JOIN_RESULT
-        echo "Docker Swarm Joined."
+        PrintStep Setup Worker Node to $BIND on WSL2
+        ColorEcho WARN "Not support join to master node from WSL2 for stability."
     fi
-    #else
-    #    PrintStep Setup Worker Node to $BIND on WSL2
-    #    echo "Cannot join to master node from WSL2"
-    #fi
 fi 
-echo
-echo Install Complete.
+ColorEcho Install Complete.

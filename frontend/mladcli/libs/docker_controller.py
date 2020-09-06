@@ -2,7 +2,7 @@ import sys, os, copy, time, datetime
 from pathlib import Path
 import docker, requests
 from docker.types import LogConfig
-from MLAppDeploy.libs import utils, interrupt_handler as InterruptHandler, logger_thread as LoggerThread
+from mladcli.libs import utils, interrupt_handler as InterruptHandler, logger_thread as LoggerThread
 
 HOME = str(Path.home())
 CONFIG_PATH = HOME + '/.mlad'
@@ -12,10 +12,7 @@ SHORT_LEN = 10
 # Docker CLI from HOST
 def getDockerCLI():
     config = utils.read_config()
-    if config['docker']['wsl2']:
-        return docker.from_env(environment={})
-    else:
-        return docker.from_env(environment={'DOCKER_HOST':'%s'%config['docker']['host']})
+    return docker.from_env(environment={'DOCKER_HOST':'%s'%config['docker']['host']})
 
 # Image
 def image_list(project=None):
@@ -60,10 +57,10 @@ def image_build(project, workspace, tagging=False):
     cli = getDockerCLI()
 
     # Block duplicated running.
-    filters = 'MLAD.PROJECT=%s' % project_name
-    if len(cli.services.list(filters={'label': filters})):
-        print('Need to down running project.', file=sys.stderr)
-        sys.exit(1)
+    #filters = 'MLAD.PROJECT=%s' % project_name
+    #if len(cli.services.list(filters={'label': filters})):
+    #    print('Need to down running project.', file=sys.stderr)
+    #    sys.exit(1)
 
     # Check latest image
     latest_image = None
@@ -187,7 +184,7 @@ def running_projects():
     return data
 
 def images_up(project, services, by_service=False):
-    import MLAppDeploy.default as default
+    from mladcli.default import project_service as service_default
 
     config = utils.read_config()
 
@@ -195,41 +192,50 @@ def images_up(project, services, by_service=False):
     project_version=project['version'].lower()
     repository = utils.getRepository(project)
     image_name = '{REPOSITORY}:latest'.format(REPOSITORY=repository)
-   
     wait_queue = list(services.keys())
     running_queue = []
 
     cli = getDockerCLI()
  
     # Block duplicated running.
-    filters = 'MLAD.PROJECT=%s' % project_name
-    if len(cli.services.list(filters={'label': filters})):
-        print('Already running project by service.', file=sys.stderr)
-        sys.exit(1)
+    skip_create_network = False
+    if not project['partial']:
+        filters = 'MLAD.PROJECT=%s' % project_name
+        if len(cli.services.list(filters={'label': filters})):
+            print('Already running project.', file=sys.stderr)
+            sys.exit(1)
+    else:
+        for service_name in services:
+            filters = [f'MLAD.PROJECT={project_name}', f'MLAD.PROJECT.SERVICE={service_name}']
+            if len(cli.services.list(filters={'label': filters})):
+                print(f'Already running service[{service_name}] in project.', file=sys.stderr)
+                sys.exit(1)
+        if len(cli.services.list(filters={'label': f'MLAD.PROJECT={project_name}'})): skip_create_network = True
 
     with InterruptHandler(message='Wait.', blocked=True):
         # Create Docker Network
         networks = [ 
             '%s_backend_%s' % (project_name, 'overlay' if by_service else 'bridge'),
         ]
-        for network in networks:
-            try:
-                instance = cli.networks.get(network)
-                if instance: 
-                    print('Clear already created network.', file=sys.stderr)
-                    instance.remove()
-                    time.sleep(1)
-            except docker.errors.APIError as e:
-                pass
-            try:
-                print('Create network...')
-                if by_service:
-                    cli.networks.create(network, driver='overlay', ingress='frontend' in network)
-                else:
-                    cli.networks.create(network, driver='bridge')
-            except docker.errors.APIError as e:
-                print('Failed to create network.', file=sys.stderr)
-                print(e, file=sys.stderr)
+        if not skip_create_network:
+            for network in networks:
+                try:
+                    instance = cli.networks.get(network)
+                    if instance: 
+                        print('Clear already created network.', file=sys.stderr)
+                        instance.remove()
+                        time.sleep(1)
+                except docker.errors.APIError as e:
+                    pass
+                try:
+                    print('Create network...')
+                    if by_service:
+                        cli.networks.create(network, driver='overlay', ingress='frontend' in network)
+                    else:
+                        cli.networks.create(network, driver='bridge')
+                except docker.errors.APIError as e:
+                    print('Failed to create network.', file=sys.stderr)
+                    print(e, file=sys.stderr)
 
     with InterruptHandler(blocked=True) as h:
         # Create Docker Service
@@ -264,7 +270,7 @@ def images_up(project, services, by_service=False):
 
             # Get item in wait queue
             service_key = wait_queue.pop(0)
-            service = default.project_service(services[service_key])
+            service = service_default(services[service_key])
 
             # Check dependencies
             requeued = False
@@ -411,7 +417,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, services=[], 
     with InterruptHandler() as h:
         if by_service:
             instances = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            if not utils.is_wsl2():
+            if not utils.is_host_wsl2():
                 logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
             else:
                 logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances ]
@@ -430,28 +436,41 @@ def show_logs(project, tail='all', follow=False, timestamps=False, services=[], 
         else:
             print('Cannot find running project.', file=sys.stderr)
 
-def images_down(project, by_service=False):
+def images_down(project, services, by_service=False):
     config = utils.read_config()
     project_name = utils.getProjectName(project)
 
     cli = getDockerCLI()
 
-    # Block not running.
-    if by_service:
+    # Block duplicated running.
+    if not project['partial']:
         filters = 'MLAD.PROJECT=%s' % project_name
         if not len(cli.services.list(filters={'label': filters})):
-            print('Cannot running service.', file=sys.stderr)
+            print('Already stopped project.', file=sys.stderr)
             sys.exit(1)
+    else:
+        for service_name in services:
+            filters = [f'MLAD.PROJECT={project_name}', f'MLAD.PROJECT.SERVICE={service_name}']
+            if not len(cli.services.list(filters={'label': filters})):
+                print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
+                sys.exit(1)
 
     with InterruptHandler(message='Wait.', blocked=True):
+        drop_with_network = True
         if by_service:
-            services = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            if len(services):
-                for service in services:
+            #services = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
+            down_services = []
+            for service_name in services:
+                filters = [f'MLAD.PROJECT={project_name}', f'MLAD.PROJECT.SERVICE={service_name}']
+                down_services += cli.services.list(filters={'label': filters})
+            if len(down_services):
+                for service in down_services:
                     print('Stop %s...'%service.name)
                     service.remove()
             else:
                 print('Cannot find running services.', file=sys.stderr)
+            if len(cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})) > 0:
+                drop_with_network = False
         else:
             containers = cli.containers.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
             if len(containers):
@@ -463,16 +482,18 @@ def images_down(project, by_service=False):
                     container.remove()
             else:
                 print('Cannot find running containers.', file=sys.stderr)
-        networks = [ 
-            '%s_backend_%s' % (project_name, 'overlay' if by_service else 'bridge'),
-        ]
-        for network in networks:
-            try:
-                instance = cli.networks.get(network)
-                instance.remove()
-                print('Network removed.')
-            except docker.errors.APIError as e:
-                print('Network already removed.', file=sys.stderr)
+
+        if drop_with_network:
+            networks = [ 
+                '%s_backend_%s' % (project_name, 'overlay' if by_service else 'bridge'),
+            ]
+            for network in networks:
+                try:
+                    instance = cli.networks.get(network)
+                    instance.remove()
+                    print('Network removed.')
+                except docker.errors.APIError as e:
+                    print('Network already removed.', file=sys.stderr)
 
 def show_status(project, services, all=False):
     project_name = utils.getProjectName(project)

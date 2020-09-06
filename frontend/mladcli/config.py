@@ -1,6 +1,6 @@
 import sys, os
-import MLAppDeploy.libs.utils as utils
-import MLAppDeploy.default as default
+from mladcli.libs import utils
+from mladcli.default import config as default_config
 
 def dict_to_graph(vars, base={}):
     config = base
@@ -42,13 +42,40 @@ def get_value(config, keys, stack=[]):
         sys.exit(1)
 
 def init(username, address):
+    if address.startswith('unix://'):
+        docker_host = address
+    elif ':' in address:
+        docker_host = address
+        address, docker_port = address.split(':')
+    elif not address in ['localhost', '127.0.0.1']:
+        docker_host = f'{address}:2375'
+    else:
+        docker_host = f'unix:///var/run/docker.sock'
+
+    address = utils.get_advertise_addr() if docker_host.startswith('unix://') else address
+
+    # specific controlling docker
+    minio_port = utils.get_default_service_port('mlad_minio', 9000, docker_host)
+    if minio_port: 
+        minio_address = f'{address}:{minio_port}'
+        verifySSL = False
+    else:
+        minio_address = None
+        verifySSL = True
+    registry_port = utils.get_default_service_port('mlad_registry', 5000, docker_host)
+    if registry_port:
+        registry_address = f'{address}:{registry_port}'
+    else:
+        registry_address = None
+
     utils.generate_empty_config()
     set(*(
-        'account.username=%s'%username, 
-        'docker.host=%s:2375'%address,
-        'docker.registry=%s:5000'%address,
-        f'docker.wsl2={("localhost" == address or "127.0.0.1" == address) and utils.is_wsl2()}',
-        's3.endpoint=%s:9000'%address
+        f'account.username={username}', 
+        f'docker.host={docker_host}',
+        f'docker.registry={registry_address}',
+        f'docker.wsl2={utils.is_host_wsl2(docker_host)}', 
+        f's3.endpoint={minio_address}',
+        f's3.verify={verifySSL}'
     ))
     get(None)
 
@@ -59,18 +86,18 @@ def set(*args):
         print('Argument format is not valid.', file=sys.stderr)
         sys.exit(1)
 
-    config = default.config(utils.read_config())
+    config = default_config(utils.read_config())
     config = dict_to_graph(vars, config)
 
     utils.write_config(config)
 
 def get(keys):
-    config = default.config(utils.read_config())
+    config = default_config(utils.read_config())
     data = get_value(config, keys)
     if isinstance(data, list):
         print('{:24} {:32}'.format('KEY', 'VALUE'))
         for key, value in data:
             #if key and value: print('{}={}'.format(key, value))
-            if key and value: print('{:24} {:32}'.format(key, value))
+            if key: print('{:24} {:32}'.format(key, value))
     else:
         print(data)

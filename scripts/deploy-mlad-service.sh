@@ -1,9 +1,29 @@
 #!/bin/bash
+
+function ColorEcho {
+    COLOR="\033[0m"
+    if [[ "$1" == "ERROR" ]]; then
+        COLOR="\033[0;31m"
+        shift;
+    elif [[ "$1" == "WARN" ]]; then
+        COLOR="\033[0;33m"
+        shift;
+    elif [[ "$1" == "INFO" ]]; then
+        COLOR="\033[0;32m"
+        shift;
+    elif [[ "$1" == "DEBUG" ]]; then
+        COLOR="\033[0;34m"
+        shift;
+    fi
+
+    echo -e "$COLOR$@\033[0m"
+}
+
 function Usage {
-    echo "Registration Insecure Registry to Docker Swarm(MLAppDeploy)."
-    echo "$ $0 [-H,--host docker-host-address] [registry-addresses...]"
-    echo "    -H, --host : Address of Docker-Swarm master node."
-    echo "    -h, --help : This page"
+    ColorEcho INFO "Deploy default services for MLAppDeploy environment."
+    ColorEcho "$ $0 [-H,--host docker-host-address] [minio|registry]"
+    ColorEcho "    -H, --host : Address of Docker-Swarm master node."
+    ColorEcho "    -h, --help : This page"
     exit 1
 }
 
@@ -26,19 +46,20 @@ while true; do
     shift
 done
 
-if [[ ! -z "$HOST" ]]; then
+if [[ "$HOST" != *":"* ]]; then
+    if [[ -z "$HOST" ]]; then
+        export DOCKER_HOST=
+    else
+        export DOCKER_HOST=$HOST:2375
+    fi
+else
     export DOCKER_HOST=$HOST
 fi
 
-if [[ "$DOCKER_HOST" != *":"* ]]; then
-    export DOCKER_HOST=$DOCKER_HOST:2375
-fi
-
-
 if [[ -z "$DOCKER_HOST" ]]; then
-    echo "Deploy default services to localhost."
+    ColorEcho WARN "Deploy default services to localhost."
 else
-    echo "Deploy default services to $DOCKER_HOST."
+    ColorEcho INFO "Deploy default services to $DOCKER_HOST."
 fi
 
 read -p "Type Access Key of MinIO (Default: MLAPPDEPLOY) : " ACCESS_KEY
@@ -46,4 +67,4 @@ export ACCESS_KEY
 read -p "Type Secret Key of MinIO (Default: MLAPPDEPLOY) : " SECRET_KEY
 export SECRET_KEY
 
-docker-compose -p MLAppDeploy -f services/default-services.yaml up -d
+docker-compose -p MLAppDeploy -f `dirname $0`/services/default-services.yaml up -d $@

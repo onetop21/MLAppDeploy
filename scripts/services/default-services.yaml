@@ -2,12 +2,13 @@ version: '3.7'
 
 services:
   minio:
+    container_name: mlad_minio
     image: minio/minio
     volumes:
     - ${HOME}/.mlad/.services/minio-data:/data
     - ${HOME}/.mlad/.services/minio-config:/root/.minio
     ports:
-    - "9000:80"
+    - "9000:9000"
     environment:
       MINIO_ACCESS_KEY: ${ACCESS_KEY:-MLAPPDEPLOY}
       MINIO_SECRET_KEY: ${SECRET_KEY:-MLAPPDEPLOY}
@@ -16,7 +17,7 @@ services:
     labels:
       mlappdeploy.type: "base-storage"
       mlappdeploy.description: "S3 compatible storage for MLAppDeploy"
-    command: server --address ":80" /data
+    command: server /data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/minio/health/live"]
       interval: 30s
@@ -29,6 +30,7 @@ services:
         constraints:
         - node.role == manager
   registry:
+    container_name: mlad_registry
     image: registry:2
     volumes:
     - ${HOME}/.mlad/.services/registry:/var/lib/registry

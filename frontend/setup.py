@@ -1,26 +1,32 @@
+import sys
+import os
 from setuptools import setup, find_packages
+from mladcli import __version__
 
-# Get version
-__version__ = '0.0.1'
-with open('mlad/__version__.py') as f:
-  import re
-  version = re.search(r'version[ =\'"]+([0-9.]+)', f.read())
-  if version:
-    for group in version.groups():
-      __version__ = group
+def main():
+    # Read Description form file
+    try:
+        with open('README.md') as f:
+            description = f.read()
+    except:
+        print('Cannot find README.md file.', file=sys.stderr)
+        description = ""
 
-setup(
-  name='MLAppDeploy',
-  version=__version__,
-  description='Machine learning Application Deployment Tool.',
-  author='Hyoil LEE',
-  author_email='onetop21@gmail.com',
-  license='MIT License',
-  packages=find_packages(exclude=['.temp']),
-  url='',
-  zip_safe=False,
-  python_requires='>3.5',
-  install_requires=['Click==7.0', 'PyYAML<4.3,>=3.10', 'docker==4.0.2'],
-  scripts=['mlad/mlad']
-)
+    setup(
+      name='MLAppDeploy',
+      version=__version__,
+      description='Machine learning Application Deployment Tool.',
+      long_description=description,
+      author='Hyoil LEE',
+      author_email='onetop21@gmail.com',
+      license='MIT License',
+      packages=find_packages(exclude=['.temp']),
+      url='https://github.com/onetop21/MLAppDeploy.git',
+      zip_safe=False,
+      python_requires='>3.5',
+      install_requires=['Click==7.0', 'PyYAML<4.3,>=3.10', 'docker==4.0.2'],
+      scripts=['mladcli/mlad']
+    )
 
+if __name__ == '__main__':
+    main()

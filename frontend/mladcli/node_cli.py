@@ -1,5 +1,5 @@
 import sys, os, click
-import MLAppDeploy as mlad
+from mladcli import node
 
 # mlad node ls
 # mlad node enable [name]
@@ -9,19 +9,19 @@ import MLAppDeploy as mlad
 @click.command()
 def ls():
     '''Show Connected Nodes.'''
-    mlad.node.list()
+    node.list()
 
 @click.command()
 @click.argument('ID')
 def enable(id):
     '''Enable to Use Node.'''
-    mlad.node.enable(id)
+    node.enable(id)
 
 @click.command()
 @click.argument('ID')
 def disable(id):
     '''Disable to Use Node.'''
-    mlad.node.disable(id)
+    node.disable(id)
 
 @click.command()
 @click.argument('KV', nargs=-1)
@@ -29,14 +29,14 @@ def disable(id):
 def add(node, kv):
     '''Add label to node.'''
     kvdict = dict([ _.split('=') for _ in kv ])
-    mlad.node.label_add(node, **kvdict)
+    node.label_add(node, **kvdict)
 
 @click.command()
 @click.argument('KEY', nargs=-1)
 @click.pass_obj
 def rm(node, key):
     '''Remove label from node.'''
-    mlad.node.label_rm(node, *key)
+    node.label_rm(node, *key)
 
 @click.group()
 @click.argument('NODE')

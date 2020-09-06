@@ -57,14 +57,14 @@ def read_project():
     else:
         return None
 
-def get_project(default):
+def get_project(default_project):
     project = read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)
         print('$ %s --help' % sys.argv[0], file=sys.stderr)
         sys.exit(1)
 
-    return default.project(project)
+    return default_project(project)
 
 def print_table(data, no_data_msg=None, max_width=32):
     widths = [max(_) for _ in zip(*[[min(len(str(value)), max_width) for value in datum] for datum in data])]
@@ -81,7 +81,7 @@ def print_table(data, no_data_msg=None, max_width=32):
 
 def convert_dockerfile(project, workspace):
     config = read_config()
-    from MLAppDeploy.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
+    from mladcli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 
     envs = [
         #DOCKERFILE_ENV.format(KEY='TF_CPP_MIN_LOG_LEVEL', VALUE=3),
@@ -152,5 +152,38 @@ def update_obj(base, obj):
                 del item[key]
     return merge(obj, copy.deepcopy(base))
 
-def is_wsl2():
-   return 'microsoft-standard' in os.uname()[2]
+def get_advertise_addr():
+    # If this local machine is WSL2
+    if 'microsoft' in os.uname().release:
+        #print("Wait for getting host IP address...")
+        #import subprocess
+        #output = subprocess.check_output(['powershell.exe', '-Command', '(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected" }).IPv4Address.IPAddress'])
+        #addr = output.strip(b'\r\n').decode()
+        addr = 'localhost'
+    else:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        addr = s.getsockname()[0]
+        s.close()
+    return addr
+
+def is_host_wsl2(docker_host=None):
+    # Check WSL2 in Docker Host, Not Local Machine!
+    import docker
+    if not docker_host:
+        config = read_config()
+        docker_host = config['docker']['host']
+    cli = docker.from_env(environment={ 'DOCKER_HOST': docker_host })
+    return 'microsoft' in cli.info()['KernelVersion']
+
+def get_default_service_port(container_name, internal_port, docker_host=None):
+    import docker
+    if not docker_host:
+        config = utils.read_config()
+        docker_host = config['docker']['host']
+    cli = docker.from_env(environment={ 'DOCKER_HOST': docker_host })
+    external_port = None
+    for _ in [_.ports[f'{internal_port}/tcp'] for _ in cli.containers.list() if _.name in [f'{container_name}']]: 
+        external_port = _[0]['HostPort']
+    return external_port

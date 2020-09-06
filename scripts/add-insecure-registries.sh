@@ -4,11 +4,30 @@ DAEMON_JSON="/etc/docker/daemon.json"
 MAX_STEP=4
 STEP=0
 
+function ColorEcho {
+    COLOR="\033[0m"
+    if [[ "$1" == "ERROR" ]]; then
+        COLOR="\033[0;31m"
+        shift;
+    elif [[ "$1" == "WARN" ]]; then
+        COLOR="\033[0;33m"
+        shift;
+    elif [[ "$1" == "INFO" ]]; then
+        COLOR="\033[0;32m"
+        shift;
+    elif [[ "$1" == "DEBUG" ]]; then
+        COLOR="\033[0;34m"
+        shift;
+    fi
+
+    echo -e "$COLOR$@\033[0m"
+}
+
 function Usage {
-    echo "Registration Insecure Registry to Docker Swarm(MLAppDeploy)."
-    echo "$ $0 [-H,--host docker-host-address] [registry-addresses...]"
-    echo "    -H, --host : Address of Docker-Swarm master node."
-    echo "    -h, --help : This page"
+    ColorEcho INFO "Registration Insecure Registry to Docker Swarm(MLAppDeploy)."
+    ColorEcho "$ $0 [-H,--host docker-host-address] [registry-addresses...]"
+    ColorEcho "    -H, --host : Address of Docker-Swarm master node."
+    ColorEcho "    -h, --help : This page"
     exit 1
 }
 
@@ -47,17 +66,19 @@ function RemoteRun {
         SCRIPT="echo '$(base64 -w0 $0)' > /tmp/$FILENAME.b64; base64 -d /tmp/$FILENAME.b64 > /tmp/$FILENAME; bash /tmp/$FILENAME"
         ssh -t $HOST $SCRIPT $@
     else
-        echo "Timeout to Connect [$HOST]"
+        ColorEcho ERROR "Timeout to Connect [$HOST]"
     fi
 }
 
 if [[ ! -z "$HOST" ]]; then
     HOST_ARGS="-H $HOST"
+else
+    HOST_ARGS="-H ''"
 fi
 
 ## Main Script
 function GetPrivileged {
-    echo "Request sudo privileged."
+    Colorecho WARN "Request sudo privileged."
     sudo ls >> /dev/null 2>&1
     if [[ ! "$?" == "0" ]]; then
         exit 1
@@ -71,10 +92,10 @@ function IsInstalled {
 function RequiresFromApt {
     printf "Check requires [$1]... "
     if [[ `IsInstalled $1` == '0' ]]; then
-        echo Need to install $1.
+        ColorEcho WARN Need to install $1.
         sudo apt install -y $1
     else
-        echo Okay
+        ColorEcho DEBUG Okay
     fi
 }
 
@@ -94,7 +115,7 @@ function AppendInsecureRegistries {
         CONFIG=`echo $CONFIG | jq '."insecure-registries"=[]'`
     fi
     if [ `echo $CONFIG | jq '."insecure-registries"' | grep $1 >> /dev/null; echo $?` == "0" ]; then
-        echo "Already registered registry [$1]"
+        ColorEcho INFO "Already registered registry [$1]"
     else
         CONFIG=`echo $CONFIG | jq ".\"insecure-registries\"=[\"$1\"]+.\"insecure-registries\""`
         echo $CONFIG | jq . | sudo dd status=none of=$DAEMON_JSON
@@ -109,7 +130,7 @@ if [[ -z "$IS_NODE" ]]; then
         NODE_LIST=`sudo docker $HOST_ARGS node ls -q | xargs docker $HOST_ARGS node inspect | jq '.[].Status.Addr' -r`
         for NODE in $NODE_LIST
         do
-            echo "[$NODE] Registering Insecure Registries..."
+            ColorEcho INFO "[$NODE] Registering Insecure Registries..."
             read -p "Type administrator username: " USER
             if [[ ! -z "$USER" ]]; then
                USER=$USER@ 
@@ -117,7 +138,7 @@ if [[ -z "$IS_NODE" ]]; then
             RemoteRun $USER$NODE "--node -- $@"
         done
     else
-        echo Cannot gather node list from Docker-Swarm.
+        ColorEcho WARN Cannot gather node list from Docker-Swarm.
         exit $?
     fi
 else

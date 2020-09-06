@@ -1,5 +1,5 @@
 import sys, os, getpass, click
-import MLAppDeploy as mlad
+from mladcli import project
 
 # mlad project init
 # mlad project ls | mlad ls
@@ -15,41 +15,42 @@ import MLAppDeploy as mlad
 @click.option('--author', '-a', default=getpass.getuser(), help='Project Author')
 def init(name, version, author):
     '''Initialize MLAppDeploy Project.'''
-    mlad.project.init(name, version, author)
+    project.init(name, version, author)
 
 @click.command()
 def ls():
     '''Show Projects Deployed on Cluster.'''
-    mlad.project.list()
+    project.list()
 
 @click.command()
 @click.option('--all', '-a', is_flag=True, help='Show included shutdown service.')
 def ps(all):
     '''Show Project Status Deployed on Cluster.'''
-    mlad.project.status(all)
+    project.status(all)
 
 @click.command()
 @click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image')
 def build(tagging):
     '''Build Project to Image for Deploying on Cluster.'''
-    mlad.project.build(tagging)
+    project.build(tagging)
 
 @click.command()
 @click.option('--build', '-b', is_flag=True, help='Build Project Image before Deploy and Run Project')
 def test(build):
     '''Deploy and Run a Latest Built Project on Local or Cluster.'''
-    mlad.project.test(build)
+    project.test(build)
 
 @click.command()
-@click.argument('image', required=False)
-def up(image):
+@click.argument('services', nargs=-1, required=False)
+def up(services):
     '''Deploy and Run a Project on Local or Cluster.'''
-    mlad.project.up(image)
+    project.up(services)
 
 @click.command()
-def down():
+@click.argument('services', nargs=-1, required=False)
+def down(services):
     '''Stop and Remove Current Project Deployed on Cluster.'''
-    mlad.project.down()
+    project.down(services)
 
 @click.command()
 @click.option('--tail', default='255', help='Number of lines to show from the end of logs (default "255")')
@@ -58,13 +59,13 @@ def down():
 @click.argument('SERVICES', nargs=-1)
 def logs(tail, follow, timestamps, services):
     '''Show Current Project Logs Deployed on Cluster.'''
-    mlad.project.logs(tail, follow, timestamps, services)
+    project.logs(tail, follow, timestamps, services)
 
 @click.command()
 @click.argument('scales', nargs=-1)
 def scale(scales):
     '''Change Replicas Count of Running Service in Deployed on Cluster.'''
-    mlad.project.scale(scales)
+    project.scale(scales)
 
 @click.command()
 def update():

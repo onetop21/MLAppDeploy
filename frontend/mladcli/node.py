@@ -1,8 +1,8 @@
 import sys, os
 import requests
 from pathlib import Path
-from MLAppDeploy.libs import utils, docker_controller as docker, interrupt_handler
-import MLAppDeploy.default as default
+from mladcli.libs import utils, docker_controller as docker, interrupt_handler
+import mladcli.default as default
 
 def list():
     nodes = docker.node_list()

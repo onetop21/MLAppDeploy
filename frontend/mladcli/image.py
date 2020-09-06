@@ -1,14 +1,14 @@
 import sys, os
 import requests
 from pathlib import Path
-from MLAppDeploy.libs import utils, docker_controller as docker, interrupt_handler
-import MLAppDeploy.default as default
+from mladcli.libs import utils, docker_controller as docker, interrupt_handler
+from mladcli.default import project as default_project
 
 def list(all, tail):
     if all:
         project = None
     else:
-        project = utils.get_project(default)
+        project = utils.get_project(default_project)
 
     images, dummies = docker.image_list(project['project'] if project else None)
 
@@ -51,7 +51,7 @@ def remove(ids, force):
 
 def prune(all):
     if not all:
-        project = utils.get_project(default)
+        project = utils.get_project(default_project)
 
         result = docker.image_prune(project['project'])
         if result:

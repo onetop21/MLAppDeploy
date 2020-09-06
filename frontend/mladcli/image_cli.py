@@ -1,5 +1,5 @@
 import sys, os, click
-import MLAppDeploy as mlad
+from mladcli import image
 
 # mlad image ls
 # mlad image search
@@ -11,26 +11,26 @@ import MLAppDeploy as mlad
 @click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10")')
 def ls(all, tail):
     '''Show built image list.'''
-    mlad.image.list(all, tail)
+    image.list(all, tail)
 
 @click.command()
 @click.argument('KEYWORD', required=True)
 def search(keyword):
     '''Search image from registry.'''
-    mlad.image.search(keyword)
+    image.search(keyword)
 
 @click.command()
 @click.option('--force', '-f', is_flag=True, help='Remove forcely.')
 @click.argument('ID', nargs=-1, required=False)
 def rm(force, id):
     '''Remove built image.'''
-    mlad.image.remove(id, force)
+    image.remove(id, force)
 
 @click.command()
 @click.option('--all', '-a', is_flag=True, help='Remove unused all project images.')
 def prune(all):
     '''Remove unused and untagged project images.'''
-    mlad.image.prune(all)
+    image.prune(all)
 
 @click.group()
 def cli():

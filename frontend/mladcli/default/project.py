@@ -1,5 +1,5 @@
 import sys
-import MLAppDeploy.libs.utils as utils
+from mladcli.libs import utils
 
 obj = {
     'project': {
