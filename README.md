@@ -1,62 +1,94 @@
 # MLAppDeploy
 Machine Learning Application Deployment Tool by Docker Swarm
-## Installation
-### Master
-#### 1. Install Docker
+## Environment Installation
+### 1. Install MLAppDeploy Environment
 ``` bash
-$ bash scripts/install_docker.sh
+$ bash scripts/install-mlad-env.sh                  # Install as master node
+$ bash scripts/install-mlad-env.sh -b <Master Node> # Install as worker node
+$ bash scripts/install-mlad-env.sh -r <Remote Host> # Install at remote host
 ```
-#### 2. Initialize Docker Swarm
+### 2. Deploy Default Services
 ``` bash
-$ docker swarm init
+$ bash scripts/deploy-mlad-service.sh                # Deploy services to local master
+$ bash scripts/deploy-mlad-service.sh -H <Master IP> # Deploy services to remote master
+$ bash scripts/deploy-mlad-service.sh minio          # Deploy minio service only.
 ```
-#### 3. Enable Docker Daemon Remote Mode. (Optional)
+### 3. Add Insecure Registries (Optional)
 ```
-$ bash scripts/enable_remote_master_docker.sh
+$ bash scripts/add-insecure-registries.sh <Address with Port>                   # Add insecure registries to all nodes connected with local master
+$ bash scripts/add-insecure-registries.sh -H <Remote Host> <Address with Port>  # Add insecure registries to all nodes connected with remote master
 ```
-#### 4. Install Nvidia Docker Runtime if you have GPUs. (Optional)
+## Frontend Installation
+### 1. Install Virtual Environment
 ``` bash
-$ bash scripts/install_nvidia_docker_runtime.sh
+$ sudo apt install -y python3-virtualenv
+$ python3 -m virtualenv -p python3 <EnvDir>
 ```
-#### 5. Run Default Background Service(MinIO Server, Docker Registry) on Master Server. (Optional)
+### 2. Enable Virtual Environment
 ``` bash
-$ bash scripts/run_background_services.sh
+$ source <EnvDir>/bin/activate # Enable
+(EnvDir) $ deactivate          # Disable (Optional)
 ```
-#### 6. Register Certificate for Docker Registry. (After 3; Optional)
-> Connect to MinIO Server (http://IPAddress:9000; Default Access/Secret Key: MLAPPDEPLOY) <br>
-> Find certificate (docker-registry/certs/IPADDRESS-PORT/domain.crt) and get shareable link URL <br>
-> Run script as below <br>
-```
-$ bash scripts/register_certs.sh
-```
-> Paste shareable link.
-### Cluster
-#### 1. Install Docker
+### 3. Install Python FrontEnd
 ``` bash
-$ bash scripts/install_docker.sh
+(EnvDir) $ cd frontend
+(EnvDir) $ python setup.py install
 ```
-#### 2. Check Accessablility to Master.
-```
-$ bash scripts/check_ACL.sh [Master IP Address]
-```
-#### 3. Join Docker Swarm
-at Master
+
+## How to use
+### 1. Initialize Configuration
 ``` bash
-$ docker swarm join-token worker
+(EnvDir) $ mlad config init
+Username [<USER>]:
+Master IP Address [unix:///var/run/docker.sock]:
 ```
-at Cluster
+### 2. Connect External MinIO(S3 Compatible Storage) and Private Docker Registry (Optional)
+If you want to connect to your S3 storage and registry, you can attach to external those by modify configurations.
 ``` bash
-$ docker swarm join ...
+(EnvDir) $ mlad config set s3.endpoint=s3.amazonaws.com # Change S3 endpoint
+(EnvDir) $ mlad config get                              # Show current configuration
 ```
-#### 4. Install Nvidia Docker Runtime if you have GPUs. (Optional)
+### 3. Generate Project File
 ``` bash
-$ bash scripts/install_nvidia_docker_runtime.sh
+(EnvDir) $ cd <YOUR PROJECT DIR>
+(EnvDir) $ mlad project init
+Project Name : <Enter Your Project Name>
 ```
-#### 5. Register Certificate for Docker Registry. (After Master.3; Optional)
-> Connect to MinIO Server (http://IPAddress:9000; Default Access/Secret Key: MLAPPDEPLOY) <br>
-> Find certificate (docker-registry/certs/IPADDRESS-PORT/domain.crt) and get shareable link URL <br>
-> Run script as below <br>
+### 4. Customize Project File
+Customize project file(**mlad-project.yml**).
+### 5. Build Project Image
+``` bash
+(EnvDir) $ mlad build
 ```
-$ bash scripts/register_certs.sh
+### 6. Deploy Services on MLAppDeploy
+``` bash
+(EnvDir) $ mlad up                # Deploy whole services in project.
+(EnvDir) $ mlad up <services...>  # Deploy services in project partialy.
 ```
-> Paste shareable link.
+### 7. Down Service from MLAppDeploy
+``` bash
+(EnvDir) $ mlad down                # Down whole services in project.
+(EnvDir) $ mlad down <services...>  # Down services in project partialy.
+```
+### 8. Show Logs
+``` bash
+(EnvDir) $ mlad logs                # Show logs til now.
+(EnvDir) $ mlad logs -f             # Show logs with follow.
+(EnvDir) $ mlad logs -t             # Show logs with timestamp.
+(EnvDir) $ mlad logs <service name> # show logs filtered by service name.
+```
+### 9. Show Running Service in Project
+``` bash
+(EnvDir) $ cd <YOUR PROJECT DIR>
+(EnvDir) $ mlad ps      # Show running services in project.
+(EnvDir) $ mlad ps -a   # Show all services in project
+```
+### 10. Show All Deployed Project
+``` bash
+(EnvDir) $ mlad ls
+```
+### 11. And so on.
+You can show more information by below command.
+``` bash
+(EnvDir) $ mlad --help
+```
