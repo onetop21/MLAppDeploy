@@ -25,7 +25,7 @@ services:
       retries: 3
     deploy:
       restart_policy:
-        condition: always
+        condition: any
       placement:
         constraints:
         - node.role == manager
@@ -43,7 +43,7 @@ services:
       mlappdeploy.description: "Private docker registry for MLAppDeploy"
     deploy:
       restart_policy:
-        condition: always
+        condition: any
       placement:
         constraints:
         - node.role == manager
