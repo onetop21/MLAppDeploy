@@ -3,6 +3,16 @@ from mladcli.libs import utils
 from mladcli.default import config as default_config
 
 def dict_to_graph(vars, base={}):
+    def convert_type(value, tyidx=0):
+        from distutils import util
+        TYPES = [int, lambda x: bool(util.strtobool(x)), float]
+        if tyidx < len(TYPES):
+            try:
+                value = TYPES[tyidx](value)
+            except ValueError as e:
+                value = convert_type(value, tyidx+1)
+        return value
+        # str to float
     config = base
     for ckeys in vars:
         keys = ckeys.split('.')
@@ -11,7 +21,7 @@ def dict_to_graph(vars, base={}):
             head[key] = head[key] if key in head else {}
             head = head[key]
         if vars[ckeys]:
-            head[keys[-1]] = vars[ckeys] 
+            head[keys[-1]] = convert_type(vars[ckeys])
         elif len(keys):
             if keys[-1] in head: del head[keys[-1]]
         else:
@@ -98,6 +108,15 @@ def get(keys):
         print('{:24} {:32}'.format('KEY', 'VALUE'))
         for key, value in data:
             #if key and value: print('{}={}'.format(key, value))
-            if key: print('{:24} {:32}'.format(key, value))
+            if key: print('{:24} {:32}'.format(key, str(value)))
     else:
         print(data)
+
+def env(unset):
+    config = utils.get_service_env()
+    for line in config:
+        if unset:
+            K, V = line.split('=')
+            print(f'export {K}=')
+        else:
+            print(f'export {line}')

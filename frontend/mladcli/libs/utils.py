@@ -180,10 +180,21 @@ def is_host_wsl2(docker_host=None):
 def get_default_service_port(container_name, internal_port, docker_host=None):
     import docker
     if not docker_host:
-        config = utils.read_config()
+        config = read_config()
         docker_host = config['docker']['host']
     cli = docker.from_env(environment={ 'DOCKER_HOST': docker_host })
     external_port = None
     for _ in [_.ports[f'{internal_port}/tcp'] for _ in cli.containers.list() if _.name in [f'{container_name}']]: 
         external_port = _[0]['HostPort']
     return external_port
+
+def get_service_env():
+    config = read_config()
+    env = [
+        f'BOTO3_HOST={"https" if config["s3"]["verify"] else "http"}://{config["s3"]["endpoint"]}',
+        f'S3_ENDPOINT={config["s3"]["endpoint"]}',
+        f'S3_USE_HTTPS={1 if config["s3"]["verify"] else 0}',
+        f'AWS_ACCESS_KEY_ID={config["s3"]["accesskey"]}',
+        f'AWS_SECRET_ACCESS_KEY={config["s3"]["secretkey"]}',
+    ]
+    return env

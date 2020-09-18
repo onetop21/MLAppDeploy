@@ -26,6 +26,12 @@ def get(key):
     '''Get Configurations.'''
     config.get(key)
 
+@click.command()
+@click.option('--unset', '-u', is_flag=True)
+def env(unset):
+    '''To set environment variables, run "eval $(mlad config env)"'''
+    config.env(unset)
+
 @click.group()
 def cli():
     '''Manage Configuration.'''
@@ -33,5 +39,6 @@ def cli():
 cli.add_command(init)
 cli.add_command(set)
 cli.add_command(get)
+cli.add_command(env)
 
 #sys.modules[__name__] = config

@@ -288,13 +288,8 @@ def images_up(project, services, by_service=False):
                 BUCKET_PATH = '{}/{}/'.format(config['account']['username'], project['name'].lower())
                 service_name = service_key.lower()
                 image = service['image'] or image_name
-                env = [
-                    'TF_CPP_MIN_LOG_LEVEL={}'.format(3),
-                    'S3_ENDPOINT={}'.format(config['s3']['endpoint']),
-                    'S3_USE_HTTPS={}'.format(0),
-                    'AWS_ACCESS_KEY_ID={}'.format(config['s3']['accesskey']),
-                    'AWS_SECRET_ACCESS_KEY={}'.format(config['s3']['secretkey']),
-                ]
+                env = utils.get_service_env()
+                env += [ 'TF_CPP_MIN_LOG_LEVEL={}'.format(3) ]
                 env += [ 'SERVICENAME={}'.format(service_name) ]
                 env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
                 env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
