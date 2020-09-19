@@ -155,11 +155,10 @@ def update_obj(base, obj):
 def get_advertise_addr():
     # If this local machine is WSL2
     if 'microsoft' in os.uname().release:
-        #print("Wait for getting host IP address...")
-        #import subprocess
-        #output = subprocess.check_output(['powershell.exe', '-Command', '(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected" }).IPv4Address.IPAddress'])
-        #addr = output.strip(b'\r\n').decode()
-        addr = 'localhost'
+        print("Wait for getting host IP address...")
+        import subprocess
+        output = subprocess.check_output(['powershell.exe', '-Command', '(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected" }).IPv4Address.IPAddress'])
+        addr = output.strip(b'\r\n').decode()
     else:
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

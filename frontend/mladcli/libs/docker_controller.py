@@ -290,10 +290,12 @@ def images_up(project, services, by_service=False):
                 image = service['image'] or image_name
                 env = utils.get_service_env()
                 env += [ 'TF_CPP_MIN_LOG_LEVEL={}'.format(3) ]
-                env += [ 'SERVICENAME={}'.format(service_name) ]
-                env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
-                env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
-                env += [ 'DATADIR=s3://data/{}'.format('') ]
+                env += [ 'PROJECT={}'.format(project['name'].lower()) ]
+                env += [ 'SERVICE={}'.format(service_name) ]
+                env += [ 'USERNAME={}'.format(config['account']['username']) ]
+                #env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
+                #env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
+                #env += [ 'DATADIR=s3://data/{}'.format('') ]
                 env += [ '{KEY}={VALUE}'.format(KEY=key, VALUE=service['env'][key]) for key in service['env'].keys() ]
                 command = service['command'] + service['arguments']
                 labels = {
@@ -375,12 +377,13 @@ def images_up(project, services, by_service=False):
                         pass
                     instance = cli.services.create(
                         name=inst_name,
+                        #hostname=f'{service_name}.{{{{.Task.Slot}}}}',
                         image=image, 
-                        env=env,
+                        env=env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={service_name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
                         command=command,
                         container_labels=labels,
                         labels=labels,
-                        networks=[{'Target': network, 'Aliases': [ service_name ]} for network in networks ],
+                        networks=[{'Target': network, 'Aliases': [service_name]} for network in networks ],
                         restart_policy=restart_policy,
                         resources=resources,
                         mode=service_mode,
