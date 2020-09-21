@@ -207,7 +207,8 @@ function VerifyNVIDIAContainerRuntime {
 
 function TouchDaemonJSON {
     # If no file
-    if [[ ! -f "$DAEMON_JSON" ]]; then
+    #if [[ ! -f "$DAEMON_JSON" ]]; then
+    if [[ ! `sudo test -f "$DAEMON_JSON";echo $?` ]]; then
         echo '{}' | sudo dd status=none of=$DAEMON_JSON
     elif [[ -z `sudo cat $DAEMON_JSON` ]]; then
         # If empty file
@@ -227,10 +228,6 @@ function NVIDIAContainerRuntimeConfiguration {
 }
 
 function UpdateGPUResources {
-    if [[ ! -f "$DAEMON_JSON" ]]; then
-        echo '{}' | sudo dd status=none of=$DAEMON_JSON
-    fi
-
     # Enable GPU on docker swarm
     GPU_IDS=`nvidia-smi -a | grep UUID | awk '{print substr($4,0,12)}'`
     CONFIG=`sudo cat $DAEMON_JSON | jq '."default-runtime"="nvidia"' | jq '."node-generic-resources"=[]'`
@@ -244,6 +241,14 @@ function AdvertiseGPUonSwarm {
     # Advertise GPU device to swarm.
     sudo sed -i -e 's/#swarm-resource/swarm-resource/' /etc/nvidia-container-runtime/config.toml
 }  
+
+function ClearDockerSwarmSetting {
+    ColorEcho Clear Swarm Setting...
+    sudo docker -H "" swarm leave --force >> /dev/null 2>&1
+    sudo docker -H "" container prune -f >> /dev/null 2>&1
+    sudo docker -H "" network prune -f >> /dev/null 2>&1
+    sudo docker -H "" network create --subnet 10.10.0.0/24 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
+}
 
 # Start Script
 GetPrivileged
@@ -322,11 +327,7 @@ if [[ -z $BIND ]]; then
         ColorEcho WARN "Not support to bind other nodes."
     fi
 
-    ColorEcho Clear Swarm Setting...
-    sudo docker -H "" swarm leave --force >> /dev/null 2>&1
-    sudo docker -H "" container prune -f >> /dev/null 2>&1
-    sudo docker -H "" network prune -f >> /dev/null 2>&1
-    sudo docker -H "" network create --subnet 10.10.0.0/24 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
+    ClearDockerSwarmSetting
     JOIN_RESULT=`sudo docker -H "" swarm init $@ 1>/dev/null`
     if [ "$?" != "0" ];
     then
@@ -338,10 +339,7 @@ else
     if [[ `IsWSL2` == '0' ]]; then
         PrintStep Setup Worker Node to $BIND
 
-        ColorEcho Clear Swarm Setting...
-        sudo docker -H "" swarm leave --force >> /dev/null 2>&1
-        sudo docker -H "" container prune -f >> /dev/null 2>&1
-        sudo docker -H "" network prune -f >> /dev/null 2>&1
+        ClearDockerSwarmSetting
 
         # Connect and Join
         JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
