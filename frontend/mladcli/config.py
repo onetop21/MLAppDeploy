@@ -69,14 +69,27 @@ def init(username, address):
     if minio_port: 
         minio_address = f'{address}:{minio_port}'
         verifySSL = False
+        region = 'ap-northeast-2'
+        print(f'Detected MinIO Server[{minio_address}] on MLAppDeploy[{docker_host}].')
+        access_key = input('Access Key ID [MLAPPDEPLOY]: ') or 'MLAPPDEPLOY'
+        secret_key = input('Secret Access Key [MLAPPDEPLOY]: ') or 'MLAPPDEPLOY'
     else:
-        minio_address = None
-        verifySSL = True
+        print(f'Failed to detect MinIO Server on MLAppDeploy[{docker_host}].')
+        s3_address = input(f'S3 Compatible Address [https://s3.amazonaws.com]: ') or 'https://s3.amazonaws.com'
+        minio_address = None if s3_address == 'https://s3.amazonaws.com' else s3_address.split('//')[-1]
+        verifySSL = s3_address.startswith('https://')
+        region = input('Region [us-east-1]: ') or 'us-east-1'
+        access_key = input('Access Key ID: ')
+        secret_key = input('Secret Access Key: ')
+        
     registry_port = utils.get_default_service_port('mlad_registry', 5000, docker_host)
     if registry_port:
         registry_address = f'{address}:{registry_port}'
+        print(f'Detected Docker Registry[{registry_address}] on MLAppDeploy[{docker_host}].')
     else:
         registry_address = None
+        print(f'Failed to detect Docker Registry on MLAppDeploy[{docker_host}].')
+        print(f'Docker image will be shared by Docker Hub.')
 
     utils.generate_empty_config()
     set(*(
@@ -85,7 +98,10 @@ def init(username, address):
         f'docker.registry={registry_address}',
         f'docker.wsl2={utils.is_host_wsl2(docker_host)}', 
         f's3.endpoint={minio_address}',
-        f's3.verify={verifySSL}'
+        f's3.verify={verifySSL}',
+        f's3.region={region}',
+        f's3.accesskey={access_key}',
+        f's3.secretkey={secret_key}',
     ))
     get(None)
 
