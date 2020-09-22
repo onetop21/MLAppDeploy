@@ -173,8 +173,17 @@ function VerifyDocker {
 
 function InstallNVIDIAContainerRuntime2008 {
     # https://github.com/NVIDIA/nvidia-container-runtime
-    sudo apt-get install -y nvidia-container-runtime
 
+    # Add the package repositories
+    curl -s -L https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
+      sudo apt-key add-
+    distribution=$(. /etc/os-release;echo $ID$VERSION)
+    curl -s -L https://nvidia.github.io/nvidia-container-runtime/$distribution/nvidia-container-runtime.list | \
+      sudo tee /etc/apt/sources.list.d/nvidia-container-runtime.list
+    sudo apt-get update
+
+    # Install nvidia-container-runtime
+    sudo apt-get install -y nvidia-container-runtime
 }
 
 function InstallNVIDIAContainerRuntime2001 {
