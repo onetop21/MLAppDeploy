@@ -398,9 +398,9 @@ def images_up(project, services, by_service=False):
 def show_logs(project, tail='all', follow=False, timestamps=False, services=[], by_service=False):
     project_name = utils.getProjectName(project)
     project_version=project['version'].lower()
+    config = utils.read_config()
 
     def task_logger(id, **params):
-        config = utils.read_config()
         with requests.get('http://{}/v1.24/tasks/{}/logs'.format(config['docker']['host'], id), params=params, stream=True) as resp:
             for iter in resp.iter_content(0x7FFFFFFF):
                 out = iter[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
@@ -415,7 +415,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, services=[], 
     with InterruptHandler() as h:
         if by_service:
             instances = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
-            if not utils.is_host_wsl2():
+            if not utils.is_host_wsl2() and not config['docker']['host'].startswith('unix://'):
                 logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
             else:
                 logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances ]
