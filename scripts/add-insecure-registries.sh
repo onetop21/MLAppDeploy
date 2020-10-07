@@ -78,7 +78,7 @@ fi
 
 ## Main Script
 function GetPrivileged {
-    Colorecho WARN "Request sudo privileged."
+    ColorEcho WARN "Request sudo privileged."
     sudo ls >> /dev/null 2>&1
     if [[ ! "$?" == "0" ]]; then
         exit 1
