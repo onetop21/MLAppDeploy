@@ -6,7 +6,6 @@ from mladcli.libs import utils, interrupt_handler as InterruptHandler, logger_th
 
 HOME = str(Path.home())
 CONFIG_PATH = HOME + '/.mlad'
-PROJECT_PATH = os.getcwd()
 SHORT_LEN = 10
 
 # Docker CLI from HOST
@@ -52,7 +51,7 @@ def image_build(project, workspace, tagging=False):
 
     PROJECT_CONFIG_PATH = utils.getProjectConfigPath(project)
     DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
-    DOCKERIGNORE_FILE = PROJECT_PATH + '/.dockerignore'
+    DOCKERIGNORE_FILE = utils.getWorkingDir() + '/.dockerignore'
 
     cli = getDockerCLI()
 
@@ -80,7 +79,7 @@ def image_build(project, workspace, tagging=False):
     # Docker build
     try:
         image = cli.images.build(
-            path=PROJECT_PATH,
+            path=utils.getWorkingDir(),
             tag=latest_name,
             dockerfile=DOCKERFILE_FILE,
             labels={

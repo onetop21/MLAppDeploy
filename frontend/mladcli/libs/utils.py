@@ -12,6 +12,24 @@ CONFIG_FILE = HOME + '/.mlad/config.yml'
 PROJECT_PATH = os.getcwd()
 PROJECT_FILE = os.getcwd() + '/mlad-project.yml'
 
+ProjectArgs = {
+    'project_file': PROJECT_FILE,
+    'working_dir': PROJECT_PATH
+}
+
+def apply_project_arguments(project_file=None, workdir=None):
+    if project_file: ProjectArgs['project_file'] = project_file
+    if workdir:
+        ProjectArgs['working_dir'] = workdir
+    else:
+        ProjectArgs['working_dir'] = os.path.dirname(ProjectArgs['project_file'])
+
+def getProjectFile():
+    return ProjectArgs['project_file']
+
+def getWorkingDir():
+    return ProjectArgs['working_dir']
+
 def generate_empty_config():
     if not os.path.exists(CONFIG_PATH):
         os.makedirs(CONFIG_PATH, exist_ok=True)
@@ -29,11 +47,10 @@ def getProjectName(project):
 
 def getRepository(project):
     config = read_config()
-    repository = '{REPO}/{OWNER}/{NAME}'.format(
-        REPO=config['docker']['registry'],
-        OWNER=config['account']['username'],
-        NAME=project['name'].lower(),
-    )
+    if 'registry' in config['docker']:
+        repository = f"{config['docker']['registry']}/{config['account']['username']}/{project['name'].lower()}"
+    else:
+        repository = f"{config['account']['username']}/{project['name'].lower()}"
     return repository
 
 def read_config():
@@ -50,8 +67,8 @@ def write_config(config):
         f.write(dump(config, default_flow_style=False, Dumper=Dumper))
 
 def read_project():
-    if os.path.exists(PROJECT_FILE):
-        with open(PROJECT_FILE) as f:
+    if os.path.exists(getProjectFile()):
+        with open(getProjectFile()) as f:
             project = load(f.read(), Loader=Loader)
         return project or {}
     else:
@@ -190,7 +207,6 @@ def get_default_service_port(container_name, internal_port, docker_host=None):
 def get_service_env():
     config = read_config()
     env = [
-        f'BOTO3_HOST={"https" if config["s3"]["verify"] else "http"}://{config["s3"]["endpoint"]}',
         f'S3_ENDPOINT={config["s3"]["endpoint"]}',
         f'S3_USE_HTTPS={1 if config["s3"]["verify"] else 0}',
         f'AWS_ACCESS_KEY_ID={config["s3"]["accesskey"]}',

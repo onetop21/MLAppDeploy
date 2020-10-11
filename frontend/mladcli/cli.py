@@ -7,8 +7,11 @@ from mladcli import node_cli as node
 
 @click.group()
 @click.version_option(version=__version__, prog_name='MLAppDeploy')
-def main():
+@click.option('--file', '-f', default=None, hidden=True)
+@click.option('--workdir', default=None, hidden=True)
+def main(file, workdir):
     '''Machine Learning Application Deployment Tool. (https://github.com/onetop21/MLAppDeploy.git)'''
+    project.cli_args(file, workdir)
 
 main.add_command(config.cli, 'config')
 main.add_command(image.cli, 'image')

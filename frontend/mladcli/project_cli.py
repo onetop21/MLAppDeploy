@@ -1,5 +1,6 @@
 import sys, os, getpass, click
 from mladcli import project
+from mladcli.libs import utils
 
 # mlad project init
 # mlad project ls | mlad ls
@@ -72,8 +73,17 @@ def update():
     '''Update Running Project or Service Deployed on Cluster.'''
 
 @click.group()
-def cli():
+@click.option('--file', '-f', default=None, help='Specify an alternate project file')
+@click.option('--workdir', default=None, help='Specify an alternate working directory\t\t\t\n(default: the path of the project file)')
+def cli(file, workdir):
     '''Manage Machine Learning Projects.'''
+    cli_args(file, workdir)
+
+def cli_args(file, workdir):
+    if file != None and not os.path.isfile(file):
+        click.echo('Project file is not exist.')
+        sys.exit(1)
+    utils.apply_project_arguments(file, workdir)
 
 cli.add_command(init)
 cli.add_command(ls)
