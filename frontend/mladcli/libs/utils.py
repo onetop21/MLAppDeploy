@@ -22,7 +22,7 @@ def apply_project_arguments(project_file=None, workdir=None):
     if workdir:
         ProjectArgs['working_dir'] = workdir
     else:
-        ProjectArgs['working_dir'] = os.path.dirname(ProjectArgs['project_file'])
+        ProjectArgs['working_dir'] = os.path.dirname(ProjectArgs['project_file']) or '.'
 
 def getProjectFile():
     return ProjectArgs['project_file']
