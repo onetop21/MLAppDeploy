@@ -73,7 +73,7 @@ function RemoteRun {
 if [[ ! -z "$HOST" ]]; then
     HOST_ARGS="-H $HOST"
 else
-    HOST_ARGS="-H ''"
+    HOST_ARGS=""
 fi
 
 ## Main Script
