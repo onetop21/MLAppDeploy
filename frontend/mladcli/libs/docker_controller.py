@@ -291,7 +291,7 @@ def images_up(project, services, by_service=False):
                 env = utils.get_service_env()
                 env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
                 env += [f"PROJECT={project['name'].lower()}"]
-                env += [f"PROJECT_ID={PROJECT_ID}"]
+                env += [f"PROJECT_ID={project_id}"]
                 env += [f"SERVICE={service_name}"]
                 env += [f"USERNAME={config['account']['username']}"]
                 #env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
