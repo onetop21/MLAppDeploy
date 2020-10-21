@@ -191,6 +191,7 @@ def images_up(project, services, by_service=False):
     project_version=project['version'].lower()
     repository = utils.getRepository(project)
     image_name = '{REPOSITORY}:latest'.format(REPOSITORY=repository)
+    project_id = utils.generate_unique_id()
     wait_queue = list(services.keys())
     running_queue = []
 
@@ -288,10 +289,11 @@ def images_up(project, services, by_service=False):
                 service_name = service_key.lower()
                 image = service['image'] or image_name
                 env = utils.get_service_env()
-                env += [ 'TF_CPP_MIN_LOG_LEVEL={}'.format(3) ]
-                env += [ 'PROJECT={}'.format(project['name'].lower()) ]
-                env += [ 'SERVICE={}'.format(service_name) ]
-                env += [ 'USERNAME={}'.format(config['account']['username']) ]
+                env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
+                env += [f"PROJECT={project['name'].lower()}"]
+                env += [f"PROJECT_ID={PROJECT_ID}"]
+                env += [f"SERVICE={service_name}"]
+                env += [f"USERNAME={config['account']['username']}"]
                 #env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
                 #env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
                 #env += [ 'DATADIR=s3://data/{}'.format('') ]

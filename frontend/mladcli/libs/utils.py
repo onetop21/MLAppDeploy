@@ -1,4 +1,4 @@
-import sys, os, copy 
+import sys, os, copy, uuid
 from pathlib import Path
 from yaml import load, dump
 try:
@@ -213,3 +213,10 @@ def get_service_env():
         f'AWS_SECRET_ACCESS_KEY={config["s3"]["secretkey"]}',
     ]
     return env
+
+def generate_unique_id(length=None):
+    UUID = uuid.uuid4()
+    if length:
+        return UUID.hex[:length]
+    else:
+        return str(UUID)
