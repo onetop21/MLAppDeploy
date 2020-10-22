@@ -352,7 +352,7 @@ else
 
         # Connect and Join
         JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
-        JOIN_RESULT=`$JOIN_COMMAND`
+        JOIN_RESULT=`sudo $JOIN_COMMAND`
         if [ "$?" != "0" ];
         then
             ColorEcho WARN $JOIN_RESULT
