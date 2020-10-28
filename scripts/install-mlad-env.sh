@@ -256,7 +256,7 @@ function ClearDockerSwarmSetting {
     sudo docker -H "" swarm leave --force >> /dev/null 2>&1
     sudo docker -H "" container prune -f >> /dev/null 2>&1
     sudo docker -H "" network prune -f >> /dev/null 2>&1
-    sudo docker -H "" network create --subnet 10.10.0.0/24 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
+    sudo docker -H "" network create --subnet 10.10.0.0/16 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
 }
 
 # Start Script
