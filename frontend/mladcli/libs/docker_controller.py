@@ -230,9 +230,15 @@ def images_up(project, services, by_service=False):
                 try:
                     print('Create network...')
                     if by_service:
-                        ipam_pool = docker.types.IPAMPool(subnet='10.0.4.0/22')
-                        ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
-                        cli.networks.create(network, driver='overlay', ipam=ipam_config, ingress='frontend' in network)
+                        for _ in range(0, 255, 4):
+                            subnet = f'10.0.{_}.0/22'
+                            ipam_pool = docker.types.IPAMPool(subnet=subnet)
+                            ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+                            net = cli.networks.create(network, driver='overlay', ipam=ipam_config, ingress='frontend' in network)
+                            if net.attrs['Driver']: 
+                                print(f'Selected Subnet [{subnet}]')
+                                break
+                            net.remove()
                     else:
                         cli.networks.create(network, driver='bridge')
                 except docker.errors.APIError as e:
