@@ -26,17 +26,17 @@ def disable(id):
 @click.command()
 @click.argument('KV', nargs=-1)
 @click.pass_obj
-def add(node, kv):
+def add(id, kv):
     '''Add label to node.'''
     kvdict = dict([ _.split('=') for _ in kv ])
-    node.label_add(node, **kvdict)
+    node.label_add(id, **kvdict)
 
 @click.command()
 @click.argument('KEY', nargs=-1)
 @click.pass_obj
-def rm(node, key):
+def rm(id, key):
     '''Remove label from node.'''
-    node.label_rm(node, *key)
+    node.label_rm(id, *key)
 
 @click.group()
 @click.argument('NODE')
