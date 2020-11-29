@@ -92,3 +92,71 @@ You can show more information by below command.
 ``` bash
 (EnvDir) $ mlad --help
 ```
+
+## Appendix
+### Node labeling and constraints
+Add label to node.
+```bash
+(EnvDir) $ mlad node label [ID or HOSTNAME] add [KEY]=[VALUE]
+```
+Modify constraints at your project file.
+```yaml
+...
+services:
+  ...
+  service-name:
+    ...
+    deploy:
+      ...
+      constraints:
+        ...
+        labels.[KEY]: [VALUE]
+```
+
+#### Example
+Labeling.
+```bash
+(EnvDir) $ mlad node ls
+ID          HOSTNAME        ADDRESS       ROLE     STATE  AVAILABILITY  ENGINE    LABELS
+abcdef0001  operator-node   192.168.65.1  Manager  Ready  Active        19.03.13
+abcdef0002  learner-node    192.168.65.2  Worker   Ready  Active        19.03.13
+abcdef0003  actor-node-01   192.168.65.3  Worker   Ready  Active        19.03.13
+abcdef0004  actor-node-02   192.168.65.4  Worker   Ready  Active        19.03.13
+abcdef0005  actor-node-03   192.168.65.5  Worker   Ready  Active        19.03.13
+(EnvDir) $ mlad node label actor-node-01 add type=actor
+Added.
+(EnvDir) $ mlad node label actor-node-02 add type=actor
+Added.
+(EnvDir) $ mlad node label actor-node-03 add type=actor
+Added.
+(EnvDir) $ mlad node ls
+ID          HOSTNAME        ADDRESS       ROLE     STATE  AVAILABILITY  ENGINE    LABELS
+abcdef0001  operator-node   192.168.65.1  Manager  Ready  Active        19.03.13
+abcdef0002  learner-node    192.168.65.2  Worker   Ready  Active        19.03.13
+abcdef0003  actor-node-01   192.168.65.3  Worker   Ready  Active        19.03.13  type=actor
+abcdef0004  actor-node-02   192.168.65.4  Worker   Ready  Active        19.03.13  type=actor
+abcdef0005  actor-node-03   192.168.65.5  Worker   Ready  Active        19.03.13  type=actor
+```
+Modifying project file.
+```yaml
+...
+services:
+  operator:
+    ...
+    deploy:
+      constraints:
+        hostname: operator-node
+  learner:
+    ...
+    deploy:
+      constraints:
+        hostname: learner-node
+
+  actor:
+    ...
+    deploy:
+      constraints:
+        replicas: 10
+        labels.type: actor
+```
+
