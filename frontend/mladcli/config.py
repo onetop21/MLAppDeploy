@@ -120,10 +120,9 @@ def get(keys):
     config = default_config(utils.read_config())
     data = get_value(config, keys)
     if isinstance(data, list):
-        print('{:24} {:32}'.format('KEY', 'VALUE'))
+        print(f'{"KEY":24} {"VALUE":32}')
         for key, value in data:
-            #if key and value: print('{}={}'.format(key, value))
-            if key: print('{:24} {:32}'.format(key, str(value)))
+            if key: print(f'{key:24} {str(value):32}')
     else:
         print(data)
 

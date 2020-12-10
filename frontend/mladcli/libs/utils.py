@@ -39,11 +39,11 @@ def generate_empty_config():
 
 def getProjectConfigPath(project):
     config = read_config()
-    return '%s/%s/%s'%(CONFIG_PATH, config['account']['username'], project['name'].lower())
+    return f"{CONFIG_PATH}/{config['account']['username']}/{project['name'].lower()}"
 
 def getProjectName(project):
     config = read_config()
-    return '{USERNAME}_{PROJECT}'.format(USERNAME=config['account']['username'], PROJECT=project['name'].lower())
+    return f"{config['account']['username']}_{project['name'].lower()}"
 
 def getRepository(project):
     config = read_config()
@@ -78,7 +78,7 @@ def get_project(default_project):
     project = read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)
-        print('$ %s --help' % sys.argv[0], file=sys.stderr)
+        print(f'$ {sys.argv[0]} --help', file=sys.stderr)
         sys.exit(1)
 
     return default_project(project)
@@ -135,10 +135,10 @@ def convert_dockerfile(project, workspace):
             PRESCRIPTS=';'.join(workspace['prescripts']) if len(workspace['prescripts']) else "echo .",
             REQUIRES='\n'.join(requires),
             POSTSCRIPTS=';'.join(workspace['postscripts']) if len(workspace['postscripts']) else "echo .",
-            COMMAND='[%s]'%', '.join(
-                ['"{}"'.format(item) for item in workspace['command'].split()] + 
-                ['"{}"'.format(item) for item in workspace['arguments'].split()]
-            ),
+            COMMAND='[{}]'.format(', '.join(
+                [f'"{item}"' for item in workspace['command'].split()] + 
+                [f'"{item}"' for item in workspace['arguments'].split()]
+            )),
         ))
 
 def merge(source, destination):

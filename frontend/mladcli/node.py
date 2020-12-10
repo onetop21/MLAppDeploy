@@ -15,7 +15,7 @@ def list():
         engine = node.attrs['Description']['Engine']['EngineVersion']
         state = node.attrs['Status']['State']
         address = node.attrs['Status']['Addr']
-        labels = ', '.join(['{}={}'.format(key, value) for key, value in node.attrs['Spec']['Labels'].items()])
+        labels = ', '.join([f'{key}={value}' for key, value in node.attrs['Spec']['Labels'].items()])
         columns.append((ID, hostname, address, role.title(), state.title(), 'Active' if activate else '-', engine, labels))
     utils.print_table(columns, 'No attached node.')
 

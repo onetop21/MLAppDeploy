@@ -15,10 +15,10 @@ def list(all, tail):
     data = [('ID', 'REGISTRY', 'BUILD USER', 'PROJECT NAME', 'PROJECT AUTHOR', 'VERSION', 'CREATED')]
     for id, repository, tag, head, project_name, author, created in images[:tail]:
         registry, builder, _ = repository.split('/')
-        data.append((id, registry, builder, project_name, author, ('[{}]' if head else '{}').format(tag), created))
+        data.append((id, registry, builder, project_name, author, f'[{tag}]' if head else f'{tag}', created))
     utils.print_table(data, 'No have built image.')
     if dummies:
-        print('This project has %d cached-images. To secure disk spaces by cleaning cache.' % dummies) 
+        print(f'This project has {dummies} cached-images. To secure disk spaces by cleaning cache.') 
 
 def search(keyword):
     import urllib3, json
@@ -26,12 +26,12 @@ def search(keyword):
     config = utils.read_config()
     try:
         images = []
-        catalog = json.loads(requests.get('https://%s/v2/_catalog' % config['docker']['registry'], verify=False).text)
+        catalog = json.loads(requests.get(f"http://{config['docker']['registry']}/v2/_catalog", verify=False).text)
         if 'repositories' in catalog:
             repositories = catalog['repositories']
             for repository in repositories:
-                tags = json.loads(requests.get('https://%s/v2/%s/tags/list' % (config['docker']['registry'], repository), verify=False).text)
-                images += [ '%s/%s:%s' % (config['docker']['registry'], tags['name'], tag) for tag in tags['tags'] ] 
+                tags = json.loads(requests.get(f'http://{config["docker"]["registry"]}/v2/{repository}/tags/list', verify=False).text)
+                images += [ f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags'] ] 
             found = [ item for item in filter(None, [image if keyword in image else None for image in images]) ]
 
             columns = [('REPOSITORY', 'TAG')]
@@ -42,7 +42,7 @@ def search(keyword):
         else:
             print('No images.', file=sys.stderr)
     except requests.exceptions.ConnectionError as e:
-        print('Cannot connect to docker registry [%s]' % config['docker']['registry'], file=sys.stderr)
+        print(f"Cannot connect to docker registry [{config['docker']['registry']}]", file=sys.stderr)
 
 def remove(ids, force):
     print('Remove project image...')
@@ -55,7 +55,7 @@ def prune(all):
 
         result = docker.image_prune(project['project'])
         if result:
-            print('%d images removed.' % result)
+            print(f'{result} images removed.')
         else:
             print('Already cleared.', file=sys.stderr)
     else:
@@ -63,14 +63,14 @@ def prune(all):
         if result['ImagesDeleted'] and len(result['ImagesDeleted']):
             for deleted in result['ImagesDeleted']:
                 status, value = [ (key, deleted[key]) for key in deleted ][-1]
-                print('{:12} {:32}'.format(status, value))
+                print(f'{status:12} {value:32}')
             reclaimed = result['SpaceReclaimed']
             unit = 0
             unit_list = ['B', 'KB', 'MB', 'GB', 'TB' ]
             while reclaimed / 1000. > 1:
                 reclaimed /= 1000.
                 unit += 1
-            print('%.2f%s Space Reclaimed.' % (reclaimed, unit_list[unit]))
+            print(f'{reclaimed:.2f}{unit_list[unit]} Space Reclaimed.')
         else:
             print('Already cleared.', file=sys.stderr)
         result = docker.image_prune()
