@@ -37,12 +37,12 @@ def status(all):
         columns.append((id, username, name, service, node, desired_state, current_state, error))
     utils.print_table(columns, 'Project is not running.')
 
-def build(tagging):
+def build(tagging, verbose):
     project = utils.get_project(default_project)
 
     print('Generating project image...')
     utils.convert_dockerfile(project['project'], project['workspace'])
-    image_name = docker.image_build(project['project'], project['workspace'], tagging)
+    image_name = docker.image_build(project['project'], project['workspace'], tagging, verbose)
     if image_name:
         print('Built Image :', image_name)
 

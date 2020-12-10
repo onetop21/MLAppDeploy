@@ -30,10 +30,11 @@ def ps(all):
     project.status(all)
 
 @click.command()
-@click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image')
-def build(tagging):
+@click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image.')
+@click.option('--verbose', '-v', is_flag=True, help='Print detail-log during build a image.')
+def build(tagging, verbose):
     '''Build Project to Image for Deploying on Cluster.'''
-    project.build(tagging)
+    project.build(tagging, verbose)
 
 @click.command()
 @click.option('--build', '-b', is_flag=True, help='Build Project Image before Deploy and Run Project')

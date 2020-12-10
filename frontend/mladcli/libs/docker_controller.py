@@ -45,7 +45,7 @@ def image_list(project=None):
             dummies += 1
     return data, dummies
 
-def image_build(project, workspace, tagging=False):
+def image_build(project, workspace, tagging=False, verbose=False):
     config = utils.read_config()
     project_name = utils.getProjectName(project)
     project_version=project['version'].lower()
@@ -118,7 +118,7 @@ def image_build(project, workspace, tagging=False):
             if 'error' in _:
                 raise docker.errors.BuildError(_['error'], None)
             elif 'stream' in _:
-                sys.stdout.write(_['stream'])
+                if verbose: sys.stdout.write(_['stream'])
 
     except docker.errors.BuildError as e:
         print(e, file=sys.stderr)
