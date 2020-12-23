@@ -1,5 +1,7 @@
 import sys, os, copy, time
 from pathlib import Path
+from datetime import datetime
+from dateutil import parser
 import docker, requests
 from docker.types import LogConfig
 from mladcli.libs import utils, interrupt_handler as InterruptHandler, logger_thread as LoggerThread
@@ -214,8 +216,13 @@ def running_projects():
             replicas = service.attrs['Spec']['Mode']['Replicated']['Replicas']
             image = service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image']
             username = service.attrs['Spec']['Labels']['MLAD.PROJECT.USERNAME']
-            data[project] = data[project] if project in data else { 'username': username,'image': image, 'services': 0 }
-            data[project]['services'] += replicas
+            tasks_status = [task['Status']['State'] for task in service.tasks()]
+
+            default = { 'username': username,'image': image, 'services': 0, 'replicas': 0, 'tasks': 0 }
+            data[project] = data[project] if project in data else default
+            data[project]['services'] += 1
+            data[project]['replicas'] += replicas
+            data[project]['tasks'] += tasks_status.count('running')
 
     return data
 
@@ -481,7 +488,7 @@ def images_up(project, services, by_service=False):
             return None
     return project_name
             
-def show_logs(project, tail='all', follow=False, timestamps=False, services=[], by_service=False):
+def show_logs(project, tail='all', follow=False, timestamps=False, targets=[], by_service=False):
     project_name = utils.getProjectName(project)
     project_version=project['version'].lower()
     config = utils.read_config()
@@ -512,7 +519,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, services=[], 
 
         if len(logs):
             name_width = min(32, max([len(name) for name, _ in logs]))
-            loggers = [ LoggerThread(name, name_width, log, services, by_service, timestamps, SHORT_LEN) for name, log in logs ]
+            loggers = [ LoggerThread(name, name_width, log, targets, by_service, timestamps, SHORT_LEN) for name, log in logs ]
             for logger in loggers: logger.start()
             while not h.interrupted and max([ not logger.interrupted for logger in loggers ]):
                 time.sleep(0.01)
@@ -591,7 +598,7 @@ def show_status(project, services, all=False):
     # Block not running.
     filters = f'MLAD.PROJECT={project_name}'
     if not len(cli.services.list(filters={'label': filters})):
-        print('Cannot running service.', file=sys.stderr)
+        print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
     task_info = []
@@ -602,18 +609,34 @@ def show_status(project, services, all=False):
             username = instance.attrs['Spec']['Labels']['MLAD.PROJECT.USERNAME']
             service = instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE']
             tasks = instance.tasks()
+            if 'Ports' in instance.attrs['Endpoint']:
+                publish = ', '.join(['->'.join([str(_['TargetPort']), str(_['PublishedPort'])]) for _ in instance.attrs['Endpoint']['Ports']])
+            else:
+                publish = ''
             for task in tasks:
+                uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
+                if uptime > 24 * 60 * 60:
+                    uptime = f"{uptime // (24 * 60 * 60):.0f} days"
+                elif uptime > 60 * 60:
+                    uptime = f"{uptime // (60 * 60):.0f} hours"
+                elif uptime > 60:
+                    uptime = f"{uptime // 60:.0f} minutes"
+                else:
+                    uptime = f"{uptime:.0f} seconds"
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
                     task_info.append((
                         task['ID'][:SHORT_LEN],
                         name, 
                         username,
                         service,
+                        task['Slot'],
                         cli.nodes.get(task['NodeID']).attrs['Description']['Hostname'] if 'NodeID' in task else '-',
-                        task['DesiredState'], 
-                        task['Status']['State'], 
-                        task['Status']['Err'] if 'Err' in task['Status'] else '-')
-                    )
+                        task['DesiredState'].title(), 
+                        f"{task['Status']['State'].title()}", 
+                        task['Status']['Err'] if 'Err' in task['Status'] else '-',
+                        uptime,
+                        publish
+                    ))
         except docker.errors.NotFound as e:
             pass
     
@@ -627,7 +650,7 @@ def scale_service(project, scale_spec):
     # Block not running.
     filters = f'MLAD.PROJECT={project_name}'
     if not len(cli.services.list(filters={'label': filters})):
-        print('Cannot running service.', file=sys.stderr)
+        print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
     
     for service_name in scale_spec:

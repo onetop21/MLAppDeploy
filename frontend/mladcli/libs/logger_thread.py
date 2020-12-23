@@ -54,8 +54,8 @@ class LoggerThread(threading.Thread):
                     if not len(self.filters) or sum([filter in name for filter in self.filters]): # Need to check performance
                         self.colorkey[name] = self.colorkey[name] if name in self.colorkey else Colors[colorIndex()]
                         print(("{}{:%d}{} {}" % self.width).format(self.colorkey[name], name, NoColor, msg))
-                    else:
-                        self.interrupt()
+                    #else:
+                    #    self.interrupt()
             except StopIteration as e:
                 self.interrupt()
             #time.sleep(0.001)

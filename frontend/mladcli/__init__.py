@@ -1,3 +1,3 @@
 import sys
 import os
-__version__ = "0.0.5a"
+__version__ = "0.0.5b"

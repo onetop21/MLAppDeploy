@@ -23,18 +23,19 @@ def init(name, version, author):
 def list():
     data = docker.running_projects()
 
-    columns = [('PROJECT', 'USERNAME', 'IMAGE', 'SERVICES')]
+    columns = [('PROJECT', 'USERNAME', 'IMAGE', 'SERVICES', 'TASKS')]
     for project in data:
-        columns.append((project, data[project]['username'], data[project]['image'], data[project]['services']))
+        running_tasks = f"{data[project]['tasks']}/{data[project]['replicas']}"
+        columns.append((project, data[project]['username'], data[project]['image'], data[project]['services'], f"{running_tasks:>5}"))
     utils.print_table(columns, 'Cannot find running project.', 48)
 
 def status(all):
     project = utils.get_project(default_project)
     
     task_info = docker.show_status(project['project'], project['services'] or {}, all)
-    columns = [('ID', 'USERNAME', 'PROJECT', 'SERVICE', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'ERROR')]
-    for id, name, username, service, node, desired_state, current_state, error in task_info:
-        columns.append((id, username, name, service, node, desired_state, current_state, error))
+    columns = [('ID', 'USERNAME', 'PROJECT', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'ERROR', 'UPTIME', 'PORTS')]
+    for id, name, username, service, slot, node, desired_state, current_state, error, uptime, ports in task_info:
+        columns.append((id, username, name, service, slot, node, desired_state, current_state, error, uptime, ports))
     utils.print_table(columns, 'Project is not running.')
 
 def build(tagging, verbose):
@@ -107,9 +108,9 @@ def down(services):
     docker.images_down(project['project'], down_services, True)
     print('Done.')
 
-def logs(tail, follow, timestamps, services):
+def logs(tail, follow, timestamps, targets):
     project = utils.get_project(default_project)
-    docker.show_logs(project['project'], tail, follow, timestamps, services, True)
+    docker.show_logs(project['project'], tail, follow, timestamps, targets, True)
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
