@@ -25,9 +25,10 @@ def ls():
 
 @click.command()
 @click.option('--all', '-a', is_flag=True, help='Show included shutdown service.')
-def ps(all):
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
+def ps(all, no_trunc):
     '''Show Project Status Deployed on Cluster.'''
-    project.status(all)
+    project.status(all, no_trunc)
 
 @click.command()
 @click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image.')

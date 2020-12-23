@@ -84,13 +84,17 @@ def get_project(default_project):
     return default_project(project)
 
 def print_table(data, no_data_msg=None, max_width=32):
-    widths = [max(_) for _ in zip(*[[min(len(str(value)), max_width) for value in datum] for datum in data])]
+    if max_width > 0:
+        widths = [max(_) for _ in zip(*[[min(len(str(value)), max_width) for value in datum] for datum in data])]
+    else:
+        widths = [max(_) for _ in zip(*[[len(str(value)) for value in datum] for datum in data])]
     format = '  '.join([('{:%d}' % _) for _ in widths])
-    titled = False
+    firstline = True
     for datum in data:
-        if not titled:
+        datum = [_ if not isinstance(_, str) or len(_) <= w else f"{_[:w-3]}..." for _, w in zip(datum, widths)]
+        if firstline:
             print(format.format(*datum).upper())
-            titled = True
+            firstline = False
         else:
             print(format.format(*datum))
     if len(data) < 2:
