@@ -28,9 +28,13 @@ def main():
         'Click>=7.0,<8.0.0', 
         'PyYAML>=3.10,<6.0', 
         'docker>=4.0.2,<5.0.0',
-        'requests-unixsocketx>=0.2.0',
+        'requests-unixsocket>=0.2.0',
       ],
-      scripts=['mladcli/mlad']
+      #scripts=['mladcli/mlad']
+      entry_points='''
+        [console_scripts]
+        mlad=mladcli.cli:main
+      '''
     )
 
 if __name__ == '__main__':
