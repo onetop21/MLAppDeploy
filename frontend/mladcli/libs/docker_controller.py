@@ -1,8 +1,12 @@
-import sys, os, copy, time
+import sys
+import os
+import copy
+import time
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
-import docker, requests
+import docker
+import requests
 from docker.types import LogConfig
 from mladcli.libs import utils, interrupt_handler as InterruptHandler, logger_thread as LoggerThread
 
@@ -488,30 +492,44 @@ def images_up(project, services, by_service=False):
             return None
     return project_name
             
-def show_logs(project, tail='all', follow=False, timestamps=False, targets=[], by_service=False):
+def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], by_service=False):
     project_name = utils.getProjectName(project)
     project_version=project['version'].lower()
     config = utils.read_config()
 
-    def task_logger(id, **params):
-        with requests.get(f"http://{config['docker']['host']}/v1.24/tasks/{id}/logs", params=params, stream=True) as resp:
-            for iter in resp.iter_content(0x7FFFFFFF):
-                out = iter[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
+    def query_logs(target, **params):
+        if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
+            host = config['docker']['host'] 
+        elif config['docker']['host'].startswith('unix://'):
+            host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
+        else:
+            host = f"http://{config['docker']['host']}"
+
+        import requests_unixsocket
+        with requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, stream=True) as resp:
+            for line in resp.iter_lines():
+                out = line[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
                 if timestamps:
                     temp = out.split(' ')
                     out = ' '.join([temp[1], temp[0]] + temp[2:])
                 yield out.encode('utf8')
-                #yield iter[docker.constants.STREAM_HEADER_SIZE_BYTES:] 
         return ''
 
     cli = getDockerCLI()
     with InterruptHandler() as h:
         if by_service:
             instances = cli.services.list(filters={'label': f'MLAD.PROJECT={project_name}'})
-            if not utils.is_host_wsl2() and not config['docker']['host'].startswith('unix://'):
-                logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], task_logger(task['ID'], details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances for task in inst.tasks() ]
+            filtered = []
+            services = [(inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], f"/services/{inst.attrs['ID']}", inst.tasks()) for inst in instances]
+            if filters:
+                for _ in services:
+                    if _[0] in filters:
+                        filtered.append(_[:2])
+                    else:
+                        filtered += [(_[0], f"/tasks/{task['ID']}") for task in _[2] if task['ID'][:10] in filters]
             else:
-                logs = [ (inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for inst in instances ]
+                filtered = [_[:2] for _ in services]
+            logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
         else:
             instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_name}'})
             timestamps = True
@@ -519,7 +537,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, targets=[], b
 
         if len(logs):
             name_width = min(32, max([len(name) for name, _ in logs]))
-            loggers = [ LoggerThread(name, name_width, log, targets, by_service, timestamps, SHORT_LEN) for name, log in logs ]
+            loggers = [ LoggerThread(name, name_width, log, by_service, timestamps, SHORT_LEN) for name, log in logs ]
             for logger in loggers: logger.start()
             while not h.interrupted and max([ not logger.interrupted for logger in loggers ]):
                 time.sleep(0.01)

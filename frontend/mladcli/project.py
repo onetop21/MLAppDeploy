@@ -120,9 +120,9 @@ def down(services):
     docker.images_down(project['project'], down_services, True)
     print('Done.')
 
-def logs(tail, follow, timestamps, targets):
+def logs(tail, follow, timestamps, filters):
     project = utils.get_project(default_project)
-    docker.show_logs(project['project'], tail, follow, timestamps, targets, True)
+    docker.show_logs(project['project'], tail, follow, timestamps, filters, True)
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])

@@ -56,14 +56,14 @@ def down(services):
     project.down(services)
 
 @click.command()
-@click.option('--tail', default='255', help='Number of lines to show from the end of logs (default "255")')
+@click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
 @click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs.')
 @click.option('--follow', '-f', is_flag=True, help='Follow log output')
 @click.argument('SERVICES|TASKS', nargs=-1)
 def logs(tail, follow, timestamps, **kwargs):
     '''Show Current Project Logs Deployed on Cluster.'''
-    targets = kwargs.get('services|tasks')
-    project.logs(tail, follow, timestamps, targets)
+    filters = kwargs.get('services|tasks')
+    project.logs(tail, follow, timestamps, filters)
 
 @click.command()
 @click.argument('scales', nargs=-1)
