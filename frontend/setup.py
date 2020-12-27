@@ -24,7 +24,12 @@ def main():
       url='https://github.com/onetop21/MLAppDeploy.git',
       zip_safe=False,
       python_requires='>3.5',
-      install_requires=['Click>=7.0,<8.0.0', 'PyYAML>=3.10,<6.0', 'docker>=4.0.2,<5.0.0'],
+      install_requires=[
+        'Click>=7.0,<8.0.0', 
+        'PyYAML>=3.10,<6.0', 
+        'docker>=4.0.2,<5.0.0',
+        'requests-unixsocketx>=0.2.0',
+      ],
       scripts=['mladcli/mlad']
     )
 
