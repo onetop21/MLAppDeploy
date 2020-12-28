@@ -23,28 +23,25 @@ def init(name, version, author):
 def list():
     data = docker.running_projects()
 
-    columns = [('PROJECT', 'USERNAME', 'IMAGE', 'SERVICES', 'TASKS')]
+    columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
     for project in data:
         running_tasks = f"{data[project]['tasks']}/{data[project]['replicas']}"
-        columns.append((project, data[project]['username'], data[project]['image'], data[project]['services'], f"{running_tasks:>5}"))
+        columns.append((data[project]['username'], data[project]['project'], data[project]['image'], data[project]['services'], f"{running_tasks:>5}"))
     utils.print_table(columns, 'Cannot find running project.', 48)
 
 def status(all, no_trunc):
+    config = utils.read_config()
     project = utils.get_project(default_project)
     
     task_info = docker.show_status(project['project'], project['services'] or {}, all)
-    columns = [('ID', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'ERROR', 'UPTIME', 'PORTS')]
+    columns = [('ID', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'UPTIME', 'PORTS', 'ERROR')]
     columns_data = []
-    _username = None
-    _projectname = None
-    for id, name, username, service, slot, node, desired_state, current_state, error, uptime, ports in task_info:
-        columns_data.append((id, service, slot, node, desired_state, current_state, error, uptime, ports))
-        _username = username
-        _projectname = name
+    for id, service, slot, node, desired_state, current_state, uptime, ports, error in task_info:
+        columns_data.append((id, service, slot, node, desired_state, current_state, uptime, ports, error))
     columns_data = sorted(columns_data, key=lambda x: f"{x[1]}-{x[2]:08}")
     columns += columns_data
 
-    print(f"USERNAME: [{_username}] / PROJECT: [{_projectname}]")
+    print(f"USERNAME: [{config['account']['username']}] / PROJECT: [{project['project']['name']}]")
     if no_trunc:
         utils.print_table(columns, 'Project is not running.', -1)
     else:

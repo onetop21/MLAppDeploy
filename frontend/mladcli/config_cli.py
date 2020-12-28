@@ -20,7 +20,7 @@ def init(username, address):
     config.init(username, address)
 
 @click.command()
-@click.argument('VAR', required=True, nargs=-1)
+@click.argument('VAR', required=True, nargs=-1, autocompletion=get_config_key_completion)
 def set(var):
     '''Set Configurations. [KEY=VALUE]...'''
     config.set(*var) 

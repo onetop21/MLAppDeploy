@@ -209,13 +209,14 @@ def running_projects():
     data = {}
     if len(services):
         for service in services:
-            project = service.attrs['Spec']['Labels']['MLAD.PROJECT.NAME']
+            project = service.attrs['Spec']['Labels']['MLAD.PROJECT']
+            project_name = service.attrs['Spec']['Labels']['MLAD.PROJECT.NAME']
             replicas = service.attrs['Spec']['Mode']['Replicated']['Replicas']
             image = service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image']
             username = service.attrs['Spec']['Labels']['MLAD.PROJECT.USERNAME']
             tasks_status = [task['Status']['State'] for task in service.tasks()]
 
-            default = { 'username': username,'image': image, 'services': 0, 'replicas': 0, 'tasks': 0 }
+            default = { 'username': username, 'project': project_name, 'image': image, 'services': 0, 'replicas': 0, 'tasks': 0 }
             data[project] = data[project] if project in data else default
             data[project]['services'] += 1
             data[project]['replicas'] += replicas
@@ -630,8 +631,8 @@ def show_status(project, services, all=False):
     for inst_name in inst_names:
         try:
             instance = cli.services.get(inst_name)
-            name = instance.attrs['Spec']['Labels']['MLAD.PROJECT.NAME']
-            username = instance.attrs['Spec']['Labels']['MLAD.PROJECT.USERNAME']
+            #name = instance.attrs['Spec']['Labels']['MLAD.PROJECT.NAME']
+            #username = instance.attrs['Spec']['Labels']['MLAD.PROJECT.USERNAME']
             service = instance.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE']
             tasks = instance.tasks()
             if 'Ports' in instance.attrs['Endpoint']:
@@ -651,16 +652,14 @@ def show_status(project, services, all=False):
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
                     task_info.append((
                         task['ID'][:SHORT_LEN],
-                        name, 
-                        username,
                         service,
                         task['Slot'],
                         cli.nodes.get(task['NodeID']).attrs['Description']['Hostname'] if 'NodeID' in task else '-',
                         task['DesiredState'].title(), 
                         f"{task['Status']['State'].title()}", 
-                        task['Status']['Err'] if 'Err' in task['Status'] else '-',
                         uptime,
-                        publish
+                        publish,
+                        task['Status']['Err'] if 'Err' in task['Status'] else '-'
                     ))
         except docker.errors.NotFound as e:
             pass
