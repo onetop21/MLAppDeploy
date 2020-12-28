@@ -9,6 +9,7 @@ except ImportError as e:
 HOME = str(Path.home())
 CONFIG_PATH = HOME + '/.mlad'
 CONFIG_FILE = HOME + '/.mlad/config.yml'
+COMPLETION_FILE = HOME + '/.mlad/completion.sh'
 PROJECT_PATH = os.getcwd()
 PROJECT_FILE = os.getcwd() + '/mlad-project.yml'
 
@@ -65,6 +66,16 @@ def read_config():
 def write_config(config):
     with open(CONFIG_FILE, 'w') as f:
         f.write(dump(config, default_flow_style=False, Dumper=Dumper))
+
+def get_completion(shell='bash'):
+    return os.popen(f"_MLAD_COMPLETE=source_{shell} mlad").read()
+
+def write_completion(shell='bash'):
+    with open(COMPLETION_FILE, 'wt') as f:
+        f.write(get_completion(shell))
+    if shell == 'bash':
+        with open(f"{HOME}/.bash_completion", 'wt') as f:
+            f.write(f". {COMPLETION_FILE}")
 
 def read_project():
     if os.path.exists(getProjectFile()):

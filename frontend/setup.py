@@ -30,7 +30,6 @@ def main():
         'docker>=4.0.2,<5.0.0',
         'requests-unixsocket>=0.2.0',
       ],
-      #scripts=['mladcli/mlad']
       entry_points='''
         [console_scripts]
         mlad=mladcli.cli:main

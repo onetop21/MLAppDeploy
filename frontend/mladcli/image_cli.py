@@ -1,5 +1,8 @@
-import sys, os, click
+import sys
+import os
+import click
 from mladcli import image
+from mladcli.autocompletion import *
 
 # mlad image ls
 # mlad image search
@@ -21,7 +24,7 @@ def search(keyword):
 
 @click.command()
 @click.option('--force', '-f', is_flag=True, help='Remove forcely.')
-@click.argument('ID', nargs=-1, required=False)
+@click.argument('ID', nargs=-1, required=True, autocompletion=get_image_list_completion)
 def rm(force, id):
     '''Remove built image.'''
     image.remove(id, force)
@@ -32,7 +35,7 @@ def prune(all):
     '''Remove unused and untagged project images.'''
     image.prune(all)
 
-@click.group()
+@click.group('image')
 def cli():
     '''Manage Docker Image.'''
 

@@ -1,5 +1,10 @@
-import sys, os, getpass, click
+import sys
+import os
+import getpass
+import click
 from mladcli import config
+from mladcli.libs import utils
+from mladcli.autocompletion import *
 
 # mlad config init
 # mlad config set [key=value]
@@ -21,7 +26,7 @@ def set(var):
     config.set(*var) 
 
 @click.command()
-@click.argument('KEY', required=False)
+@click.argument('KEY', required=False, autocompletion=get_config_key_completion)
 def get(key):
     '''Get Configurations.'''
     config.get(key)
@@ -32,7 +37,23 @@ def env(unset):
     '''To set environment variables, run "eval $(mlad config env)"'''
     config.env(unset)
 
-@click.group()
+@click.command()
+@click.option('--install', is_flag=True, help='Install Shell-Completion to Shell(Linux Only).')
+def completion(install):
+    '''Activate Auto Completion (Linux Only)'''
+    shell = os.path.basename(os.environ.get('SHELL'))
+    if shell in ['bash', 'zsh']:
+        if install:
+            utils.write_completion(shell)
+            click.echo(f"Register \"source {utils.COMPLETION_FILE}\" to rc file.")
+        else:
+            completion_script = utils.get_completion(shell)
+            click.echo(completion_script)
+            click.echo("# To set environment variables, run \"eval \"$(mlad config completion)\"\"")
+    else:
+        click.echo(f'Cannot support shell [{shell}].\nSupported Shell: bash, zsh')
+
+@click.group('config')
 def cli():
     '''Manage Configuration.'''
 
@@ -40,5 +61,6 @@ cli.add_command(init)
 cli.add_command(set)
 cli.add_command(get)
 cli.add_command(env)
+cli.add_command(completion)
 
 #sys.modules[__name__] = config

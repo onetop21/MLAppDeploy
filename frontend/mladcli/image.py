@@ -50,28 +50,23 @@ def remove(ids, force):
     print('Done.')
 
 def prune(all):
-    if not all:
-        project = utils.get_project(default_project)
-
-        result = docker.image_prune(project['project'])
-        if result:
-            print(f'{result} images removed.')
-        else:
-            print('Already cleared.', file=sys.stderr)
+    if all:
+        result = docker.image_prune(None)
     else:
-        result = docker.image_prune()
-        if result['ImagesDeleted'] and len(result['ImagesDeleted']):
-            for deleted in result['ImagesDeleted']:
-                status, value = [ (key, deleted[key]) for key in deleted ][-1]
-                print(f'{status:12} {value:32}')
-            reclaimed = result['SpaceReclaimed']
-            unit = 0
-            unit_list = ['B', 'KB', 'MB', 'GB', 'TB' ]
-            while reclaimed / 1000. > 1:
-                reclaimed /= 1000.
-                unit += 1
-            print(f'{reclaimed:.2f}{unit_list[unit]} Space Reclaimed.')
-        else:
-            print('Already cleared.', file=sys.stderr)
-        result = docker.image_prune()
+        project = utils.get_project(default_project)
+        result = docker.image_prune(project['project'])
+
+    if result['ImagesDeleted'] and len(result['ImagesDeleted']):
+        for deleted in result['ImagesDeleted']:
+            status, value = [ (key, deleted[key]) for key in deleted ][-1]
+            print(f'{status:12} {value:32}')
+        reclaimed = result['SpaceReclaimed']
+        unit = 0
+        unit_list = ['B', 'KB', 'MB', 'GB', 'TB' ]
+        while reclaimed / 1000. > 1:
+            reclaimed /= 1000.
+            unit += 1
+        print(f'{reclaimed:.2f}{unit_list[unit]} Space Reclaimed.')
+    else:
+        print('Already cleared.', file=sys.stderr)
 

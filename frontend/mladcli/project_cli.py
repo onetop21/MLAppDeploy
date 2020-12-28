@@ -1,6 +1,10 @@
-import sys, os, getpass, click
+import sys
+import os
+import getpass
+import click
 from mladcli import project
 from mladcli.libs import utils
+from mladcli.autocompletion import *
 
 # mlad project init
 # mlad project ls | mlad ls
@@ -44,13 +48,13 @@ def test(build):
     project.test(build)
 
 @click.command()
-@click.argument('services', nargs=-1, required=False)
+@click.argument('services', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
 def up(services):
     '''Deploy and Run a Project on Local or Cluster.'''
     project.up(services)
 
 @click.command()
-@click.argument('services', nargs=-1, required=False)
+@click.argument('services', nargs=-1, required=False, autocompletion=get_running_services_completion)
 def down(services):
     '''Stop and Remove Current Project Deployed on Cluster.'''
     project.down(services)
@@ -59,14 +63,14 @@ def down(services):
 @click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
 @click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs.')
 @click.option('--follow', '-f', is_flag=True, help='Follow log output')
-@click.argument('SERVICES|TASKS', nargs=-1)
+@click.argument('SERVICES|TASKS', nargs=-1, autocompletion=get_running_services_tasks_completion)
 def logs(tail, follow, timestamps, **kwargs):
     '''Show Current Project Logs Deployed on Cluster.'''
     filters = kwargs.get('services|tasks')
     project.logs(tail, follow, timestamps, filters)
 
 @click.command()
-@click.argument('scales', nargs=-1)
+@click.argument('scales', nargs=-1, autocompletion=get_running_services_completion)
 def scale(scales):
     '''Change Replicas Count of Running Service in Deployed on Cluster.'''
     project.scale(scales)
@@ -75,7 +79,7 @@ def scale(scales):
 def update():
     '''Update Running Project or Service Deployed on Cluster.'''
 
-@click.group()
+@click.group('project')
 @click.option('--file', '-f', default=None, help='Specify an alternate project file')
 @click.option('--workdir', default=None, help='Specify an alternate working directory\t\t\t\n(default: the path of the project file)')
 def cli(file, workdir):

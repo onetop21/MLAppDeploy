@@ -27,7 +27,7 @@ def image_list(project=None):
     config = utils.read_config()
 
     filters = 'MLAD.PROJECT'
-    if project: filters+= f"={utils.getProjecteName(projecet)}"
+    if project: filters+= f"={utils.getProjectName(project)}"
 
     cli = getDockerCLI()
     images = cli.images.list(filters={ 'label': filters } )
@@ -164,27 +164,20 @@ def image_build(project, workspace, tagging=False, verbose=False):
 def image_remove(ids, force):
     config = utils.read_config()
     cli = getDockerCLI()
-    result = [ cli.images.remove(image=id, force=force) for id in ids ]
+    try:
+        result = [ cli.images.remove(image=id, force=force) for id in ids ]
+    except docker.errors.ImageNotFound as e:
+        print(e, file=sys.stderr)
+        result = []
     return result
 
 def image_prune(project):
     config = utils.read_config()
 
     cli = getDockerCLI()
-    if project:
-        filters = 'MLAD.PROJECT'
-        if project: filters+= f'={utils.getProjectName(project)}'
-
-        images = cli.images.list(filters={ 'label': filters } )
-
-        count = 0
-        for image in images:
-            if not image.tags:
-                cli.images.remove(image=image.id, force=False)
-                count += 1
-        return count 
-    else:
-        return cli.images.prune(filters={ 'dangling': True })
+    filters = 'MLAD.PROJECT'
+    if project: filters+= f'={utils.getProjectName(project)}'
+    return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
 
 def image_push(project):
     config = utils.read_config()
@@ -526,7 +519,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], b
                     if _[0] in filters:
                         filtered.append(_[:2])
                     else:
-                        filtered += [(_[0], f"/tasks/{task['ID']}") for task in _[2] if task['ID'][:10] in filters]
+                        filtered += [(_[0], f"/tasks/{task['ID']}") for task in _[2] if task['ID'][:SHORT_LEN] in filters]
             else:
                 filtered = [_[:2] for _ in services]
             logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
@@ -603,6 +596,20 @@ def images_down(project, services, by_service=False):
                     print('Network removed.')
                 except docker.errors.APIError as e:
                     print('Network already removed.', file=sys.stderr)
+
+def get_running_services(project):
+    project_name = utils.getProjectName(project)
+    cli = getDockerCLI()
+    filters = f'MLAD.PROJECT={project_name}'
+    services = cli.services.list(filters={'label': filters})
+    return [_.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'] for _ in services]
+
+def get_running_tasks(project):
+    project_name = utils.getProjectName(project)
+    cli = getDockerCLI()
+    filters = f'MLAD.PROJECT={project_name}'
+    services = cli.services.list(filters={'label': filters})
+    return [__['ID'][:SHORT_LEN] for _ in services for __ in _.tasks()]
 
 def show_status(project, services, all=False):
     project_name = utils.getProjectName(project)
@@ -686,6 +693,10 @@ def scale_service(project, scale_spec):
 def node_list():
     cli = getDockerCLI()
     return cli.nodes.list()
+
+def node_get(id):
+    cli = getDockerCLI()
+    return cli.nodes.get(id)
 
 def node_enable(id):
     cli = getDockerCLI()
