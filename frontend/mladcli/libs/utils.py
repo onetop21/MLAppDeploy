@@ -1,4 +1,8 @@
-import sys, os, copy, uuid
+import sys
+import os
+import copy
+import uuid
+import socket
 from pathlib import Path
 from yaml import load, dump
 try:
@@ -42,9 +46,22 @@ def getProjectConfigPath(project):
     config = read_config()
     return f"{CONFIG_PATH}/{config['account']['username']}/{project['name'].lower()}"
 
-def getProjectName(project):
+def get_project_name(project, project_id=None):
     config = read_config()
-    return f"{config['account']['username']}_{project['name'].lower()}"
+    username = config['account']['username']
+    project_lower_name = project['name'].lower()
+    if project_id:
+        project_short_id = project_id.hex[:10]
+        return f"{username}-{project_lower_name}-{project_short_id}"
+    else:
+        return f"{username}-{project_lower_name}"
+
+def get_project_key():
+    '''
+    Project Hash: [HOSTNAME]@[PROJECT DIR]
+    '''
+    key = f"{socket.gethostname()}@{ProjectArgs['project_file']}"
+    return key
 
 def getRepository(project):
     config = read_config()
@@ -234,4 +251,4 @@ def generate_unique_id(length=None):
     if length:
         return UUID.hex[:length]
     else:
-        return str(UUID)
+        return UUID

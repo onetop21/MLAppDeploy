@@ -5,9 +5,11 @@ import time
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
+from typing import Union
 import docker
 import requests
 from docker.types import LogConfig
+from mladcli import exception
 from mladcli.libs import utils, interrupt_handler as InterruptHandler, logger_thread as LoggerThread
 
 HOME = str(Path.home())
@@ -15,19 +17,137 @@ CONFIG_PATH = HOME + '/.mlad'
 SHORT_LEN = 10
 
 # Docker CLI from HOST
-def getDockerCLI(lowlevel=False):
+def getDockerCLI(lowlevel = False):
     config = utils.read_config()
     if not lowlevel:
+        # docker.client.DockerClient
         return docker.from_env(environment={'DOCKER_HOST': config['docker']['host']})
     else:
+        # docker.api.client.APIClient
         return docker.APIClient(config['docker']['host'])
+
+# Manage Project and Network
+def get_project_network(cli):
+    if not isinstance(cli, docker.client.DockerClient): raise TypeError()
+    project_key = utils.get_project_key()
+    networks = cli.networks.list(filters={'label':f"MLAD.PROJECT={project_key}"})
+    if len(networks) == 1:
+        return networks[0]
+    elif len(networks) == 0:
+        return None
+    else:
+        raise exception.Duplicated(f'Need to remove networks or down project, because exists duplicated networks.')
+
+def get_running_project_info(network=None):
+    if not network: network = get_project_network()
+    if network:
+        labels = network.attrs['Labels']
+        hostname, path = labels['MLAD.PROJECT'].split('@')
+        uuid10 = uuid.UUID(labels['MLAD.PROJECT.ID']).hex[:10]
+        return {
+            'up_from': {
+                'hostname': hostname,
+                'path': path
+            },
+            'name': labels['MLAD.PROJECT.NAME'],
+            'instance': f"{labels['MLAD.PROJECT.NAME']}-{uuid10}"
+            'username': labels['MLAD.PROJECT.USERNAME'],
+            'version': labels['MLAD.PROJECT.VERSION'],
+            'ID': uuid.UUID(labels['MLAD.PROJECT.ID']),
+        }
+    else:
+        return {}
+
+def create_project_network(project, driver='overlay', allow_reuse=False):
+    cli = getDockerCLI()
+
+    network = get_project_network():
+    if network:
+        if allaw_reuse: return network
+        raise exception.AlreadyExist('Already exist project network.')
+
+    project_key = utils.get_project_key()
+    project_id = utils.generate_unique_id()
+    project_name = utils.get_project_name(project, project_id)
+    project_version = project['version'].lower()
+
+    # Create Docker Network
+    network_name =  f"{project_name}-{driver}"
+    try:
+        print('Create network...')
+        labels = {
+            'MLAD.PROJECT': project_key,
+            'MLAD.PROJECT.NAME': project['name'].lower(),
+            'MLAD.PROJECT.USERNAME': config['account']['username'],
+            'MLAD.PROJECT.VERSION': project_version,
+            'MLAD.PROJECT.ID': str(project_id)
+        }
+
+        if driver == 'overlay':
+            for _ in range(0, 255, 4):
+                subnet = f'10.0.{_}.0/22'
+                ipam_pool = docker.types.IPAMPool(subnet=subnet)
+                ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+                network = cli.networks.create(
+                    network_name, 
+                    labels=labels,
+                    driver='overlay', 
+                    ipam=ipam_config, 
+                    ingress=False)
+                if network.attrs['Driver']: 
+                    print(f'Selected Subnet [{subnet}]')
+                    break
+                network.remove()
+        else:
+            network = cli.networks.create(
+                network_name, 
+                labels=labels,
+                driver='bridge')
+    except docker.errors.APIError as e:
+        print('Failed to create network.', file=sys.stderr)
+        print(e, file=sys.stderr)
+        network = None
+    return network
+
+def destroy_project_network():
+    cli = getDockerCLI()
+
+    network = get_project_network()
+    if not network:
+        print('Cannot find project network.', file=sys.stderr)
+        return False
+
+    network.remove()
+    tick = 0
+    while get_project_network():
+        tick += 1
+        sys.stdout.write(f"\rWait to remove network [{tick}s]")
+        time.sleep(1)
+    return True
+
+# Manage services and tasks
+def get_running_service_names():
+    project_key = utils.get_project_key()
+    cli = getDockerCLI()
+    filters = f'MLAD.PROJECT={project_key}'
+    services = cli.services.list(filters={'label': filters})
+    return [_.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'] for _ in services]
+
+def get_running_task_ids():
+    project_key = utils.get_project_key()
+    cli = getDockerCLI()
+    filters = f'MLAD.PROJECT={project_key}'
+    services = cli.services.list(filters={'label': filters})
+    return [__['ID'][:SHORT_LEN] for _ in services for __ in _.tasks()]
 
 # Image
 def image_list(project=None):
     config = utils.read_config()
+    #project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
 
     filters = 'MLAD.PROJECT'
-    if project: filters+= f"={utils.getProjectName(project)}"
+    if project: filters+= f"={project_key}"
 
     cli = getDockerCLI()
     images = cli.images.list(filters={ 'label': filters } )
@@ -53,7 +173,8 @@ def image_list(project=None):
 
 def image_build(project, workspace, tagging=False, verbose=False):
     config = utils.read_config()
-    project_name = utils.getProjectName(project)
+    #project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
     project_version=project['version'].lower()
     repository = utils.getRepository(project)
     latest_name = f'{repository}:latest'
@@ -66,7 +187,7 @@ def image_build(project, workspace, tagging=False, verbose=False):
     llcli = getDockerCLI(True)
 
     # Block duplicated running.
-    #filters = 'MLAD.PROJECT=%s' % project_name
+    #filters = 'MLAD.PROJECT=%s' % project_key
     #if len(cli.services.list(filters={'label': filters})):
     #    print('Need to down running project.', file=sys.stderr)
     #    sys.exit(1)
@@ -74,7 +195,7 @@ def image_build(project, workspace, tagging=False, verbose=False):
     # Check latest image
     latest_image = None
     commit_number = 1
-    images = cli.images.list(filters={'label': f'MLAD.PROJECT={project_name}'})
+    images = cli.images.list(filters={'label': f'MLAD.PROJECT={project_key}'})
     if len(images):
         latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
         if latest_image and len(latest_image): latest_image = latest_image[0]
@@ -93,7 +214,7 @@ def image_build(project, workspace, tagging=False, verbose=False):
             tag=latest_name,
             dockerfile=DOCKERFILE_FILE,
             labels={
-                'MLAD.PROJECT': project_name,
+                'MLAD.PROJECT': project_key,
                 'MLAD.PROJECT.NAME': project['name'].lower(),
                 'MLAD.PROJECT.USERNAME': config['account']['username'],
                 'MLAD.PROJECT.VERSION': project_version
@@ -111,7 +232,7 @@ def image_build(project, workspace, tagging=False, verbose=False):
         #    tag=latest_name,
         #    dockerfile=DOCKERFILE_FILE,
         #    labels={
-        #        'MLAD.PROJECT': project_name,
+        #        'MLAD.PROJECT': project_key,
         #        'MLAD.PROJECT.NAME': project['name'].lower(),
         #        'MLAD.PROJECT.USERNAME': config['account']['username'],
         #        'MLAD.PROJECT.VERSION': project_version
@@ -176,12 +297,13 @@ def image_prune(project):
 
     cli = getDockerCLI()
     filters = 'MLAD.PROJECT'
-    if project: filters+= f'={utils.getProjectName(project)}'
+    if project: filters+= f'={utils.get_project_name(project)}'
     return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
 
 def image_push(project):
     config = utils.read_config()
-    project_name = utils.getProjectName(project)
+    #project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
     project_version=project['version'].lower()
     repository = utils.getRepository(project)
     
@@ -209,7 +331,7 @@ def running_projects():
     data = {}
     if len(services):
         for service in services:
-            project = service.attrs['Spec']['Labels']['MLAD.PROJECT']
+            project_key = service.attrs['Spec']['Labels']['MLAD.PROJECT']
             project_name = service.attrs['Spec']['Labels']['MLAD.PROJECT.NAME']
             replicas = service.attrs['Spec']['Mode']['Replicated']['Replicas']
             image = service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image']
@@ -217,10 +339,10 @@ def running_projects():
             tasks_status = [task['Status']['State'] for task in service.tasks()]
 
             default = { 'username': username, 'project': project_name, 'image': image, 'services': 0, 'replicas': 0, 'tasks': 0 }
-            data[project] = data[project] if project in data else default
-            data[project]['services'] += 1
-            data[project]['replicas'] += replicas
-            data[project]['tasks'] += tasks_status.count('running')
+            data[project_key] = data[project_key] if project_key in data else default
+            data[project_key]['services'] += 1
+            data[project_key]['replicas'] += replicas
+            data[project_key]['tasks'] += tasks_status.count('running')
 
     return data
 
@@ -229,265 +351,372 @@ def images_up(project, services, by_service=False):
 
     config = utils.read_config()
 
-    project_name = utils.getProjectName(project)
-    project_version=project['version'].lower()
+    project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
+    project_version = project['version'].lower()
     repository = utils.getRepository(project)
     image_name = f'{repository}:latest'
-    project_id = utils.generate_unique_id()
-    wait_queue = list(services.keys())
-    running_queue = []
 
     cli = getDockerCLI()
- 
-    # Block duplicated running.
-    skip_create_network = False
+
+    # Get Network
     if not project['partial']:
-        filters = f'MLAD.PROJECT={project_name}'
-        if len(cli.services.list(filters={'label': filters})):
+        try:
+            network = create_project_network(project)
+        except exception.AlreadyExist as e:
+            print(e, file=sys.stderr)
             print('Already running project.', file=sys.stderr)
             sys.exit(1)
     else:
-        for service_name in services:
-            filters = [f'MLAD.PROJECT={project_name}', f'MLAD.PROJECT.SERVICE={service_name}']
-            if len(cli.services.list(filters={'label': filters})):
-                print(f'Already running service[{service_name}] in project.', file=sys.stderr)
-                sys.exit(1)
+        network = create_project_network(project, allow_reuse=True)
 
-        running_services = cli.services.list(filters={'label': f'MLAD.PROJECT={project_name}'})
-        if len(running_services): 
-            skip_create_network = True
-            project_id = running_services[0].attrs['Spec']['Labels'].get('MLAD.PROJECT.ID', project_id)
+    # Check service status
+    running_services = get_running_services()
+    for service_name in services:
+        if service_name in running_services:
+            print(f'Already running service[{service_name}] in project.', file=sys.stderr)
+            sys.exit(1)
 
-    with InterruptHandler(message='Wait.', blocked=True):
-        # Create Docker Network
-        networks = [ 
-            f'{project_name}_backend_{"overlay" if by_service else "bridge"}'
-        ]
-        if not skip_create_network:
-            for network in networks:
-                try:
-                    instance = cli.networks.get(network)
-                    if instance: 
-                        print('Clear already created network.', file=sys.stderr)
-                        instance.remove()
-                        time.sleep(1)
-                except docker.errors.APIError as e:
-                    pass
-                try:
-                    print('Create network...')
-                    if by_service:
-                        for _ in range(0, 255, 4):
-                            subnet = f'10.0.{_}.0/22'
-                            ipam_pool = docker.types.IPAMPool(subnet=subnet)
-                            ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
-                            net = cli.networks.create(network, driver='overlay', ipam=ipam_config, ingress='frontend' in network)
-                            if net.attrs['Driver']: 
-                                print(f'Selected Subnet [{subnet}]')
-                                break
-                            net.remove()
-                    else:
-                        cli.networks.create(network, driver='bridge')
-                except docker.errors.APIError as e:
-                    print('Failed to create network.', file=sys.stderr)
-                    print(e, file=sys.stderr)
+    # Update Project Name
+    project_info = get_running_project_info(network)
+    project_instance = project_info['instance']
 
-    with InterruptHandler(blocked=True) as h:
-        # Create Docker Service
-        pending_instance = None
-        while not h.interrupted and (len(wait_queue) or pending_instance):
-            # Check Pending instances
-            if pending_instance:
-                service_name, expired = pending_instance
-                inst_name = f'{project_name}_{service_name}'
-                if by_service:
-                    instance = cli.services.get(inst_name)
-                    tasks = instance.tasks()
-                    #running = min([task['Status']['State'] == 'running' for task in tasks ])
-                    running = min([task['DesiredState'] == 'running' for task in tasks ])
-                    status = 'running' if running else 'preparing'
-                else:
-                    instance = cli.containers.get(inst_name)
-                    status = instance.status
-                #print(status)
-                if status == 'running':
-                    print('[RUNNING]')
-                    running_queue.append(service_name)
-                    pending_instance = None
-                elif expired < time.time():
-                    print('[FAILED]', file=sys.stderr)
-                    show_logs(project, 'all', False, False, [], by_service)
-                    sys.exit(1)
-                else:
-                    time.sleep(1)
-                    continue
-            if not len(wait_queue): break
-
-            # Get item in wait queue
-            service_key = wait_queue.pop(0)
+    with InterruptHandler(message='Wait.', blocked=True) as h:
+        for service_name in [_.lower() for _ in services]:
             service = service_default(services[service_key])
+            image = service['image'] or image_name
+            env = utils.get_service_env()
+            env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
+            env += [f"PROJECT={project_info['name']}"]
+            env += [f"USERNAME={project_info['username']}"]
+            env += [f"PROJECT_ID={project_info['ID']}"]
+            env += [f"SERVICE={service_name}"]
+            #env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
+            #env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
+            #env += [ 'DATADIR=s3://data/{}'.format('') ]
+            env += [ f"{key}={service['env'][key]}" for key in service['env'].keys() ]
+            command = service['command'] + service['arguments']
+            labels = copy.copy(network.attrs['Labels'])
+            labels['MLAD.PROJECT.SERVICE'] = service_name
+            
+            policy = service['deploy']['restart_policy']
+            # Convert Human-readable to nanoseconds ns|us|ms|s|m|h
+            if policy['delay']:
+                converted = policy['delay']
+                timeinfo = str(converted).lower()
+                if timeinfo.endswith('ns'):
+                    converted = int(timeinfo[:-2]) * 1
+                elif timeinfo.endswith('us'):
+                    converted = int(timeinfo[:-2]) * 1000
+                elif timeinfo.endswith('ms'):
+                    converted = int(timeinfo[:-2]) * 1000000
+                elif timeinfo.endswith('s'):
+                    converted = int(timeinfo[:-1]) * 1000000000
+                elif timeinfo.endswith('m'):
+                    converted = int(timeinfo[:-1]) * 1000000000 * 60
+                elif timeinfo.endswith('h'):
+                    converted = int(timeinfo[:-1]) * 1000000000 * 60 * 60
+                policy['delay'] = converted
+            if policy['window']:
+                converted = policy['window']
+                timeinfo = str(converted).lower()
+                if timeinfo.endswith('ns'):
+                    converted = int(timeinfo[:-2]) * 1
+                elif timeinfo.endswith('us'):
+                    converted = int(timeinfo[:-2]) * 1000
+                elif timeinfo.endswith('ms'):
+                    converted = int(timeinfo[:-2]) * 1000000
+                elif timeinfo.endswith('s'):
+                    converted = int(timeinfo[:-1]) * 1000000000
+                elif timeinfo.endswith('m'):
+                    converted = int(timeinfo[:-1]) * 1000000000 * 60
+                elif timeinfo.endswith('h'):
+                    converted = int(timeinfo[:-1]) * 1000000000 * 60 * 60
+                policy['window'] = converted
 
-            # Check dependencies
-            requeued = False
-            if pending_instance:
-                requeued = True
-            else:
-                for depend in service['depends']:
-                    if not depend in running_queue:
-                        wait_queue.append(service_key)
-                        requeued = True
-                        break
+            restart_policy = docker.types.RestartPolicy(
+                condition=policy['condition'], 
+                delay=policy['delay'], 
+                max_attempts=policy['max_attempts'], 
+                window=policy['window']
+            )
+            resources = docker.types.Resources()
+            service_mode = docker.types.ServiceMode('replicated')
+            constraints = []
+            if by_service:
+                res_spec = {}
+                if 'cpus' in service['deploy']['quotes']: 
+                    res_spec['cpu_limit'] = service['deploy']['quotes']['cpus'] * 1000000000
+                    res_spec['cpu_reservation'] = service['deploy']['quotes']['cpus'] * 1000000000
+                if 'mems' in service['deploy']['quotes']: 
+                    data = str(service['deploy']['quotes']['mems'])
+                    size = int(data[:-1])
+                    unit = data.lower()[-1:]
+                    if unit == 'g':
+                        size *= (2**30)
+                    elif unit == 'm':
+                        size *= (2**20)
+                    elif unit == 'k':
+                        size *= (2**10)
+                    res_spec['mem_limit'] = size
+                    res_spec['mem_reservation'] = size
+                if 'gpus' in service['deploy']['quotes']:
+                    if service['deploy']['quotes']['gpus'] > 0:
+                        res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+                    else: 
+                        #res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+                        env += [ 'NVIDIA_VISIBLE_DEVICES=void' ]
+                resources = docker.types.Resources(**res_spec)
+                service_mode = docker.types.ServiceMode('replicated', replicas=service['deploy']['replicas'])
+                constraints = [
+                    f"node.{key}=={str(service['deploy']['constraints'][key])}" for key in service['deploy']['constraints']
+                ]
 
-            if not requeued:
-                # Define specs and resources
-                BUCKET_PATH = f"{config['account']['username']}/{project['name'].lower()}/"
-                service_name = service_key.lower()
-                image = service['image'] or image_name
-                env = utils.get_service_env()
-                env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
-                env += [f"PROJECT={project['name'].lower()}"]
-                env += [f"PROJECT_ID={project_id}"]
-                env += [f"SERVICE={service_name}"]
-                env += [f"USERNAME={config['account']['username']}"]
-                #env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
-                #env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
-                #env += [ 'DATADIR=s3://data/{}'.format('') ]
-                env += [ f"{key}={service['env'][key]}" for key in service['env'].keys() ]
-                command = service['command'] + service['arguments']
-                labels = {
-                    'MLAD.PROJECT': project_name, 
-                    'MLAD.PROJECT.ID': project_id,
-                    'MLAD.PROJECT.NAME': project['name'].lower(), 
-                    'MLAD.PROJECT.SERVICE': service_name,
-                    'MLAD.PROJECT.USERNAME': config['account']['username']
-                }
-                
-                policy = service['deploy']['restart_policy']
-                # Convert Human-readable to nanoseconds ns|us|ms|s|m|h
-                if policy['delay']:
-                    converted = policy['delay']
-                    timeinfo = str(converted).lower()
-                    if timeinfo.endswith('ns'):
-                        converted = int(timeinfo[:-2]) * 1
-                    elif timeinfo.endswith('us'):
-                        converted = int(timeinfo[:-2]) * 1000
-                    elif timeinfo.endswith('ms'):
-                        converted = int(timeinfo[:-2]) * 1000000
-                    elif timeinfo.endswith('s'):
-                        converted = int(timeinfo[:-1]) * 1000000000
-                    elif timeinfo.endswith('m'):
-                        converted = int(timeinfo[:-1]) * 1000000000 * 60
-                    elif timeinfo.endswith('h'):
-                        converted = int(timeinfo[:-1]) * 1000000000 * 60 * 60
-                    policy['delay'] = converted
-                if policy['window']:
-                    converted = policy['window']
-                    timeinfo = str(converted).lower()
-                    if timeinfo.endswith('ns'):
-                        converted = int(timeinfo[:-2]) * 1
-                    elif timeinfo.endswith('us'):
-                        converted = int(timeinfo[:-2]) * 1000
-                    elif timeinfo.endswith('ms'):
-                        converted = int(timeinfo[:-2]) * 1000000
-                    elif timeinfo.endswith('s'):
-                        converted = int(timeinfo[:-1]) * 1000000000
-                    elif timeinfo.endswith('m'):
-                        converted = int(timeinfo[:-1]) * 1000000000 * 60
-                    elif timeinfo.endswith('h'):
-                        converted = int(timeinfo[:-1]) * 1000000000 * 60 * 60
-                    policy['window'] = converted
-
-                restart_policy = docker.types.RestartPolicy(
-                    condition=policy['condition'], 
-                    delay=policy['delay'], 
-                    max_attempts=policy['max_attempts'], 
-                    window=policy['window']
+            # Try to run
+            inst_name = f"{project_info['instance']}-{service_name}"
+            print(f'Start {inst_name}...', end=' ')
+            if not by_service:
+                try:
+                    instance = cli.containers.get(inst_name)
+                    if instance:
+                        instance.stop()
+                        instance.remove()
+                except docker.errors.NotFound as e:
+                    pass
+                instance = cli.containers.run(
+                    image, 
+                    command=command,
+                    name=inst_name,
+                    environment=env,
+                    labels=labels,
+                    runtime='runc',
+                    restart_policy={'Name': 'on-failure', 'MaximumRetryCount': 1},
+                    detach=True,
                 )
-                resources = docker.types.Resources()
-                service_mode = docker.types.ServiceMode('replicated')
-                constraints = []
-                if by_service:
-                    res_spec = {}
-                    if 'cpus' in service['deploy']['quotes']: 
-                        res_spec['cpu_limit'] = service['deploy']['quotes']['cpus'] * 1000000000
-                        res_spec['cpu_reservation'] = service['deploy']['quotes']['cpus'] * 1000000000
-                    if 'mems' in service['deploy']['quotes']: 
-                        data = str(service['deploy']['quotes']['mems'])
-                        size = int(data[:-1])
-                        unit = data.lower()[-1:]
-                        if unit == 'g':
-                            size *= (2**30)
-                        elif unit == 'm':
-                            size *= (2**20)
-                        elif unit == 'k':
-                            size *= (2**10)
-                        res_spec['mem_limit'] = size
-                        res_spec['mem_reservation'] = size
-                    if 'gpus' in service['deploy']['quotes']:
-                        if service['deploy']['quotes']['gpus'] > 0:
-                            res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
-                        else: 
-                            #res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
-                            env += [ 'NVIDIA_VISIBLE_DEVICES=void' ]
-                    resources = docker.types.Resources(**res_spec)
-                    service_mode = docker.types.ServiceMode('replicated', replicas=service['deploy']['replicas'])
-                    constraints = [
-                        f"node.{key}=={str(service['deploy']['constraints'][key])}" for key in service['deploy']['constraints']
-                    ]
-
-                # Try to run
-                inst_name = f'{project_name}_{service_name}'
-                print(f'Start {inst_name}...', end=' ')
-                if not by_service:
-                    try:
-                        instance = cli.containers.get(inst_name)
-                        if instance:
-                            instance.stop()
-                            instance.remove()
-                    except docker.errors.NotFound as e:
-                        pass
-                    instance = cli.containers.run(
-                        image, 
-                        command=command,
-                        name=inst_name,
-                        environment=env,
-                        labels=labels,
-                        runtime='runc',
-                        restart_policy={'Name': 'on-failure', 'MaximumRetryCount': 1},
-                        detach=True,
-                    )
-                    for network_name in networks:
-                        network = cli.networks.get(network_name)
-                        network.connect(instance, aliases=[service_name])
-                else:
-                    try:
-                        instance = cli.services.get(inst_name)
-                        if instance:
-                            instance.remove()
-                    except docker.errors.NotFound as e:
-                        pass
-                    instance = cli.services.create(
-                        name=inst_name,
-                        #hostname=f'{service_name}.{{{{.Task.Slot}}}}',
-                        image=image, 
-                        env=env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={service_name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
-                        mounts=['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro'],
-                        command=command,
-                        container_labels=labels,
-                        labels=labels,
-                        networks=[{'Target': network, 'Aliases': [service_name]} for network in networks ],
-                        restart_policy=restart_policy,
-                        resources=resources,
-                        mode=service_mode,
-                        constraints=constraints
-                    )
-                pending_instance = (service_name, time.time() + 3600)
+                for network_name in networks:
+                    network = cli.networks.get(network_name)
+                    network.connect(instance, aliases=[service_name])
+            else:
+                try:
+                    instance = cli.services.get(inst_name)
+                    if instance:
+                        instance.remove()
+                except docker.errors.NotFound as e:
+                    pass
+                instance = cli.services.create(
+                    name=inst_name,
+                    #hostname=f'{service_name}.{{{{.Task.Slot}}}}',
+                    image=image, 
+                    env=env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={service_name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
+                    mounts=['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro'],
+                    command=command,
+                    container_labels=labels,
+                    labels=labels,
+                    networks=[{'Target': network, 'Aliases': [service_name]} for network in networks ],
+                    restart_policy=restart_policy,
+                    resources=resources,
+                    mode=service_mode,
+                    constraints=constraints
+                )
+        
+#        # Create Docker Service
+#        pending_instance = None
+#        while not h.interrupted and (len(wait_queue) or pending_instance):
+#            # Check Pending instances
+#            if pending_instance:
+#                service_name, expired = pending_instance
+#                inst_name = f"{project_info['instance']}-{service_name}"
+#                if by_service:
+#                    instance = cli.services.get(inst_name)
+#                    tasks = instance.tasks()
+#                    #running = min([task['Status']['State'] == 'running' for task in tasks ])
+#                    running = min([task['DesiredState'] == 'running' for task in tasks ])
+#                    status = 'running' if running else 'preparing'
+#                else:
+#                    instance = cli.containers.get(inst_name)
+#                    status = instance.status
+#                #print(status)
+#                if status == 'running':
+#                    print('[RUNNING]')
+#                    running_queue.append(service_name)
+#                    pending_instance = None
+#                elif expired < time.time():
+#                    print('[FAILED]', file=sys.stderr)
+#                    show_logs(project, 'all', False, False, [], by_service)
+#                    sys.exit(1)
+#                else:
+#                    time.sleep(1)
+#                    continue
+#            if not len(wait_queue): break
+#
+#            # Get item in wait queue
+#            service_key = wait_queue.pop(0)
+#            service = service_default(services[service_key])
+#
+#            # Check dependencies
+#            requeued = False
+#            if pending_instance:
+#                requeued = True
+#            else:
+#                for depend in service['depends']:
+#                    if not depend in running_queue:
+#                        wait_queue.append(service_key)
+#                        requeued = True
+#                        break
+#
+#            if not requeued:
+#                # Define specs and resources
+#                BUCKET_PATH = f"{config['account']['username']}/{project['name'].lower()}/"
+#                service_name = service_key.lower()
+#                image = service['image'] or image_name
+#                env = utils.get_service_env()
+#                env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
+#                env += [f"PROJECT={project['name'].lower()}"]
+#                env += [f"PROJECT_ID={project_id}"]
+#                env += [f"SERVICE={service_name}"]
+#                env += [f"USERNAME={config['account']['username']}"]
+#                #env += [ 'OUTDIR=s3://models/{}'.format(BUCKET_PATH) ]
+#                #env += [ 'LOGDIR=s3://logs/{}'.format(BUCKET_PATH) ]
+#                #env += [ 'DATADIR=s3://data/{}'.format('') ]
+#                env += [ f"{key}={service['env'][key]}" for key in service['env'].keys() ]
+#                command = service['command'] + service['arguments']
+#                labels = {
+#                    'MLAD.PROJECT': project_key, 
+#                    'MLAD.PROJECT.NAME': project['name'].lower(), 
+#                    'MLAD.PROJECT.USERNAME': config['account']['username'],
+#                    'MLAD.PROJECT.VERSION': project_version,
+#                    'MLAD.PROJECT.ID': project_id,
+#                    'MLAD.PROJECT.SERVICE': service_name
+#                }
+#                
+#                policy = service['deploy']['restart_policy']
+#                # Convert Human-readable to nanoseconds ns|us|ms|s|m|h
+#                if policy['delay']:
+#                    converted = policy['delay']
+#                    timeinfo = str(converted).lower()
+#                    if timeinfo.endswith('ns'):
+#                        converted = int(timeinfo[:-2]) * 1
+#                    elif timeinfo.endswith('us'):
+#                        converted = int(timeinfo[:-2]) * 1000
+#                    elif timeinfo.endswith('ms'):
+#                        converted = int(timeinfo[:-2]) * 1000000
+#                    elif timeinfo.endswith('s'):
+#                        converted = int(timeinfo[:-1]) * 1000000000
+#                    elif timeinfo.endswith('m'):
+#                        converted = int(timeinfo[:-1]) * 1000000000 * 60
+#                    elif timeinfo.endswith('h'):
+#                        converted = int(timeinfo[:-1]) * 1000000000 * 60 * 60
+#                    policy['delay'] = converted
+#                if policy['window']:
+#                    converted = policy['window']
+#                    timeinfo = str(converted).lower()
+#                    if timeinfo.endswith('ns'):
+#                        converted = int(timeinfo[:-2]) * 1
+#                    elif timeinfo.endswith('us'):
+#                        converted = int(timeinfo[:-2]) * 1000
+#                    elif timeinfo.endswith('ms'):
+#                        converted = int(timeinfo[:-2]) * 1000000
+#                    elif timeinfo.endswith('s'):
+#                        converted = int(timeinfo[:-1]) * 1000000000
+#                    elif timeinfo.endswith('m'):
+#                        converted = int(timeinfo[:-1]) * 1000000000 * 60
+#                    elif timeinfo.endswith('h'):
+#                        converted = int(timeinfo[:-1]) * 1000000000 * 60 * 60
+#                    policy['window'] = converted
+#
+#                restart_policy = docker.types.RestartPolicy(
+#                    condition=policy['condition'], 
+#                    delay=policy['delay'], 
+#                    max_attempts=policy['max_attempts'], 
+#                    window=policy['window']
+#                )
+#                resources = docker.types.Resources()
+#                service_mode = docker.types.ServiceMode('replicated')
+#                constraints = []
+#                if by_service:
+#                    res_spec = {}
+#                    if 'cpus' in service['deploy']['quotes']: 
+#                        res_spec['cpu_limit'] = service['deploy']['quotes']['cpus'] * 1000000000
+#                        res_spec['cpu_reservation'] = service['deploy']['quotes']['cpus'] * 1000000000
+#                    if 'mems' in service['deploy']['quotes']: 
+#                        data = str(service['deploy']['quotes']['mems'])
+#                        size = int(data[:-1])
+#                        unit = data.lower()[-1:]
+#                        if unit == 'g':
+#                            size *= (2**30)
+#                        elif unit == 'm':
+#                            size *= (2**20)
+#                        elif unit == 'k':
+#                            size *= (2**10)
+#                        res_spec['mem_limit'] = size
+#                        res_spec['mem_reservation'] = size
+#                    if 'gpus' in service['deploy']['quotes']:
+#                        if service['deploy']['quotes']['gpus'] > 0:
+#                            res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+#                        else: 
+#                            #res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+#                            env += [ 'NVIDIA_VISIBLE_DEVICES=void' ]
+#                    resources = docker.types.Resources(**res_spec)
+#                    service_mode = docker.types.ServiceMode('replicated', replicas=service['deploy']['replicas'])
+#                    constraints = [
+#                        f"node.{key}=={str(service['deploy']['constraints'][key])}" for key in service['deploy']['constraints']
+#                    ]
+#
+#                # Try to run
+#                inst_name = f'{project_name}-{service_name}'
+#                print(f'Start {inst_name}...', end=' ')
+#                if not by_service:
+#                    try:
+#                        instance = cli.containers.get(inst_name)
+#                        if instance:
+#                            instance.stop()
+#                            instance.remove()
+#                    except docker.errors.NotFound as e:
+#                        pass
+#                    instance = cli.containers.run(
+#                        image, 
+#                        command=command,
+#                        name=inst_name,
+#                        environment=env,
+#                        labels=labels,
+#                        runtime='runc',
+#                        restart_policy={'Name': 'on-failure', 'MaximumRetryCount': 1},
+#                        detach=True,
+#                    )
+#                    for network_name in networks:
+#                        network = cli.networks.get(network_name)
+#                        network.connect(instance, aliases=[service_name])
+#                else:
+#                    try:
+#                        instance = cli.services.get(inst_name)
+#                        if instance:
+#                            instance.remove()
+#                    except docker.errors.NotFound as e:
+#                        pass
+#                    instance = cli.services.create(
+#                        name=inst_name,
+#                        #hostname=f'{service_name}.{{{{.Task.Slot}}}}',
+#                        image=image, 
+#                        env=env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={service_name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
+#                        mounts=['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro'],
+#                        command=command,
+#                        container_labels=labels,
+#                        labels=labels,
+#                        networks=[{'Target': network, 'Aliases': [service_name]} for network in networks ],
+#                        restart_policy=restart_policy,
+#                        resources=resources,
+#                        mode=service_mode,
+#                        constraints=constraints
+#                    )
+#                pending_instance = (service_name, time.time() + 3600)
             time.sleep(1)
         if h.interrupted:
             return None
     return project_name
             
 def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], by_service=False):
-    project_name = utils.getProjectName(project)
+    #project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
     project_version=project['version'].lower()
     config = utils.read_config()
 
@@ -512,7 +741,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], b
     cli = getDockerCLI()
     with InterruptHandler() as h:
         if by_service:
-            instances = cli.services.list(filters={'label': f'MLAD.PROJECT={project_name}'})
+            instances = cli.services.list(filters={'label': f'MLAD.PROJECT={project_key}'})
             filtered = []
             services = [(inst.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], f"/services/{inst.attrs['ID']}", inst.tasks()) for inst in instances]
             if filters:
@@ -525,7 +754,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], b
                 filtered = [_[:2] for _ in services]
             logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
         else:
-            instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_name}'})
+            instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
             timestamps = True
             logs = [ (inst.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for inst in instances ]
 
@@ -541,30 +770,42 @@ def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], b
 
 def images_down(project, services, by_service=False):
     config = utils.read_config()
-    project_name = utils.getProjectName(project)
+    project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
 
     cli = getDockerCLI()
 
     # Block duplicated running.
     if not project['partial']:
-        filters = f'MLAD.PROJECT={project_name}'
-        if not len(cli.services.list(filters={'label': filters})):
+        filters = f'MLAD.PROJECT={project_key}'
+        running_services = cli.services.list(filters={'label': filters})
+        if not len(running_services):
             print('Already stopped project.', file=sys.stderr)
             sys.exit(1)
+        project_id = running_services[0].attrs['Spec']['Labels'].get('MLAD.PROJECT.ID')
     else:
+        running_services = []
         for service_name in services:
-            filters = [f'MLAD.PROJECT={project_name}', f'MLAD.PROJECT.SERVICE={service_name}']
-            if not len(cli.services.list(filters={'label': filters})):
+            filters = [f'MLAD.PROJECT={project_key}', f'MLAD.PROJECT.SERVICE={service_name}']
+            running_services = cli.services.list(filters={'label': filters})
+            if not len(running_services):
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
+        project_id = running_services[0].attrs['Spec']['Labels'].get('MLAD.PROJECT.ID')
+
+    # Update Project Name
+    project_name = f"{project_name}-{project_id.replace('-','')[:10]}"
 
     with InterruptHandler(message='Wait.', blocked=True):
         drop_with_network = True
-        if by_service:
-            #services = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_name})
+        th tqdm(total=100) as pbar:
+            for i in range(10):
+                    sleep(0.1)
+                            pbar.update(10)if by_service:
+            #services = cli.services.list(filters={'label': 'MLAD.PROJECT=%s'%project_key})
             down_services = []
             for service_name in services:
-                filters = [f'MLAD.PROJECT={project_name}', f'MLAD.PROJECT.SERVICE={service_name}']
+                filters = [f'MLAD.PROJECT={project_key}', f'MLAD.PROJECT.SERVICE={service_name}']
                 down_services += cli.services.list(filters={'label': filters})
             if len(down_services):
                 for service in down_services:
@@ -572,10 +813,10 @@ def images_down(project, services, by_service=False):
                     service.remove()
             else:
                 print('Cannot find running services.', file=sys.stderr)
-            if len(cli.services.list(filters={'label': f'MLAD.PROJECT={project_name}'})) > 0:
+            if len(cli.services.list(filters={'label': f'MLAD.PROJECT={project_key}'})) > 0:
                 drop_with_network = False
         else:
-            containers = cli.containers.list(filters={'label': f'MLAD.PROJECT={project_name}'})
+            containers = cli.containers.list(filters={'label': f'MLAD.PROJECT={project_key}'})
             if len(containers):
                 for container in containers:
                     print(f'Stop {container.name}...')
@@ -588,7 +829,7 @@ def images_down(project, services, by_service=False):
 
         if drop_with_network:
             networks = [ 
-                f'{project_name}_backend_{"overlay" if by_service else "bridge"}'
+                f"{project_name.replace('.','-')}-{'overlay' if by_service else 'bridge'}"
             ]
             for network in networks:
                 try:
@@ -598,34 +839,26 @@ def images_down(project, services, by_service=False):
                 except docker.errors.APIError as e:
                     print('Network already removed.', file=sys.stderr)
 
-def get_running_services(project):
-    project_name = utils.getProjectName(project)
-    cli = getDockerCLI()
-    filters = f'MLAD.PROJECT={project_name}'
-    services = cli.services.list(filters={'label': filters})
-    return [_.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'] for _ in services]
-
-def get_running_tasks(project):
-    project_name = utils.getProjectName(project)
-    cli = getDockerCLI()
-    filters = f'MLAD.PROJECT={project_name}'
-    services = cli.services.list(filters={'label': filters})
-    return [__['ID'][:SHORT_LEN] for _ in services for __ in _.tasks()]
-
 def show_status(project, services, all=False):
-    project_name = utils.getProjectName(project)
+    project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
 
-    inst_names = []
-    for key in services.keys():
-        inst_names.append(f'{project_name}_{key.lower()}')
-    
     cli = getDockerCLI()
 
     # Block not running.
-    filters = f'MLAD.PROJECT={project_name}'
-    if not len(cli.services.list(filters={'label': filters})):
+    filters = f'MLAD.PROJECT={project_key}'
+    running_services = cli.services.list(filters={'label': filters})
+    if not len(running_services):
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
+    project_id = running_services[0].attrs['Spec']['Labels'].get('MLAD.PROJECT.ID')
+    
+    # Update Project Name
+    project_name = f"{project_name}-{project_id.replace('-','')[:10]}"
+
+    inst_names = []
+    for key in services.keys():
+        inst_names.append(f'{project_name}-{key.lower()}')
 
     task_info = []
     for inst_name in inst_names:
@@ -667,19 +900,25 @@ def show_status(project, services, all=False):
     return task_info
     
 def scale_service(project, scale_spec):
-    project_name = utils.getProjectName(project)
+    project_name = utils.get_project_name(project)
+    project_key = utils.get_project_key()
     
     cli = getDockerCLI()
     
     # Block not running.
-    filters = f'MLAD.PROJECT={project_name}'
-    if not len(cli.services.list(filters={'label': filters})):
+    filters = f'MLAD.PROJECT={project_key}'
+    running_services = cli.services.list(filters={'label': filters})
+    if not len(running_services):
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
+    project_id = running_services[0].attrs['Spec']['Labels'].get('MLAD.PROJECT.ID')
     
+    # Update Project Name
+    project_name = f"{project_name}-{project_id.replace('-','')[:10]}"
+
     for service_name in scale_spec:
         try:
-            service = cli.services.get(f'{project_name}_{service_name}')
+            service = cli.services.get(f'{project_name}-service_name}')
 
             if service.scale(int(scale_spec[service_name])):
                 print(f'Change scale service [{service_name}].')
