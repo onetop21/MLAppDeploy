@@ -46,7 +46,7 @@ def getProjectConfigPath(project):
     config = read_config()
     return f"{CONFIG_PATH}/{config['account']['username']}/{project['name'].lower()}"
 
-def get_project_name(project, project_id=None):
+def generate_project_name(project, project_id=None):
     config = read_config()
     username = config['account']['username']
     project_lower_name = project['name'].lower()
@@ -63,7 +63,7 @@ def get_project_key():
     key = f"{socket.gethostname()}@{ProjectArgs['project_file']}"
     return key
 
-def getRepository(project):
+def get_repository(project):
     config = read_config()
     if 'registry' in config['docker']:
         repository = f"{config['docker']['registry']}/{config['account']['username']}/{project['name'].lower()}"

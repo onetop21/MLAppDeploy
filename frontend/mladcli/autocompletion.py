@@ -18,13 +18,13 @@ def get_dir_completion(ctx, args, incomplete):
 
 def get_node_list_completion(ctx, args, incomplete):
     nodes = controller.node_list()
-    hostnames = [_.attrs['Description']['Hostname'] for _ in nodes]
-    ids = [_.attrs['ID'][:controller.SHORT_LEN] for _ in nodes] if incomplete else []
+    hostnames = [_['hostname'] for _ in nodes]
+    ids = [_['ID'][:controller.SHORT_LEN] for _ in nodes] if incomplete else []
     return [_ for _ in hostnames + ids if _.startswith(incomplete)]
 
 def get_node_label_completion(ctx, args, incomplete):
     node = controller.node_get(args[2])
-    keys = [f'{key}' for key, value in node.attrs['Spec']['Labels'].items()]
+    keys = [f'{key}' for key, value in node['labels'].items()]
     return [_ for _ in keys if _.startswith(incomplete)]
     
 def get_config_key_completion(ctx, args, incomplete):

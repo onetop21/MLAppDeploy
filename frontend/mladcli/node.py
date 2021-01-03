@@ -8,15 +8,15 @@ def list():
     nodes = docker.node_list()
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
-        ID = node.attrs['ID'][:10]
-        role = node.attrs['Spec']['Role']
-        activate = node.attrs['Spec']['Availability'] == 'active' 
-        hostname = node.attrs['Description']['Hostname']
-        engine = node.attrs['Description']['Engine']['EngineVersion']
-        state = node.attrs['Status']['State']
-        address = node.attrs['Status']['Addr']
-        labels = ', '.join([f'{key}={value}' for key, value in node.attrs['Spec']['Labels'].items()])
-        columns.append((ID, hostname, address, role.title(), state.title(), 'Active' if activate else '-', engine, labels))
+        ID = node['ID'][:10]
+        role = node['role']
+        activate = 'Active' if node['availability'] == 'active' else '-'
+        hostname = node['hostname']
+        engine = node['engine_version']
+        state = node['status']['State']
+        address = node['status']['Addr']
+        labels = ', '.join([f'{key}={value}' for key, value in node['labels'].items()])
+        columns.append((ID, hostname, address, role.title(), state.title(), activate, engine, labels))
     utils.print_table(columns, 'No attached node.')
 
 def enable(ID):
