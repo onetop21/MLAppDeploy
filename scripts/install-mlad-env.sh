@@ -75,12 +75,16 @@ function RemoteRun {
 if [[ ! -z "$REMOTE" ]]; then
     ARGS=
     if [[ ! -z "$BIND" ]]; then
-        ARGS="-b $BIND"
+        ARGS="-b __SKIP__"
     fi
     if [[ ! -z "$@" ]]; then
         ARGS="$ARGS -- $@"
     fi
     RemoteRun $REMOTE $ARGS
+    if [[ ! -z "$BIND" ]]; then
+        JOIN_COMMAND=`ssh $BIND docker swarm join-token worker | grep join`
+        ssh -t $REMOTE $JOIN_COMMAND
+    fi
     exit 0
 fi
 
@@ -344,6 +348,8 @@ if [[ -z $BIND ]]; then
     else
         ColorEcho "Docker Swarm Initialized."
     fi
+elif [[ "$BIND" == "__SKIP__" ]]; then
+    ClearDockerSwarmSetting
 else
     if [[ `IsWSL2` == '0' ]]; then
         PrintStep Setup Worker Node to $BIND
