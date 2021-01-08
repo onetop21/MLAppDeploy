@@ -36,6 +36,7 @@ def make_base_labels(workspace, username, project):
     basename = f"{username}-{project['name'].lower()}-{project_key[:SHORT_LEN]}"
     default_image = f"{utils.get_repository(basename, registry)}:latest"
     labels = {
+        'MLAD.VERSION': '1',
         'MLAD.PROJECT': project_key,
         'MLAD.PROJECT.WORKSPACE': workspace,
         'MLAD.PROJECT.USERNAME': username,
@@ -109,7 +110,9 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
     # Create Docker Network
     network_name = f"{basename}-{driver}"
     try:
-        print('Create network...')
+        message = f"Create project network [{network_name}]..."
+        #print(message)
+        yield {'stream': message}
         labels = copy.deepcopy(base_labels)
         labels.update({
             'MLAD.PROJECT.NETWORK': network_name, 
@@ -128,7 +131,9 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
                     ipam=ipam_config, 
                     ingress=False)
                 if network.attrs['Driver']: 
-                    print(f'Selected Subnet [{subnet}]')
+                    message = f'Selected Subnet [{subnet}]'
+                    #print(message)
+                    yield {'stream': message}
                     break
                 network.remove()
         else:
@@ -136,11 +141,12 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
                 network_name, 
                 labels=labels,
                 driver='bridge')
+        yield {"result": 'succeed', 'output': network}
     except docker.errors.APIError as e:
-        print('Failed to create network.', file=sys.stderr)
-        print(e, file=sys.stderr)
-        network = None
-    return network
+        message = f"Failed to create network.\n{e}"
+        #print(message, file=sys.stderr)
+        #print(e, file=sys.stderr)
+        yield {'result': 'failed', 'stream': message}
 
 def remove_project_network(cli, network, timeout=0xFFFF):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -153,12 +159,18 @@ def remove_project_network(cli, network, timeout=0xFFFF):
             removed = True
             break
         else:
-            print(f"Wait to remove network [{tick}s]", end="\r")
+            message = f"\033[1A\033[KWait to remove network [{tick}s]"
+            #print(message, end="\r")
+            yield {'stream': message}
             time.sleep(1)
     if not removed:
-        print(f"Failed to remove network.", file=sys.stderr)
-        return False
-    return True
+        message = f"Failed to remove network."
+        #print(message, file=sys.stderr)
+        yield {'status': 'failed', 'stream': message}
+        #return False
+    else:
+        yield {'status': 'succeed'}
+        #return True
 
 # Manage services and tasks
 def get_containers(cli, project_key=None, extra_filters={}):
@@ -184,22 +196,22 @@ def get_services(cli, project_key=None, extra_filters={}):
 def inspect_service(service):
     if not isinstance(service, docker.models.services.Service): raise TypeError('Parameter is not valid type.')
     labels = service.attrs['Spec']['Labels']
-    hostname, path = labels['MLAD.PROJECT.WORKSPACE'].split(':')
+    hostname, path = labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     inspect = {
-        'key': uuid.UUID(labels['MLAD.PROJECT']),
+        'key': uuid.UUID(labels['MLAD.PROJECT']) if labels.get('MLAD.VERSION') else '',
         'workspace': {
             'hostname': hostname,
             'path': path
         },
-        'username': labels['MLAD.PROJECT.USERNAME'],
-        'network': labels['MLAD.PROJECT.NETWORK'],
-        'project': labels['MLAD.PROJECT.NAME'],
-        'id': uuid.UUID(labels['MLAD.PROJECT.ID']),
-        'version': labels['MLAD.PROJECT.VERSION'],
-        'base': labels['MLAD.PROJECT.BASE'],
+        'username': labels.get('MLAD.PROJECT.USERNAME'),
+        'network': labels.get('MLAD.PROJECT.NETWORK'),
+        'project': labels.get('MLAD.PROJECT.NAME'),
+        'id': uuid.UUID(labels['MLAD.PROJECT.ID']) if labels.get('MLAD.VERSION') else '',
+        'version': labels.get('MLAD.PROJECT.VERSION'),
+        'base': labels.get('MLAD.PROJECT.BASE'),
         'image': service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image'], # Replace from labels['MLAD.PROJECT.IMAGE']
 
-        'name': labels['MLAD.PROJECT.SERVICE'], 
+        'name': labels.get('MLAD.PROJECT.SERVICE'), 
         'replicas': service.attrs['Spec']['Mode']['Replicated']['Replicas'],
         'tasks': dict([(task['ID'], task) for task in service.tasks()]),
         'ports': {}
@@ -720,7 +732,16 @@ def images_up(project, services, by_service=False):
     # Get Network
     if not project['partial']:
         try:
-            network = create_project_network(cli, base_labels, swarm=by_service)
+            #network = create_project_network(cli, base_labels, swarm=by_service)
+            for _ in create_project_network(cli, base_labels, swarm=by_service):
+                if 'stream' in _:
+                    print(_['stream'])
+                if 'result' in _:
+                    if _['result'] == 'succeed':
+                        network = _['output']
+                    else:
+                        print(_['stream'])
+                    break
         except exception.AlreadyExist as e:
             print(e, file=sys.stderr)
             print('Already running project.', file=sys.stderr)
@@ -742,7 +763,8 @@ def images_up(project, services, by_service=False):
     with InterruptHandler(message='Wait.', blocked=True) as h:
         instances = create_services(cli, network, services)  
         for instance in instances:
-            print(f'Start {instance}...', end=' ')
+            inspect = inspect_service(instance)
+            print(f"Starting {inspect['name']}...")
             time.sleep(1)
         if h.interrupted:
             return None
@@ -833,8 +855,13 @@ def images_down(project, services, by_service=False):
             remove_containers(cli, targets)
         if not project['partial']:
             try:
-                remove_project_network(cli, network)
-                print('Network removed.')
+                for _ in remove_project_network(cli, network):
+                    if 'stream' in _:
+                        print(_['stream'])
+                    if 'status' in _:
+                        if _['status'] == 'succeed':
+                            print('Network removed.')
+                        break
             except docker.errors.APIError as e:
                 print('Network already removed.', file=sys.stderr)
 
