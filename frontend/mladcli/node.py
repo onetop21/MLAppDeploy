@@ -8,7 +8,7 @@ def list():
     nodes = docker.node_list()
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
-        ID = node['ID'][:10]
+        ID = node['id'][:10]
         role = node['role']
         activate = 'Active' if node['availability'] == 'active' else '-'
         hostname = node['hostname']

@@ -24,17 +24,26 @@ def get_docker_client():
     # docker.client.DockerClient
     return docker.from_env(environment={'DOCKER_HOST': config['docker']['host']})
 
-def lowlevel_client(cli):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    return cli.api
-
 # Manage Project and Network
-def base_labels(project_key, username, project):
+def make_base_labels(workspace, username, project):
+    config = utils.read_config()
+    #workspace = f"{hostname}:{workspace}"
+    # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
+    ## docker.host
+    ## docker.registry
+    project_key = utils.project_key(workspace)
+    registry = config['docker']['registry']
+    basename = f"{username}-{project['name'].lower()}-{project_key[:SHORT_LEN]}"
+    default_image = f"{utils.get_repository(basename, registry)}:latest"
     labels = {
         'MLAD.PROJECT': project_key,
+        'MLAD.PROJECT.WORKSPACE': workspace,
         'MLAD.PROJECT.USERNAME': username,
         'MLAD.PROJECT.NAME': project['name'].lower(),
-        'MLAD.PROJECT.VERSION': project['version'].lower()
+        'MLAD.PROJECT.AUTHOR': project['author'],
+        'MLAD.PROJECT.VERSION': project['version'].lower(),
+        'MLAD.PROJECT.BASE': basename,
+        'MLAD.PROJECT.IMAGE': default_image,
     }
     return labels
 
@@ -51,7 +60,6 @@ def get_project_networks(cli, project_key=None):
     else:
         return dict([(_.name, _) for _ in networks])
 
-
 def get_labels(obj):
     if isinstance(obj, docker.models.networks.Network):
         return obj.attrs['Labels']
@@ -63,19 +71,19 @@ def get_labels(obj):
 def inspect_project_network(network):
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     labels = network.attrs['Labels']
-    hostname, path = labels['MLAD.PROJECT'].split('@')
-    uuid10 = uuid.UUID(labels['MLAD.PROJECT.ID']).hex[:10]
+    hostname, path = labels['MLAD.PROJECT.WORKSPACE'].split(':')
     return {
-        'key': labels['MLAD.PROJECT'],
-        'up_from': {
+        'key': uuid.UUID(labels['MLAD.PROJECT']),
+        'workspace': {
             'hostname': hostname,
             'path': path
         },
-        'name': labels['MLAD.PROJECT.NAME'],
-        'instance': f"{labels['MLAD.PROJECT.NAME']}-{uuid10}",
         'username': labels['MLAD.PROJECT.USERNAME'],
+        'name': labels['MLAD.PROJECT.NETWORK'],
+        'project': labels['MLAD.PROJECT.NAME'],
+        'id': uuid.UUID(labels['MLAD.PROJECT.ID']),
         'version': labels['MLAD.PROJECT.VERSION'],
-        'ID': uuid.UUID(labels['MLAD.PROJECT.ID']),
+        'base': labels['MLAD.PROJECT.BASE'],
         "image": labels['MLAD.PROJECT.IMAGE'],
     }
 
@@ -83,27 +91,29 @@ def is_swarm_mode(network):
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     return network.attrs['Driver'] == 'overlay'
 
-def create_project_network(cli, config, project_key, project, swarm=True, allow_reuse=False):
+def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    #workspace = utils.get_workspace()
     driver = 'overlay' if swarm else 'bridge'
+    project_key = base_labels['MLAD.PROJECT']
     network = get_project_networks(cli, project_key)
     if network:
         if allow_reuse: return network
         raise exception.AlreadyExist('Already exist project network.')
 
-    project_id = utils.generate_unique_id()
-    project_name = utils.generate_project_name(project, project_id)
-    project_version = project['version'].lower()
-    repository = utils.get_repository(project)
+    basename = base_labels['MLAD.PROJECT.BASE']
+    project_version = base_labels['MLAD.PROJECT.VERSION']
+    #inspect_image(_) for _ in get_images(cli, project_key)
+    default_image = base_labels['MLAD.PROJECT.IMAGE']
 
     # Create Docker Network
-    network_name =  f"{project_name}-{driver}"
+    network_name = f"{basename}-{driver}"
     try:
         print('Create network...')
-        labels = base_labels(project_key, config['account']['username'], project)
+        labels = copy.deepcopy(base_labels)
         labels.update({
-            'MLAD.PROJECT.ID': str(project_id),
-            'MLAD.PROJECT.IMAGE': f"{repository}:latest"
+            'MLAD.PROJECT.NETWORK': network_name, 
+            'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
         })
 
         if driver == 'overlay':
@@ -135,11 +145,11 @@ def create_project_network(cli, config, project_key, project, swarm=True, allow_
 def remove_project_network(cli, network, timeout=0xFFFF):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
-    project_info = inspect_project_network(network)
+    network_info = inspect_project_network(network)
     network.remove()
     removed = False
     for tick in range(timeout):
-        if not get_project_networks(cli, project_info['key']):
+        if not get_project_networks(cli, network_info['key'].hex):
             removed = True
             break
         else:
@@ -174,21 +184,22 @@ def get_services(cli, project_key=None, extra_filters={}):
 def inspect_service(service):
     if not isinstance(service, docker.models.services.Service): raise TypeError('Parameter is not valid type.')
     labels = service.attrs['Spec']['Labels']
-    hostname, path = labels['MLAD.PROJECT'].split('@')
-    uuid10 = uuid.UUID(labels['MLAD.PROJECT.ID']).hex[:10]
+    hostname, path = labels['MLAD.PROJECT.WORKSPACE'].split(':')
     inspect = {
-        'key': labels['MLAD.PROJECT'],
-        'up_from': {
+        'key': uuid.UUID(labels['MLAD.PROJECT']),
+        'workspace': {
             'hostname': hostname,
             'path': path
         },
-        'name': labels['MLAD.PROJECT.NAME'],
-        'instance': f"{labels['MLAD.PROJECT.NAME']}-{uuid10}",
         'username': labels['MLAD.PROJECT.USERNAME'],
+        'network': labels['MLAD.PROJECT.NETWORK'],
+        'project': labels['MLAD.PROJECT.NAME'],
+        'id': uuid.UUID(labels['MLAD.PROJECT.ID']),
         'version': labels['MLAD.PROJECT.VERSION'],
-        'ID': uuid.UUID(labels['MLAD.PROJECT.ID']),
-        'service_name': labels['MLAD.PROJECT.SERVICE'],
+        'base': labels['MLAD.PROJECT.BASE'],
         'image': service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image'], # Replace from labels['MLAD.PROJECT.IMAGE']
+
+        'name': labels['MLAD.PROJECT.SERVICE'], 
         'replicas': service.attrs['Spec']['Mode']['Replicated']['Replicas'],
         'tasks': dict([(task['ID'], task) for task in service.tasks()]),
         'ports': {}
@@ -210,7 +221,7 @@ def get_task_ids(cli, project_key, extra_filters={}):
     services = cli.services.list(filters={'label': filters})
     return [__['ID'][:SHORT_LEN] for _ in services for __ in _.tasks()]
 
-def create_services(cli, config, network, services):
+def create_services(cli, network, services, extra_labels={}):
     from mladcli.default import project_service as service_default
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
@@ -221,7 +232,7 @@ def create_services(cli, config, network, services):
     # Update Project Name
     project_info = inspect_project_network(network)
     image_name = project_info['image']
-    project_instance = project_info['instance']
+    project_base = project_info['base']
 
     instances = []
     for name in services:
@@ -238,13 +249,14 @@ def create_services(cli, config, network, services):
         image = service['image'] or image_name
         env = utils.get_service_env()
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
-        env += [f"PROJECT={project_info['name']}"]
+        env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
-        env += [f"PROJECT_ID={project_info['ID']}"]
+        env += [f"PROJECT_ID={project_info['id']}"]
         env += [f"SERVICE={name}"]
         env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
         command = service['command'] + service['arguments']
         labels = copy.copy(network_labels)
+        labels.update(extra_labels)
         labels['MLAD.PROJECT.SERVICE'] = name
         
         policy = service['deploy']['restart_policy']
@@ -320,7 +332,7 @@ def create_services(cli, config, network, services):
             ]
 
         # Try to run
-        inst_name = f"{project_info['instance']}-{name}"
+        inst_name = f"{project_base}-{name}"
         if not swarm_mode:
             instance = cli.containers.run(
                 image, 
@@ -353,71 +365,94 @@ def create_services(cli, config, network, services):
             instances.append(instance)
     return instances
 
-def remove_containers(cli, project_key, names, timeout=0xFFFF):
+def remove_containers(cli, containers, timeout=0xFFFF):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    if not names: names = get_services(cli, project_key).keys()
-    query = lambda x: get_containers(cli, project_key, extra_filters={'MLAD.PROJECT.SERVICE': x})
     for _ in names:
-        services = query(_)
-        for service in services:
+        for container in containers:
             print(f"Stop {service.name}...")
-            service.stop()
-        for service in services:
-            service.wait()
+            container.stop()
+        for container in containers:
+            container.wait()
             container.remove()
     return True
 
-def remove_services(cli, project_key, names=None, timeout=0xFFFF):
+def remove_services(cli, services, timeout=0xFFFF):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    if not names: names = get_services(cli, project_key).keys()
-    query = lambda x: get_services(cli, project_key, extra_filters={'MLAD.PROJECT.SERVICE': x})
-    removed = False
-    for _ in names:
-        services = query(_)
-        for name in services:
-            service = services[name]
-            print(f"Stop {name}...")
-            service.remove()
+    for service in services:
+        inspect = inspect_service(service)
+        print(f"Stop {inspect['name']}...")
+        service.remove()
+    removed = True
+    for service in services:
+        service_removed = False
         for _ in range(timeout):
-            removed = True
-            for name in names:
-                if name in query(_): removed = False
-            if removed: break
-            else: time.sleep(1)
+            try:
+                service.reload()
+            except docker.errors.NotFound:
+                service_removed = True
+                break
+            time.sleep(1)
+        removed &= service_removed
     return removed
 
 # Image Control
-def get_images(cli, config, project_key=None):
+def get_images(cli, project_key=None):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
 
     filters = 'MLAD.PROJECT'
     if project_key: filters+= f"={project_key}"
     return cli.images.list(filters={ 'label': filters } )
 
-def build_image(cli, config, project_key, project, workspace, tar):
+def inspect_image(image):
+    if not isinstance(image, docker.models.images.Image): raise TypeError('Parameter is not valid type.')
+    sorted_tags = sorted(image.tags, key=lambda x: chr(0xFFFF) if x.endswith('latest') else x)
+    headed = False
+    if sorted_tags:
+        latest_tag = sorted_tags[-1]
+        repository, tag = latest_tag.rsplit(':', 1) if ':' in latest_tag else (latest_tag, '')
+        headed = latest_tag.endswith('latest')
+    else:
+        repository, tag = image.short_id.split(':',1)[-1], ''
+    labels = {
+        # for Image
+        'id': image.id.split(':',1)[-1],
+        'short_id': image.short_id.split(':',1)[-1],
+        'repository': repository,
+        'tag': tag,
+        'tags': image.tags,
+        'latest': headed,
+        'author': image.attrs['Author'],
+        'created': image.attrs['Created'],
+        # for Project
+        'workspace': image.labels['MLAD.PROJECT.WORKSPACE'] if 'MLAD.PROJECT.WORKSPACE' in image.labels else 'Not Supported',
+        'project_name': image.labels['MLAD.PROJECT.NAME'],
+    }
+    return labels
+            
+def build_image(cli, base_labels, project, working_dir, tar, registry=None):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    llcli = lowlevel_client(cli)
-
-    project_version=project['version'].lower()
-    repository = utils.get_repository(project)
-    latest_name = f'{repository}:latest'
-
     # Setting path and docker file
     #os.getcwd() + "/.mlad/"
+    #temporary
     PROJECT_CONFIG_PATH = utils.getProjectConfigPath(project)
+    username = base_labels['MLAD.PROJECT.USERNAME']
+    project_name = base_labels['MLAD.PROJECT.NAME']
+    latest_name = base_labels['MLAD.PROJECT.IMAGE']
+
+    PROJECT_CONFIG_PATH = f"{utils.CONFIG_PATH}/{username}/{project_name}"
     DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
-    DOCKERIGNORE_FILE = utils.getWorkingDir() + '/.dockerignore'
+    DOCKERIGNORE_FILE = working_dir + '/.dockerignore'
 
     # extract tar to /tmp/mlad/latest_name
     # build image
     ## Ref : https://docs.docker.com/engine/api/v1.41/#operation/ImageBuild
     # POST /build
 
-    build_output = llcli.build(
-        path=utils.getWorkingDir(),
+    build_output = cli.api.build(
+        path=working_dir,
         tag=latest_name,
         dockerfile=DOCKERFILE_FILE,
-        labels=base_labels(project_key, config['account']['username'], project),
+        labels=base_labels,
         forcerm=True,
         decode=True
     )
@@ -427,7 +462,7 @@ def build_image(cli, config, project_key, project, workspace, tar):
         image = (None, build_output)
     return image
 
-def remove_image(cli, ids, force):
+def remove_image(cli, ids, force=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     return [ cli.images.remove(image=id, force=force) for id in ids ]
 
@@ -437,13 +472,18 @@ def prune_images(cli, project_key):
     if project_key: filters+= f'={project_key}'
     return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
 
-def push_images(cli, config, project):
+def push_images(cli, project_key):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    project_key = utils.get_project_key()
-    project_version=project['version'].lower()
-    repository = utils.get_repository(project)
-    
-    return cli.images.push(repository, stream=True, decode=True)
+    for _ in get_images(cli, project_key):
+        inspect = inspect_image(_)
+        if inspect['short_id'] == inspect['repository']: continue
+        repository = inspect['repository']
+        output = cli.images.push(repository, stream=True, decode=True)
+        try:
+            for stream in output:
+                yield stream
+        except StopIteration:
+            pass
  
 def get_nodes(cli, node_key=None):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -455,7 +495,7 @@ def get_nodes(cli, node_key=None):
 def inspect_node(node):
     if not isinstance(node, docker.models.nodes.Node): raise TypeError('Parameter is not valid type.')
     return {
-        'ID': node.attrs['ID'],
+        'id': node.attrs['ID'],
         'hostname': node.attrs['Description']['Hostname'],
         'labels': node.attrs['Spec']['Labels'],
         'role': node.attrs['Spec']['Role'],
@@ -522,10 +562,8 @@ def remove_node_labels(cli, node_key, *keys):
 # for Command Line Interface (Local)
 def image_list(project=None):
     cli = get_docker_client()
-    config = utils.read_config()
-    project_key = utils.get_project_key()
-
-    images = get_images(cli, config, project_key)
+    project_key = utils.project_key(utils.get_workspace())
+    images = get_images(cli, project_key)
 
     dummies = 0
     data = []
@@ -548,21 +586,20 @@ def image_list(project=None):
 
 def image_build(project, workspace, tagging=False, verbose=False):
     config = utils.read_config()
-    project_key = utils.get_project_key()
-    project_version=project['version'].lower()
-    repository = utils.get_repository(project)
-    latest_name = f'{repository}:latest'
+    cli = get_docker_client()
 
     PROJECT_CONFIG_PATH = utils.getProjectConfigPath(project)
     DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
     DOCKERIGNORE_FILE = utils.getWorkingDir() + '/.dockerignore'
 
-    cli = get_docker_client()
+    base_labels = make_base_labels(utils.get_workspace(), config['account']['username'], project)
+    project_key = base_labels['MLAD.PROJECT']
+    project_version = base_labels['MLAD.PROJECT.VERSION']
 
     # Check latest image
     latest_image = None
     commit_number = 1
-    images = cli.images.list(filters={'label': f'MLAD.PROJECT={project_key}'})
+    images = get_images(cli, project_key)
     if len(images):
         latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
         if latest_image and len(latest_image): latest_image = latest_image[0]
@@ -576,7 +613,7 @@ def image_build(project, workspace, tagging=False, verbose=False):
 
     # Docker build
     try:
-        image = build_image(cli, config, project_key, project, workspace, None)
+        image = build_image(cli, base_labels, project, utils.getWorkingDir(), None, config['docker']['registry'])
 
         # Print build output
         for _ in image[1]:
@@ -632,14 +669,15 @@ def image_remove(ids, force):
 
 def image_prune(project):
     cli = get_docker_client()
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
     return prune_images(cli, project_key)
 
 def image_push(project):
     config = utils.read_config()
     cli = get_docker_client()
     try:
-        for _ in push_images(cli, config, project):
+        project_key = utils.project_key(utils.get_workspace())
+        for _ in push_images(cli, project_key):
             if 'error' in _:
                 raise docker.errors.APIError(_['error'], None)
             elif 'stream' in _:
@@ -649,6 +687,8 @@ def image_push(project):
         print('Failed to Update Image to Registry.', file=sys.stderr)
         print('Please Check Registry Server.', file=sys.stderr)
         sys.exit(1)
+    except StopIteration:
+        pass
     
 # Project
 def running_projects():
@@ -673,23 +713,23 @@ def running_projects():
 def images_up(project, services, by_service=False):
     config = utils.read_config()
 
-    project_key = utils.get_project_key()
-    project_version = project['version'].lower()
-    repository = utils.get_repository(project)
-    image_name = f'{repository}:latest'
-
     cli = get_docker_client()
-
+    base_labels = make_base_labels(utils.get_workspace(), config['account']['username'], project)
+    project_key = base_labels['MLAD.PROJECT']
+    
     # Get Network
     if not project['partial']:
         try:
-            network = create_project_network(cli, config, project_key, project, swarm=by_service)
+            network = create_project_network(cli, base_labels, swarm=by_service)
         except exception.AlreadyExist as e:
             print(e, file=sys.stderr)
             print('Already running project.', file=sys.stderr)
             sys.exit(1)
     else:
-        network = create_project_network(cli, config, project_key, project, swarm=by_service, allow_reuse=True)
+        network = create_project_network(cli, base_labels, swarm=by_service, allow_reuse=True)
+
+    network_inspect = inspect_project_network(network)
+    project_version = network_inspect['version']
 
     # Check service status
     running_services = get_services(cli, project_key)
@@ -698,21 +738,18 @@ def images_up(project, services, by_service=False):
             print(f'Already running service[{service_name}] in project.', file=sys.stderr)
             sys.exit(1)
 
-    # Update Project Name
     project_info = inspect_project_network(network)
-    project_instance = project_info['instance']
-
     with InterruptHandler(message='Wait.', blocked=True) as h:
-        instances = create_services(cli, config, network, services)  
+        instances = create_services(cli, network, services)  
         for instance in instances:
             print(f'Start {instance}...', end=' ')
             time.sleep(1)
         if h.interrupted:
             return None
-    return project_info['instance']
+    return project_info['base']
             
 def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], by_service=False):
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
     project_version=project['version'].lower()
     config = utils.read_config()
 
@@ -766,7 +803,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], b
 
 def images_down(project, services, by_service=False):
     config = utils.read_config()
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
 
     cli = get_docker_client()
 
@@ -783,13 +820,17 @@ def images_down(project, services, by_service=False):
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
     inspect = inspect_project_network(network)
-    project_id = inspect['ID']
+    project_id = inspect['id']
 
     with InterruptHandler(message='Wait.', blocked=True):
         if by_service:
-            remove_services(cli, project_key, services.keys())
+            running_services = get_services(cli, project_key).values()
+            targets = [_ for _ in running_services if inspect_service(_)['name'] in services]
+            remove_services(cli, targets)
         else:
-            remove_containers(cli, project_key, services.keys())
+            running_containers = get_containers(cli, project_key).values()
+            targets = [_ for _ in running_containers if inspect_service(_)['name'] in services]
+            remove_containers(cli, targets)
         if not project['partial']:
             try:
                 remove_project_network(cli, network)
@@ -798,7 +839,7 @@ def images_down(project, services, by_service=False):
                 print('Network already removed.', file=sys.stderr)
 
 def show_status(project, services, all=False):
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
     cli = get_docker_client()
 
     # Block not running.
@@ -838,7 +879,7 @@ def show_status(project, services, all=False):
     return task_info
     
 def scale_service(project, scale_spec):
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
     
     cli = get_docker_client()
     
@@ -863,7 +904,7 @@ def scale_service(project, scale_spec):
             print(f'Cannot find service [{service_name}].', file=sys.stderr)
 
 def get_running_services(project):
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
     cli = get_docker_client()
     services = get_services(cli, project_key)
     #print( [name for name, service in services if inspect_service(service)[''] ==  ) 

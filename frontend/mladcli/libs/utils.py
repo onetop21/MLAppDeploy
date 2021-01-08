@@ -11,9 +11,15 @@ except ImportError as e:
     from yaml import Loader, Dumper
 
 HOME = str(Path.home())
-CONFIG_PATH = HOME + '/.mlad'
-CONFIG_FILE = HOME + '/.mlad/config.yml'
-COMPLETION_FILE = HOME + '/.mlad/completion.sh'
+
+CLIENT_CONFIG_PATH = HOME + '/.mlad'
+SERVICE_CONFIG_PATH = '/opt/mlad'
+CONFIG_PATH = CLIENT_CONFIG_PATH
+
+CLIENT_CONFIG_FILE = CLIENT_CONFIG_PATH + '/config.yml'
+SERVICE_CONFIG_FILE = SERVICE_CONFIG_PATH + '/config.yml'
+CONFIG_FILE = CLIENT_CONFIG_FILE
+COMPLETION_FILE = CLIENT_CONFIG_FILE + '/completion.sh'
 PROJECT_PATH = os.getcwd()
 PROJECT_FILE = os.getcwd() + '/mlad-project.yml'
 
@@ -46,29 +52,22 @@ def getProjectConfigPath(project):
     config = read_config()
     return f"{CONFIG_PATH}/{config['account']['username']}/{project['name'].lower()}"
 
-def generate_project_name(project, project_id=None):
-    config = read_config()
-    username = config['account']['username']
-    project_lower_name = project['name'].lower()
-    if project_id:
-        project_short_id = project_id.hex[:10]
-        return f"{username}-{project_lower_name}-{project_short_id}"
-    else:
-        return f"{username}-{project_lower_name}"
-
-def get_project_key():
+def get_workspace():
     '''
     Project Hash: [HOSTNAME]@[PROJECT DIR]
     '''
-    key = f"{socket.gethostname()}@{ProjectArgs['project_file']}"
+    key = f"{socket.gethostname()}:{ProjectArgs['project_file']}"
     return key
 
-def get_repository(project):
-    config = read_config()
-    if 'registry' in config['docker']:
-        repository = f"{config['docker']['registry']}/{config['account']['username']}/{project['name'].lower()}"
+def project_key(workspace):
+    return hash(workspace).hex
+
+def get_repository(base_name, registry=None):
+    if registry:
+        repository = f"{registry}/{base_name.replace('-', '/', 1)}"
     else:
-        repository = f"{config['account']['username']}/{project['name'].lower()}"
+        print(base_name)
+        repository = f"{base_name.replace('-', '/', 1)}"
     return repository
 
 def read_config():
@@ -252,3 +251,7 @@ def generate_unique_id(length=None):
         return UUID.hex[:length]
     else:
         return UUID
+
+def hash(body: str):
+    import hashlib
+    return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
