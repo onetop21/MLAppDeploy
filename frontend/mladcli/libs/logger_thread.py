@@ -37,20 +37,24 @@ class LoggerThread(threading.Thread):
         while not self.interrupted:
             try:
                 name = self.name
-                msg = next(self.log).decode('utf8')[:-1] # Remove line feed
+                msg = next(self.log).decode('utf8')
                 if msg.startswith('Error'):
                     print(f'{ErrColor}{msg}{NoColor}')
                 else:
                     if self.detail: 
                         if self.timestamps:
-                            _, timestamp, msg = msg.split(' ', 2)
+                            split_msg = msg.split(' ', 2)
+                            if len(split_msg) < 3: _, timestamp, body = (*split_msg, '')
+                            else: _, timestamp, body = split_msg
                             #msg = ' '.join([parser.parse(timestamp).astimezone().isoformat(), msg])
-                            msg = ' '.join([parser.parse(timestamp).astimezone().strftime("[%Y-%m-%d %H:%M:%S.%f]"), msg])
+                            body = ' '.join([parser.parse(timestamp).astimezone().strftime("[%Y-%m-%d %H:%M:%S.%f]"), body])
                         else:
-                            _, msg = msg.split(' ', 1)                       
+                            split_msg = msg.split(' ', 1)
+                            if len(split_msg) < 2: _, body = (*split_msg, '')
+                            else: _, body = split_msg
                         name += f".{_[_.rfind('=')+1:][:self.short_len]}"
                     self.colorkey[name] = self.colorkey[name] if name in self.colorkey else Colors[colorIndex()]
-                    print(("{}{:%d}{} {}" % self.width).format(self.colorkey[name], name, NoColor, msg))
+                    print(("{}{:%d}{} {}" % self.width).format(self.colorkey[name], name, NoColor, body))
             except StopIteration as e:
                 self.interrupt()
 

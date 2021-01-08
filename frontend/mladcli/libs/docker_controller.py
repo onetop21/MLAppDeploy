@@ -766,7 +766,7 @@ def show_logs(project, tail='all', follow=False, timestamps=False, filters=[], b
             for line in resp.iter_lines():
                 out = line[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
                 if timestamps:
-                    temp = out.split(' ')
+                    temp = f"{out} ".split(' ') # Add space at end to prevent error without body
                     out = ' '.join([temp[1], temp[0]] + temp[2:])
                 yield out.encode('utf8')
         return ''
