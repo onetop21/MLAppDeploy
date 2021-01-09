@@ -111,7 +111,6 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
     network_name = f"{basename}-{driver}"
     try:
         message = f"Create project network [{network_name}]..."
-        #print(message)
         yield {'stream': message}
         labels = copy.deepcopy(base_labels)
         labels.update({
@@ -132,7 +131,6 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
                     ingress=False)
                 if network.attrs['Driver']: 
                     message = f'Selected Subnet [{subnet}]'
-                    #print(message)
                     yield {'stream': message}
                     break
                 network.remove()
@@ -144,8 +142,6 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
         yield {"result": 'succeed', 'output': network}
     except docker.errors.APIError as e:
         message = f"Failed to create network.\n{e}"
-        #print(message, file=sys.stderr)
-        #print(e, file=sys.stderr)
         yield {'result': 'failed', 'stream': message}
 
 def remove_project_network(cli, network, timeout=0xFFFF):
@@ -478,7 +474,7 @@ def remove_image(cli, ids, force=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     return [ cli.images.remove(image=id, force=force) for id in ids ]
 
-def prune_images(cli, project_key):
+def prune_images(cli, project_key=None):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     filters = 'MLAD.PROJECT'
     if project_key: filters+= f'={project_key}'
@@ -572,30 +568,6 @@ def remove_node_labels(cli, node_key, *keys):
 
 
 # for Command Line Interface (Local)
-def image_list(project=None):
-    cli = get_docker_client()
-    project_key = utils.project_key(utils.get_workspace())
-    images = get_images(cli, project_key)
-
-    dummies = 0
-    data = []
-    for image in images:
-        if image.tags:
-            head = max([ tag.endswith('latest') for tag in image.tags ])
-            repository, tag = sorted(image.tags)[0].rsplit(':', 1)
-            data.append((
-                image.short_id[-SHORT_LEN:], 
-                repository,
-                tag,
-                head,
-                image.labels['MLAD.PROJECT.NAME'], 
-                image.attrs['Author'], 
-                image.attrs['Created'], 
-            ))
-        else:
-            dummies += 1
-    return data, dummies
-
 def image_build(project, workspace, tagging=False, verbose=False):
     config = utils.read_config()
     cli = get_docker_client()
@@ -669,59 +641,7 @@ def image_build(project, workspace, tagging=False, verbose=False):
     else:
         return None
 
-def image_remove(ids, force):
-    config = utils.read_config()
-    cli = get_docker_client()
-    try:
-        result = remove_image(cli, ids, force)
-    except docker.errors.ImageNotFound as e:
-        print(e, file=sys.stderr)
-        result = []
-    return result
-
-def image_prune(project):
-    cli = get_docker_client()
-    project_key = utils.project_key(utils.get_workspace())
-    return prune_images(cli, project_key)
-
-def image_push(project):
-    config = utils.read_config()
-    cli = get_docker_client()
-    try:
-        project_key = utils.project_key(utils.get_workspace())
-        for _ in push_images(cli, project_key):
-            if 'error' in _:
-                raise docker.errors.APIError(_['error'], None)
-            elif 'stream' in _:
-                sys.stdout.write(_['stream'])
-    except docker.errors.APIError as e:
-        print(e, file=sys.stderr)
-        print('Failed to Update Image to Registry.', file=sys.stderr)
-        print('Please Check Registry Server.', file=sys.stderr)
-        sys.exit(1)
-    except StopIteration:
-        pass
-    
 # Project
-def running_projects():
-    config = utils.read_config()
-    cli = get_docker_client()
-    data = {}
-    for service in get_services(cli).values():
-        inspect = inspect_service(service)
-        default = { 
-            'username': inspect['username'], 
-            'project': inspect['name'], 
-            'image': inspect['image'],
-            'services': 0, 'replicas': 0, 'tasks': 0 
-        }
-        project_key = inspect['key']
-        data[project_key] = data[project_key] if project_key in data else default
-        data[project_key]['services'] += 1
-        data[project_key]['replicas'] += inspect['replicas']
-        data[project_key]['tasks'] += [_['Status']['State'] for _ in inspect['tasks'].values()].count('running')
-    return data
-
 def images_up(project, services, by_service=False):
     config = utils.read_config()
 
@@ -865,94 +785,3 @@ def images_down(project, services, by_service=False):
             except docker.errors.APIError as e:
                 print('Network already removed.', file=sys.stderr)
 
-def show_status(project, services, all=False):
-    project_key = utils.project_key(utils.get_workspace())
-    cli = get_docker_client()
-
-    # Block not running.
-    network = get_project_networks(cli, project_key)
-    if not network:
-        print('Cannot find running service.', file=sys.stderr)
-        sys.exit(1)
-
-    task_info = []
-    for service_name, service in get_services(cli, project_key).items():
-        inspect = inspect_service(service)
-        try:
-            for task_id, task in inspect['tasks'].items():
-                uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
-                if uptime > 24 * 60 * 60:
-                    uptime = f"{uptime // (24 * 60 * 60):.0f} days"
-                elif uptime > 60 * 60:
-                    uptime = f"{uptime // (60 * 60):.0f} hours"
-                elif uptime > 60:
-                    uptime = f"{uptime // 60:.0f} minutes"
-                else:
-                    uptime = f"{uptime:.0f} seconds"
-                if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    task_info.append((
-                        task_id,
-                        service_name,
-                        task['Slot'],
-                        inspect_node(get_nodes(cli, task['NodeID']))['hostname'] if 'NodeID' in task else '-',
-                        task['DesiredState'].title(), 
-                        f"{task['Status']['State'].title()}", 
-                        uptime,
-                        ', '.join([_ for _ in inspect['ports']]),
-                        task['Status']['Err'] if 'Err' in task['Status'] else '-'
-                    ))
-        except docker.errors.NotFound as e:
-            pass
-    return task_info
-    
-def scale_service(project, scale_spec):
-    project_key = utils.project_key(utils.get_workspace())
-    
-    cli = get_docker_client()
-    
-    # Block not running.
-    network = get_project_networks(cli, project_key)
-    if not network:
-        print('Cannot find running service.', file=sys.stderr)
-        sys.exit(1)
-
-    # Inspect Data
-    inspect = inspect_project_network(network)
-
-    for service_name in scale_spec:
-        try:
-            services = get_services(cli, project_key, extra_filters={'MLAD.PROJECT.SERVICE': service_name})
-            for service in services:
-                if service.scale(int(scale_spec[service_name])):
-                    print(f'Change scale service [{service_name}].')
-                else:
-                    print(f'Failed to change scale service [{service_name}].')
-        except docker.errors.NotFound:
-            print(f'Cannot find service [{service_name}].', file=sys.stderr)
-
-def get_running_services(project):
-    project_key = utils.project_key(utils.get_workspace())
-    cli = get_docker_client()
-    services = get_services(cli, project_key)
-    #print( [name for name, service in services if inspect_service(service)[''] ==  ) 
-    print (services.items())
-
-def node_list():
-    cli = get_docker_client()
-    return [inspect_node(_) for _ in get_nodes(cli).values()]
-
-def node_enable(node_key):
-    cli = get_docker_client()
-    return enable_node(cli, node_key)
-
-def node_disable(node_key):
-    cli = get_docker_client()
-    return disable_node(cli, node_key)
-
-def node_label_add(node_key, **kvs):
-    cli = get_docker_client()
-    return add_node_labels(cli, node_key, **kvs)
-
-def node_label_rm(node_key, *keys):
-    cli = get_docker_client()
-    return remove_node_labels(cli, node_key, *keys)

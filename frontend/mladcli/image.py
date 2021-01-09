@@ -1,24 +1,41 @@
 import sys, os
 import requests
+import docker
 from pathlib import Path
-from mladcli.libs import utils, docker_controller as docker, interrupt_handler
+from mladcli.libs import utils
+from mladcli.libs import docker_controller as ctlr
+from mladcli.libs import interrupt_handler
 from mladcli.default import project as default_project
 
 def list(all, tail):
+    cli = ctlr.get_docker_client()
     if all:
-        project = None
+        images = ctlr.get_images(cli, project_key)
     else:
-        project = utils.get_project(default_project)
-
-    images, dummies = docker.image_list(project['project'] if project else None)
+        project_key = utils.project_key(utils.get_workspace())
+        images = ctlr.get_images(cli, project_key)
 
     data = [('ID', 'REGISTRY', 'BUILD USER', 'PROJECT NAME', 'PROJECT AUTHOR', 'VERSION', 'CREATED')]
-    for id, repository, tag, head, project_name, author, created in images[:tail]:
-        registry, builder, _ = repository.split('/')
-        data.append((id, registry, builder, project_name, author, f'[{tag}]' if head else f'{tag}', created))
+    untagged = 0
+    for _ in [ctlr.inspect_image(_) for _ in images[:tail]]:
+        if _['short_id'] == _['repository']:
+            untagged += 1
+            continue
+        else:
+            registry, builder, __ = _['repository'].split('/')
+            row = [
+                _['short_id'],
+                registry,
+                builder,
+                _['project_name'],
+                _['author'],
+                f"[{_['tag']}]" if _['latest'] else f"{_['tag']}",
+                _['created']
+            ]
+            data.append(row)
     utils.print_table(data, 'No have built image.')
-    if dummies:
-        print(f'This project has {dummies} cached-images. To secure disk spaces by cleaning cache.') 
+    if untagged:
+        print(f'This project has {untagged} untagged images. To free disk spaces up by cleaning gabage images.') 
 
 def search(keyword):
     import urllib3, json
@@ -46,15 +63,21 @@ def search(keyword):
 
 def remove(ids, force):
     print('Remove project image...')
-    result = docker.image_remove(ids, force)
+    cli = ctlr.get_docker_client()
+    try:
+        result = ctlr.remove_image(cli, ids, force)
+    except docker.errors.ImageNotFound as e:
+        print(e, file=sys.stderr)
+        result = []
     print('Done.')
 
 def prune(all):
+    cli = ctlr.get_docker_client()
     if all:
-        result = docker.image_prune(None)
+        result = ctlr.prune_images(cli) 
     else:
-        project = utils.get_project(default_project)
-        result = docker.image_prune(project['project'])
+        project_key = utils.project_key(utils.get_workspace())
+        result = ctlr.prune_images(cli, project_key) 
 
     if result['ImagesDeleted'] and len(result['ImagesDeleted']):
         for deleted in result['ImagesDeleted']:
