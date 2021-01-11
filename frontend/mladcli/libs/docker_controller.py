@@ -259,6 +259,7 @@ def create_services(cli, network, services, extra_labels={}):
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
+        env += [f"PROJECT_KEY={project_info['key']}"]
         env += [f"PROJECT_ID={project_info['id']}"]
         env += [f"SERVICE={name}"]
         env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
