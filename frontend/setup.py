@@ -29,6 +29,7 @@ def main():
         'PyYAML>=3.10,<6.0', 
         'docker>=4.0.2,<5.0.0',
         'requests-unixsocket>=0.2.0',
+        'python-dateutil>=2.8.1,<3.0.0',
       ],
       entry_points='''
         [console_scripts]
