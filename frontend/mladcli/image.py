@@ -10,7 +10,7 @@ from mladcli.default import project as default_project
 def list(all, tail):
     cli = ctlr.get_docker_client()
     if all:
-        images = ctlr.get_images(cli, project_key)
+        images = ctlr.get_images(cli)
     else:
         project_key = utils.project_key(utils.get_workspace())
         images = ctlr.get_images(cli, project_key)
