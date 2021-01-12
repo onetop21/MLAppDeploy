@@ -6,8 +6,8 @@ app = FastAPI()
 
 '''
 # 인증 (Admin 전용)
-POST    /api/v1/admin/user_token    * generate user token
-GET     /api/v1/user/auth           * authenticate user token
+POST    /api/v1/admin/user_token    generate_user_token
+GET     /api/v1/user/auth           verify_token(decode_token())
 
 # 설정 (Admin 전용)
 POST    /api/v1/config          * create server config
