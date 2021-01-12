@@ -202,11 +202,12 @@ def inspect_service(service):
         'username': labels.get('MLAD.PROJECT.USERNAME'),
         'network': labels.get('MLAD.PROJECT.NETWORK'),
         'project': labels.get('MLAD.PROJECT.NAME'),
-        'id': uuid.UUID(labels['MLAD.PROJECT.ID']) if labels.get('MLAD.VERSION') else '',
+        'project_id': uuid.UUID(labels['MLAD.PROJECT.ID']) if labels.get('MLAD.VERSION') else '',
         'version': labels.get('MLAD.PROJECT.VERSION'),
         'base': labels.get('MLAD.PROJECT.BASE'),
         'image': service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image'], # Replace from labels['MLAD.PROJECT.IMAGE']
 
+        'id': uuid.UUID(service.id),
         'name': labels.get('MLAD.PROJECT.SERVICE'), 
         'replicas': service.attrs['Spec']['Mode']['Replicated']['Replicas'],
         'tasks': dict([(task['ID'], task) for task in service.tasks()]),
@@ -260,7 +261,7 @@ def create_services(cli, network, services, extra_labels={}):
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
         env += [f"PROJECT_KEY={project_info['key']}"]
-        env += [f"PROJECT_ID={project_info['id']}"]
+        env += [f"PROJECT_ID={project_info['project_id']}"]
         env += [f"SERVICE={name}"]
         env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
         command = service['command'] + service['arguments']

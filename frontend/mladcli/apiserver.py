@@ -10,23 +10,23 @@ POST    /api/v1/admin/user_token    generate_user_token
 GET     /api/v1/user/auth           verify_token(decode_token())
 
 # 설정 (Admin 전용) -> docker config 사용하는 것으로?
-POST    /api/v1/config          * create server config
-PUT     /api/v1/config          * update server config
+#POST    /api/v1/config          * create server config
+#PUT     /api/v1/config          * update server config
 GET     /api/v1/config          * get server config
 
 # 프로젝트
 POST    /api/v1/project         create_project_network
 GET     /api/v1/project         get_project_networks
-GET     /api/v1/project/[ID]    inspect_project_network
-DELETE  /api/v1/project/[ID]    remove_project_network
+GET     /api/v1/project/[PID]   inspect_project_network
+DELETE  /api/v1/project/[PID]   remove_project_network
 
 # 서비스 (컨트롤러에서 사용 가능)
-POST    /api/v1/project/[ID]/service            create_services
-GET     /api/v1/project/[ID]/service            get_services
-GET     /api/v1/project/[ID]/service/[ID]       inspect_service
-GET     /api/v1/project/[ID]/service/[ID]/tasks get_task_ids
-PUT     /api/v1/project/[ID]/service/[ID]/scale scale_services
-DELETE  /api/v1/project/[ID]/service/[ID]       remove_services
+POST    /api/v1/project/[PID]/service               create_services
+GET     /api/v1/project/[PID]/service               get_services
+GET     /api/v1/project/[PID]/service/[SNAME]       inspect_service
+GET     /api/v1/project/[PID]/service/[SNAME]/tasks get_task_ids
+PUT     /api/v1/project/[PID]/service/[SNAME]/scale scale_services
+DELETE  /api/v1/project/[PID]/service/[SNAME]       remove_services
 
 # 로그 (컨트롤러에서 사용 가능)
 GET     /api/v1/project/[ID]/logs               * logs
