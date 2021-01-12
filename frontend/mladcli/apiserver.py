@@ -9,7 +9,7 @@ app = FastAPI()
 POST    /api/v1/admin/user_token    generate_user_token
 GET     /api/v1/user/auth           verify_token(decode_token())
 
-# 설정 (Admin 전용)
+# 설정 (Admin 전용) -> docker config 사용하는 것으로?
 POST    /api/v1/config          * create server config
 PUT     /api/v1/config          * update server config
 GET     /api/v1/config          * get server config
@@ -34,7 +34,7 @@ GET     /api/v1/project/[ID]/logs               * logs
 # 이미지 (로컬에서 하는게 나을 수도 있음)
 POST    /api/v1/image       build_image
 GET     /api/v1/image       get_images
-GET     /api/v1/image/[ID]  * inspect_image
+GET     /api/v1/image/[ID]  inspect_image
 DELETE  /api/v1/image/[ID]  remove_image
 DELETE  /api/v1/image       prune_images
 POST    /api/v1/image       push_images
