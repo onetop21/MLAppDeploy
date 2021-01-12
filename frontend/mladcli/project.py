@@ -58,7 +58,7 @@ def status(all, no_trunc):
 
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
-    network = ctlr.get_project_networks(cli, project_key)
+    network = ctlr.get_project_network(cli, project_key=project_key)
     if not network:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
@@ -243,7 +243,7 @@ def down(services):
     project_key = utils.project_key(utils.get_workspace())
 
     # Block duplicated running.
-    network = ctlr.get_project_networks(cli, project_key)
+    network = ctlr.get_project_network(cli, project_key=project_key)
     if not network:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
@@ -288,7 +288,7 @@ def scale(scales):
     project_key = utils.project_key(utils.get_workspace())
     
     # Block not running.
-    network = ctlr.get_project_networks(cli, project_key)
+    network = ctlr.get_project_network(cli, project_key=project_key)
     if not network:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)

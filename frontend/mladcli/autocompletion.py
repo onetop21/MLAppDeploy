@@ -26,7 +26,7 @@ def get_node_list_completion(ctx, args, incomplete):
 def get_node_label_completion(ctx, args, incomplete):
     node_key = args[args.index('label')+1]
     cli = controller.get_docker_client()
-    node = controller.inspect_node(controller.get_nodes(cli, node_key))
+    node = controller.inspect_node(controller.get_node(cli, node_key))
     keys = [f'{key}' for key, value in node['labels'].items()]
     return [_ for _ in keys if _.startswith(incomplete)]
     

@@ -104,7 +104,7 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
     #workspace = utils.get_workspace()
     driver = 'overlay' if swarm else 'bridge'
     project_key = base_labels['MLAD.PROJECT']
-    network = get_project_network(cli, project_key)
+    network = get_project_network(cli, project_key=project_key)
     if network:
         if allow_reuse: return network
         raise exception.AlreadyExist('Already exist project network.')
@@ -158,7 +158,7 @@ def remove_project_network(cli, network, timeout=0xFFFF):
     network.remove()
     removed = False
     for tick in range(timeout):
-        if not get_project_network(cli, network_info['key'].hex):
+        if not get_project_network(cli, project_key=network_info['key'].hex):
             removed = True
             break
         else:
@@ -768,7 +768,7 @@ def images_down(project, services, by_service=False):
     cli = get_docker_client()
 
     # Block duplicated running.
-    network = get_project_network(cli, project_key)
+    network = get_project_network(cli, project_key=project_key)
     if not project['partial']:
         if not network:
             print('Already stopped project.', file=sys.stderr)
