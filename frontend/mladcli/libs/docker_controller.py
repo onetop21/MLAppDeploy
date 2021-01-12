@@ -48,18 +48,25 @@ def make_base_labels(workspace, username, project):
     }
     return labels
 
-def get_project_networks(cli, project_key=None):
+def get_project_networks(cli):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    networks = cli.networks.list(filters={'label':f"MLAD.PROJECT={project_key}"})
-    if project_key:
-        if len(networks) == 1:
-            return networks[0]
-        elif len(networks) == 0:
-            return None
-        else:
-            raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
+    networks = cli.networks.list(filters={'label':f"MLAD.PROJECT"})
+    return dict([(_.name, _) for _ in networks])
+
+def get_project_network(cli, **kwargs):
+    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    if kwargs.get('project_key'):
+        networks = cli.networks.list(filters={'label':f"MLAD.PROJECT={kwargs.get('project_key')}"})
+    elif kwargs.get('project_id'):
+        networks = cli.networks.list(filters={'label':f"MLAD.PROJECT.ID={kwargs.get('project_id')}"})
     else:
-        return dict([(_.name, _) for _ in networks])
+        raise TypeError('At least one parameter is required.')
+    if len(networks) == 1:
+        return networks[0]
+    elif len(networks) == 0:
+        return None
+    else:
+        raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
 
 def get_labels(obj):
     if isinstance(obj, docker.models.networks.Network):
@@ -97,7 +104,7 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
     #workspace = utils.get_workspace()
     driver = 'overlay' if swarm else 'bridge'
     project_key = base_labels['MLAD.PROJECT']
-    network = get_project_networks(cli, project_key)
+    network = get_project_network(cli, project_key)
     if network:
         if allow_reuse: return network
         raise exception.AlreadyExist('Already exist project network.')
@@ -151,7 +158,7 @@ def remove_project_network(cli, network, timeout=0xFFFF):
     network.remove()
     removed = False
     for tick in range(timeout):
-        if not get_project_networks(cli, network_info['key'].hex):
+        if not get_project_network(cli, network_info['key'].hex):
             removed = True
             break
         else:
@@ -188,6 +195,10 @@ def get_services(cli, project_key=None, extra_filters={}):
         return dict([(_.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], _) for _ in services])
     else:
         return dict([(_.name, _) for _ in services])
+
+def get_service(cli, service_id):
+    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    return cli.services.get(service_id)
 
 def inspect_service(service):
     if not isinstance(service, docker.models.services.Service): raise TypeError('Parameter is not valid type.')
@@ -413,6 +424,10 @@ def get_images(cli, project_key=None):
     if project_key: filters+= f"={project_key}"
     return cli.images.list(filters={ 'label': filters } )
 
+def get_image(cli, image_id):
+    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    return cli.images.get(image_id)    
+
 def inspect_image(image):
     if not isinstance(image, docker.models.images.Image): raise TypeError('Parameter is not valid type.')
     sorted_tags = sorted(image.tags, key=lambda x: chr(0xFFFF) if x.endswith('latest') else x)
@@ -495,12 +510,13 @@ def push_images(cli, project_key):
         except StopIteration:
             pass
  
-def get_nodes(cli, node_key=None):
+def get_nodes(cli):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    if node_key:
-        return cli.nodes.get(node_key)
-    else: 
-        return dict([(_.short_id, _) for _ in cli.nodes.list()])
+    return dict([(_.short_id, _) for _ in cli.nodes.list()])
+
+def get_node(cli, node_key):
+    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    return cli.nodes.get(node_key)
 
 def inspect_node(node):
     if not isinstance(node, docker.models.nodes.Node): raise TypeError('Parameter is not valid type.')
@@ -752,7 +768,7 @@ def images_down(project, services, by_service=False):
     cli = get_docker_client()
 
     # Block duplicated running.
-    network = get_project_networks(cli, project_key)
+    network = get_project_network(cli, project_key)
     if not project['partial']:
         if not network:
             print('Already stopped project.', file=sys.stderr)
