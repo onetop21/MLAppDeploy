@@ -6,3 +6,6 @@ class AlreadyExist(Exception):
 
 class Duplicated(Exception):
     pass
+
+class TokenError(Exception):
+    pass
