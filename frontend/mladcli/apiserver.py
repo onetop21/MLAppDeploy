@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import FastAPI
-
+from mladcli.libs import docker_controller as ctlr
 app = FastAPI()
 
 '''
@@ -50,6 +50,7 @@ DELETE  /api/v1/node/[ID]/labels    remove_node_labels
 
 @app.get("/")
 def read_root():
+    ctlr.temp_func()
     return {"Hello": "World"}
 
 

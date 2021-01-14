@@ -20,6 +20,8 @@ HOME = str(Path.home())
 CONFIG_PATH = HOME + '/.mlad'
 SHORT_LEN = 10
 
+def temp_func():
+    print("test")
 # Docker CLI from HOST
 def get_docker_client():
     config = utils.read_config()
@@ -112,7 +114,6 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
             yield {"result": 'succeed', 'output': network}
             return
         raise exception.AlreadyExist('Already exist project network.')
-
     basename = base_labels['MLAD.PROJECT.BASE']
     project_version = base_labels['MLAD.PROJECT.VERSION']
     #inspect_image(_) for _ in get_images(cli, project_key)
