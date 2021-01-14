@@ -137,22 +137,45 @@ def build(tagging, verbose):
 
     print('Done.')
 
-def test(_build):
+def test(with_build):
     project = utils.get_project(default_project)
 
-    if _build: build(False)
+    if with_build: build(False, True)
 
     print('Deploying test container image to local...')
-    project_name = ctlr.images_up(project['project'], project['services'] or {}, False)
-    if project_name:
-        ctlr.show_logs(project['project'], 'all', True, False, [], False)
-    #ctlr.images_down(project['project'], False)
+    config = utils.read_config()
 
     cli = ctlr.get_docker_client()
-    project_key = utils.project_key(utils.get_workspace())
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
+    project_key = base_labels['MLAD.PROJECT']
+    
+    with interrupt_handler(message='Wait.', blocked=True) as h:
+        # Create Network
+        for _ in ctlr.create_project_network(cli, base_labels, swarm=False):
+            if 'stream' in _:
+                print(_['stream'])
+            if 'result' in _:
+                if _['result'] == 'succeed':
+                    network = _['output']
+                else:
+                    print(f"Unknown Stream Result [{_['stream']}]")
+                break
 
+        # Start Containers
+        instances = ctlr.create_containers(cli, network, project['services'] or {})  
+        for instance in instances:
+            inspect = ctlr.inspect_container(instance)
+            print(f"Starting {inspect['name']}...")
+            time.sleep(1)
+
+    # Show Logs
+    with interrupt_handler(blocked=False) as h:
+        for _ in ctlr.container_logs(cli, project_key, 'all', True, False, []):
+            sys.stdout.write(_)
+
+    # Stop Containers and Network
     with interrupt_handler(message='Wait.', blocked=True):
-        services = ctlr.get_containers(cli, project_key).values()
+        containers = ctlr.get_containers(cli, project_key).values()
         ctlr.remove_containers(cli, containers)
 
         try:
@@ -215,17 +238,13 @@ def up(services):
                     print(_['stream'])
                 break
 
-    network_inspect = ctlr.inspect_project_network(network)
-    project_version = network_inspect['version']
-
     # Check service status
     running_services = ctlr.get_services(cli, project_key)
-    for service_name in services:
+    for service_name in targets:
         if service_name in running_services:
             print(f'Already running service[{service_name}] in project.', file=sys.stderr)
-            del serices[service_name]
+            del targets[service_name]
 
-    project_info = ctlr.inspect_project_network(network)
     with interrupt_handler(message='Wait.', blocked=True) as h:
         instances = ctlr.create_services(cli, network, targets)  
         for instance in instances:
@@ -233,9 +252,7 @@ def up(services):
             print(f"Starting {inspect['name']}...")
             time.sleep(1)
         if h.interrupted:
-            return None
-    return project_info['base']
-
+            pass
     print('Done.')
 
 def down(services):
@@ -278,8 +295,17 @@ def down(services):
     print('Done.')
 
 def logs(tail, follow, timestamps, filters):
-    project = utils.get_project(default_project)
-    ctlr.show_logs(project['project'], tail, follow, timestamps, filters, True)
+    cli = ctlr.get_docker_client()
+    project_key = utils.project_key(utils.get_workspace())
+
+    # Block not running.
+    network = ctlr.get_project_network(cli, project_key=project_key)
+    if not network:
+        print('Cannot find running project.', file=sys.stderr)
+        sys.exit(1)
+
+    for _ in ctlr.get_project_logs(cli, project_key, tail, follow, timestamps, filters):
+        sys.stdout.write(_)
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
@@ -290,7 +316,7 @@ def scale(scales):
     # Block not running.
     network = ctlr.get_project_network(cli, project_key=project_key)
     if not network:
-        print('Cannot find running service.', file=sys.stderr)
+        print('Cannot find running project.', file=sys.stderr)
         sys.exit(1)
 
     # Inspect Data

@@ -11,20 +11,22 @@ class InterruptHandler(object):
         self.released = False
         self.original_handler = signal.getsignal(self.sig)
         def handler(signum, frmae):
-            if not self.blocked: self.release()
+            if not self.blocked:
+                self.release(True)
             self.interrupted = True
             print(self.message, file=sys.stderr)
         signal.signal(self.sig, handler)
         return self
 
     def __exit__(self, type, value, tb):
-        self.release()
+        return self.release()
 
-    def release(self):
+    def release(self, interrupted=False):
         if self.released:
-            return False
+            return True
         signal.signal(self.sig, self.original_handler)
         self.released = True
-        return True
+        if interrupted: raise Exception()
+        return False
 
 sys.modules[__name__] = InterruptHandler

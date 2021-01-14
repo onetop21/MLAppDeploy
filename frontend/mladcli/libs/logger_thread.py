@@ -21,7 +21,7 @@ def colorIndex():
     return next(_counter) % len(Colors)
 
 class LoggerThread(threading.Thread):
-    def __init__(self, name, width, log, detail=False, timestamps=False, short_len=10):
+    def __init__(self, name, width, log, detail=False, timestamps=False, short_len=10, queue=None):
         threading.Thread.__init__(self)
         self.name = name if len(name) <= width else (name[:width-3] + '...')
         self.width = width
@@ -30,6 +30,7 @@ class LoggerThread(threading.Thread):
         self.timestamps = timestamps
         self.short_len = short_len
         self.colorkey = {}
+        self.queue = queue
         self.interrupted = False
         self.daemon = True
 
@@ -42,6 +43,7 @@ class LoggerThread(threading.Thread):
                     print(f'{ErrColor}{msg}{NoColor}')
                 else:
                     if self.detail: 
+                        # Logs from Docker REST API
                         if self.timestamps:
                             split_msg = msg.split(' ', 2)
                             if len(split_msg) < 3: _, timestamp, body = (*split_msg, '')
@@ -53,10 +55,28 @@ class LoggerThread(threading.Thread):
                             if len(split_msg) < 2: _, body = (*split_msg, '')
                             else: _, body = split_msg
                         name += f".{_[_.rfind('=')+1:][:self.short_len]}"
+                    else:
+                        # Logs from Docker Py
+                        split_msg = msg.strip('\r\n').split(' ', 1)
+                        if len(split_msg) < 2: _, body = (*split_msg, '')
+                        else: _, body = split_msg
+
                     self.colorkey[name] = self.colorkey[name] if name in self.colorkey else Colors[colorIndex()]
-                    print(("{}{:%d}{} {}" % self.width).format(self.colorkey[name], name, NoColor, body))
+                    output = ("{}{:%d}{} {}" % self.width).format(self.colorkey[name], name, NoColor, body)
+                    if self.queue:
+                        try:
+                            self.queue.put({"stream": f"{output}\n"})
+                        except BrokenPipeError:
+                            pass
+                    else:
+                        print(output)
             except StopIteration as e:
                 self.interrupt()
+        if self.queue:
+            try:
+                self.queue.put({"status": "interrupted"})
+            except BrokenPipeError:
+                pass
 
     def interrupt(self):
         self.interrupted = True

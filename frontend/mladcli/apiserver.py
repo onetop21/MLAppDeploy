@@ -24,7 +24,7 @@ DELETE  /api/v1/project/[PID]   remove_project_network
 POST    /api/v1/project/[PID]/service               create_services
 GET     /api/v1/project/[PID]/service               get_services
 GET     /api/v1/project/[PID]/service/[SID]         inspect_service
-GET     /api/v1/project/[PID]/service/[SID]/tasks   get_task_ids
+GET     /api/v1/project/[PID]/service/[SID]/tasks   inspect_service(get_service())['tasks']
 PUT     /api/v1/project/[PID]/service/[SID]/scale   scale_services
 DELETE  /api/v1/project/[PID]/service/[SID]         remove_services
 

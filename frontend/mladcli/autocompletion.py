@@ -61,7 +61,7 @@ def get_stopped_services_completion(ctx, args, incomplete):
     project_file = [_ for _ in [args[i+1] for i, _ in enumerate(args[:-1]) if _ in ['-f', '--file']] if os.path.isfile(_)]
     if project_file: utils.apply_project_arguments(project_file[-1], None)
 
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
     services = controller.get_services(cli, project_key)
     return [_ for _ in project['services'] if _.startswith(incomplete) and not _ in services]
 
@@ -70,7 +70,7 @@ def get_running_services_completion(ctx, args, incomplete):
     project_file = [_ for _ in [args[i+1] for i, _ in enumerate(args[:-1]) if _ in ['-f', '--file']] if os.path.isfile(_)]
     if project_file: utils.apply_project_arguments(project_file[-1], None)
 
-    project_key = utils.get_project_key()
+    project_key = utils.project_key(utils.get_workspace())
     services = controller.get_services(cli, project_key)
     return [_ for _ in services if _.startswith(incomplete)]
 
@@ -79,6 +79,7 @@ def get_running_services_tasks_completion(ctx, args, incomplete):
     project_file = [_ for _ in [args[i+1] for i, _ in enumerate(args[:-1]) if _ in ['-f', '--file']] if os.path.isfile(_)]
     if project_file: utils.apply_project_arguments(project_file[-1], None)
 
-    services = get_services(cli, project_key)
-    tasks = get_task_ids(cli, project_key)
+    project_key = utils.project_key(utils.get_workspace())
+    services = controller.get_services(cli, project_key)
+    tasks = [__ for _ in services.values() for __ in controller.inspect_service(_)['tasks']]
     return [_ for _ in (list(services.keys()) + tasks) if _.startswith(incomplete)]
