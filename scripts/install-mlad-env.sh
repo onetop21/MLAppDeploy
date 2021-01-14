@@ -72,6 +72,12 @@ function RemoteRun {
     fi
 }
 
+if [[ ! -z "$HOST" ]]; then
+    HOST_ARGS="-H $HOST"
+else
+    HOST_ARGS=""
+fi
+
 if [[ ! -z "$REMOTE" ]]; then
     ARGS=
     if [[ ! -z "$BIND" ]]; then
@@ -172,7 +178,7 @@ function InstallDocker {
 }
 
 function VerifyDocker {
-    echo `sudo docker -H "" run -it --rm $@ hello-world > /dev/null 2>&1; echo $?`
+    echo `sudo docker $HOST_ARGS run -it --rm $@ hello-world > /dev/null 2>&1; echo $?`
 }
 
 function InstallNVIDIAContainerRuntime2008 {
@@ -194,7 +200,7 @@ function InstallNVIDIAContainerRuntime2001 {
     # Deprecated Method Officialy
 
     # If you have nvidia-docker 1.0 installed: we need to remove it and all existing GPU containers
-    docker -H "" volume ls -q -f driver=nvidia-docker | xargs -r -I{} -n1 sudo docker -H "" ps -q -a -f volume={} | xargs -r sudo docker -H "" rm -f
+    docker $HOST_ARGS volume ls -q -f driver=nvidia-docker | xargs -r -I{} -n1 sudo docker $HOST_ARGS ps -q -a -f volume={} | xargs -r sudo docker $HOST_ARGS rm -f
     sudo apt-get purge -y nvidia-docker
 
     # Add the package repositories
@@ -215,7 +221,7 @@ function InstallNVIDIAContainerRuntime {
 }
 
 function VerifyNVIDIAContainerRuntime {
-    echo `sudo docker -H "" run -it --rm --gpus hello-world > /dev/null 2>&1; echo $?`
+    echo `sudo docker $HOST_ARGS run -it --rm --gpus hello-world > /dev/null 2>&1; echo $?`
 }
 
 function TouchDaemonJSON {
@@ -257,10 +263,10 @@ function AdvertiseGPUonSwarm {
 
 function ClearDockerSwarmSetting {
     ColorEcho Clear Swarm Setting...
-    sudo docker -H "" swarm leave --force >> /dev/null 2>&1
-    sudo docker -H "" container prune -f >> /dev/null 2>&1
-    sudo docker -H "" network prune -f >> /dev/null 2>&1
-    sudo docker -H "" network create --subnet 10.10.0.0/16 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
+    sudo docker $HOST_ARGS swarm leave --force >> /dev/null 2>&1
+    sudo docker $HOST_ARGS container prune -f >> /dev/null 2>&1
+    sudo docker $HOST_ARGS network prune -f >> /dev/null 2>&1
+    sudo docker $HOST_ARGS network create --subnet 10.10.0.0/16 --gateway 10.10.0.1 -o com.docker.network.bridge.enable_icc=false -o com.docker.network.bridge.name=docker_gwbridge docker_gwbridge
 }
 
 # Start Script
@@ -334,6 +340,8 @@ if [[ -z $BIND ]]; then
 
         sudo systemctl daemon-reload
         sudo systemctl restart docker.service
+        
+        ADVERTISE="--advertise-addr `hostname -I | hostname -I | awk '{print $1}'`"
     else
         PrintStep Setup Master node on WSL2.
         ColorEcho WARN "MLAppDeploy environment works only standalone on WSL2."
@@ -341,7 +349,7 @@ if [[ -z $BIND ]]; then
     fi
 
     ClearDockerSwarmSetting
-    JOIN_RESULT=`sudo docker -H "" swarm init $@ 1>/dev/null`
+    JOIN_RESULT=`sudo docker $HOST_ARGS swarm init $@ $ADVERTISE 1>/dev/null`
     if [ "$?" != "0" ];
     then
         ColorEcho WARN $JOIN_RESULT
