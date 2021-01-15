@@ -3,10 +3,7 @@ import os
 import copy
 import time
 import uuid
-from multiprocessing import Queue, Value
 from pathlib import Path
-from datetime import datetime
-from dateutil import parser
 from typing import Dict, List
 from dataclasses import dataclass, field
 import docker
@@ -14,7 +11,7 @@ import requests
 from docker.types import LogConfig
 from mladcli import exception
 from mladcli.libs import utils
-from mladcli.libs.docker_logs import logs as query_logs, LogCollector
+from mladcli.libs.docker_logs import LogHandler, LogCollector
 
 HOME = str(Path.home())
 CONFIG_PATH = HOME + '/.mlad'
@@ -644,7 +641,6 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False,
 
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
     logs = [ (inst.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for inst in instances ]
-
     if len(logs):
         with LogCollector() as collector:
             for name, log in logs:
@@ -654,55 +650,6 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False,
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-# 정상 동작
-#def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, filters=[]):
-#    config = utils.read_config()
-#
-#    def query_logs(target, **params):
-#        if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
-#            host = config['docker']['host'] 
-#        elif config['docker']['host'].startswith('unix://'):
-#            host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
-#        else:
-#            host = f"http://{config['docker']['host']}"
-#
-#        import requests_unixsocket
-#        with requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, stream=True) as resp:
-#            for line in resp.iter_lines():
-#                out = line[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
-#                if out:
-#                    if timestamps:
-#                        temp = f"{out} ".split(' ') # Add space at end to prevent error without body
-#                        out = ' '.join([temp[1], temp[0]] + temp[2:])
-#                    out = out.strip() + '\n'
-#                yield out.encode()
-#
-#    services = get_services(cli, project_key)
-#    filtered = []
-#    sources = [(_['name'], f"/services/{_['id']}", _['tasks']) for _ in [inspect_service(_) for _ in services.values()]]
-#    if filters:
-#        filtered = []
-#        for _ in sources:
-#            if _[0] in filters:
-#                filtered.append(_[:2])
-#            else:
-#                filtered += [(_[0], f"/tasks/{__}") for __ in _[2] if __ in filters]
-#    else:
-#        filtered = [_[:2] for _ in sources]
-#
-#    logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
-#
-#    if len(logs):
-#        with LogCollector() as collector:
-#            for name, log in logs:
-#                collector.add_iterable(log, name=name, timestamps=timestamps)
-#            for message in collector:
-#                yield message
-#    else:
-#        print('Cannot find running containers.', file=sys.stderr)
-
-
-# 테스트
 def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, filters=[]):
     config = utils.read_config()
 
@@ -719,19 +666,18 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         filtered = [_[:2] for _ in sources]
 
-    logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
+    handler = LogHandler(cli)
+    logs = [ (service_name, handler.logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
 
     if len(logs):
-        with LogCollector() as collector:
+        with LogCollector(release_callback=handler.close) as collector:
             for name, log in logs:
                 collector.add_iterable(log, name=name, timestamps=timestamps)
             for message in collector:
                 yield message
     else:
         print('Cannot find running containers.', file=sys.stderr)
-
-
-
+    handler.release()
 
 
 

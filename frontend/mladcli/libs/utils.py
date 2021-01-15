@@ -255,3 +255,27 @@ def generate_unique_id(length=None):
 def hash(body: str):
     import hashlib
     return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
+
+# for Log Coloring
+CLEAR_COLOR = '\x1b[0m'
+ERROR_COLOR = '\x1b[1;31;40m'
+
+import itertools
+from functools import lru_cache
+@lru_cache
+def color_table():
+    table = []
+    for bg in range(40, 48):
+        for fg in range(30, 38):
+            if fg % 10 == 1: continue # Remove Red Foreground
+            if fg % 10 == bg % 10: continue
+            color = ';'.join(['1', str(fg), str(bg)])
+            table.append(f'\x1b[{color}m')
+    return table
+
+def color_index():
+    global _color_counter
+    if not hasattr(sys.modules[__name__], '_color_counter'): _color_counter = itertools.count()
+    return next(_color_counter) % len(color_table())
+
+

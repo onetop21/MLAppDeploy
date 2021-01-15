@@ -2,7 +2,6 @@ import sys
 import os
 import time
 import docker
-import itertools
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
@@ -13,33 +12,19 @@ from mladcli.libs import interrupt_handler
 from mladcli.default import project as default_project
 from mladcli.Format import PROJECT
 
-# for Log Coloring
-NoColor = '\x1b[0m'
-ErrColor = '\x1b[1;31;40m'
-Colors = []
-for bg in range(40, 48):
-    for fg in range(30, 38):
-        if fg % 10 == 1: continue # Remove Red Foreground
-        if fg % 10 == bg % 10: continue
-        color = ';'.join(['1', str(fg), str(bg)])
-        Colors.append(f'\x1b[{color}m')
-
-_counter = itertools.count()
-def color_index():
-    return next(_counter) % len(Colors)
-
-def print_log(log, namewidth, colorkey):
-    name = f"{log['name']}.{log['task_id']}" if 'task_id' in log else log['name']
+def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
+    name = f"{log['name']}.{log['task_id'][:len_short_id]}" if 'task_id' in log else log['name']
+    namewidth = min(max_name_width, log['name_width'] + len_short_id + 1)
     msg = log['stream'].decode()
     timestamp = log['timestamp'].strftime("[%Y-%m-%d %H:%M:%S.%f]") if 'timestamp' in log else None
     if msg.startswith('Error'):
-        sys.stderr.write(f'{ErrColor}{msg}{NoColor}')
+        sys.stderr.write(f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}')
     else:
-        colorkey[name] = colorkey[name] if name in colorkey else Colors[color_index()]
+        colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
         if timestamp:
-            sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, NoColor, timestamp, msg))
+            sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, timestamp, msg))
         else:
-            sys.stdout.write(("{}{:%d}{} {}" % namewidth).format(colorkey[name], name, NoColor, msg))
+            sys.stdout.write(("{}{:%d}{} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, msg))
 
 # Main CLI Functions
 def init(name, version, author):
@@ -201,9 +186,8 @@ def test(with_build):
     # Show Logs
     with interrupt_handler(blocked=False) as h:
         colorkey = {}
-        name_width = min(32, max([len(name) for name in project['services']]))
         for _ in ctlr.container_logs(cli, project_key, 'all', True, False, []):
-            if _: print_log(_, name_width, colorkey)
+            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
 
     # Stop Containers and Network
     with interrupt_handler(message='Wait.', blocked=True):
@@ -339,9 +323,8 @@ def logs(tail, follow, timestamps, filters):
     #for _ in ctlr.get_project_logs(cli, project_key, tail, follow, timestamps, filters):
     #    sys.stdout.write(_)
     colorkey = {}
-    name_width = min(32, max([len(name) for name in ctlr.get_services(cli, project_key)]) + ctlr.SHORT_LEN + 1)
     for _ in ctlr.get_project_logs(cli, project_key, tail, follow, timestamps, filters):
-        if _: print_log(_, name_width, colorkey)
+        _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
