@@ -3,7 +3,8 @@ import os
 import copy
 import time
 import uuid
-from multiprocessing import Queue
+from threading import Thread
+from multiprocessing import Queue, Value
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
@@ -642,33 +643,100 @@ def remove_node_labels(cli, node_key, *keys):
     node.update(spec)
 
 # Log
-import asyncio
-async def parse_log_stream(queue, query):
-    queue.put(next(query).decode('utf8'))
+from dateutil import parser
+class LogCollector(): 
+    def __init__(self, maxbuffer=1000):
+        self.threads = {}
+        self.queue = Queue(maxsize=maxbuffer)
+        self.should_run = Value('b', True)
+
+    def __next__(self):
+        msg = self.queue.get()
+        object_id = msg['object_id']
+        if 'stream' in msg:
+            stream = msg['stream'].decode()
+            output = {'name': self.threads[object_id]['name']}
+            if not self.threads[object_id]['from_dockerpy']:
+                if self.threads[object_id]['timestamps']:
+                    separated = stream.split(' ', 2)
+                    if len(separated) < 3: _, timestamp, body = (*separated, '')
+                    else: _, timestamp, body = separated
+                    output['timestamp'] = parser.parse(timestamp).astimezone()
+                    output['stream'] = body.encode()
+                else:
+                    separated = stream.split(' ', 1)
+                    if len(separated) < 2: _, body = (*separated, '')
+                    else: _, body = separated
+                    output['stream'] = body.encode()
+                output['task_id'] = f"{_[_.rfind('=')+1:][:SHORT_LEN]}"
+            else:
+                if self.threads[object_id]['timestamps']:
+                    separated = stream.split(' ', 1)
+                    if len(separated) < 2: timestamp, body = (*separated, '')
+                    else: timestamp, body = separated
+                    output['timestamp'] = parser.parse(timestamp).astimezone()
+                    output['stream'] = body.encode()
+                else:
+                    output['stream'] = stream.encode()
+            return output
+        elif 'status' in msg and msg['status'] == 'stopped':
+            del self.threads[object_id]
+            if not self.threads: raise StopIteration
+        else: raise RuntimeError('Invalid stream type.')
+
+    def __iter__(self):
+        return self
+
+    def __enter__(self):
+        self.should_run.value = True
+        return self
+
+    def __exit__(self, ty, val, tb):
+        self.release()
+        if ty == KeyboardInterrupt:
+            return True
+        else:
+            import traceback
+            traceback.print_exception(ty, val, tb)
+            return False
+
+    def add_iterable(self, iterable, name=None, timestamps=False):
+        self.threads[id(iterable)] = {
+            'name': name, 
+            'timestamps': timestamps,
+            'from_dockerpy': isinstance(iterable, docker.types.daemon.CancellableStream),
+            'thread': Thread(target=LogCollector._read_stream, args=(iterable, self.queue, self.should_run), daemon=True)
+        }
+        self.threads[id(iterable)]['thread'].start()
+
+    def release(self):
+        #self.queue.close()
+        #self.queue.join_thread()
+        self.should_run.value = False
+        for _ in self.threads.values():
+            _['thread'].join()
+        #print('Released Collector.', file=sys.stderr)
+
+    def _read_stream(iterable, queue, should_run):
+        for _ in iterable:
+            if not should_run.value: break
+            if _: queue.put({'stream': _, 'object_id': id(iterable)})
+        queue.put({'status': 'stopped', 'object_id': id(iterable)})
+        #print('Stream Thread is Down.', file=sys.stderr)
+
 
 def container_logs(cli, project_key, tail='all', follow=False, timestamps=False, filters=[]):
     config = utils.read_config()
 
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
-    timestamps = True
     logs = [ (inst.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for inst in instances ]
 
     if len(logs):
-        queue = Queue()
-        name_width = min(32, max([len(name) for name, _ in logs]))
-
-        loggers = [ parse_log_stream(queue, log) for name, log in logs ]
-        for logger in loggers: logger.start()
-        running_loggers = len(loggers)
-        while running_loggers:
-            try:
-                message = queue.get()
-                if 'stream' in message:
-                    yield message['stream']
-                elif 'status' in message and message['status'] == 'interrupted':
-                    running_loggers -= 1
-            except BrokenPipeError:
-                running_logger = 0
+        with LogCollector() as collector:
+            for name, log in logs:
+                collector.add_iterable(log, name=name, timestamps=timestamps)
+            for message in collector:
+                yield message
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
@@ -713,11 +781,12 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
         with requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, stream=True) as resp:
             for line in resp.iter_lines():
                 out = line[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
-                if timestamps:
-                    temp = f"{out} ".split(' ') # Add space at end to prevent error without body
-                    out = ' '.join([temp[1], temp[0]] + temp[2:])
-                yield out.encode('utf8')
-        return ''
+                if out:
+                    if timestamps:
+                        temp = f"{out} ".split(' ') # Add space at end to prevent error without body
+                        out = ' '.join([temp[1], temp[0]] + temp[2:])
+                    out = out.strip() + '\n'
+                yield out.encode()
 
     services = get_services(cli, project_key)
     filtered = []
@@ -735,19 +804,141 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
 
     if len(logs):
-        queue = Queue()
-        name_width = min(32, max([len(name) for name, _ in logs]))
-        loggers = [ LoggerThread(name, name_width, log, True, timestamps, SHORT_LEN, queue) for name, log in logs ]
-        for logger in loggers: logger.start()
-        running_loggers = len(loggers)
-        while running_loggers:
-            message = queue.get()
-            if 'stream' in message:
-                yield message['stream']
-            elif 'status' in message and message['status'] == 'interrupted':
-                running_loggers -= 1
+        with LogCollector() as collector:
+            for name, log in logs:
+                collector.add_iterable(log, name=name, timestamps=timestamps)
+            for message in collector:
+                yield message
     else:
-        print('Cannot find running services or tasks.', file=sys.stderr)
+        print('Cannot find running containers.', file=sys.stderr)
+
+#def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, filters=[]):
+#    config = utils.read_config()
+#
+#    def query_logs(target, **params):
+#        if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
+#            host = config['docker']['host'] 
+#        elif config['docker']['host'].startswith('unix://'):
+#            host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
+#        else:
+#            host = f"http://{config['docker']['host']}"
+#
+#        import requests_unixsocket
+#        with requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, stream=True) as resp:
+#            def get_line(resp):
+#                import struct
+#                line = bytearray()
+#                try:
+#                    resp.raise_for_status()
+#                except requests.exceptions.HTTPError as e:
+#                    raise create_api_error_from_http_exception(e)
+#                while True:
+#                    try:
+#                        print("Start")
+#                        header = resp.raw.read(docker.constants.STREAM_HEADER_SIZE_BYTES)
+#                        if not header:
+#                            break
+#                        _, length = struct.unpack('>BxxxL', header)
+#                        print(_, length, header)
+#                        if not length:
+#                            continue
+#                        data = resp.raw.read(length)
+#                        if not data:
+#                            break
+#                        print('Data', data)
+#                        yield data
+#                    #except StopIteration:
+#                    #    pass
+#                    #except requests.exceptions.StreamConsumedError:
+#                    #    pass
+#                    except Exception as e:
+#                        print("Exception", type(e), e)
+#                        break
+#            #for line in resp.iter_lines():
+#            for line in get_line(resp):
+#                out = line[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
+#                if out:
+#                    if timestamps:
+#                        temp = f"{out} ".split(' ') # Add space at end to prevent error without body
+#                        out = ' '.join([temp[1], temp[0]] + temp[2:])
+#                    out = out.strip() + '\n'
+#                yield out.encode()
+#            print("??")
+#
+#    services = get_services(cli, project_key)
+#    filtered = []
+#    sources = [(_['name'], f"/services/{_['id']}", _['tasks']) for _ in [inspect_service(_) for _ in services.values()]]
+#    if filters:
+#        filtered = []
+#        for _ in sources:
+#            if _[0] in filters:
+#                filtered.append(_[:2])
+#            else:
+#                filtered += [(_[0], f"/tasks/{__}") for __ in _[2] if __ in filters]
+#    else:
+#        filtered = [_[:2] for _ in sources]
+#
+#    logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
+#
+#    if len(logs):
+#        with LogCollector() as collector:
+#            for name, log in logs:
+#                collector.add_iterable(log, name=name, timestamps=timestamps)
+#            for message in collector:
+#                yield message
+#    else:
+#        print('Cannot find running containers.', file=sys.stderr)
+
+#def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, filters=[]):
+#    config = utils.read_config()
+#
+#    def query_logs(target, **params):
+#        if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
+#            host = config['docker']['host'] 
+#        elif config['docker']['host'].startswith('unix://'):
+#            host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
+#        else:
+#            host = f"http://{config['docker']['host']}"
+#
+#        import requests_unixsocket
+#        with requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, stream=True) as resp:
+#            for line in resp.iter_lines():
+#                out = line[docker.constants.STREAM_HEADER_SIZE_BYTES:].decode('utf8')
+#                if timestamps:
+#                    temp = f"{out} ".split(' ') # Add space at end to prevent error without body
+#                    out = ' '.join([temp[1], temp[0]] + temp[2:])
+#                yield out.encode('utf8')
+#        return ''
+#
+#    services = get_services(cli, project_key)
+#    filtered = []
+#    sources = [(_['name'], f"/services/{_['id']}", _['tasks']) for _ in [inspect_service(_) for _ in services.values()]]
+#    if filters:
+#        filtered = []
+#        for _ in sources:
+#            if _[0] in filters:
+#                filtered.append(_[:2])
+#            else:
+#                filtered += [(_[0], f"/tasks/{__}") for __ in _[2] if __ in filters]
+#    else:
+#        filtered = [_[:2] for _ in sources]
+#
+#    logs = [ (service_name, query_logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
+#
+#    if len(logs):
+#        queue = Queue()
+#        name_width = min(32, max([len(name) for name, _ in logs]))
+#        loggers = [ LoggerThread(name, name_width, log, True, timestamps, SHORT_LEN, queue) for name, log in logs ]
+#        for logger in loggers: logger.start()
+#        running_loggers = len(loggers)
+#        while running_loggers:
+#            message = queue.get()
+#            if 'stream' in message:
+#                yield message['stream']
+#            elif 'status' in message and message['status'] == 'interrupted':
+#                running_loggers -= 1
+#    else:
+#        print('Cannot find running services or tasks.', file=sys.stderr)
 
 
 
