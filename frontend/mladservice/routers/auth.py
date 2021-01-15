@@ -11,9 +11,8 @@ def create_token(req: TokenRequest):
     user_token = generate_user_token(username)
     return {'token': user_token}
 
-# @router.get("/user/auth")
-# def verify_token(token: str = Header(None)):
-#     decoded = decode_token(token) #user token
-#     print(decoded)
-#     res = verify_token(decoded)
-#     return {'result': res}
+@router.get("/user/auth")
+def verify_user(user_token: str = Header(...)):
+    decoded = decode_token(user_token)
+    res = verify_token(decoded)
+    return {'result': res}
