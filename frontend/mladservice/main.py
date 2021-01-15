@@ -19,9 +19,10 @@ def create_app():
     app.include_router(service.router, prefix=APIV1)
     app.include_router(project.router, prefix=APIV1,
                        dependencies=[Depends(user.verify_auth)])
-    app.include_router(auth.router, prefix=APIV1,
+    app.include_router(auth.admin_router, prefix=APIV1,
                        dependencies=[Depends(admin.verify_auth)])
-        
+    app.include_router(auth.user_router, prefix=APIV1)
+
     print(f"Admin Token : {generate_admin_token().decode()}")
 
     return app
