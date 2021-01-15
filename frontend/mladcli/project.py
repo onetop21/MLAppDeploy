@@ -186,7 +186,7 @@ def test(with_build):
     # Show Logs
     with interrupt_handler(blocked=False) as h:
         colorkey = {}
-        for _ in ctlr.container_logs(cli, project_key, 'all', True, False, []):
+        for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
             _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
 
     # Stop Containers and Network
@@ -310,7 +310,7 @@ def down(services):
 
     print('Done.')
 
-def logs(tail, follow, timestamps, filters):
+def logs(tail, follow, timestamps, names_or_ids):
     cli = ctlr.get_docker_client()
     project_key = utils.project_key(utils.get_workspace())
 
@@ -320,10 +320,8 @@ def logs(tail, follow, timestamps, filters):
         print('Cannot find running project.', file=sys.stderr)
         sys.exit(1)
 
-    #for _ in ctlr.get_project_logs(cli, project_key, tail, follow, timestamps, filters):
-    #    sys.stdout.write(_)
     colorkey = {}
-    for _ in ctlr.get_project_logs(cli, project_key, tail, follow, timestamps, filters):
+    for _ in ctlr.get_project_logs(cli, project_key, tail, follow, timestamps, names_or_ids):
         _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
 
 def scale(scales):

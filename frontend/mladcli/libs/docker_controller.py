@@ -636,7 +636,7 @@ def remove_node_labels(cli, node_key, *keys):
         del spec['Labels'][key]
     node.update(spec)
 
-def container_logs(cli, project_key, tail='all', follow=False, timestamps=False, filters=[]):
+def container_logs(cli, project_key, tail='all', follow=False, timestamps=False):
     config = utils.read_config()
 
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
@@ -650,24 +650,24 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False,
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, filters=[]):
+def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[]):
     config = utils.read_config()
 
     services = get_services(cli, project_key)
-    filtered = []
+    selected = []
     sources = [(_['name'], f"/services/{_['id']}", _['tasks']) for _ in [inspect_service(_) for _ in services.values()]]
-    if filters:
-        filtered = []
+    if names_or_ids:
+        selected = []
         for _ in sources:
-            if _[0] in filters:
-                filtered.append(_[:2])
+            if _[0] in names_or_ids:
+                selected.append(_[:2])
             else:
-                filtered += [(_[0], f"/tasks/{__}") for __ in _[2] if __ in filters]
+                selected += [(_[0], f"/tasks/{__}") for __ in _[2] if __ in names_or_ids]
     else:
-        filtered = [_[:2] for _ in sources]
+        selected = [_[:2] for _ in sources]
 
     handler = LogHandler(cli)
-    logs = [ (service_name, handler.logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in filtered ]
+    logs = [(service_name, handler.logs(target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
 
     if len(logs):
         with LogCollector(release_callback=handler.close) as collector:
