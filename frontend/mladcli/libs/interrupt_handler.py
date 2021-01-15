@@ -26,7 +26,7 @@ class InterruptHandler(object):
             return True
         signal.signal(self.sig, self.original_handler)
         self.released = True
-        if interrupted: raise Exception()
+        if interrupted: raise KeyboardInterrupt
         return False
 
 sys.modules[__name__] = InterruptHandler
