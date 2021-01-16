@@ -45,8 +45,8 @@ def decode_token(token):
 def verify_token(token):
     if not isinstance(token, dict): raise TypeError('Invalid token(decoded) type.')
     config = utils.read_config()
-    admin_key = uuid.UUID('11111111111111111111111111111111')
-    user_key = uuid.UUID('11111111111111111111111111111111')
+    admin_key = config['auth_keys']['admin']
+    user_key = config['auth_keys']['user']
     if token['role'] == 'admin':
         if token['created'] != process_uptime(): 
             print('Expired token.', file=sys.stderr)
@@ -65,7 +65,7 @@ def verify_token(token):
 
 def generate_admin_token():
     config = utils.read_config()
-    admin_key = uuid.UUID('11111111111111111111111111111111')
+    admin_key = config['auth_keys']['admin']
     key = f"admin;{ISOFormat(process_uptime())}"
     postfix_hash = hashlib.sha1(f"{key};{admin_key}".encode())
     token = f"{key};{postfix_hash.hexdigest()}"
@@ -73,7 +73,7 @@ def generate_admin_token():
 
 def generate_user_token(username):
     config = utils.read_config()
-    user_key = uuid.UUID('11111111111111111111111111111111')
+    user_key = config['auth_keys']['user']
     expired = '2099-12-31 23:59:59'
     expired_date = datetime.datetime.strptime(expired, '%Y-%m-%d %H:%M:%S')
     key = f"user;{username};{ISOFormat(datetime.datetime.now())};{ISOFormat(expired_date)}"

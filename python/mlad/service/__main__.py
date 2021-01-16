@@ -1,6 +1,7 @@
 import os
 import uvicorn
-#from mlad.service.main import app
+from mlad import __version__
+from mlad.service.libs import utils
 
 from fastapi import FastAPI, Depends, Header
 from fastapi.logger import logger
@@ -55,7 +56,11 @@ DELETE  /api/v1/node/[ID]/labels    remove_node_labels
 APIV1 = '/api/v1'
 
 def create_app():
-    app = FastAPI()
+    app = FastAPI(
+        title="MLAppDeploy API Server",
+        description="MLAppDeploy is a tool for training and deploying ML code easily.",
+        version=__version__,
+    )
 
     user = Authorization('user')
     admin = Authorization('admin')
@@ -78,8 +83,8 @@ app = create_app()
 
 # Run by 'mlad-service # Not support yet'
 def main():
-    uvicorn.run(app)
-    #host=os.environ.get('HOST', '0.0.0.0'), port=os.environ.get('PORT', 2380)
+    config = utils.read_config()
+    uvicorn.run(app, host=config['server']['host'], port=config['server']['port'], debug=config['server']['debug'])
 
 # Run by 'python -m mlad.service'
 if __name__ == '__main__':
