@@ -162,7 +162,7 @@ def build(tagging, verbose):
 
     print('Generating project image...')
 
-    workspace = utils.getWorkingDir()
+    workspace = utils.get_working_dir()
     # Prepare workspace data from project file
     envs = []
     for key in project['workspace']['env'].keys():
