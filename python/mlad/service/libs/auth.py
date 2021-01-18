@@ -82,15 +82,19 @@ def generate_user_token(username):
     return base64.b64encode(token.encode())
 
 if __name__ == '__main__':
+    from pprint import pprint
     admin_token = generate_admin_token()
     print('Admin Token :', admin_token)
     user_token = generate_user_token('onetop21')
     print('User Token :', user_token)
 
+
     time.sleep(3)
 
     decoded = decode_token(admin_token)
+    pprint(decoded)
     print(verify_token(decoded))
 
     decoded = decode_token(user_token)
+    pprint(decoded)
     print(verify_token(decoded))

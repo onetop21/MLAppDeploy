@@ -79,7 +79,8 @@ app = create_app()
 
 # Run by 'mlad-service # Not support yet'
 def main():
-    uvicorn.run(app, host=os.environ.get('HOST', '0.0.0.0'), port=os.environ.get('PORT', 2380))
+    uvicorn.run(app)
+    #host=os.environ.get('HOST', '0.0.0.0'), port=os.environ.get('PORT', 2380)
 
 # Run by 'python -m mlad.service'
 if __name__ == '__main__':

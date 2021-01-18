@@ -673,7 +673,7 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
             for name, log in logs:
                 collector.add_iterable(log, name=name, timestamps=timestamps)
             for message in collector:
-                yield message
+                yield message['stream']
     else:
         print('Cannot find running containers.', file=sys.stderr)
     handler.release()

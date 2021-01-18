@@ -10,7 +10,7 @@ class RestartPolicy(BaseModel):
 class Quotes(BaseModel):
     cpus: int
     gpus: int
-    mems: str #8G
+    mems: str
 
 class Deploy(BaseModel):
     quotes: Quotes

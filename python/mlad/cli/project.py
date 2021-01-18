@@ -10,6 +10,7 @@ from mlad.cli import exception
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
+import docker
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
