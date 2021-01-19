@@ -1,15 +1,18 @@
 import sys
 import os
+import io
 import time
+import tarfile
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
 from mlad.core.docker import controller as ctlr
 from mlad.core.default import project as default_project
-from mlad.cli import exception
+from mlad.core import exception
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
+from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
@@ -126,15 +129,100 @@ def status(all, no_trunc):
 
 def build(tagging, verbose):
     cli = ctlr.get_docker_client()
+    config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
 
     project = utils.get_project(default_project)
+    
+    # Generate Base Labels
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
+
+    # Prepare Latest Image
+    latest_image = None
+    commit_number = 1
+    images = ctlr.get_images(cli, project_key)
+    if len(images):
+        latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
+        if latest_image and len(latest_image): latest_image = latest_image[0]
+        tags = sorted(filter(None, [ tag if not tag.endswith('latest') else None for image in images for tag in image.tags ]))
+        if len(tags): commit_number=int(tags[-1].split('.')[-1])+1
+    image_version = f"{base_labels['MLAD.PROJECT.VERSION']}.{commit_number}"
 
     print('Generating project image...')
-    utils.convert_dockerfile(project['project'], project['workspace'])
-    image_name = ctlr.image_build(project['project'], project['workspace'], tagging, verbose)
-    if image_name:
-        print('Built Image :', image_name)
+
+    workspace = utils.getWorkingDir()
+    # Prepare workspace data from project file
+    envs = []
+    for key in project['workspace']['env'].keys():
+        envs.append(DOCKERFILE_ENV.format(
+            KEY=key,
+            VALUE=project['workspace']['env'][key]
+        ))
+    requires = []
+    for key in project['workspace']['requires'].keys():
+        if key == 'apt':
+            requires.append(DOCKERFILE_REQ_APT.format(
+                SRC=project['workspace']['requires'][key]
+            ))
+        elif key == 'pip':
+            requires.append(DOCKERFILE_REQ_PIP.format(
+                SRC=project['workspace']['requires'][key]
+            )) 
+
+    # Dockerfile to memory
+    dockerfile = DOCKERFILE.format(
+        BASE=project['workspace']['base'],
+        AUTHOR=project['project']['author'],
+        ENVS='\n'.join(envs),
+        PRESCRIPTS=';'.join(project['workspace']['prescripts']) if len(project['workspace']['prescripts']) else "echo .",
+        REQUIRES='\n'.join(requires),
+        POSTSCRIPTS=';'.join(project['workspace']['postscripts']) if len(project['workspace']['postscripts']) else "echo .",
+        COMMAND='[{}]'.format(', '.join(
+            [f'"{item}"' for item in project['workspace']['command'].split()] + 
+            [f'"{item}"' for item in project['workspace']['arguments'].split()]
+        )),
+    )
+
+    tarbytes = io.BytesIO()
+    dockerfile_info = tarfile.TarInfo('.dockerfile')
+    dockerfile_info.size = len(dockerfile)
+    with tarfile.open(fileobj=tarbytes, mode='w:') as tar:
+        for name, arcname in utils.arcfiles(workspace, project['workspace']['ignore']):
+            tar.add(name, arcname)
+        tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
+    tarbytes.seek(0)
+
+    # Build Image
+    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name) 
+
+    # Print build output
+    for _ in build_output:
+        if 'error' in _:
+            sys.stderr.write(f"{_['error']}\n")
+            sys.exit(1)
+        elif 'stream' in _:
+            if verbose:
+                sys.stdout.write(_['stream'])
+
+    image = ctlr.get_image(cli, base_labels['MLAD.PROJECT.IMAGE'])
+    # Check duplicated.
+    tagged = False
+    if latest_image != image:
+        if tagging:
+            image.tag(repository, tag=image_version)
+            tagged = True
+        if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
+            latest_image.tag('remove')
+            cli.images.remove('remove')
+    else:
+        if tagging and len(latest_image.tags) < 2:
+            image.tag(repository, tag=image_version)
+            tagged = True
+        else:
+            print('Already built project to image.', file=sys.stderr)
+
+    if tagged:
+        print(f"Built Image: {'/'.join(repository.split('/')[1:])}:{image_version}")
 
     # Upload Image
     print('Update project image to registry...')
@@ -168,15 +256,19 @@ def test(with_build):
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
         # Create Network
-        for _ in ctlr.create_project_network(cli, base_labels, swarm=False):
-            if 'stream' in _:
-                print(_['stream'])
-            if 'result' in _:
-                if _['result'] == 'succeed':
-                    network = _['output']
-                else:
-                    print(f"Unknown Stream Result [{_['stream']}]")
-                break
+        try:
+            for _ in ctlr.create_project_network(cli, base_labels, swarm=False):
+                if 'stream' in _:
+                    sys.stdout.write(_['stream'])
+                if 'result' in _:
+                    if _['result'] == 'succeed':
+                        network = _['output']
+                    else:
+                        print(f"Unknown Stream Result [{_['stream']}]")
+                    break
+        except exception.AlreadyExist as e:
+            print('Already running project.', file=sys.stderr)
+            sys.exit(1)
 
         # Start Containers
         instances = ctlr.create_containers(cli, network, project['services'] or {})  
@@ -199,7 +291,7 @@ def test(with_build):
         try:
             for _ in ctlr.remove_project_network(cli, network):
                 if 'stream' in _:
-                    print(_['stream'])
+                    sys.stdout.write(_['stream'])
                 if 'status' in _:
                     if _['status'] == 'succeed':
                         print('Network removed.')
@@ -230,31 +322,28 @@ def up(services):
     project_key = base_labels['MLAD.PROJECT']
     
     # Get Network
-    if not services:
-        try:
+    try:
+        if not services:
             for _ in ctlr.create_project_network(cli, base_labels, swarm=True):
                 if 'stream' in _:
-                    print(_['stream'])
+                    sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
                         network = _['output']
-                    else:
-                        print(_['stream'])
                     break
-        except exception.AlreadyExist as e:
-            print(e, file=sys.stderr)
-            print('Already running project.', file=sys.stderr)
-            sys.exit(1)
-    else:
-        for _ in ctlr.create_project_network(cli, base_labels, swarm=True, allow_reuse=True):
-            if 'stream' in _:
-                print(_['stream'])
-            if 'result' in _:
-                if _['result'] == 'succeed':
-                    network = _['output']
-                else:
-                    print(_['stream'])
-                break
+        else:
+            for _ in ctlr.create_project_network(cli, base_labels, swarm=True, allow_reuse=True):
+                if 'stream' in _:
+                    sys.stdout.write(_['stream'])
+                if 'result' in _:
+                    if _['result'] == 'succeed':
+                        network = _['output']
+                    break
+    except exception.AlreadyExist as e:
+        #print(e, file=sys.stderr)
+        print('Already running project.', file=sys.stderr)
+        sys.exit(1)
+
 
     # Check service status
     running_services = ctlr.get_services(cli, project_key)
@@ -302,7 +391,7 @@ def down(services):
             try:
                 for _ in ctlr.remove_project_network(cli, network):
                     if 'stream' in _:
-                        print(_['stream'])
+                        sys.stdout.write(_['stream'])
                     if 'status' in _:
                         if _['status'] == 'succeed':
                             print('Network removed.')

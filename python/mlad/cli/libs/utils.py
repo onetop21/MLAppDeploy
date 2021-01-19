@@ -1,6 +1,7 @@
 import sys
 import os
 import copy
+import fnmatch
 import uuid
 import socket
 from pathlib import Path
@@ -127,6 +128,7 @@ def print_table(data, no_data_msg=None, max_width=32):
     if len(data) < 2:
         print(no_data_msg, file=sys.stderr)
 
+# CLI
 def convert_dockerfile(project, workspace):
     config = read_config()
     from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
@@ -277,5 +279,31 @@ def color_index():
     global _color_counter
     if not hasattr(sys.modules[__name__], '_color_counter'): _color_counter = itertools.count()
     return next(_color_counter) % len(color_table())
+
+###############
+def match(filepath, ignores):
+    result = False
+    normpath = os.path.normpath(filepath)
+    for ignore in ignores:
+        if ignore.startswith('#'):
+            pass
+        elif ignore.startswith('!'):
+            result &= not fnmatch.fnmatch(normpath, ignore[1:])
+        else:
+            result |= fnmatch.fnmatch(normpath, ignore)
+    return result
+
+def arcfiles(workspace='.', ignores=[]):
+    for root, dirs, files in os.walk(workspace):
+        for name in files:
+            filepath = os.path.join(root, name)
+            if not match(filepath, ignores):
+                yield filepath, os.path.relpath(os.path.abspath(filepath), os.path.abspath(workspace))
+        prune_dirs = []
+        for name in dirs:
+            dirpath = os.path.join(root, name)
+            if match(dirpath, ignores):
+                prune_dirs.append(name)
+        for _ in prune_dirs: dirs.remove(_)
 
 

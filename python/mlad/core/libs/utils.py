@@ -278,4 +278,3 @@ def color_index():
     if not hasattr(sys.modules[__name__], '_color_counter'): _color_counter = itertools.count()
     return next(_color_counter) % len(color_table())
 
-

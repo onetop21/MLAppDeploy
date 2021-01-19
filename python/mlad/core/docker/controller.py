@@ -2,12 +2,14 @@ import sys
 import os
 import copy
 import time
+import json
 import uuid
 from pathlib import Path
 from typing import Dict, List
 from dataclasses import dataclass, field
 import docker
 import requests
+import requests_unixsocket
 from docker.types import LogConfig
 from mlad.core import exception
 from mlad.core.libs import utils
@@ -47,6 +49,19 @@ def make_base_labels(workspace, username, project):
         'MLAD.PROJECT.IMAGE': default_image,
     }
     return labels
+
+def get_auth_header(cli, repo_name):
+    # docker.auth.get_config_header(client, registry)
+    registry, repo_name = docker.auth.resolve_repository_name(image_name)
+    header = docker.auth.get_config_header(cli.api, registry)
+    if header:
+        return {'X-Registry-Auth': header}
+    #headers['X-Registry-Auth'] = docker.auth.encode_header(auth_config)
+    else:
+        return {}
+    # get_all_auth_header(): -> docker.api.build.BuildApiMixin._set_auth_headers(self, headers)
+    # or cli.api._auth_configs.get_all_credentials() -> JSON(X-Registry-Config)
+    # and docker.auth.encode_header(JSON) -> X-Registry-Config or X-Registry-Auth
 
 def get_project_networks(cli):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -118,7 +133,7 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
     # Create Docker Network
     network_name = f"{basename}-{driver}"
     try:
-        message = f"Create project network [{network_name}]..."
+        message = f"Create project network [{network_name}]...\n"
         yield {'stream': message}
         labels = copy.deepcopy(base_labels)
         labels.update({
@@ -138,7 +153,7 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
                     ipam=ipam_config, 
                     ingress=False)
                 if network.attrs['Driver']: 
-                    message = f'Selected Subnet [{subnet}]'
+                    message = f'Selected Subnet [{subnet}]\n'
                     yield {'stream': message}
                     break
                 network.remove()
@@ -149,7 +164,7 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
                 driver='bridge')
         yield {"result": 'succeed', 'output': network}
     except docker.errors.APIError as e:
-        message = f"Failed to create network.\n{e}"
+        message = f"Failed to create network.\n{e}\n"
         yield {'result': 'failed', 'stream': message}
 
 def remove_project_network(cli, network, timeout=0xFFFF):
@@ -163,12 +178,12 @@ def remove_project_network(cli, network, timeout=0xFFFF):
             removed = True
             break
         else:
-            message = f"\033[1A\033[KWait to remove network [{tick}s]"
-            #print(message, end="\r")
+            padding = '\033[1A\033[K' if tick else ''
+            message = f"{padding}Wait to remove network [{tick}s]\n"
             yield {'stream': message}
             time.sleep(1)
     if not removed:
-        message = f"Failed to remove network."
+        message = f"Failed to remove network.\n"
         #print(message, file=sys.stderr)
         yield {'status': 'failed', 'stream': message}
         #return False
@@ -510,39 +525,40 @@ def inspect_image(image):
         'project_name': image.labels['MLAD.PROJECT.NAME'],
     }
     return labels
-            
-def build_image(cli, base_labels, project, working_dir, tar, registry=None):
+
+def build_image(cli, base_labels, tar, dockerfile):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     # Setting path and docker file
     #os.getcwd() + "/.mlad/"
     #temporary
-    PROJECT_CONFIG_PATH = utils.getProjectConfigPath(project)
-    username = base_labels['MLAD.PROJECT.USERNAME']
+    project_base = base_labels['MLAD.PROJECT.BASE']
     project_name = base_labels['MLAD.PROJECT.NAME']
+    username = base_labels['MLAD.PROJECT.USERNAME']
     latest_name = base_labels['MLAD.PROJECT.IMAGE']
 
-    PROJECT_CONFIG_PATH = f"{utils.CONFIG_PATH}/{username}/{project_name}"
-    DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
-    DOCKERIGNORE_FILE = working_dir + '/.dockerignore'
-
-    # extract tar to /tmp/mlad/latest_name
-    # build image
-    ## Ref : https://docs.docker.com/engine/api/v1.41/#operation/ImageBuild
-    # POST /build
-
-    build_output = cli.api.build(
-        path=working_dir,
-        tag=latest_name,
-        dockerfile=DOCKERFILE_FILE,
-        labels=base_labels,
-        forcerm=True,
-        decode=True
-    )
-    try:
-        image = (cli.images.get(latest_name), build_output)
-    except docker.errors.APIError:
-        image = (None, build_output)
-    return image
+    headers = {
+        'content-type': 'application/x-tar',
+        'X-Registry-Config': '{}'
+    }
+    params = {
+        'dockerfile': dockerfile,
+        't': latest_name,
+        'labels': json.dumps(base_labels),
+        'forcerm': 1,
+    }
+    config = utils.read_config()
+    if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
+        host = config['docker']['host'] 
+    elif config['docker']['host'].startswith('unix://'):
+        host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
+    else:
+        host = f"http://{config['docker']['host']}"
+    def _request_build(headers, params, tar):
+        with requests_unixsocket.post(f"{host}/v1.24/build", headers=headers, params=params, data=tar, stream=True) as resp:
+            for _ in resp.iter_lines(decode_unicode=True):
+                line = json.loads(_)
+                yield line
+    return _request_build(headers, params, tar)
 
 def remove_image(cli, ids, force=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -678,92 +694,3 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
         print('Cannot find running containers.', file=sys.stderr)
     handler.release()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# for Command Line Interface (Local)
-def image_build(project, workspace, tagging=False, verbose=False):
-    config = utils.read_config()
-    cli = get_docker_client()
-
-    PROJECT_CONFIG_PATH = utils.getProjectConfigPath(project)
-    DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
-    DOCKERIGNORE_FILE = utils.getWorkingDir() + '/.dockerignore'
-
-    base_labels = make_base_labels(utils.get_workspace(), config['account']['username'], project)
-    project_key = base_labels['MLAD.PROJECT']
-    project_version = base_labels['MLAD.PROJECT.VERSION']
-
-    # Check latest image
-    latest_image = None
-    commit_number = 1
-    images = get_images(cli, project_key)
-    if len(images):
-        latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
-        if latest_image and len(latest_image): latest_image = latest_image[0]
-        tags = sorted(filter(None, [ tag if not tag.endswith('latest') else None for image in images for tag in image.tags ]))
-        if len(tags): commit_number=int(tags[-1].split('.')[-1])+1
-    image_version = f'{project_version}.{commit_number}'
-
-    # Generate dockerignore
-    with open(DOCKERIGNORE_FILE, 'w') as f:
-        f.write('\n'.join(workspace['ignore']))
-
-    # Docker build
-    try:
-        image = build_image(cli, base_labels, project, utils.getWorkingDir(), None, config['docker']['registry'])
-
-        # Print build output
-        for _ in image[1]:
-            if 'error' in _:
-                raise docker.errors.BuildError(_['error'], None)
-            elif 'stream' in _:
-                if verbose: sys.stdout.write(_['stream'])
-
-    except docker.errors.BuildError as e:
-        print(e, file=sys.stderr)
-        # Remove dockerignore
-        os.unlink(DOCKERIGNORE_FILE)
-        sys.exit(1)
-    except docker.errors.APIError as e:
-        print(e, file=sys.stderr)
-        # Remove dockerignore
-        os.unlink(DOCKERIGNORE_FILE)
-        sys.exit(1)
-
-    # Remove dockerignore
-    os.unlink(DOCKERIGNORE_FILE)
-
-    # Check duplicated.
-    tagged = False
-    if latest_image != image[0]:
-        if tagging:
-            image[0].tag(repository, tag=image_version)
-            tagged = True
-        if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
-            latest_image.tag('remove')
-            cli.images.remove('remove')
-    else:
-        if tagging and len(latest_image.tags) < 2:
-            image[0].tag(repository, tag=image_version)
-            tagged = True
-        else:
-            print('Already built project to image.', file=sys.stderr)
-
-    if tagged:
-        return f"{'/'.join(repository.split('/')[1:])}:{image_version}"
-    else:
-        return None
