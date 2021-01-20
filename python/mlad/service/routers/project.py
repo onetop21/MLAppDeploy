@@ -1,5 +1,4 @@
 import json
-import docker
 from typing import List
 from fastapi import APIRouter, Query, HTTPException
 from mlad.service.models import project
