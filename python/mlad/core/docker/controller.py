@@ -6,7 +6,6 @@ import json
 import uuid
 from pathlib import Path
 from typing import Dict, List
-from dataclasses import dataclass, field
 import docker
 import requests
 import requests_unixsocket

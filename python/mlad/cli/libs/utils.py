@@ -264,7 +264,7 @@ ERROR_COLOR = '\x1b[1;31;40m'
 
 import itertools
 from functools import lru_cache
-@lru_cache
+@lru_cache(maxsize=None)
 def color_table():
     table = []
     for bg in range(40, 48):

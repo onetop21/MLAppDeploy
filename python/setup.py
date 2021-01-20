@@ -34,6 +34,7 @@ def main():
       entry_points='''
         [console_scripts]
         mlad=mlad.cli.__main__:main
+        mlad2=mlad.cli2.__main__:main
       '''
     )
 
