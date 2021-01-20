@@ -6,7 +6,6 @@ from mlad.service.models import project
 from mlad.service.exception import InvalidProjectError
 from mlad.core.docker import controller as ctlr
 from fastapi.responses import StreamingResponse
-from mlad.cli.libs import utils
 
 router = APIRouter()
 
