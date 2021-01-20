@@ -4,7 +4,6 @@ import uvicorn
 
 from fastapi import FastAPI, Depends, Header
 from fastapi.logger import logger
-from fastapi import FastAPI, Depends
 from mlad.service.routers import image, service, project, node, auth
 from mlad.service.auth import Authorization
 from mlad.service.libs.auth import generate_admin_token
