@@ -101,7 +101,6 @@ def project_log(project_id: str, tail:str = Query('all'),
 
         def get_logs(logs):
             for _ in logs:
-                print(_)
                 _['stream']=_['stream'].decode()
                 if timestamps:
                     _['timestamp']=str(_['timestamp'])
