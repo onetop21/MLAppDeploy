@@ -2,13 +2,13 @@ import sys
 import os
 import click
 import copy
-from mlad.cli import __version__
-from mlad.cli import config_cli as config
-from mlad.cli import image_cli as image
-from mlad.cli import project_cli as project
-from mlad.cli import node_cli as node
+from mlad.cli2 import __version__
+from mlad.cli2 import config_cli as config
+from mlad.cli2 import image_cli as image
+from mlad.cli2 import project_cli as project
+from mlad.cli2 import node_cli as node
 
-from mlad.cli.autocompletion import *
+from mlad.cli2.autocompletion import *
 
 class EntryGroup(click.Group):
     def __init__(self, name=None, commands=None, **attrs):

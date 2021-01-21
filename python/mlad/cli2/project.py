@@ -9,10 +9,10 @@ from dateutil import parser
 from mlad.core.docker import controller as ctlr
 from mlad.core.default import project as default_project
 from mlad.core import exception
-from mlad.cli.libs import utils
-from mlad.cli.libs import interrupt_handler
-from mlad.cli.Format import PROJECT
-from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
+from mlad.cli2.libs import utils
+from mlad.cli2.libs import interrupt_handler
+from mlad.cli2.Format import PROJECT
+from mlad.cli2.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']

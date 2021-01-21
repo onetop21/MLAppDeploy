@@ -3,7 +3,7 @@ import os
 import glob
 from mlad.core.default import project as default_project
 from mlad.core.docker import controller as controller
-from mlad.cli.libs import utils
+from mlad.cli2.libs import utils
 
 def get_project_file_completion(ctx, args, incomplete):
     files = glob.glob(f"{incomplete}*" or '*')    

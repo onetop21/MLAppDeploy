@@ -2,9 +2,9 @@ import sys
 import os
 import getpass
 import click
-from mlad.cli import config
-from mlad.cli.libs import utils
-from mlad.cli.autocompletion import *
+from mlad.cli2 import config
+from mlad.cli2.libs import utils
+from mlad.cli2.autocompletion import *
 
 # mlad config init
 # mlad config set [key=value]

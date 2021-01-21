@@ -2,8 +2,8 @@ import sys, os
 import requests
 from pathlib import Path
 from mlad.core.docker import controller as ctlr
-from mlad.cli.libs import utils
-from mlad.cli.libs import interrupt_handler
+from mlad.cli2.libs import utils
+from mlad.cli2.libs import interrupt_handler
 
 def list():
     cli = ctlr.get_docker_client()

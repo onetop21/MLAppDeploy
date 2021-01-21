@@ -131,7 +131,7 @@ def print_table(data, no_data_msg=None, max_width=32):
 # CLI
 def convert_dockerfile(project, workspace):
     config = read_config()
-    from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
+    from mlad.cli2.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 
     envs = [
         #DOCKERFILE_ENV.format(KEY='TF_CPP_MIN_LOG_LEVEL', VALUE=3),

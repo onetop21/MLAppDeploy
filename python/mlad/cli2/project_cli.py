@@ -2,9 +2,9 @@ import sys
 import os
 import getpass
 import click
-from mlad.cli import project
-from mlad.cli.libs import utils
-from mlad.cli.autocompletion import *
+from mlad.cli2 import project
+from mlad.cli2.libs import utils
+from mlad.cli2.autocompletion import *
 
 # mlad project init
 # mlad project ls | mlad ls

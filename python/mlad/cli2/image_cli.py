@@ -1,8 +1,8 @@
 import sys
 import os
 import click
-from mlad.cli import image
-from mlad.cli.autocompletion import *
+from mlad.cli2 import image
+from mlad.cli2.autocompletion import *
 
 # mlad image ls
 # mlad image search

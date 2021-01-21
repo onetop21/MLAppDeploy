@@ -1,6 +1,6 @@
 import sys, os, click
-from mlad.cli import node
-from mlad.cli.autocompletion import *
+from mlad.cli2 import node
+from mlad.cli2.autocompletion import *
 
 # mlad node ls
 # mlad node enable [name]

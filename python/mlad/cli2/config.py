@@ -1,5 +1,5 @@
 import sys, os
-from mlad.cli.libs import utils
+from mlad.cli2.libs import utils
 from mlad.core.default import config as default_config
 
 def dict_to_graph(vars, base={}):
