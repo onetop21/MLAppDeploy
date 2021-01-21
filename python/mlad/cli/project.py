@@ -3,6 +3,7 @@ import os
 import io
 import time
 import tarfile
+import docker
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
@@ -99,7 +100,7 @@ def status(all, no_trunc):
                 else:
                     uptime = f"{uptime:.0f} seconds"
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    node = ctlr.get_nodes(cli, task['NodeID'])
+                    node = ctlr.get_node(cli, task['NodeID'])
                     node_inspect = ctlr.inspect_node(node)
                     task_info.append((
                         task_id,
