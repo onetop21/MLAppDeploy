@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from dateutil import parser
 from mlad.core.docker import controller as ctlr
+from mlad.core.libs import utils as core_utils
 from mlad.core.default import project as default_project
 from mlad.core import exception
 from mlad.cli.libs import utils
@@ -187,7 +188,7 @@ def build(tagging, verbose):
     tarbytes = io.BytesIO()
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(dockerfile)
-    with tarfile.open(fileobj=tarbytes, mode='w:') as tar:
+    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
         for name, arcname in utils.arcfiles(workspace, project['workspace']['ignore']):
             tar.add(name, arcname)
         tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))

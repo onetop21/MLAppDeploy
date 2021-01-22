@@ -306,4 +306,3 @@ def arcfiles(workspace='.', ignores=[]):
                 prune_dirs.append(name)
         for _ in prune_dirs: dirs.remove(_)
 
-

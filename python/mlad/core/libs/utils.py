@@ -278,3 +278,18 @@ def color_index():
     if not hasattr(sys.modules[__name__], '_color_counter'): _color_counter = itertools.count()
     return next(_color_counter) % len(color_table())
 
+
+# Make Host for requests_unixsocket
+def get_requests_host():
+    config = read_config()
+    if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
+        host = config['docker']['host'] 
+    elif config['docker']['host'].startswith('unix://'):
+        host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
+    else:
+        host = f"http://{config['docker']['host']}"
+    return host
+
+# Change Key Style (ex. task_template -> TaskTemplate)
+def change_key_style(dct):
+    return dict((k.title().replace('_',''), v) for k, v in dct.items())
