@@ -6,14 +6,14 @@ from mlad.core.docker import controller as ctlr
 
 router = APIRouter()
 
-def _check_project_id(project_id, service):
-    if project_id == str(ctlr.inspect_service(service)['project_id']):
+def _check_project_key(project_key, service):
+    if project_key == str(ctlr.inspect_service(service)['key']):
         return True
     else:
-        raise InvalidServiceError(project_id, service.short_id)
+        raise InvalidServiceError(project_key, service.short_id)
 
-@router.get("/project/{project_id}/service")
-def service_list(project_id:str, 
+@router.get("/project/{project_key}/service")
+def service_list(project_key:str, 
                  labels: List[str] = Query(None)):
     cli = ctlr.get_docker_client()
     #TODO check labels validation
@@ -24,12 +24,11 @@ def service_list(project_id:str,
                        for label in labels}
 
     try:
-        network = ctlr.get_project_network(cli, project_id=project_id)
+        key = str(project_key).replace('-','')
+        network = ctlr.get_project_network(cli, project_key=key)
         if not network:
-            raise InvalidProjectError(project_id)
+            raise InvalidProjectError(project_key)
 
-        key = ctlr.inspect_project_network(network)['key']
-        key = str(key).replace('-','')
         services = ctlr.get_services(cli, key, extra_filters=labels_dict)        
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -38,8 +37,8 @@ def service_list(project_id:str,
 
     return [_.short_id for _ in services.values()]
 
-@router.post("/project/{project_id}/service")
-def service_create(project_id:str, req:service.CreateRequest):
+@router.post("/project/{project_key}/service")
+def service_create(project_key:str, req:service.CreateRequest):
     services = req.services
     targets=dict()
     for _ in services:
@@ -48,9 +47,10 @@ def service_create(project_id:str, req:service.CreateRequest):
 
     cli = ctlr.get_docker_client()
     try:
-        network = ctlr.get_project_network(cli, project_id=project_id)
+        key = str(project_key).replace('-','')
+        network = ctlr.get_project_network(cli, project_key=key)
         if not network:
-            raise InvalidProjectError(project_id)
+            raise InvalidProjectError(project_key)
 
         services = ctlr.create_services(cli, network, targets)
     except InvalidProjectError as e:
@@ -59,12 +59,12 @@ def service_create(project_id:str, req:service.CreateRequest):
         raise HTTPException(status_code=500, detail=str(e))
     return [_.short_id for _ in services]
 
-@router.get("/project/{project_id}/service/{service_id}")
-def service_inspect(project_id:str, service_id:str):
+@router.get("/project/{project_key}/service/{service_id}")
+def service_inspect(project_key:str, service_id:str):
     cli = ctlr.get_docker_client()
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_id(project_id, service):
+        if _check_project_key(project_key, service):
             inspects = ctlr.inspect_service(service)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -73,12 +73,12 @@ def service_inspect(project_id:str, service_id:str):
     return inspects
 
 
-@router.get("/project/{project_id}/service/{service_id}/tasks")
-def service_tasks(project_id:str, service_id:str):
+@router.get("/project/{project_key}/service/{service_id}/tasks")
+def service_tasks(project_key:str, service_id:str):
     cli = ctlr.get_docker_client()
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_id(project_id, service):
+        if _check_project_key(project_key, service):
              tasks= ctlr.inspect_service(
                 ctlr.get_service(cli, service_id))['tasks']           
     except InvalidServiceError as e:
@@ -88,13 +88,13 @@ def service_tasks(project_id:str, service_id:str):
     return tasks
 
 
-@router.put("/project/{project_id}/service/{service_id}/scale")
-def service_scale(project_id:str, service_id:str, 
+@router.put("/project/{project_key}/service/{service_id}/scale")
+def service_scale(project_key:str, service_id:str, 
                   req: service.ScaleRequest):
     cli = ctlr.get_docker_client()
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_id(project_id, service):
+        if _check_project_key(project_key, service):
             service.scale(req.scale_spec)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -102,12 +102,12 @@ def service_scale(project_id:str, service_id:str,
         raise HTTPException(status_code=500, detail=str(e))
     return {'message':'scale updated'}
 
-@router.delete("/project/{project_id}/service/{service_id}")
-def service_remove(project_id:str, service_id:str):
+@router.delete("/project/{project_key}/service/{service_id}")
+def service_remove(project_key:str, service_id:str):
     cli = ctlr.get_docker_client()
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_id(project_id, service):
+        if _check_project_key(project_key, service):
             ctlr.remove_services(cli, [service])
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))

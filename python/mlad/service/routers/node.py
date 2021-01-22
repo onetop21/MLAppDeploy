@@ -4,7 +4,7 @@ from mlad.core.docker import controller as ctlr
 
 router = APIRouter()
 
-@router.get("/node/list")
+@router.get("/node")
 def node_list():
     cli = ctlr.get_docker_client()
     try:

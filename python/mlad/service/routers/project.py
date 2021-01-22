@@ -46,13 +46,14 @@ def projects():
     return projects
 
 
-@router.get("/project/{project_id}")
-def project_inspect(project_id:str):
+@router.get("/project/{project_key}")
+def project_inspect(project_key:str):
     cli = ctlr.get_docker_client()
     try:
-        network = ctlr.get_project_network(cli, project_id=project_id)
+        key = str(project_key).replace('-','')
+        network = ctlr.get_project_network(cli, project_key=key)
         if not network:
-            raise InvalidProjectError(project_id)
+            raise InvalidProjectError(project_key)
         inspect = ctlr.inspect_project_network(network)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -60,13 +61,14 @@ def project_inspect(project_id:str):
         raise HTTPException(status_code=500, detail=str(e))
     return inspect
 
-@router.delete("/project/{project_id}")
-def project_remove(project_id:str):
+@router.delete("/project/{project_key}")
+def project_remove(project_key:str):
     cli = ctlr.get_docker_client()
     try:
-        network = ctlr.get_project_network(cli, project_id=project_id)
+        key = str(project_key).replace('-','')
+        network = ctlr.get_project_network(cli, project_key=key)
         if not network:
-            raise InvalidProjectError(project_id)
+            raise InvalidProjectError(project_key)
         for _ in ctlr.remove_project_network(cli, network):
             if 'stream' in _:
                 print(_['stream'])
@@ -78,21 +80,20 @@ def project_remove(project_id:str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {'message': f'project {project_id} removed'}
+    return {'message': f'project {project_key} removed'}
 
 
-@router.get("/project/{project_id}/logs")
-def project_log(project_id: str, tail:str = Query('all'),
+@router.get("/project/{project_key}/logs")
+def project_log(project_key: str, tail:str = Query('all'),
                 follow: bool = Query(False),
                 timestamps: bool = Query(False),
                 names_or_ids: list = Query(None)):
     cli = ctlr.get_docker_client()
     try:
-        network = ctlr.get_project_network(cli, project_id=project_id)
+        key = str(project_key).replace('-','')
+        network = ctlr.get_project_network(cli, project_key=key)
         if not network:
-            raise InvalidProjectError(project_id)
-        key = ctlr.inspect_project_network(network)['key']
-        key = str(key).replace('-','')
+            raise InvalidProjectError(project_key)
 
         logs = ctlr.get_project_logs(cli, key, 
             tail, follow, timestamps, names_or_ids)
