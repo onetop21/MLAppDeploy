@@ -36,11 +36,8 @@ def apply_project_arguments(project_file=None, workdir=None):
     else:
         ProjectArgs['working_dir'] = os.path.dirname(ProjectArgs['project_file']) or '.'
 
-def getProjectFile():
+def get_project_file():
     return ProjectArgs['project_file']
-
-def getWorkingDir():
-    return ProjectArgs['working_dir']
 
 def generate_empty_config():
     if not os.path.exists(CONFIG_PATH):
@@ -48,10 +45,6 @@ def generate_empty_config():
     if not os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'w') as f:
             f.write('')
-
-def getProjectConfigPath(project):
-    config = read_config()
-    return f"{CONFIG_PATH}/{config['account']['username']}/{project['name'].lower()}"
 
 def get_workspace():
     '''
@@ -62,14 +55,6 @@ def get_workspace():
 
 def project_key(workspace):
     return hash(workspace).hex
-
-def get_repository(base_name, registry=None):
-    if registry:
-        repository = f"{registry}/{base_name.replace('-', '/', 1)}"
-    else:
-        print(base_name)
-        repository = f"{base_name.replace('-', '/', 1)}"
-    return repository
 
 def read_config():
     try:
@@ -95,8 +80,8 @@ def write_completion(shell='bash'):
             f.write(f". {COMPLETION_FILE}")
 
 def read_project():
-    if os.path.exists(getProjectFile()):
-        with open(getProjectFile()) as f:
+    if os.path.exists(get_project_file()):
+        with open(get_project_file()) as f:
             project = load(f.read(), Loader=Loader)
         return project or {}
     else:
@@ -129,51 +114,6 @@ def print_table(data, no_data_msg=None, max_width=32):
         print(no_data_msg, file=sys.stderr)
 
 # CLI
-def convert_dockerfile(project, workspace):
-    config = read_config()
-    from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
-
-    envs = [
-        #DOCKERFILE_ENV.format(KEY='TF_CPP_MIN_LOG_LEVEL', VALUE=3),
-        #DOCKERFILE_ENV.format(KEY='S3_ENDPOINT', VALUE=config['s3']['endpoint']),
-        #DOCKERFILE_ENV.format(KEY='S3_USE_HTTPS', VALUE=0),
-        #DOCKERFILE_ENV.format(KEY='AWS_ACCESS_KEY_ID', VALUE=config['s3']['accesskey']),
-        #DOCKERFILE_ENV.format(KEY='AWS_SECRET_ACCESS_KEY', VALUE=config['s3']['secretkey']),
-    ]
-    for key in workspace['env'].keys():
-        envs.append(DOCKERFILE_ENV.format(
-            KEY=key,
-            VALUE=workspace['env'][key]
-        ))
-    requires = []
-    for key in workspace['requires'].keys():
-        if key == 'apt':
-            requires.append(DOCKERFILE_REQ_APT.format(
-                SRC=workspace['requires'][key]
-            ))
-        elif key == 'pip':
-            requires.append(DOCKERFILE_REQ_PIP.format(
-                SRC=workspace['requires'][key]
-            )) 
-
-    PROJECT_CONFIG_PATH = getProjectConfigPath(project)
-    DOCKERFILE_FILE = PROJECT_CONFIG_PATH + '/Dockerfile'
-
-    os.makedirs(PROJECT_CONFIG_PATH, exist_ok=True)
-    with open(DOCKERFILE_FILE, 'w') as f:
-        f.write(DOCKERFILE.format(
-            BASE=workspace['base'],
-            AUTHOR=project['author'],
-            ENVS='\n'.join(envs),
-            PRESCRIPTS=';'.join(workspace['prescripts']) if len(workspace['prescripts']) else "echo .",
-            REQUIRES='\n'.join(requires),
-            POSTSCRIPTS=';'.join(workspace['postscripts']) if len(workspace['postscripts']) else "echo .",
-            COMMAND='[{}]'.format(', '.join(
-                [f'"{item}"' for item in workspace['command'].split()] + 
-                [f'"{item}"' for item in workspace['arguments'].split()]
-            )),
-        ))
-
 def merge(source, destination):
     if source:
         for key, value in source.items():
@@ -237,8 +177,7 @@ def get_default_service_port(container_name, internal_port, docker_host=None):
         external_port = _[0]['HostPort']
     return external_port
 
-def get_service_env():
-    config = read_config()
+def get_service_env(config):
     env = [
         f'S3_ENDPOINT={config["s3"]["endpoint"]}',
         f'S3_USE_HTTPS={1 if config["s3"]["verify"] else 0}',

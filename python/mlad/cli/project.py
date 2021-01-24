@@ -8,7 +8,6 @@ from pathlib import Path
 from datetime import datetime
 from dateutil import parser
 from mlad.core.docker import controller as ctlr
-from mlad.core.libs import utils as core_utils
 from mlad.core.default import project as default_project
 from mlad.core import exception
 from mlad.cli.libs import utils
@@ -51,7 +50,8 @@ def init(name, version, author):
         ))
 
 def list():
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     projects = {}
     for service in ctlr.get_services(cli).values():
         inspect = ctlr.inspect_service(service)
@@ -75,8 +75,8 @@ def list():
     utils.print_table(columns, 'Cannot find running project.', 64)
 
 def status(all, no_trunc):
-    cli = ctlr.get_docker_client()
     config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
 
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
@@ -130,14 +130,14 @@ def status(all, no_trunc):
         utils.print_table(columns, 'Project is not running.')
 
 def build(tagging, verbose):
-    cli = ctlr.get_docker_client()
     config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     project = utils.get_project(default_project)
     
     # Generate Base Labels
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
 
     # Prepare Latest Image
     latest_image = None
@@ -252,14 +252,15 @@ def test(with_build):
     print('Deploying test container image to local...')
     config = utils.read_config()
 
-    cli = ctlr.get_docker_client()
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
+    cli = ctlr.get_docker_client(config['docker']['host'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
         # Create Network
         try:
-            for _ in ctlr.create_project_network(cli, base_labels, swarm=False):
+            extra_envs = utils.get_service_env(config)
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
@@ -318,15 +319,16 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_docker_client(config['docker']['host'])
 
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     
     # Get Network
     try:
+        extra_envs = utils.get_service_env(config)
         if not services:
-            for _ in ctlr.create_project_network(cli, base_labels, swarm=True):
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
@@ -334,7 +336,7 @@ def up(services):
                         network = _['output']
                     break
         else:
-            for _ in ctlr.create_project_network(cli, base_labels, swarm=True, allow_reuse=True):
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
@@ -365,7 +367,8 @@ def up(services):
     print('Done.')
 
 def down(services):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     # Block duplicated running.
@@ -404,7 +407,8 @@ def down(services):
     print('Done.')
 
 def logs(tail, follow, timestamps, names_or_ids):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     # Block not running.
@@ -420,7 +424,8 @@ def logs(tail, follow, timestamps, names_or_ids):
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
 
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
     
     # Block not running.

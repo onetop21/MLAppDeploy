@@ -1,5 +1,4 @@
-import sys
-import os
+
 import copy
 import time
 import json
@@ -20,20 +19,15 @@ CONFIG_PATH = HOME + '/.mlad'
 SHORT_LEN = 10
 
 # Docker CLI from HOST
-def get_docker_client():
-    config = utils.read_config()
+def get_docker_client(host='unix:///var/run/docker.sock'):
     # docker.client.DockerClient
-    return docker.from_env(environment={'DOCKER_HOST': config['docker']['host']})
+    return docker.from_env(environment={'DOCKER_HOST': host})
 
 # Manage Project and Network
-def make_base_labels(workspace, username, project):
-    config = utils.read_config()
+def make_base_labels(workspace, username, project, registry):
     #workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
-    ## docker.host
-    ## docker.registry
     project_key = utils.project_key(workspace)
-    registry = config['docker']['registry']
     basename = f"{username}-{project['name'].lower()}-{project_key[:SHORT_LEN]}"
     default_image = f"{utils.get_repository(basename, registry)}:latest"
     labels = {
@@ -122,7 +116,7 @@ def is_swarm_mode(network):
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     return network.attrs['Driver'] == 'overlay'
 
-def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
+def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     #workspace = utils.get_workspace()
     driver = 'overlay' if swarm else 'bridge'
@@ -148,6 +142,7 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
             'MLAD.PROJECT.NETWORK': network_name, 
             'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
             'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
+            'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
         })
 
         if driver == 'overlay':
@@ -311,7 +306,7 @@ def create_containers(cli, network, services, extra_labels={}):
             raise exception.Duplicated('Already running container.')
 
         image = service['image'] or image_name
-        env = utils.get_service_env()
+        env = utils.decode_dict(network_labels.get('MLAD.PROJECT.ENV'))
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
@@ -362,7 +357,7 @@ def create_services(cli, network, services, extra_labels={}):
             raise exception.Duplicated('Already running service.')
 
         image = service['image'] or image_name
-        env = utils.get_service_env()
+        env = utils.decode_dict(network_labels.get('MLAD.PROJECT.ENV'))
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
@@ -671,8 +666,6 @@ def remove_node_labels(cli, node_key, *keys):
     node.update(spec)
 
 def container_logs(cli, project_key, tail='all', follow=False, timestamps=False):
-    config = utils.read_config()
-
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
     logs = [ (inst.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for inst in instances ]
     if len(logs):
@@ -685,8 +678,6 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False)
         print('Cannot find running containers.', file=sys.stderr)
 
 def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[]):
-    config = utils.read_config()
-
     services = get_services(cli, project_key)
     selected = []
     sources = [(_['name'], f"/services/{_['id']}", _['tasks']) for _ in [inspect_service(_) for _ in services.values()]]

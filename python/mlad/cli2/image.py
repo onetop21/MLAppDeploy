@@ -8,7 +8,8 @@ from mlad.cli2.libs import utils
 from mlad.cli2.libs import interrupt_handler
 
 def list(all, tail):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     if all:
         images = ctlr.get_images(cli)
     else:
@@ -63,7 +64,8 @@ def search(keyword):
 
 def remove(ids, force):
     print('Remove project image...')
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     try:
         result = ctlr.remove_image(cli, ids, force)
     except docker.errors.ImageNotFound as e:
@@ -72,7 +74,8 @@ def remove(ids, force):
     print('Done.')
 
 def prune(all):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     if all:
         result = ctlr.prune_images(cli) 
     else:
