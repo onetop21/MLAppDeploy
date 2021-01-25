@@ -1,3 +1,4 @@
+import json
 from typing import List
 from fastapi import APIRouter, Query, HTTPException
 from mlad.service.models import service
@@ -7,7 +8,8 @@ from mlad.core.docker import controller as ctlr
 router = APIRouter()
 
 def _check_project_key(project_key, service):
-    if project_key == str(ctlr.inspect_service(service)['key']):
+    inspect_key = str(ctlr.inspect_service(service)['key']).replace('-','')
+    if project_key == inspect_key:
         return True
     else:
         raise InvalidServiceError(project_key, service.short_id)
@@ -39,11 +41,13 @@ def service_list(project_key:str,
 
 @router.post("/project/{project_key}/service")
 def service_create(project_key:str, req:service.CreateRequest):
-    services = req.services
-    targets=dict()
-    for _ in services:
-        targets[_.name]=dict(_)
-        del targets[_.name]['name']
+    targets = req.json
+    # services = json.loads(req.json())['services']
+    # targets = dict()
+    # for _ in services:
+    #     print(_)
+    #     targets[_['name']]=dict(_)
+    #     del targets[_['name']]['name']
 
     cli = ctlr.get_docker_client()
     try:
@@ -56,6 +60,7 @@ def service_create(project_key:str, req:service.CreateRequest):
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
     return [_.short_id for _ in services]
 
@@ -64,7 +69,8 @@ def service_inspect(project_key:str, service_id:str):
     cli = ctlr.get_docker_client()
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_key(project_key, service):
+        key = str(project_key).replace('-','')
+        if _check_project_key(key, service):
             inspects = ctlr.inspect_service(service)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -78,7 +84,8 @@ def service_tasks(project_key:str, service_id:str):
     cli = ctlr.get_docker_client()
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_key(project_key, service):
+        key = str(project_key).replace('-','')
+        if _check_project_key(key, service):
              tasks= ctlr.inspect_service(
                 ctlr.get_service(cli, service_id))['tasks']           
     except InvalidServiceError as e:

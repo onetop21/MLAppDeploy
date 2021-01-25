@@ -161,7 +161,7 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
                 network_name, 
                 labels=labels,
                 driver='bridge')
-        yield {"result": 'succeed', 'output': network}
+        yield {"result": 'succeed', 'output': network.id, 'project_key':project_key}
     except docker.errors.APIError as e:
         message = f"Failed to create network.\n{e}\n"
         yield {'result': 'failed', 'stream': message}

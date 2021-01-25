@@ -3,9 +3,11 @@ import os
 import io
 import time
 import tarfile
+import docker
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
+from requests.exceptions import HTTPError
 from mlad.core.docker import controller as ctlr
 from mlad.core.default import project as default_project
 from mlad.core import exception
@@ -13,6 +15,13 @@ from mlad.cli2.libs import utils
 from mlad.cli2.libs import interrupt_handler
 from mlad.cli2.Format import PROJECT
 from mlad.cli2.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
+from mlad.api import service as service_api
+from mlad.api import project as project_api
+from mlad.api import node as node_api
+
+#To be removed
+token = 'YWRtaW47MjAyMS0wMS0yNVQxNToyNTo0OS43NTAwMDArMDk6MDA7NjU2Y2I5ZWQ3YWZmODEyNDgyOTAxYzFkYmFlMzcyOGMxYjAyOTlmNA=='
+
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
@@ -20,7 +29,8 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     if 'task_id' in log:
         name = f"{name}.{log['task_id'][:len_short_id]}"
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
-    msg = log['stream'].decode()
+    #msg = log['stream'].decode()
+    msg = log['stream']
     timestamp = log['timestamp'].strftime("[%Y-%m-%d %H:%M:%S.%f]") if 'timestamp' in log else None
     if msg.startswith('Error'):
         sys.stderr.write(f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}')
@@ -49,46 +59,49 @@ def init(name, version, author):
         ))
 
 def list():
+    from pprint import pprint
     cli = ctlr.get_docker_client()
     projects = {}
-    for service in ctlr.get_services(cli).values():
-        inspect = ctlr.inspect_service(service)
-        default = { 
+    for project in project_api.get(token):
+        for service in service_api.get(project['key']):
+            inspect = service_api.inspect(project['key'], service)
+            default = { 
             'username': inspect['username'], 
             'project': inspect['name'], 
             'image': inspect['image'],
             'services': 0, 'replicas': 0, 'tasks': 0 
-        }
-        project_key = inspect['key']
-        tasks = inspect['tasks'].values()
-        tasks_state = [_['Status']['State'] for _ in tasks]
-        projects[project_key] = projects[project_key] if project_key in projects else default
-        projects[project_key]['services'] += 1
-        projects[project_key]['replicas'] += inspect['replicas']
-        projects[project_key]['tasks'] += tasks_state.count('running')
-    columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
+            }
+            project_key = inspect['key']
+            tasks = inspect['tasks'].values()
+            tasks_state = [_['Status']['State'] for _ in tasks]
+            projects[project_key] = projects[project_key] if project_key in projects else default
+            projects[project_key]['services'] += 1
+            projects[project_key]['replicas'] += inspect['replicas']
+            projects[project_key]['tasks'] += tasks_state.count('running')
+        columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
+
     for project in projects:
         running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
         columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['services'], f"{running_tasks:>5}"))
     utils.print_table(columns, 'Cannot find running project.', 64)
 
 def status(all, no_trunc):
-    cli = ctlr.get_docker_client()
     config = utils.read_config()
 
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
-    network = ctlr.get_project_network(cli, project_key=project_key)
-    if not network:
-        print('Cannot find running service.', file=sys.stderr)
-        sys.exit(1)
-    inspect = ctlr.inspect_project_network(network)
+    try:
+        inspect = project_api.inspect(token, project_key=project_key)
+    except HTTPError as e:
+        if e.response.status_code == 404:
+            print('Cannot find running service.', file=sys.stderr)
+            sys.exit(1)
 
     task_info = []
-    for service_name, service in ctlr.get_services(cli, project_key).items():
-        service_inspect = ctlr.inspect_service(service)
+    for service in service_api.get(project_key):
+        service_inspect = service_api.inspect(project_key,service)
         try:
-            for task_id, task in service_inspect['tasks'].items():
+            for task_id, task in service_api.get_tasks(project_key, service).items():
                 uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
                 if uptime > 24 * 60 * 60:
                     uptime = f"{uptime // (24 * 60 * 60):.0f} days"
@@ -99,11 +112,10 @@ def status(all, no_trunc):
                 else:
                     uptime = f"{uptime:.0f} seconds"
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    node = ctlr.get_nodes(cli, task['NodeID'])
-                    node_inspect = ctlr.inspect_node(node)
+                    node_inspect = node_api.inspect(token, task['NodeID'])
                     task_info.append((
                         task_id,
-                        service_name,
+                        service_inspect['name'],
                         task['Slot'],
                         node_inspect['hostname'] if 'NodeID' in task else '-',
                         task['DesiredState'].title(), 
@@ -316,50 +328,48 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
-    cli = ctlr.get_docker_client()
-
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
-    project_key = base_labels['MLAD.PROJECT']
     
-    # Get Network
-    try:
-        if not services:
-            for _ in ctlr.create_project_network(cli, base_labels, swarm=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        network = _['output']
-                    break
-        else:
-            for _ in ctlr.create_project_network(cli, base_labels, swarm=True, allow_reuse=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        network = _['output']
-                    break
-    except exception.AlreadyExist as e:
-        #print(e, file=sys.stderr)
-        print('Already running project.', file=sys.stderr)
-        sys.exit(1)
-
-
+    if not services:
+        res = project_api.create(token, project['project'], utils.get_workspace(), 
+            config['account']['username'], allow_reuse=False)
+    else:
+        res = project_api.create(token, project['project'], utils.get_workspace(), 
+            config['account']['username'], allow_reuse=True)
+    for _ in res:
+        if 'stream' in _:
+            sys.stdout.write(_['stream'])
+        if 'result' in _:
+            if _['result'] == 'succeed':
+                network_id = _['output']
+                project_key = _['project_key']
+                break 
+ 
     # Check service status
-    running_services = ctlr.get_services(cli, project_key)
+    running_services = service_api.get(project_key)
     for service_name in targets:
-        if service_name in running_services:
+        running_svc_names = [service_api.inspect(project_key, _)['name'] 
+            for _ in running_services]
+        if service_name in running_svc_names:
             print(f'Already running service[{service_name}] in project.', file=sys.stderr)
             del targets[service_name]
 
+    def _target_model(targets):
+        services = []
+        for k, v in targets.items():
+            v['name']=k
+            services.append(v)
+        return services
+
     with interrupt_handler(message='Wait.', blocked=True) as h:
-        instances = ctlr.create_services(cli, network, targets)  
+        target_model = _target_model(targets)
+        instances = service_api.create(project_key, target_model)  
         for instance in instances:
-            inspect = ctlr.inspect_service(instance)
+            inspect = service_api.inspect(project_key, instance)
             print(f"Starting {inspect['name']}...")
             time.sleep(1)
         if h.interrupted:
             pass
+
     print('Done.')
 
 def down(services):
@@ -367,38 +377,39 @@ def down(services):
     project_key = utils.project_key(utils.get_workspace())
 
     # Block duplicated running.
-    network = ctlr.get_project_network(cli, project_key=project_key)
-    if not network:
+    inspect = project_api.inspect(token, project_key=project_key)
+    if not inspect:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
+
     if services:
-        running_services = ctlr.get_services(cli, project_key)
+        running_services = service_api.get(project_key)
+        running_svc_names = [service_api.inspect(project_key,_)['name'] 
+            for _ in running_services]
         for service_name in services:
-            if not service_name in running_services:
+            if not service_name in running_svc_names:
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
 
     with interrupt_handler(message='Wait.', blocked=True):
-        running_services = ctlr.get_services(cli, project_key).values()
+        running_services = service_api.get(project_key)
         def filtering(_):
-            inspect = ctlr.inspect_service(_)
+            inspect = service_api.inspect(project_key, _)
             return not services or inspect['name'] in services
         targets = [_ for _ in running_services if filtering(_)]
-        ctlr.remove_services(cli, targets)
+        for target in targets:
+            service_api.remove(project_key, target)
 
-        # Remove Network
+        #Remove Network
         if not services:
-            try:
-                for _ in ctlr.remove_project_network(cli, network):
-                    if 'stream' in _:
-                        sys.stdout.write(_['stream'])
-                    if 'status' in _:
-                        if _['status'] == 'succeed':
-                            print('Network removed.')
-                        break
-            except docker.errors.APIError as e:
-                print('Network already removed.', file=sys.stderr)
-
+            res = project_api.delete(token, project_key)
+            for _ in res:
+                if 'stream' in _:
+                    sys.stdout.write(_['stream'])
+                if 'status' in _:
+                    if _['status'] == 'succeed':
+                        print('Network removed.')
+                    break
     print('Done.')
 
 def logs(tail, follow, timestamps, names_or_ids):
@@ -406,39 +417,36 @@ def logs(tail, follow, timestamps, names_or_ids):
     project_key = utils.project_key(utils.get_workspace())
 
     # Block not running.
-    network = ctlr.get_project_network(cli, project_key=project_key)
-    if not network:
-        print('Cannot find running project.', file=sys.stderr)
-        sys.exit(1)
+    try:
+        project = project_api.inspect(token, project_key)
+    except HTTPError as e:
+        if e.response.status_code == 404:
+            print('Cannot find running service.', file=sys.stderr)
+            sys.exit(1)
 
-    colorkey = {}
-    for _ in ctlr.get_project_logs(cli, project_key, tail, follow, timestamps, names_or_ids):
+    logs = project_api.log(token, project_key, tail, follow,
+        timestamps, names_or_ids)
+
+    colorkey = {}   
+    for _ in logs:
         _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
+
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
 
-    cli = ctlr.get_docker_client()
     project_key = utils.project_key(utils.get_workspace())
-    
-    # Block not running.
-    network = ctlr.get_project_network(cli, project_key=project_key)
-    if not network:
-        print('Cannot find running project.', file=sys.stderr)
-        sys.exit(1)
+    try:    
+        project = project_api.inspect(token, project_key)
+    except HTTPError as e:
+        if e.response.status_code == 404:
+            print('Cannot find running service.', file=sys.stderr)
+            sys.exit(1)
 
-    # Inspect Data
-    inspect = ctlr.inspect_project_network(network)
-
-    services = ctlr.get_services(cli, project_key)
-    for name, service in [(_, services[_]) for _ in services if _ in scale_spec]:
-        try:
-            if service.scale(int(scale_spec[name])):
-                print(f'Change scale service [{name}].')
-            else:
-                print(f'Failed to change scale service [{name}].')
-        except docker.errors.NotFound:
-            print(f'Cannot find service [{name}].', file=sys.stderr)
-
-
+    services = service_api.get(project_key)
+    for service in services:
+        inspect = service_api.inspect(project_key, service)
+        if inspect['name'] in scale_spec:
+            service_api.scale(project_key, 
+                service, scale_spec[inspect['name']])
 

@@ -4,10 +4,13 @@ from pathlib import Path
 from mlad.core.docker import controller as ctlr
 from mlad.cli2.libs import utils
 from mlad.cli2.libs import interrupt_handler
+from mlad.api import node as node_api
+
+#to be removed
+token = 'YWRtaW47MjAyMS0wMS0yMVQxMzozMDo0OC44OTAwMDArMDk6MDA7MDZkNjQ5MGZmZmRmNDZkOGRmMjE2N2NjN2ZjYzdkYjQwMjEzZDBiMw=='
 
 def list():
-    cli = ctlr.get_docker_client()
-    nodes = [ctlr.inspect_node(_) for _ in ctlr.get_nodes(cli).values()]
+    nodes = [node_api.inspect(token,_) for _ in node_api.get(token)]
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
         ID = node['id'][:10]
@@ -22,21 +25,17 @@ def list():
     utils.print_table(columns, 'No attached node.')
 
 def enable(ID):
-    cli = ctlr.get_docker_client()
-    ctlr.enable_node(cli, ID)
+    node_api.enable(token, ID)
     print('Updated.')
 
 def disable(ID):
-    cli = ctlr.get_docker_client()
-    ctlr.disable_node(cli, ID)
+    node_api.disable(token, ID)
     print('Updated.')
 
 def label_add(node, **kvs):
-    cli = ctlr.get_docker_client()
-    ctlr.add_node_labels(cli, node, **kvs)
+    node_api.add_label(token, node, **kvs)
     print('Added.')
 
 def label_rm(node, *keys):
-    cli = ctlr.get_docker_client()
-    ctlr.remove_node_labels(node, *keys)
+    node_api.delete_label(token, node, *keys)
     print('Removed.')

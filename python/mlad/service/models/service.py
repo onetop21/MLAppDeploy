@@ -2,21 +2,21 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 class RestartPolicy(BaseModel):
-    condition: str
-    delay: int
-    max_attempts: int
-    window: int
+    condition: Optional[str]=None
+    delay: Optional[int]=None
+    max_attempts: Optional[int]=None
+    window: Optional[int]=None
 
 class Quotes(BaseModel):
-    cpus: int
-    gpus: int
-    mems: str
+    cpus: Optional[int]=None
+    gpus: Optional[int]=None
+    mems: Optional[str]=None
 
 class Deploy(BaseModel):
-    quotes: Quotes
-    constraints: dict
-    restart_policy: RestartPolicy
-    replica: int
+    quotes: Optional[Quotes]= None
+    constraints: Optional[dict]=None
+    restart_policy: Optional[RestartPolicy]=None
+    replicas: Optional[int]=None
 
 class Service(BaseModel):
     name: str #service_name
@@ -28,8 +28,19 @@ class Service(BaseModel):
     #labels: dict
     deploy: Optional[Deploy]=None
 
+
 class CreateRequest(BaseModel):
     services: List[Service]
+    
+    @property
+    def json(self):
+        import json
+        targets = dict()
+        for _ in self.services:
+            service = json.loads(_.json())
+            targets[_.name]=service
+            del targets[_.name]['name']
+        return targets
 
 class ScaleRequest(BaseModel):
     scale_spec: int

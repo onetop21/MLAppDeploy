@@ -18,22 +18,17 @@ def project_create(req: project.CreateRequest,allow_reuse:bool = Query(False)):
     base_labels = ctlr.make_base_labels(
         workspace, username, dict(req.project))
     try:
-        gen = ctlr.create_project_network(
+        res = ctlr.create_project_network(
             cli, base_labels, swarm=True, allow_reuse=allow_reuse)          
-        for _ in gen:
-            if 'stream' in _:
-                print(_['stream'])
-            if 'result' in _:
-                if _['result'] == 'succeed':
-                    network = _['output']
-                else:
-                    print(_['stream'])
-                break
+
+        def create_project(gen):
+            for _ in gen:
+                yield json.dumps(_)
     except TypeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return ctlr.inspect_project_network(network)
+    return StreamingResponse(create_project(res))
 
 @router.get("/project")
 def projects():
@@ -68,19 +63,17 @@ def project_remove(project_key:str):
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(cli, project_key=key)
         if not network:
-            raise InvalidProjectError(project_key)
-        for _ in ctlr.remove_project_network(cli, network):
-            if 'stream' in _:
-                print(_['stream'])
-            if 'status' in _:
-                if _['status'] == 'succeed':
-                    print('Network removed')
-                break
+            raise InvalidProjectError(project_key)           
+
+        res = ctlr.remove_project_network(cli, network)
+        def remove_project(gen):
+            for _ in gen:
+                yield json.dumps(_)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {'message': f'project {project_key} removed'}
+    return StreamingResponse(remove_project(res))
 
 
 @router.get("/project/{project_key}/logs")
