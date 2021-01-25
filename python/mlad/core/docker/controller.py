@@ -174,7 +174,10 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
                     network_name, 
                     labels=labels,
                     driver='bridge')
-            yield {"result": 'succeed', 'name': network_name, 'id': network.id}
+            if network.attrs['Driver']:
+                yield {"result": 'succeed', 'name': network_name, 'id': network.id}
+            else:
+                yield {"result": 'failed', 'stream': 'Cannot find suitable subnet.'}
         except docker.errors.APIError as e:
             message = f"Failed to create network.\n{e}\n"
             yield {'result': 'failed', 'stream': message}
