@@ -265,7 +265,7 @@ def test(with_build):
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
-                        network = ctlr.get_project_network(cli, id=_['id'])
+                        network = ctlr.get_project_network(cli, network_id=_['id'])
                     else:
                         print(f"Unknown Stream Result [{_['stream']}]")
                     break
@@ -333,7 +333,7 @@ def up(services):
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
-                        network = ctlr.get_project_network(cli, id=_['id'])
+                        network = ctlr.get_project_network(cli, network_id=_['id'])
                     break
         else:
             for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=True, stream=True):
@@ -341,7 +341,7 @@ def up(services):
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
-                        network = ctlr.get_project_network(cli, id=_['id'])
+                        network = ctlr.get_project_network(cli, network_id=_['id'])
                     break
     except exception.AlreadyExist as e:
         #print(e, file=sys.stderr)

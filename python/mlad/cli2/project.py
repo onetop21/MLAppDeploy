@@ -276,7 +276,7 @@ def test(with_build):
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
-                        network = ctlr.get_project_network(cli, id=_['id'])
+                        network = ctlr.get_project_network(cli, network_id=_['id'])
                     else:
                         print(f"Unknown Stream Result [{_['stream']}]")
                     break
@@ -330,6 +330,8 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
+    project_key = base_labels['MLAD.PROJECT']
     
     if not services:
         res = project_api.create(token, project['project'], utils.get_workspace(), 
@@ -342,8 +344,7 @@ def up(services):
             sys.stdout.write(_['stream'])
         if 'result' in _:
             if _['result'] == 'succeed':
-                network_id = _['output']
-                project_key = _['project_key']
+                network_id = _['id']
                 break 
  
     #cli = ctlr.get_docker_client(config['docker']['host'])
