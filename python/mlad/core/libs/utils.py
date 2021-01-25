@@ -63,7 +63,7 @@ def decode_dict(body):
 
 # Get URL or Socket from CLI
 def get_requests_host(cli):
-    if cli.api.base_url.startswith('http+docker://localhost')   # UnixSocket
+    if cli.api.base_url.startswith('http+docker://localhost'):   # UnixSocket
         for scheme, _ in cli.api.adapters.items():
             if scheme == 'http+docker://':
                 return f"http+unix://{_.socket_path.replace('/', '%2F')}"
