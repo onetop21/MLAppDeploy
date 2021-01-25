@@ -9,3 +9,6 @@ class Duplicated(Exception):
 
 class TokenError(Exception):
     pass
+
+class NotSupportURL(Exception):
+    pass

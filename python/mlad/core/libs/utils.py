@@ -61,16 +61,17 @@ def encode_dict(body):
 def decode_dict(body):
     return json.loads(base64.urlsafe_b64decode(body.encode()).decode() or "{}")
 
-# Make Host for requests_unixsocket
-def get_requests_host():
-    config = read_config()
-    if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
-        host = config['docker']['host'] 
-    elif config['docker']['host'].startswith('unix://'):
-        host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
-    else:
-        host = f"http://{config['docker']['host']}"
-    return host
+# Get URL or Socket from CLI
+def get_requests_host(cli):
+    if cli.api.base_url.startswith('http+docker://localhost')   # UnixSocket
+        for scheme, _ in cli.api.adapters.items():
+            if scheme == 'http+docker://':
+                return f"http+unix://{_.socket_path.replace('/', '%2F')}"
+    elif cli.api.base_url.startswith('https://'):
+        return cli.api.base_url
+    elif cli.api.base_url.startswith('http://'):
+        return cli.api.base_url
+    raise exception.NotSupportURL
 
 # Change Key Style (ex. task_template -> TaskTemplate)
 def change_key_style(dct):

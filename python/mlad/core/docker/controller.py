@@ -470,7 +470,7 @@ def create_services(cli, network, services, extra_labels={}):
         body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
         #import pprint
         #pprint.pprint(body)
-        host = utils.get_requests_host()
+        host = utils.get_requests_host(cli)
         with requests_unixsocket.post(f"{host}/v1.41/services/create", headers=headers, json=body) as resp:
             if resp.status_code == 201:
                 instance = get_service(cli, inst_name)
@@ -566,7 +566,7 @@ def build_image(cli, base_labels, tar, dockerfile):
         'labels': json.dumps(base_labels),
         'forcerm': 1,
     }
-    host = utils.get_requests_host()
+    host = utils.get_requests_host(cli)
     def _request_build(headers, params, tar):
         with requests_unixsocket.post(f"{host}/v1.24/build", headers=headers, params=params, data=tar, stream=True) as resp:
             for _ in resp.iter_lines(decode_unicode=True):
