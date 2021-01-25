@@ -195,7 +195,7 @@ def build(tagging, verbose):
     tarbytes.seek(0)
 
     # Build Image
-    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name) 
+    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, stream=True) 
 
     # Print build output
     for _ in build_output:
@@ -229,7 +229,7 @@ def build(tagging, verbose):
     # Upload Image
     print('Update project image to registry...')
     try:
-        for _ in ctlr.push_images(cli, project_key):
+        for _ in ctlr.push_images(cli, project_key, stream=True):
             if 'error' in _:
                 raise docker.errors.APIError(_['error'], None)
             elif 'stream' in _:
@@ -260,12 +260,12 @@ def test(with_build):
         # Create Network
         try:
             extra_envs = utils.get_service_env(config)
-            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False):
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
-                        network = _['output']
+                        network = ctlr.get_project_network(cli, id=_['id'])
                     else:
                         print(f"Unknown Stream Result [{_['stream']}]")
                     break
@@ -292,11 +292,11 @@ def test(with_build):
         ctlr.remove_containers(cli, containers)
 
         try:
-            for _ in ctlr.remove_project_network(cli, network):
+            for _ in ctlr.remove_project_network(cli, network, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
-                if 'status' in _:
-                    if _['status'] == 'succeed':
+                if 'result' in _:
+                    if _['result'] == 'succeed':
                         print('Network removed.')
                     break
         except docker.errors.APIError as e:
@@ -328,20 +328,20 @@ def up(services):
     try:
         extra_envs = utils.get_service_env(config)
         if not services:
-            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=True):
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=True, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
-                        network = _['output']
+                        network = ctlr.get_project_network(cli, id=_['id'])
                     break
         else:
-            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=True):
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=True, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
                     if _['result'] == 'succeed':
-                        network = _['output']
+                        network = ctlr.get_project_network(cli, id=_['id'])
                     break
     except exception.AlreadyExist as e:
         #print(e, file=sys.stderr)
@@ -394,11 +394,11 @@ def down(services):
         # Remove Network
         if not services:
             try:
-                for _ in ctlr.remove_project_network(cli, network):
+                for _ in ctlr.remove_project_network(cli, network, stream=True):
                     if 'stream' in _:
                         sys.stdout.write(_['stream'])
-                    if 'status' in _:
-                        if _['status'] == 'succeed':
+                    if 'result' in _:
+                        if _['result'] == 'succeed':
                             print('Network removed.')
                         break
             except docker.errors.APIError as e:

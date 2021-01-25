@@ -21,7 +21,7 @@ def project_create(req: project.CreateRequest,allow_reuse:bool = Query(False)):
         workspace, username, dict(req.project), registry)
     try:
         res = ctlr.create_project_network(
-            cli, base_labels, extra_envs, swarm=True, allow_reuse=allow_reuse)          
+            cli, base_labels, extra_envs, swarm=True, allow_reuse=allow_reuse, stream=True)          
 
         def create_project(gen):
             for _ in gen:
@@ -67,7 +67,7 @@ def project_remove(project_key:str):
         if not network:
             raise InvalidProjectError(project_key)           
 
-        res = ctlr.remove_project_network(cli, network)
+        res = ctlr.remove_project_network(cli, network, stream=True)
         def remove_project(gen):
             for _ in gen:
                 yield json.dumps(_)

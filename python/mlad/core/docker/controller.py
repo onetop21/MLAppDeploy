@@ -76,6 +76,8 @@ def get_project_network(cli, **kwargs):
         networks = cli.networks.list(filters={'label':f"MLAD.PROJECT={kwargs.get('project_key')}"})
     elif kwargs.get('project_id'):
         networks = cli.networks.list(filters={'label':f"MLAD.PROJECT.ID={kwargs.get('project_id')}"})
+    elif kwargs.get('network_id'):
+        networks = [cli.networks.get(kwargs.get('network_id'))]
     else:
         raise TypeError('At least one parameter is required.')
     if len(networks) == 1:
@@ -116,7 +118,7 @@ def is_swarm_mode(network):
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     return network.attrs['Driver'] == 'overlay'
 
-def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False):
+def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     #workspace = utils.get_workspace()
     driver = 'overlay' if swarm else 'bridge'
@@ -124,8 +126,13 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
     network = get_project_network(cli, project_key=project_key)
     if network:
         if allow_reuse:
-            yield {"result": 'succeed', 'output': network}
-            return
+            if stream:
+                def resp_stream():
+                    yield {'result': 'exists', 'name': network.name, 'id': network.id}
+                return resp_stream()
+            else:
+                stream_out = (_ for _ in resp_stream())
+                return (network, stream_out)
         raise exception.AlreadyExist('Already exist project network.')
     basename = base_labels['MLAD.PROJECT.BASE']
     project_version = base_labels['MLAD.PROJECT.VERSION']
@@ -133,67 +140,79 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
     default_image = base_labels['MLAD.PROJECT.IMAGE']
 
     # Create Docker Network
-    network_name = f"{basename}-{driver}"
-    try:
-        message = f"Create project network [{network_name}]...\n"
-        yield {'stream': message}
-        labels = copy.deepcopy(base_labels)
-        labels.update({
-            'MLAD.PROJECT.NETWORK': network_name, 
-            'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
-            'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
-            'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
-        })
+    def resp_stream():
+        network_name = f"{basename}-{driver}"
+        try:
+            message = f"Create project network [{network_name}]...\n"
+            yield {'stream': message}
+            labels = copy.deepcopy(base_labels)
+            labels.update({
+                'MLAD.PROJECT.NETWORK': network_name, 
+                'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
+                'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
+                'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
+            })
 
-        if driver == 'overlay':
-            for _ in range(0, 255, 4):
-                subnet = f'10.0.{_}.0/22'
-                ipam_pool = docker.types.IPAMPool(subnet=subnet)
-                ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+            if driver == 'overlay':
+                for _ in range(0, 255, 4):
+                    subnet = f'10.0.{_}.0/22'
+                    ipam_pool = docker.types.IPAMPool(subnet=subnet)
+                    ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+                    network = cli.networks.create(
+                        network_name, 
+                        labels=labels,
+                        driver='overlay', 
+                        ipam=ipam_config, 
+                        ingress=False)
+                    if network.attrs['Driver']: 
+                        message = f'Selected Subnet [{subnet}]\n'
+                        yield {'stream': message}
+                        break
+                    network.remove()
+            else:
                 network = cli.networks.create(
                     network_name, 
                     labels=labels,
-                    driver='overlay', 
-                    ipam=ipam_config, 
-                    ingress=False)
-                if network.attrs['Driver']: 
-                    message = f'Selected Subnet [{subnet}]\n'
-                    yield {'stream': message}
-                    break
-                network.remove()
-        else:
-            network = cli.networks.create(
-                network_name, 
-                labels=labels,
-                driver='bridge')
-        yield {"result": 'succeed', 'output': network.id, 'project_key':project_key}
-    except docker.errors.APIError as e:
-        message = f"Failed to create network.\n{e}\n"
-        yield {'result': 'failed', 'stream': message}
+                    driver='bridge')
+            yield {"result": 'succeed', 'name': network_name, 'id': network.id}
+        except docker.errors.APIError as e:
+            message = f"Failed to create network.\n{e}\n"
+            yield {'result': 'failed', 'stream': message}
+    if stream:
+        return resp_stream()
+    else:
+        stream_out = (_ for _ in resp_stream())
+        return (get_project_network(cli, project_key=project_key), stream_out)
 
-def remove_project_network(cli, network, timeout=0xFFFF):
+def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     network_info = inspect_project_network(network)
     network.remove()
-    removed = False
-    for tick in range(timeout):
-        if not get_project_network(cli, project_key=network_info['key'].hex):
-            removed = True
-            break
+    def resp_stream():
+        removed = False
+        for tick in range(timeout):
+            if not get_project_network(cli, project_key=network_info['key'].hex):
+                removed = True
+                break
+            else:
+                padding = '\033[1A\033[K' if tick else ''
+                message = f"{padding}Wait to remove network [{tick}s]\n"
+                yield {'stream': message}
+                time.sleep(1)
+        if not removed:
+            message = f"Failed to remove network.\n"
+            #print(message, file=sys.stderr)
+            yield {'result': 'failed', 'stream': message}
+            #return False
         else:
-            padding = '\033[1A\033[K' if tick else ''
-            message = f"{padding}Wait to remove network [{tick}s]\n"
-            yield {'stream': message}
-            time.sleep(1)
-    if not removed:
-        message = f"Failed to remove network.\n"
-        #print(message, file=sys.stderr)
-        yield {'status': 'failed', 'stream': message}
-        #return False
+            yield {'result': 'succeed'}
+            #return True
+    if stream:
+        return resp_stream()
     else:
-        yield {'status': 'succeed'}
-        #return True
+        return (not get_project_network(cli, project_key=network_info['key'].hex), (_ for _ in resp_stream()))
+
 
 # Manage services and tasks
 def get_containers(cli, project_key=None, extra_filters={}):
@@ -547,7 +566,7 @@ def inspect_image(image):
     }
     return labels
 
-def build_image(cli, base_labels, tar, dockerfile):
+def build_image(cli, base_labels, tar, dockerfile, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     # Setting path and docker file
     #os.getcwd() + "/.mlad/"
@@ -572,7 +591,13 @@ def build_image(cli, base_labels, tar, dockerfile):
             for _ in resp.iter_lines(decode_unicode=True):
                 line = json.loads(_)
                 yield line
-    return _request_build(headers, params, tar)
+    if stream:
+        return _request_build(headers, params, tar)
+    else:
+        resp_stream = (_ for _ in _request_build(headers, params, tar))
+        for _ in resp_stream:
+            if 'error' in _: return (None, resp_stream)
+        return (get_image(cli, latest_name), resp_stream)
 
 def remove_image(cli, ids, force=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -584,18 +609,27 @@ def prune_images(cli, project_key=None):
     if project_key: filters+= f'={project_key}'
     return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
 
-def push_images(cli, project_key):
+def push_images(cli, project_key, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    for _ in get_images(cli, project_key):
-        inspect = inspect_image(_)
-        if inspect['short_id'] == inspect['repository']: continue
-        repository = inspect['repository']
-        output = cli.images.push(repository, stream=True, decode=True)
-        try:
-            for stream in output:
-                yield stream
-        except StopIteration:
-            pass
+    def _request_push():
+        for _ in get_images(cli, project_key):
+            inspect = inspect_image(_)
+            if inspect['short_id'] == inspect['repository']: continue
+            repository = inspect['repository']
+            output = cli.images.push(repository, stream=True, decode=True)
+            try:
+                for stream in output:
+                    yield stream
+            except StopIteration:
+                pass
+    if stream:
+        return _request_push()
+    else:
+        resp_stream = (_ for _ in _request_push())
+        for _ in resp_stream:
+            if 'error' in _: return (False, resp_stream)
+        return (True, resp_stream)
+
  
 def get_nodes(cli):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
