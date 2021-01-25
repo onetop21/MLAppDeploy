@@ -35,14 +35,7 @@ class LogHandler:
                 pass
 
     def logs(self, target, **params):
-        config = utils.read_config()
-        if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
-            host = config['docker']['host'] 
-        elif config['docker']['host'].startswith('unix://'):
-            host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
-        else:
-            host = f"http://{config['docker']['host']}"
-
+        host = utils.get_requests_host(self.cli)
         timeout = None if params['follow'] else 3
         try:
             with requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, timeout=timeout, stream=True) as resp:

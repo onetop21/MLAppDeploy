@@ -154,8 +154,12 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
             })
 
             if driver == 'overlay':
-                for _ in range(0, 255, 4):
-                    subnet = f'10.0.{_}.0/22'
+                def address_range(bs=10, be=254, cs=0, ce=255, st=4):
+                    for b in range(bs, be):
+                        for c in range(cs, ce, st):
+                            yield b, c
+                for b, c, in address_range():
+                    subnet = f'10.{b}.{c}.0/22'
                     ipam_pool = docker.types.IPAMPool(subnet=subnet)
                     ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
                     network = cli.networks.create(
@@ -164,6 +168,8 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
                         driver='overlay', 
                         ipam=ipam_config, 
                         ingress=False)
+                    time.sleep(.1)
+                    network.reload()
                     if network.attrs['Driver']: 
                         message = f'Selected Subnet [{subnet}]\n'
                         yield {'stream': message}
