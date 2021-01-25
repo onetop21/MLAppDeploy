@@ -6,7 +6,8 @@ from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
 
 def list():
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     nodes = [ctlr.inspect_node(_) for _ in ctlr.get_nodes(cli).values()]
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
@@ -22,21 +23,25 @@ def list():
     utils.print_table(columns, 'No attached node.')
 
 def enable(ID):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     ctlr.enable_node(cli, ID)
     print('Updated.')
 
 def disable(ID):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     ctlr.disable_node(cli, ID)
     print('Updated.')
 
 def label_add(node, **kvs):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     ctlr.add_node_labels(cli, node, **kvs)
     print('Added.')
 
 def label_rm(node, *keys):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     ctlr.remove_node_labels(node, *keys)
     print('Removed.')

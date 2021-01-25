@@ -1,5 +1,4 @@
-import sys
-import os
+
 import copy
 import time
 import json
@@ -20,20 +19,15 @@ CONFIG_PATH = HOME + '/.mlad'
 SHORT_LEN = 10
 
 # Docker CLI from HOST
-def get_docker_client():
-    config = utils.read_config()
+def get_docker_client(host='unix:///var/run/docker.sock'):
     # docker.client.DockerClient
-    return docker.from_env(environment={'DOCKER_HOST': config['docker']['host']})
+    return docker.from_env(environment={'DOCKER_HOST': host})
 
 # Manage Project and Network
-def make_base_labels(workspace, username, project):
-    config = utils.read_config()
+def make_base_labels(workspace, username, project, registry):
     #workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
-    ## docker.host
-    ## docker.registry
     project_key = utils.project_key(workspace)
-    registry = config['docker']['registry']
     basename = f"{username}-{project['name'].lower()}-{project_key[:SHORT_LEN]}"
     default_image = f"{utils.get_repository(basename, registry)}:latest"
     labels = {
@@ -49,15 +43,24 @@ def make_base_labels(workspace, username, project):
     }
     return labels
 
-def get_auth_header(cli, repo_name):
-    # docker.auth.get_config_header(client, registry)
-    registry, repo_name = docker.auth.resolve_repository_name(image_name)
-    header = docker.auth.get_config_header(cli.api, registry)
-    if header:
-        return {'X-Registry-Auth': header}
-    #headers['X-Registry-Auth'] = docker.auth.encode_header(auth_config)
+def get_auth_headers(cli, image_name=None, auth_config=None):
+    if image_name:
+        if not auth_config:
+            # docker.auth.get_config_header(client, registry)
+            registry, repo_name = docker.auth.resolve_repository_name(image_name)
+            header = docker.auth.get_config_header(cli.api, registry)
+            if header:
+                return {'X-Registry-Auth': header}
+            else:
+                return {'X-Registry-Auth': ''}
+        else:
+            decoded_json = json.loads(base64.b64decode(auth_configs))
+            auth_config = docker.auth.resolve_authconfig({'auths': decoded_json})
+            return {'X-Registry-Auth': docker.auth.encode_header(auth_config)}
     else:
-        return {}
+        headers = {'X-Registry-Config': ''}
+        docker.api.build.BuildApiMixin._set_auth_headers(cli.api, headers)
+        return headers
     # get_all_auth_header(): -> docker.api.build.BuildApiMixin._set_auth_headers(self, headers)
     # or cli.api._auth_configs.get_all_credentials() -> JSON(X-Registry-Config)
     # and docker.auth.encode_header(JSON) -> X-Registry-Config or X-Registry-Auth
@@ -113,7 +116,7 @@ def is_swarm_mode(network):
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     return network.attrs['Driver'] == 'overlay'
 
-def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
+def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     #workspace = utils.get_workspace()
     driver = 'overlay' if swarm else 'bridge'
@@ -138,6 +141,8 @@ def create_project_network(cli, base_labels, swarm=True, allow_reuse=False):
         labels.update({
             'MLAD.PROJECT.NETWORK': network_name, 
             'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
+            'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
+            'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
         })
 
         if driver == 'overlay':
@@ -301,7 +306,7 @@ def create_containers(cli, network, services, extra_labels={}):
             raise exception.Duplicated('Already running container.')
 
         image = service['image'] or image_name
-        env = utils.get_service_env()
+        env = utils.decode_dict(network_labels.get('MLAD.PROJECT.ENV'))
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
@@ -352,7 +357,7 @@ def create_services(cli, network, services, extra_labels={}):
             raise exception.Duplicated('Already running service.')
 
         image = service['image'] or image_name
-        env = utils.get_service_env()
+        env = utils.decode_dict(network_labels.get('MLAD.PROJECT.ENV'))
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
@@ -440,21 +445,38 @@ def create_services(cli, network, services, extra_labels={}):
 
         # Try to run
         inst_name = f"{project_base}-{name}"
-        instance = cli.services.create(
-            name=inst_name,
+        kwargs = {
+            'name': inst_name,
             #hostname=f'{name}.{{{{.Task.Slot}}}}',
-            image=image, 
-            env=env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
-            mounts=['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro'],
-            command=command,
-            container_labels=labels,
-            labels=labels,
-            networks=[{'Target': network.name, 'Aliases': [name]}],
-            restart_policy=restart_policy,
-            resources=resources,
-            mode=service_mode,
-            constraints=constraints
-        )
+            'image': image, 
+            'env': env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
+            'mounts': ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro'],
+            'command': command,
+            'container_labels': labels,
+            'labels': labels,
+            'networks': [{'Target': network.name, 'Aliases': [name]}],
+            'restart_policy': restart_policy,
+            'resources': resources,
+            'mode': service_mode,
+            'constraints': constraints
+        }
+        #instance = cli.services.create(**kwargs)
+
+        ## Create Service by REST API (with AuthConfig)
+        #params = 
+        auth_config = network_labels.get('MLAD.PROJECT.AUTH_CONFIG')
+        headers = get_auth_headers(cli, image, auth_config) if auth_config else {}
+        #headers['Content-Type'] = 'application/json'
+        body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
+        #import pprint
+        #pprint.pprint(body)
+        host = utils.get_requests_host()
+        with requests_unixsocket.post(f"{host}/v1.41/services/create", headers=headers, json=body) as resp:
+            if resp.status_code == 201:
+                instance = get_service(cli, inst_name)
+            else:
+                print(resp.text, file=sys.stderr)
+                instance = None
         instances.append(instance)
     return instances
 
@@ -535,23 +557,16 @@ def build_image(cli, base_labels, tar, dockerfile):
     username = base_labels['MLAD.PROJECT.USERNAME']
     latest_name = base_labels['MLAD.PROJECT.IMAGE']
 
-    headers = {
-        'content-type': 'application/x-tar',
-        'X-Registry-Config': '{}'
-    }
+    headers = get_auth_headers(cli)
+    headers['content-type'] = 'application/x-tar'
+
     params = {
         'dockerfile': dockerfile,
         't': latest_name,
         'labels': json.dumps(base_labels),
         'forcerm': 1,
     }
-    config = utils.read_config()
-    if config['docker']['host'].startswith('http://') or config['docker']['host'].startswith('https://'):
-        host = config['docker']['host'] 
-    elif config['docker']['host'].startswith('unix://'):
-        host = f"http+{config['docker']['host'][:7]+config['docker']['host'][7:].replace('/', '%2F')}"
-    else:
-        host = f"http://{config['docker']['host']}"
+    host = utils.get_requests_host()
     def _request_build(headers, params, tar):
         with requests_unixsocket.post(f"{host}/v1.24/build", headers=headers, params=params, data=tar, stream=True) as resp:
             for _ in resp.iter_lines(decode_unicode=True):
@@ -651,8 +666,6 @@ def remove_node_labels(cli, node_key, *keys):
     node.update(spec)
 
 def container_logs(cli, project_key, tail='all', follow=False, timestamps=False):
-    config = utils.read_config()
-
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
     logs = [ (inst.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], inst.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for inst in instances ]
     if len(logs):
@@ -665,8 +678,6 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False)
         print('Cannot find running containers.', file=sys.stderr)
 
 def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[]):
-    config = utils.read_config()
-
     services = get_services(cli, project_key)
     selected = []
     sources = [(_['name'], f"/services/{_['id']}", _['tasks']) for _ in [inspect_service(_) for _ in services.values()]]

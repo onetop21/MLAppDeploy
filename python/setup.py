@@ -1,7 +1,7 @@
 import sys
 import os
 from setuptools import setup, find_packages
-from mlad.cli import __version__
+from mlad import __version__
 
 def main():
     # Read Description form file

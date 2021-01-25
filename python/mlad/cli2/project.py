@@ -59,8 +59,8 @@ def init(name, version, author):
         ))
 
 def list():
-    from pprint import pprint
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    #cli = ctlr.get_docker_client(config['docker']['host'])
     projects = {}
     for project in project_api.get(token):
         for service in service_api.get(project['key']):
@@ -87,6 +87,7 @@ def list():
 
 def status(all, no_trunc):
     config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
 
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
@@ -140,14 +141,14 @@ def status(all, no_trunc):
         utils.print_table(columns, 'Project is not running.')
 
 def build(tagging, verbose):
-    cli = ctlr.get_docker_client()
     config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     project = utils.get_project(default_project)
     
     # Generate Base Labels
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
 
     # Prepare Latest Image
     latest_image = None
@@ -198,7 +199,7 @@ def build(tagging, verbose):
     tarbytes = io.BytesIO()
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(dockerfile)
-    with tarfile.open(fileobj=tarbytes, mode='w:') as tar:
+    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
         for name, arcname in utils.arcfiles(workspace, project['workspace']['ignore']):
             tar.add(name, arcname)
         tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
@@ -262,14 +263,15 @@ def test(with_build):
     print('Deploying test container image to local...')
     config = utils.read_config()
 
-    cli = ctlr.get_docker_client()
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'])
+    cli = ctlr.get_docker_client(config['docker']['host'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
         # Create Network
         try:
-            for _ in ctlr.create_project_network(cli, base_labels, swarm=False):
+            extra_envs = utils.get_service_env(config)
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
@@ -344,6 +346,9 @@ def up(services):
                 project_key = _['project_key']
                 break 
  
+    #cli = ctlr.get_docker_client(config['docker']['host'])
+    #base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
+ 
     # Check service status
     running_services = service_api.get(project_key)
     for service_name in targets:
@@ -373,7 +378,8 @@ def up(services):
     print('Done.')
 
 def down(services):
-    cli = ctlr.get_docker_client()
+    config = utils.read_config()
+    cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     # Block duplicated running.
@@ -413,7 +419,8 @@ def down(services):
     print('Done.')
 
 def logs(tail, follow, timestamps, names_or_ids):
-    cli = ctlr.get_docker_client()
+    # config = utils.read_config()
+    # cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     # Block not running.
@@ -434,7 +441,8 @@ def logs(tail, follow, timestamps, names_or_ids):
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
-
+    #config = utils.read_config()
+    #cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = project_api.inspect(token, project_key)
