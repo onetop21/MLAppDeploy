@@ -10,4 +10,5 @@ class CreateRequest(BaseModel):
     project: Project
     workspace: str
     username: str
+    registry: str
     extra_envs: dict

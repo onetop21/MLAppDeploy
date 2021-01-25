@@ -15,12 +15,13 @@ def project_create(req: project.CreateRequest,allow_reuse:bool = Query(False)):
     # f"{socket.gethostname()}:{os.getcwd()}/mlad-project.yml"
     workspace = req.workspace
     username = req.username
+    registry = req.registry
     extra_envs = req.extra_envs
     base_labels = ctlr.make_base_labels(
-        workspace, username, dict(req.project), extra_envs)
+        workspace, username, dict(req.project), registry)
     try:
         res = ctlr.create_project_network(
-            cli, base_labels, swarm=True, allow_reuse=allow_reuse)          
+            cli, base_labels, extra_envs, swarm=True, allow_reuse=allow_reuse)          
 
         def create_project(gen):
             for _ in gen:
