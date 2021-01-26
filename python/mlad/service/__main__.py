@@ -87,5 +87,5 @@ def main():
     uvicorn.run(app, host=config['server']['host'], port=config['server']['port'], debug=config['server']['debug'])
 
 # Run by 'python -m mlad.service'
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()

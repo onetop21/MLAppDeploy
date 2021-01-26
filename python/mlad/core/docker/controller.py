@@ -112,7 +112,7 @@ def inspect_project_network(network):
         'id': uuid.UUID(labels['MLAD.PROJECT.ID']),
         'version': labels['MLAD.PROJECT.VERSION'],
         'base': labels['MLAD.PROJECT.BASE'],
-        "image": labels['MLAD.PROJECT.IMAGE'],
+        'image': labels['MLAD.PROJECT.IMAGE'],
     }
 
 def is_swarm_mode(network):
@@ -182,7 +182,7 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
                     labels=labels,
                     driver='bridge')
             if network.attrs['Driver']:
-                yield {"result": 'succeed', 'name': network_name, 'id': network.id}
+                yield {"result": 'succeed', 'name': network_name, 'id': network.id, 'key':project_key}
             else:
                 yield {"result": 'failed', 'stream': 'Cannot find suitable subnet.\n'}
         except docker.errors.APIError as e:
@@ -500,7 +500,7 @@ def create_services(cli, network, services, extra_labels={}):
         #import pprint
         #pprint.pprint(body)
         host = utils.get_requests_host(cli)
-        with requests_unixsocket.post(f"{host}/v1.41/services/create", headers=headers, json=body) as resp:
+        with requests_unixsocket.post(f"{host}/v1.40/services/create", headers=headers, json=body) as resp:
             if resp.status_code == 201:
                 instance = get_service(cli, inst_name)
             else:

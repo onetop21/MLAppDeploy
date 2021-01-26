@@ -75,6 +75,7 @@ def service_inspect(project_key:str, service_id:str):
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
     return inspects
 
@@ -91,6 +92,7 @@ def service_tasks(project_key:str, service_id:str):
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
     return tasks
 

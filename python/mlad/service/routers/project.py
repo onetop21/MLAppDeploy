@@ -17,6 +17,7 @@ def project_create(req: project.CreateRequest,allow_reuse:bool = Query(False)):
     username = req.username
     registry = req.registry
     extra_envs = req.extra_envs
+    print(extra_envs)
     base_labels = ctlr.make_base_labels(
         workspace, username, dict(req.project), registry)
     try:
