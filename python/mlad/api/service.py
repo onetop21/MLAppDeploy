@@ -17,7 +17,6 @@ def create(project_key, services):
     return res.json()
 
 def inspect(project_key, service_id):
-    
     url = f'{PROJECT_URL}/{project_key}/service/{service_id}'
     res = requests.get(url=url)
     res.raise_for_status()

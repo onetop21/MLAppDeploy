@@ -11,4 +11,4 @@ class CreateRequest(BaseModel):
     workspace: str
     username: str
     registry: str
-    extra_envs: dict
+    extra_envs: list

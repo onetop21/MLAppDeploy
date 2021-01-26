@@ -111,7 +111,7 @@ def inspect_project_network(network):
         'id': uuid.UUID(labels['MLAD.PROJECT.ID']),
         'version': labels['MLAD.PROJECT.VERSION'],
         'base': labels['MLAD.PROJECT.BASE'],
-        "image": labels['MLAD.PROJECT.IMAGE'],
+        'image': labels['MLAD.PROJECT.IMAGE'],
     }
 
 def is_swarm_mode(network):

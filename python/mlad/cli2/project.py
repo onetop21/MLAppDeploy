@@ -20,7 +20,7 @@ from mlad.api import project as project_api
 from mlad.api import node as node_api
 
 #To be removed
-token = 'YWRtaW47MjAyMS0wMS0yNVQxNToyNTo0OS43NTAwMDArMDk6MDA7NjU2Y2I5ZWQ3YWZmODEyNDgyOTAxYzFkYmFlMzcyOGMxYjAyOTlmNA=='
+token = 'YWRtaW47MjAyMS0wMS0yNlQxMjoxNzoyNS4xNTAwMDArMDk6MDA7MGYxN2NhYjU3NWI5ZDA0YmE3NzRlN2U0NWIyYWVmNjAzYTI4MDQ3NQ=='
 
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
@@ -330,26 +330,33 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
+    # base labels -> cli or routers 위치 정해야함
     base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
-    
+
+    extra_envs = utils.get_service_env(config)
+
     if not services:
         res = project_api.create(token, project['project'], utils.get_workspace(), 
-            config['account']['username'], allow_reuse=False)
+            config['account']['username'], config['docker']['registry'],
+            extra_envs, allow_reuse=False)
     else:
         res = project_api.create(token, project['project'], utils.get_workspace(), 
-            config['account']['username'], allow_reuse=True)
+            config['account']['username'], config['docker']['registry'],
+            extra_envs, allow_reuse=True)
+    
     for _ in res:
         if 'stream' in _:
             sys.stdout.write(_['stream'])
         if 'result' in _:
             if _['result'] == 'succeed':
                 network_id = _['id']
+                #project_key = _['key']
                 break 
  
     #cli = ctlr.get_docker_client(config['docker']['host'])
     #base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
- 
+
     # Check service status
     running_services = service_api.get(project_key)
     for service_name in targets:
