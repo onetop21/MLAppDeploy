@@ -9,7 +9,9 @@ from fastapi.responses import StreamingResponse
 router = APIRouter()
 
 @router.post("/project")
-def project_create(req: project.CreateRequest,allow_reuse:bool = Query(False)):
+def project_create(req: project.CreateRequest, 
+                   allow_reuse: bool = Query(False), 
+                   swarm: bool = Query(True)):
     cli = ctlr.get_docker_client()
     #workspace = 
     # f"{socket.gethostname()}:{os.getcwd()}/mlad-project.yml"
@@ -17,12 +19,12 @@ def project_create(req: project.CreateRequest,allow_reuse:bool = Query(False)):
     username = req.username
     registry = req.registry
     extra_envs = req.extra_envs
-    print(extra_envs)
     base_labels = ctlr.make_base_labels(
         workspace, username, dict(req.project), registry)
     try:
         res = ctlr.create_project_network(
-            cli, base_labels, extra_envs, swarm=True, allow_reuse=allow_reuse, stream=True)          
+            cli, base_labels, extra_envs, swarm=swarm, 
+            allow_reuse=allow_reuse, stream=True)          
 
         def create_project(gen):
             for _ in gen:

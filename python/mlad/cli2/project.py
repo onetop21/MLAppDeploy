@@ -20,9 +20,7 @@ from mlad.api import project as project_api
 from mlad.api import node as node_api
 
 #To be removed
-token = 'YWRtaW47MjAyMS0wMS0yNlQxNToyMjo1Mi42NzAwMDArMDk6MDA7ZjY5MmI5OTZkZjM3NWJiMTcyY2E4N2RlNGIxMWYxY2Y4OGFjMTE1NQ=='
-
-
+token = 'YWRtaW47MjAyMS0wMS0yNlQxNzo1Mjo0Ni45NjAwMDArMDk6MDA7YWZlZDg3OTQyMDYwM2IzYWMyZDA3NmE4ODMwYjVlYzk2MjgyZjY2Zg=='
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
@@ -269,7 +267,6 @@ def test(with_build):
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
-        # Create Network
         try:
             extra_envs = utils.get_service_env(config)
             for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
@@ -340,11 +337,11 @@ def up(services):
     if not services:
         res = project_api.create(token, project['project'], utils.get_workspace(), 
             config['account']['username'], config['docker']['registry'],
-            extra_envs, allow_reuse=False)
+            extra_envs, swarm=True, allow_reuse=False)
     else:
         res = project_api.create(token, project['project'], utils.get_workspace(), 
             config['account']['username'], config['docker']['registry'],
-            extra_envs, allow_reuse=True)
+            extra_envs, swarm=True, allow_reuse=True)
     
     for _ in res:
         if 'stream' in _:
