@@ -154,7 +154,7 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
             })
 
             if driver == 'overlay':
-                def address_range(bs=10, be=254, cs=0, ce=255, st=4):
+                def address_range(bs=100, be=254, cs=0, ce=255, st=4):
                     for b in range(bs, be):
                         for c in range(cs, ce, st):
                             yield b, c
