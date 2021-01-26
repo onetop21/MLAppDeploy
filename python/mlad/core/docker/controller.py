@@ -3,6 +3,7 @@ import copy
 import time
 import json
 import uuid
+import base64
 from pathlib import Path
 from typing import Dict, List
 import docker
@@ -43,9 +44,9 @@ def make_base_labels(workspace, username, project, registry):
     }
     return labels
 
-def get_auth_headers(cli, image_name=None, auth_config=None):
+def get_auth_headers(cli, image_name=None, auth_configs=None):
     if image_name:
-        if not auth_config:
+        if not auth_configs:
             # docker.auth.get_config_header(client, registry)
             registry, repo_name = docker.auth.resolve_repository_name(image_name)
             header = docker.auth.get_config_header(cli.api, registry)
@@ -492,8 +493,8 @@ def create_services(cli, network, services, extra_labels={}):
 
         ## Create Service by REST API (with AuthConfig)
         #params = 
-        auth_config = network_labels.get('MLAD.PROJECT.AUTH_CONFIG')
-        headers = get_auth_headers(cli, image, auth_config) if auth_config else {}
+        auth_configs = network_labels.get('MLAD.PROJECT.AUTH_CONFIGS')
+        headers = get_auth_headers(cli, image, auth_configs) if auth_configs else get_auth_headers(cli, image)
         #headers['Content-Type'] = 'application/json'
         body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
         #import pprint

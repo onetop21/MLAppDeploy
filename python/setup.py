@@ -30,6 +30,9 @@ def main():
         'docker>=4.0.2,<5.0.0',
         'requests-unixsocket>=0.2.0',
         'python-dateutil>=2.8.1,<3.0.0',
+        'uvicorn>=0.13.3,<1.0.0',
+        'fastapi>=0.63.0,<1.0.0',
+        'psutil>=5.8.0,<5.9.0',
       ],
       entry_points='''
         [console_scripts]
