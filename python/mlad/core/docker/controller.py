@@ -55,8 +55,10 @@ def get_auth_headers(cli, image_name=None, auth_configs=None):
             else:
                 return {'X-Registry-Auth': ''}
         else:
-            decoded_json = json.loads(base64.b64decode(auth_configs))
-            auth_config = docker.auth.resolve_authconfig({'auths': decoded_json})
+            if isinstance(auth_configs, str): 
+                auth_configs = utils.decode_dict(auth_configs)
+            registry, repo_name = docker.auth.resolve_repository_name(image_name)
+            auth_config = docker.auth.resolve_authconfig({'auths': auth_configs}, registry)
             return {'X-Registry-Auth': docker.auth.encode_header(auth_config)}
     else:
         headers = {'X-Registry-Config': ''}
@@ -493,7 +495,7 @@ def create_services(cli, network, services, extra_labels={}):
 
         ## Create Service by REST API (with AuthConfig)
         #params = 
-        auth_configs = network_labels.get('MLAD.PROJECT.AUTH_CONFIGS')
+        auth_configs = utils.decode_dict(network_labels.get('MLAD.PROJECT.AUTH_CONFIGS'))
         headers = get_auth_headers(cli, image, auth_configs) if auth_configs else get_auth_headers(cli, image)
         #headers['Content-Type'] = 'application/json'
         body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
