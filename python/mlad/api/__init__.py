@@ -1,1 +1,1 @@
-URL_PREFIX = 'http://localhost:8000/api/v1'
+URL_PREFIX = 'http://localhost:8440/api/v1'

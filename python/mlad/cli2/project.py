@@ -20,7 +20,8 @@ from mlad.api import project as project_api
 from mlad.api import node as node_api
 
 #To be removed
-token = 'YWRtaW47MjAyMS0wMS0yNlQxMjoxNzoyNS4xNTAwMDArMDk6MDA7MGYxN2NhYjU3NWI5ZDA0YmE3NzRlN2U0NWIyYWVmNjAzYTI4MDQ3NQ=='
+token = 'YWRtaW47MjAyMS0wMS0yNlQxNToyMjo1Mi42NzAwMDArMDk6MDA7ZjY5MmI5OTZkZjM3NWJiMTcyY2E4N2RlNGIxMWYxY2Y4OGFjMTE1NQ=='
+
 
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
@@ -78,7 +79,7 @@ def list():
             projects[project_key]['services'] += 1
             projects[project_key]['replicas'] += inspect['replicas']
             projects[project_key]['tasks'] += tasks_state.count('running')
-        columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
+    columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
 
     for project in projects:
         running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"

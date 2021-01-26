@@ -11,11 +11,12 @@ def get(token):
     res.raise_for_status()
     return res.json()    
 
-def create(token, project,workspace, username,extra_envs, allow_reuse):
+def create(token, project,workspace, username,registry, extra_envs, allow_reuse):
     url = f'{PROJECT_URL}'
     header = {'token':token}
     with requests.post(url=url,headers=header,json={'project':project,
-        'workspace':workspace, 'username':username,'extra_envs':extra_envs},
+        'workspace':workspace, 'username':username,
+        'registry':registry, 'extra_envs':extra_envs},
         params={'allow_reuse': allow_reuse}, stream=True) as res:
         for _ in res.iter_content(1024):
             res = _.decode()
@@ -37,8 +38,8 @@ def delete(token, project_key):
             res = _.decode()
             dict_res = json.loads(res)
             yield dict_res
-    res.raise_for_status()
-    return res.json()
+    # res.raise_for_status()
+    # return res.json()
 
 def log(token, project_key, tail='all', 
         follow=False, timestamps=False, names_or_ids=[]):
