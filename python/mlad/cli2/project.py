@@ -19,9 +19,6 @@ from mlad.api import service as service_api
 from mlad.api import project as project_api
 from mlad.api import node as node_api
 
-#To be removed
-token = 'YWRtaW47MjAyMS0wMS0yNlQxNzo1Mjo0Ni45NjAwMDArMDk6MDA7YWZlZDg3OTQyMDYwM2IzYWMyZDA3NmE4ODMwYjVlYzk2MjgyZjY2Zg=='
-
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
     namewidth = min(max_name_width, log['name_width'])
@@ -61,7 +58,7 @@ def list():
     config = utils.read_config()
     #cli = ctlr.get_docker_client(config['docker']['host'])
     projects = {}
-    for project in project_api.get(token):
+    for project in project_api.get(config.mlad.token.user):
         for service in service_api.get(project['key']):
             inspect = service_api.inspect(project['key'], service)
             default = { 
@@ -86,12 +83,12 @@ def list():
 
 def status(all, no_trunc):
     config = utils.read_config()
-    cli = ctlr.get_docker_client(config['docker']['host'])
+    #cli = ctlr.get_docker_client(config['docker']['host'])
 
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
-        inspect = project_api.inspect(token, project_key=project_key)
+        inspect = project_api.inspect(config.mlad.token.user, project_key=project_key)
     except HTTPError as e:
         if e.response.status_code == 404:
             print('Cannot find running service.', file=sys.stderr)
@@ -112,7 +109,7 @@ def status(all, no_trunc):
                 else:
                     uptime = f"{uptime:.0f} seconds"
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    node_inspect = node_api.inspect(token, task['NodeID'])
+                    node_inspect = node_api.inspect(config.mlad.token.user, task['NodeID'])
                     task_info.append((
                         task_id,
                         service_inspect['name'],
@@ -133,7 +130,9 @@ def status(all, no_trunc):
     columns_data = sorted(columns_data, key=lambda x: f"{x[1]}-{x[2]:08}")
     columns += columns_data
 
-    print(f"USERNAME: [{config['account']['username']}] / PROJECT: [{inspect['project']}]")
+    # config['account']['username'] => auth_api.verify_user(token.user)['username']
+    username = 'onetop21'
+    print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
     if no_trunc:
         utils.print_table(columns, 'Project is not running.', -1)
     else:
@@ -141,13 +140,15 @@ def status(all, no_trunc):
 
 def build(tagging, verbose):
     config = utils.read_config()
-    cli = ctlr.get_docker_client(config['docker']['host'])
+    cli = ctlr.get_docker_client()
     project_key = utils.project_key(utils.get_workspace())
 
     project = utils.get_project(default_project)
     
     # Generate Base Labels
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
+    # config['account']['username'] => auth_api.verify_user(token.user)['username']
+    username = 'onetop21'
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), username, project['project'], config['docker']['registry'])
 
     # Prepare Latest Image
     latest_image = None
@@ -262,8 +263,10 @@ def test(with_build):
     print('Deploying test container image to local...')
     config = utils.read_config()
 
-    cli = ctlr.get_docker_client(config['docker']['host'])
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
+    cli = ctlr.get_docker_client()
+    # config['account']['username'] => auth_api.verify_user(token.user)['username']
+    username = 'onetop21'
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), username, project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
@@ -328,19 +331,20 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
+    # config['account']['username'] => auth_api.verify_user(token.user)['username']
+    username = 'onetop21'
     # base labels -> cli or routers 위치 정해야함
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), username, project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
 
     extra_envs = utils.get_service_env(config)
-
     if not services:
-        res = project_api.create(token, project['project'], utils.get_workspace(), 
-            config['account']['username'], config['docker']['registry'],
+        res = project_api.create(config.mlad.token.user, project['project'], utils.get_workspace(), 
+            username, config['docker']['registry'],
             extra_envs, swarm=True, allow_reuse=False)
     else:
-        res = project_api.create(token, project['project'], utils.get_workspace(), 
-            config['account']['username'], config['docker']['registry'],
+        res = project_api.create(config.mlad.token.user, project['project'], utils.get_workspace(), 
+            username, config['docker']['registry'],
             extra_envs, swarm=True, allow_reuse=True)
     
     for _ in res:
@@ -384,11 +388,11 @@ def up(services):
 
 def down(services):
     config = utils.read_config()
-    cli = ctlr.get_docker_client(config['docker']['host'])
+    #cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     # Block duplicated running.
-    inspect = project_api.inspect(token, project_key=project_key)
+    inspect = project_api.inspect(config.mlad.token.user, project_key=project_key)
     if not inspect:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
@@ -414,7 +418,7 @@ def down(services):
 
         #Remove Network
         if not services:
-            res = project_api.delete(token, project_key)
+            res = project_api.delete(config.mlad.token.user, project_key)
             for _ in res:
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
@@ -425,19 +429,19 @@ def down(services):
     print('Done.')
 
 def logs(tail, follow, timestamps, names_or_ids):
-    # config = utils.read_config()
+    config = utils.read_config()
     # cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     # Block not running.
     try:
-        project = project_api.inspect(token, project_key)
+        project = project_api.inspect(config.mlad.token.user, project_key)
     except HTTPError as e:
         if e.response.status_code == 404:
             print('Cannot find running service.', file=sys.stderr)
             sys.exit(1)
 
-    logs = project_api.log(token, project_key, tail, follow,
+    logs = project_api.log(config.mlad.token.user, project_key, tail, follow,
         timestamps, names_or_ids)
 
     colorkey = {}   
@@ -447,11 +451,11 @@ def logs(tail, follow, timestamps, names_or_ids):
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
-    #config = utils.read_config()
+    config = utils.read_config()
     #cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
     try:    
-        project = project_api.inspect(token, project_key)
+        project = project_api.inspect(config.mlad.token.user, project_key)
     except HTTPError as e:
         if e.response.status_code == 404:
             print('Cannot find running service.', file=sys.stderr)

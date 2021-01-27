@@ -6,11 +6,9 @@ from mlad.cli2.libs import utils
 from mlad.cli2.libs import interrupt_handler
 from mlad.api import node as node_api
 
-#to be removed
-token = 'YWRtaW47MjAyMS0wMS0yNVQxNToyNTo0OS43NTAwMDArMDk6MDA7NjU2Y2I5ZWQ3YWZmODEyNDgyOTAxYzFkYmFlMzcyOGMxYjAyOTlmNA=='
-
 def list():
-    nodes = [node_api.inspect(token,_) for _ in node_api.get(token)]
+    config = utils.read_config()
+    nodes = [node_api.inspect(config.mlad.token.admin,_) for _ in node_api.get(config.mlad.token.admin)]
     #config = utils.read_config()
     #cli = ctlr.get_docker_client(config['docker']['host'])
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
@@ -27,25 +25,29 @@ def list():
     utils.print_table(columns, 'No attached node.')
 
 def enable(ID):
+    config = utils.read_config()
     # config = utils.read_config()
     # cli = ctlr.get_docker_client(config['docker']['host'])
-    node_api.enable(token, ID)
+    node_api.enable(config.mlad.token.admin, ID)
     print('Updated.')
 
 def disable(ID):
+    config = utils.read_config()
     # config = utils.read_config()
     # cli = ctlr.get_docker_client(config['docker']['host'])
-    node_api.disable(token, ID)
+    node_api.disable(config.mlad.token.admin, ID)
     print('Updated.')
 
 def label_add(node, **kvs):
+    config = utils.read_config()
     # config = utils.read_config()
     # cli = ctlr.get_docker_client(config['docker']['host'])
-    node_api.add_label(token, node, **kvs)
+    node_api.add_label(config.mlad.token.admin, node, **kvs)
     print('Added.')
 
 def label_rm(node, *keys):
+    config = utils.read_config()
     # config = utils.read_config()
     # cli = ctlr.get_docker_client(config['docker']['host'])
-    node_api.delete_label(token, node, *keys)
+    node_api.delete_label(config.mlad.token.admin, node, *keys)
     print('Removed.')

@@ -1,32 +1,8 @@
-import sys, os
+import sys
+import os
+from omegaconf import OmegaConf
 from mlad.cli.libs import utils
 from mlad.core.default import config as default_config
-
-def dict_to_graph(vars, base={}):
-    def convert_type(value, tyidx=0):
-        from distutils import util
-        TYPES = [int, lambda x: bool(util.strtobool(x)), float]
-        if tyidx < len(TYPES):
-            try:
-                value = TYPES[tyidx](value)
-            except ValueError as e:
-                value = convert_type(value, tyidx+1)
-        return value
-        # str to float
-    config = base
-    for ckeys in vars:
-        keys = ckeys.split('.')
-        head = config
-        for key in keys[:-1]:
-            head[key] = head[key] if key in head else {}
-            head = head[key]
-        if vars[ckeys]:
-            head[keys[-1]] = convert_type(vars[ckeys])
-        elif len(keys):
-            if keys[-1] in head: del head[keys[-1]]
-        else:
-            if keys[-1] in config: del config[keys[-1]]
-    return config
 
 def get_value(config, keys, stack=[]):
     if not keys:
@@ -105,20 +81,13 @@ def init(username, address):
     get(None)
 
 def set(*args):
-    try:
-        vars = dict([ var.split('=') for var in args ])
-    except ValueError as e:
-        print('Argument format is not valid.', file=sys.stderr)
-        sys.exit(1)
-
-    config = default_config(utils.read_config())
-    config = dict_to_graph(vars, config)
-
+    config = default_config['remote'](utils.read_config())
+    config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
     utils.write_config(config)
 
 def get(keys):
-    config = default_config(utils.read_config())
-    data = get_value(config, keys)
+    config = default_config['local'](utils.read_config())
+    data = get_value(OmegaConf.to_container(config, resolve=True), keys)
     if isinstance(data, list):
         print(f'{"KEY":24} {"VALUE":32}')
         for key, value in data:
@@ -127,7 +96,7 @@ def get(keys):
         print(data)
 
 def env(unset):
-    config = default_config(utils.read_config())
+    config = default_config['local'](utils.read_config())
     envs = utils.get_service_env(config)
     for line in envs:
         if unset:

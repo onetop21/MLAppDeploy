@@ -1,6 +1,7 @@
 import sys
 import os
 import glob
+from omegaconf import OmegaConf
 from mlad.core.default import project as default_project
 from mlad.core.docker import controller as controller
 from mlad.cli.libs import utils
@@ -33,7 +34,7 @@ def get_node_label_completion(ctx, args, incomplete):
     return [_ for _ in keys if _.startswith(incomplete)]
     
 def get_config_key_completion(ctx, args, incomplete):
-    config = utils.read_config()
+    config = OmegaConf.to_container(utils.read_config(), resolve=True)
     def compose_keys(config, stack=[]):
         keys = []
         for k, v in config.items():
