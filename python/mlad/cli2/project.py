@@ -349,7 +349,6 @@ def up(services):
         if 'result' in _:
             if _['result'] == 'succeed':
                 network_id = _['id']
-                #project_key = _['key']
                 break 
  
     #cli = ctlr.get_docker_client(config['docker']['host'])
@@ -410,7 +409,8 @@ def down(services):
             return not services or inspect['name'] in services
         targets = [_ for _ in running_services if filtering(_)]
         for target in targets:
-            service_api.remove(project_key, target)
+            res = service_api.remove(project_key, target)
+            print(res['message'])
 
         #Remove Network
         if not services:
@@ -461,6 +461,7 @@ def scale(scales):
     for service in services:
         inspect = service_api.inspect(project_key, service)
         if inspect['name'] in scale_spec:
-            service_api.scale(project_key, 
-                service, scale_spec[inspect['name']])
+            res = service_api.scale(project_key, service, 
+                scale_spec[inspect['name']])
+            print(res['message'])
 

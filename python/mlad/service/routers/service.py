@@ -42,12 +42,6 @@ def service_list(project_key:str,
 @router.post("/project/{project_key}/service")
 def service_create(project_key:str, req:service.CreateRequest):
     targets = req.json
-    # services = json.loads(req.json())['services']
-    # targets = dict()
-    # for _ in services:
-    #     print(_)
-    #     targets[_['name']]=dict(_)
-    #     del targets[_['name']]['name']
 
     cli = ctlr.get_docker_client()
     try:
@@ -60,7 +54,6 @@ def service_create(project_key:str, req:service.CreateRequest):
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
     return [_.short_id for _ in services]
 
@@ -75,7 +68,6 @@ def service_inspect(project_key:str, service_id:str):
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
     return inspects
 
@@ -92,7 +84,6 @@ def service_tasks(project_key:str, service_id:str):
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
     return tasks
 
