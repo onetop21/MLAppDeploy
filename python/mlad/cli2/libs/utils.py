@@ -39,6 +39,9 @@ def apply_project_arguments(project_file=None, workdir=None):
 def get_project_file():
     return ProjectArgs['project_file']
 
+def get_working_dir():
+    return ProjectArgs['working_dir']
+
 def generate_empty_config():
     if not os.path.exists(CONFIG_PATH):
         os.makedirs(CONFIG_PATH, exist_ok=True)
