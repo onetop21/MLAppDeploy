@@ -127,8 +127,9 @@ def get(keys):
         print(data)
 
 def env(unset):
-    config = utils.get_service_env()
-    for line in config:
+    config = default_config(utils.read_config())
+    envs = utils.get_service_env(config)
+    for line in envs:
         if unset:
             K, V = line.split('=')
             print(f'export {K}=')
