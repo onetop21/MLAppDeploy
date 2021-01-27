@@ -12,7 +12,7 @@ def get(token):
     return res.json()    
 
 def create(token, project,workspace, username,
-           registry, extra_envs, swarm, allow_reuse):
+           registry, extra_envs=[], swarm=True, allow_reuse=False):
     url = f'{PROJECT_URL}'
     header = {'token':token}
     with requests.post(url=url,headers=header,
@@ -39,8 +39,6 @@ def delete(token, project_key):
             res = _.decode()
             dict_res = json.loads(res)
             yield dict_res
-    # res.raise_for_status()
-    # return res.json()
 
 def log(token, project_key, tail='all', 
         follow=False, timestamps=False, names_or_ids=[]):
@@ -54,5 +52,3 @@ def log(token, project_key, tail='all',
             log = _.decode()
             dict_log = json.loads(log)
             yield dict_log
-
-    res.raise_for_status()

@@ -12,7 +12,7 @@ def get(project_key, labels=None):
 def create(project_key, services):
     url = f'{PROJECT_URL}/{project_key}/service'
     res = requests.post(url=url, json={'services':services})
-    #services = [{'name':'',..},{'name',..}]
+    #services = [{'name':'',..},{'name':'',..}]
     res.raise_for_status()
     return res.json()
 
@@ -26,17 +26,18 @@ def get_tasks(project_key, service_id):
     url = f'{PROJECT_URL}/{project_key}/service/{service_id}/tasks'
     res = requests.get(url=url)
     res.raise_for_status()
-    return res.json()  
+    return res.json()
 
 def scale(project_key, service_id, scale_spec):
     url = f'{PROJECT_URL}/{project_key}/service/{service_id}/scale'
     res = requests.put(url=url, json={'scale_spec':scale_spec})
     res.raise_for_status()
-    print(res.json()['message'])
+    return res.json()
+
 
 def remove(project_key, service_id):
     url = f'{PROJECT_URL}/{project_key}/service/{service_id}'
     res = requests.delete(url=url)
     res.raise_for_status()
-    print(res.json()['message'])
+    return res.json()
 
