@@ -22,14 +22,14 @@ def create(username, expired):
     auth.create(username, expired)
 
 @click.command()
-@click.argument('TOKEN', required=True, nargs=1)
-def verify(token):
-    '''Verify User Token.'''
-    auth.verify(token) 
+@click.argument('TOKEN', required=False, nargs=1)
+def info(token):
+    '''Get Information from User Token.'''
+    auth.info(token) 
 
 @click.group('auth')
 def cli():
-    '''Manage Authentication.'''
+    '''Manage Authentication. (Admin Only)'''
 
 cli.add_command(create)
-cli.add_command(verify)
+cli.add_command(info)

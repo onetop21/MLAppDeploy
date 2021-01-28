@@ -1,9 +1,9 @@
 import requests
 
 class Node():
-    def __init__(self, token, url):
-        self.token = token
+    def __init__(self, url, token):
         self.url = url   
+        self.token = token
 
     def get(self):
         url = f'{self.url}/node'

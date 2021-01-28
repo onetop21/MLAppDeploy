@@ -7,6 +7,7 @@ import docker
 from pathlib import Path
 from datetime import datetime
 from dateutil import parser
+from functools import lru_cache
 from requests.exceptions import HTTPError
 from mlad.core.docker import controller as ctlr
 from mlad.core.default import project as default_project
@@ -15,9 +16,16 @@ from mlad.cli2.libs import utils
 from mlad.cli2.libs import interrupt_handler
 from mlad.cli2.Format import PROJECT
 from mlad.cli2.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
-from mlad.api.mlad_api import MladAPI
+from mlad.api import API
 
-url = 'http://localhost:8440/api/v1'
+@lru_cache(maxsize=None)
+def get_username(config):
+    with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+        res = api.auth.token_verify()
+    if res['result']:
+        return res['data']['username']
+    else:
+        raise RuntimeError("Token is not valid.")
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
@@ -56,8 +64,8 @@ def init(name, version, author):
 
 def list():
     config = utils.read_config()
-    api = MladAPI(config.mlad.token.user, url)
     projects = {}
+    api = API(utils.to_url(config.mlad), config.mlad.token.user)
     for inspect in api.service.get():
         default = { 
         'username': inspect['username'], 
@@ -81,7 +89,7 @@ def list():
 
 def status(all, no_trunc):
     config = utils.read_config()
-    api = MladAPI(config.mlad.token.admin, url)
+    api = API(utils.to_url(config.mlad), config.mlad.token.user)
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
@@ -127,9 +135,7 @@ def status(all, no_trunc):
     columns_data = sorted(columns_data, key=lambda x: f"{x[1]}-{x[2]:08}")
     columns += columns_data
 
-    # config['account']['username'] => auth_api.verify_user(token.user)['username']
-    username = 'onetop21'
-    print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
+    print(f"USERNAME: [{get_username(config)}] / PROJECT: [{inspect['project']}]")
     if no_trunc:
         utils.print_table(columns, 'Project is not running.', -1)
     else:
@@ -143,9 +149,7 @@ def build(tagging, verbose):
     project = utils.get_project(default_project)
     
     # Generate Base Labels
-    # config['account']['username'] => auth_api.verify_user(token.user)['username']
-    username = 'onetop21'
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), username, project['project'], config['docker']['registry'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
 
     # Prepare Latest Image
     latest_image = None
@@ -261,9 +265,7 @@ def test(with_build):
     config = utils.read_config()
 
     cli = ctlr.get_docker_client()
-    # config['account']['username'] => auth_api.verify_user(token.user)['username']
-    username = 'onetop21'
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), username, project['project'], config['docker']['registry'])
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
@@ -328,10 +330,8 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
-    api = MladAPI(config.mlad.token.user, url)
-    # config['account']['username'] => auth_api.verify_user(token.user)['username']
-    username = 'kkkdeon41'
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), username, project['project'], config['docker']['registry'])
+    api = API(utils.to_url(config.mlad), config.mlad.token.user)
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
 
     extra_envs = utils.get_service_env(config)
@@ -381,7 +381,7 @@ def down(services):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
 
-    api = MladAPI(config.mlad.token.user, url)
+    api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block duplicated running.
     inspect = api.project.inspect(project_key=project_key)
     if not inspect:
@@ -421,7 +421,7 @@ def down(services):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
-    api = MladAPI(config.mlad.token.user, url)
+    api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block not running.
     try:
         project = api.project.inspect(project_key)
@@ -441,7 +441,7 @@ def logs(tail, follow, timestamps, names_or_ids):
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
     config = utils.read_config()
-    api = MladAPI(config.mlad.token.user, url)
+    api = API(utils.to_url(config.mlad), config.mlad.token.user)
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = api.project.inspect(project_key)

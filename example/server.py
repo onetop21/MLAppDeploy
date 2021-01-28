@@ -15,4 +15,3 @@ while True:
    print(f'[{current_time}] Received Data : {data} / From : {client}')
    sock.send(client.encode(), zmq.SNDMORE)
    sock.send_string(f'Message Received. [{socket.gethostname()} - {current_time}]')
-    

@@ -14,5 +14,5 @@ while True:
    sock.send_string(f'Index: {index}')
    index += 1
    print(sock.recv_string())
-   time.sleep(1)
+   time.sleep(3)
     

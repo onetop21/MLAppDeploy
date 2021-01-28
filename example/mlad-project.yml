@@ -13,8 +13,10 @@ workspace:
     #env:  
     #    PYTHONUNBUFFERED: 1    
     ## Describe exclude files from project.
-    #ignore:
-    #   - "**/.*"
+    ignore:
+       - "**/.*"
+       - "test"
+       - "*.tar"
     ## Describe Pre/Post scripts for preparing.
     #prescripts: []
     #postscripts: []
@@ -25,10 +27,12 @@ workspace:
 services:
     server:
         command: python server.py
-    client:
+    client-endpoint:
         command: python client.py
         deploy:
-            replicas: 1
+            replicas: 2
+            constraints:
+                labels.type: master
     #[SERVICENAME]:
     ## Describe image to run docker service for run not built image from workspace.
     #    image: 

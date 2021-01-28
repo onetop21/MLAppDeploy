@@ -2,9 +2,9 @@ import json
 import requests
 
 class Project():
-    def __init__(self, token, url):
-        self.token = token
+    def __init__(self, url, token):
         self.url = f'{url}/project'
+        self.token = token
 
     def get(self):
         url = self.url

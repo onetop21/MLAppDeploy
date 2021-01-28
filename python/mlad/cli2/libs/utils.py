@@ -194,3 +194,9 @@ def arcfiles(workspace='.', ignores=[]):
                 prune_dirs.append(name)
         for _ in prune_dirs: dirs.remove(_)
 
+def to_url(dic):
+    scheme = 'http://'
+    if dic['port']:
+        return f"{scheme}{dic['host']}:{dic['port']}"
+    else:
+        return f"{scheme}{dic['host']}"

@@ -2,8 +2,8 @@ import requests
 
 class Service():
     def __init__(self, url):
-        #self.token = token
         self.url = f'{url}/project'
+        #self.token = token
 
     def get(self, project_key=None, labels=None):
         if project_key:

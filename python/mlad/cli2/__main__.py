@@ -9,6 +9,17 @@ from mlad.cli2 import image_cli as image
 from mlad.cli2 import project_cli as project
 from mlad.cli2 import node_cli as node
 from mlad.cli2.autocompletion import *
+from mlad.cli2.libs import utils
+from mlad.api import API
+def has_role(key):
+    config = utils.read_config()
+    token = config.mlad.token[key]
+    if token:
+        with API(utils.to_url(config.mlad)) as api:
+            res = api.auth.token_verify(token)
+            if res['result']:
+                return res['data']['role'] == key
+    return False
 
 class EntryGroup(click.Group):
     def __init__(self, name=None, commands=None, **attrs):
@@ -45,23 +56,26 @@ def main(file, workdir):
     project.cli_args(file, workdir)
 
 main.add_command(config.cli, 'config')
-main.add_command(auth.cli, 'auth')
-main.add_command(node.cli, 'node')
+if has_role('admin'):
+    main.add_command(auth.cli, 'auth')
+    main.add_command(node.cli, 'node')
 main.add_command(image.cli, 'image')
-main.add_command(project.cli, 'project')
+if has_role('user'):
+    main.add_command(project.cli, 'project')
 
-main.add_dummy_command()
-main.add_dummy_command('\b\bPrefer:')
+if has_role('user'):
+    main.add_dummy_command()
+    main.add_dummy_command('\b\bPrefer:')
 
-main.add_command(image.ls, 'images')
-main.add_command(project.build, 'build')
-main.add_command(project.test, 'test')
-main.add_command(project.up, 'up')
-main.add_command(project.down, 'down')
-main.add_command(project.logs, 'logs')
-main.add_command(project.ls, 'ls')
-main.add_command(project.ps, 'ps')
-main.add_command(project.scale, 'scale')
+    main.add_command(image.ls, 'images')
+    main.add_command(project.build, 'build')
+    main.add_command(project.test, 'test')
+    main.add_command(project.up, 'up')
+    main.add_command(project.down, 'down')
+    main.add_command(project.logs, 'logs')
+    main.add_command(project.ls, 'ls')
+    main.add_command(project.ps, 'ps')
+    main.add_command(project.scale, 'scale')
 
 if __name__ == '__main__':
     main()

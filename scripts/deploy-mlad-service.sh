@@ -46,6 +46,21 @@ while true; do
     shift
 done
 
+function IsInstalled {
+    echo $(which $1 | wc -l)
+}
+
+function RequiresFromApt {
+    printf "Check requires [$1]... "
+    if [[ `IsInstalled $1` == '0' ]]; then
+        ColorEcho WARN Need to install $1.
+        sudo apt install -y $1
+    else
+        ColorEcho DEBUG Okay
+    fi
+}
+
+
 if [[ "$HOST" != *":"* ]]; then
     if [[ -z "$HOST" ]]; then
         export DOCKER_HOST=
