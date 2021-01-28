@@ -23,13 +23,13 @@ def create(username, expired):
 
 @click.command()
 @click.argument('TOKEN', required=True, nargs=1)
-def verify(var):
+def verify(token):
     '''Verify User Token.'''
-    auth.verify(var) 
+    auth.verify(token) 
 
 @click.group('auth')
 def cli():
-    '''Manage Configuration.'''
+    '''Manage Authentication.'''
 
 cli.add_command(create)
 cli.add_command(verify)
