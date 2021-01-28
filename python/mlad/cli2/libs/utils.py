@@ -55,6 +55,9 @@ def get_workspace():
 def project_key(workspace):
     return hash(workspace).hex
 
+def has_config():
+    return os.path.exists(CONFIG_FILE)
+
 def read_config():
     try:
         return OmegaConf.load(CONFIG_FILE)

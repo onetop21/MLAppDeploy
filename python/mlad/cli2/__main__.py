@@ -12,13 +12,14 @@ from mlad.cli2.autocompletion import *
 from mlad.cli2.libs import utils
 from mlad.api import API
 def has_role(key):
-    config = utils.read_config()
-    token = config.mlad.token[key]
-    if token:
-        with API(utils.to_url(config.mlad)) as api:
-            res = api.auth.token_verify(token)
-            if res['result']:
-                return res['data']['role'] == key
+    if utils.has_config():
+        config = utils.read_config()
+        token = config.mlad.token[key]
+        if token:
+            with API(utils.to_url(config.mlad)) as api:
+                res = api.auth.token_verify(token)
+                if res['result']:
+                    return res['data']['role'] == key
     return False
 
 class EntryGroup(click.Group):
