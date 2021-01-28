@@ -105,7 +105,8 @@ def status(all, no_trunc):
                 else:
                     uptime = f"{uptime:.0f} seconds"
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    node_inspect = api.node.inspect(task['NodeID'])
+                    if 'NodeID' in task:
+                        node_inspect = api.node.inspect(task['NodeID'])
                     task_info.append((
                         task_id,
                         inspect['name'],

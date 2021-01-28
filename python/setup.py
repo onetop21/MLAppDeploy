@@ -33,6 +33,7 @@ def main():
         'uvicorn>=0.13.3,<1.0.0',
         'fastapi>=0.63.0,<1.0.0',
         'psutil>=5.8.0,<5.9.0',
+        'omegaconf>=2.0.6,<3.0.0',
       ],
       entry_points='''
         [console_scripts]

@@ -12,3 +12,10 @@ class Auth():
             json={'username':username})
         res.raise_for_status()
         return res.json()['token']
+
+    def token_verify(self):
+        url = f'{self.url}/user/auth'
+        header = {'user-token': self.token}
+        res = requests.get(url=url, headers=header)
+        res.raise_for_status()
+        return res.json()

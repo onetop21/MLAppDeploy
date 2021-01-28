@@ -18,6 +18,7 @@ def verify_user(user_token: str = Header(...)):
     decoded = decode_token(user_token)
     res = verify_token(decoded)
     if res:
+        del decoded['hash_key']
         return {'result': res, 'data': decoded}
     else:
         return {'result': res}
