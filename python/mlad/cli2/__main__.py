@@ -4,10 +4,10 @@ import click
 import copy
 from mlad.cli2 import __version__
 from mlad.cli2 import config_cli as config
+from mlad.cli2 import auth_cli as auth
 from mlad.cli2 import image_cli as image
 from mlad.cli2 import project_cli as project
 from mlad.cli2 import node_cli as node
-
 from mlad.cli2.autocompletion import *
 
 class EntryGroup(click.Group):
@@ -44,8 +44,9 @@ def main(file, workdir):
     '''Machine Learning Application Deployment Tool. (https://github.com/onetop21/MLAppDeploy.git)'''
     project.cli_args(file, workdir)
 
-main.add_command(node.cli, 'node')
 main.add_command(config.cli, 'config')
+main.add_command(auth.cli, 'auth')
+main.add_command(node.cli, 'node')
 main.add_command(image.cli, 'image')
 main.add_command(project.cli, 'project')
 

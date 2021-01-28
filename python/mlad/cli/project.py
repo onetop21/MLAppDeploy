@@ -101,8 +101,9 @@ def status(all, no_trunc):
                 else:
                     uptime = f"{uptime:.0f} seconds"
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    node = ctlr.get_node(cli, task['NodeID'])
-                    node_inspect = ctlr.inspect_node(node)
+                    if 'NodeID' in task:
+                        node = ctlr.get_node(cli, task['NodeID'])
+                        node_inspect = ctlr.inspect_node(node)
                     task_info.append((
                         task_id,
                         service_name,

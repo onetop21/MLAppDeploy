@@ -4,9 +4,9 @@ from mlad.core.libs import utils
 obj = {
     'image': '',
     'env': {},
-    'depends': [],
     'command': '',
     'arguments': '',
+    'publish': [],
     'deploy': {
         'quotes': {},
         'constraints': {},
