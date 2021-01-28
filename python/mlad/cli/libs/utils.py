@@ -5,11 +5,7 @@ import fnmatch
 import uuid
 import socket
 from pathlib import Path
-from yaml import load, dump
-try:
-    from yaml import CLoader as Loader, CDumper as Dumper
-except ImportError as e:
-    from yaml import Loader, Dumper
+from omegaconf import OmegaConf
 
 HOME = str(Path.home())
 
@@ -61,16 +57,13 @@ def project_key(workspace):
 
 def read_config():
     try:
-        with open(CONFIG_FILE) as f:
-            config = load(f.read(), Loader=Loader)
-        return config or {}
+        return OmegaConf.load(CONFIG_FILE)
     except FileNotFoundError as e:
         print('Need to initialize configuration before.\nTry to run "mlad config init"', file=sys.stderr)
         sys.exit(1)
 
 def write_config(config):
-    with open(CONFIG_FILE, 'w') as f:
-        f.write(dump(config, default_flow_style=False, Dumper=Dumper))
+    OmegaConf.save(config=config, f=CONFIG_FILE)
 
 def get_completion(shell='bash'):
     return os.popen(f"_MLAD_COMPLETE=source_{shell} mlad").read()
@@ -84,9 +77,11 @@ def write_completion(shell='bash'):
 
 def read_project():
     if os.path.exists(get_project_file()):
-        with open(get_project_file()) as f:
-            project = load(f.read(), Loader=Loader)
-        return project or {}
+        try:
+            project = OmegaConf.to_container(OmegaConf.load(get_project_file()), resolve=True)
+        except FileNotFoundError:
+            project = {}
+        return project
     else:
         return None
 
@@ -115,35 +110,6 @@ def print_table(data, no_data_msg=None, max_width=32):
             print(format.format(*datum))
     if len(data) < 2:
         print(no_data_msg, file=sys.stderr)
-
-# CLI
-def merge(source, destination):
-    if source:
-        for key, value in source.items():
-            if isinstance(value, dict):
-                # get node or create one
-                node = destination.setdefault(key, {})
-                merge(value, node)
-            else:
-                destination[key] = value
-    return destination 
-
-def update_obj(base, obj):
-    # Remove no child branch
-    que=[obj]
-    while len(que):
-        item = que.pop(0)
-        if isinstance(item, dict):
-            removal_keys = []
-            for key in item.keys():
-                if key != 'services':
-                    if not item[key] is None:
-                        que.append(item[key])
-                    else:
-                        removal_keys.append(key)
-            for key in removal_keys:
-                del item[key]
-    return merge(obj, copy.deepcopy(base))
 
 def get_advertise_addr():
     # If this local machine is WSL2
