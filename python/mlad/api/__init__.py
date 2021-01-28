@@ -1,1 +1,0 @@
-URL_PREFIX = 'http://localhost:8440/api/v1'

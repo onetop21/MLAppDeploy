@@ -1,40 +1,44 @@
 import requests
-from . import URL_PREFIX
 
-def get(token):
-    url = f'{URL_PREFIX}/node'
-    header = {'token':token}
-    res = requests.get(url=url, headers=header)
-    res.raise_for_status()
-    return res.json()
+class Node():
+    def __init__(self, token, url):
+        self.token = token
+        self.url = url   
 
-def inspect(token, node_id):
-    url = f'{URL_PREFIX}/node/{node_id}'
-    header = {'token':token}
-    res = requests.get(url=url, headers=header)
-    res.raise_for_status()
-    return res.json()
+    def get(self):
+        url = f'{self.url}/node'
+        header = {'token':self.token}
+        res = requests.get(url=url, headers=header)
+        res.raise_for_status()
+        return res.json()
 
-def enable(token, node_id):
-    url = f'{URL_PREFIX}/node/{node_id}/enable'
-    header = {'token':token}
-    res = requests.post(url=url, headers=header)
-    res.raise_for_status()
+    def inspect(self, node_id):
+        url = f'{self.url}/node/{node_id}'
+        header = {'token':self.token}
+        res = requests.get(url=url, headers=header)
+        res.raise_for_status()
+        return res.json()
 
-def disable(token, node_id):
-    url = f'{URL_PREFIX}/node/{node_id}/disable'
-    header = {'token':token}
-    res = requests.post(url=url, headers=header)
-    res.raise_for_status()
+    def enable(self, node_id):
+        url = f'{self.url}/node/{node_id}/enable'
+        header = {'token': self.token}
+        res = requests.post(url=url, headers=header)
+        res.raise_for_status()
 
-def add_label(token, node_id, **labels):
-    url = f'{URL_PREFIX}/node/{node_id}/labels'
-    header = {'token':token}
-    res = requests.post(url=url, headers=header, json={'labels':labels})
-    res.raise_for_status()
+    def disable(self, node_id):
+        url = f'{self.url}/node/{node_id}/disable'
+        header = {'token': self.token}
+        res = requests.post(url=url, headers=header)
+        res.raise_for_status()
 
-def delete_label(token, node_id, *keys):
-    url = f'{URL_PREFIX}/node/{node_id}/labels'
-    header = {'token':token}
-    res = requests.delete(url=url, headers=header, json={'keys':keys})
-    res.raise_for_status()
+    def add_label(self, node_id, **labels):
+        url = f'{self.url}/node/{node_id}/labels'
+        header = {'token': self.token}
+        res = requests.post(url=url, headers=header, json={'labels':labels})
+        res.raise_for_status()
+
+    def delete_label(self, node_id, *keys):
+        url = f'{self.url}/node/{node_id}/labels'
+        header = {'token': self.token}
+        res = requests.delete(url=url, headers=header, json={'keys':keys})
+        res.raise_for_status()

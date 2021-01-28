@@ -15,10 +15,9 @@ from mlad.cli2.libs import utils
 from mlad.cli2.libs import interrupt_handler
 from mlad.cli2.Format import PROJECT
 from mlad.cli2.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
-from mlad.api import service as service_api
-from mlad.api import project as project_api
-from mlad.api import node as node_api
+from mlad.api.mlad_api import MladAPI
 
+url = 'http://localhost:8440/api/v1'
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
@@ -57,8 +56,9 @@ def init(name, version, author):
 
 def list():
     config = utils.read_config()
+    api = MladAPI(config.mlad.token.user, url)
     projects = {}
-    for inspect in service_api.get():
+    for inspect in api.service.get():
         default = { 
         'username': inspect['username'], 
         'project': inspect['name'], 
@@ -81,19 +81,20 @@ def list():
 
 def status(all, no_trunc):
     config = utils.read_config()
+    api = MladAPI(config.mlad.token.admin, url)
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
-        inspect = project_api.inspect(config.mlad.token.user, project_key=project_key)
+        inspect = api.project.inspect(project_key=project_key)
     except HTTPError as e:
         if e.response.status_code == 404:
             print('Cannot find running service.', file=sys.stderr)
             sys.exit(1)
 
     task_info = []
-    for inspect in service_api.get(project_key):
+    for inspect in api.service.get(project_key):
         try:
-            for task_id, task in service_api.get_tasks(project_key, inspect['id']).items():
+            for task_id, task in api.service.get_tasks(project_key, inspect['id']).items():
                 uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
                 if uptime > 24 * 60 * 60:
                     uptime = f"{uptime // (24 * 60 * 60):.0f} days"
@@ -104,7 +105,7 @@ def status(all, no_trunc):
                 else:
                     uptime = f"{uptime:.0f} seconds"
                 if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    node_inspect = node_api.inspect(config.mlad.token.user, task['NodeID'])
+                    node_inspect = api.node.inspect(task['NodeID'])
                     task_info.append((
                         task_id,
                         inspect['name'],
@@ -326,17 +327,18 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
+    api = MladAPI(config.mlad.token.user, url)
     # config['account']['username'] => auth_api.verify_user(token.user)['username']
-    username = 'onetop21'
+    username = 'kkkdeon41'
     base_labels = ctlr.make_base_labels(utils.get_workspace(), username, project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
 
     extra_envs = utils.get_service_env(config)
     if not services:
-        res = project_api.create(token, project['project'], base_labels,
+        res = api.project.create(project['project'], base_labels,
             extra_envs, swarm=True, allow_reuse=False)
     else:
-        res = project_api.create(token, project['project'], base_labels,
+        res = api.project.create(project['project'], base_labels,
             extra_envs, swarm=True, allow_reuse=True)
     
     for _ in res:
@@ -348,7 +350,7 @@ def up(services):
                 break 
 
     # Check service status
-    running_services = service_api.get(project_key)
+    running_services = api.service.get(project_key)
     for service_name in targets:
         running_svc_names = [_['name'] for _ in running_services]
         if service_name in running_svc_names:
@@ -364,9 +366,9 @@ def up(services):
 
     with interrupt_handler(message='Wait.', blocked=True) as h:
         target_model = _target_model(targets)
-        instances = service_api.create(project_key, target_model)  
+        instances = api.service.create(project_key, target_model)  
         for instance in instances:
-            inspect = service_api.inspect(project_key, instance)
+            inspect = api.service.inspect(project_key, instance)
             print(f"Starting {inspect['name']}...")
             time.sleep(1)
         if h.interrupted:
@@ -376,17 +378,17 @@ def up(services):
 
 def down(services):
     config = utils.read_config()
-    #cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
+    api = MladAPI(config.mlad.token.user, url)
     # Block duplicated running.
-    inspect = project_api.inspect(config.mlad.token.user, project_key=project_key)
+    inspect = api.project.inspect(project_key=project_key)
     if not inspect:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
 
     if services:
-        running_services = service_api.get(project_key)
+        running_services = api.service.get(project_key)
         running_svc_names = [ _['name'] for _ in running_services ]
         for service_name in services:
             if not service_name in running_svc_names:
@@ -394,18 +396,18 @@ def down(services):
                 sys.exit(1)
 
     with interrupt_handler(message='Wait.', blocked=True):
-        running_services = service_api.get(project_key)
+        running_services = api.service.get(project_key)
 
         def filtering(inspect):
             return not services or inspect['name'] in services
         targets = [ _['id'] for _ in running_services if filtering(_) ]
         for target in targets:
-            res = service_api.remove(project_key, target)
+            res = api.service.remove(project_key, target)
             print(res['message'])
 
         #Remove Network
         if not services:
-            res = project_api.delete(config.mlad.token.user, project_key)
+            res = api.project.delete(project_key)
             for _ in res:
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
@@ -418,17 +420,17 @@ def down(services):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
-
+    api = MladAPI(config.mlad.token.user, url)
     # Block not running.
     try:
-        project = project_api.inspect(config.mlad.token.user, project_key)
+        project = api.project.inspect(project_key)
+        logs = api.project.log(project_key, tail, follow,
+            timestamps, names_or_ids)
     except HTTPError as e:
         if e.response.status_code == 404:
             print('Cannot find running service.', file=sys.stderr)
             sys.exit(1)
-
-    logs = project_api.log(config.mlad.token.user, project_key, tail, follow,
-        timestamps, names_or_ids)
+        raise(e)
 
     colorkey = {}   
     for _ in logs:
@@ -438,18 +440,18 @@ def logs(tail, follow, timestamps, names_or_ids):
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
     config = utils.read_config()
-
+    api = MladAPI(config.mlad.token.user, url)
     project_key = utils.project_key(utils.get_workspace())
     try:    
-        project = project_api.inspect(config.mlad.token.user, project_key)
+        project = api.project.inspect(project_key)
     except HTTPError as e:
         if e.response.status_code == 404:
             print('Cannot find running service.', file=sys.stderr)
             sys.exit(1)
 
-    inspects = service_api.get(project_key)
+    inspects = api.service.get(project_key)
     for inspect in inspects:
         if inspect['name'] in scale_spec:
-            res = service_api.scale(project_key, inspect['id'], 
+            res = api.service.scale(project_key, inspect['id'], 
                 scale_spec[inspect['name']])
             print(res['message'])

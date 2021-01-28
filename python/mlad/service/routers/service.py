@@ -14,7 +14,7 @@ def _check_project_key(project_key, service):
     else:
         raise InvalidServiceError(project_key, service.short_id)
 
-@router.get("/service")
+@router.get("/project/service")
 def services_list(labels: List[str] = Query(None)):
     cli = ctlr.get_docker_client()
     labels_dict=dict()
@@ -137,5 +137,3 @@ def service_remove(project_key:str, service_id:str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {'message':f'service {service_id} removed'}
-
-
