@@ -315,9 +315,9 @@ else
 
         InstallNVIDIAContainerRuntime
         NVIDIAContainerRuntimeConfiguration
-        UpdateGPUResources
-        AdvertiseGPUonSwarm
     fi
+    UpdateGPUResources
+    AdvertiseGPUonSwarm
 fi
 
 if [[ -z $BIND ]]; then
