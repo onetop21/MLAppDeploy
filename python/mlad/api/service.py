@@ -3,10 +3,15 @@ from . import URL_PREFIX
 
 PROJECT_URL = f'{URL_PREFIX}/project'
 
-def get(project_key, labels=None):
-    url = f'{PROJECT_URL}/{project_key}/service'
-    res = requests.get(url=url, params={'labels':labels})
-    res.raise_for_status()
+def get(project_key=None, labels=None):
+    if project_key:
+        url = f'{PROJECT_URL}/{project_key}/service'
+        res = requests.get(url=url, params={'labels':labels})
+        res.raise_for_status()
+    else:
+        url = f'{URL_PREFIX}/service'
+        res = requests.get(url=url, params={'labels':labels})
+        res.raise_for_status()
     return res.json()
 
 def create(project_key, services):

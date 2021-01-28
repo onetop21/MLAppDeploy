@@ -11,13 +11,13 @@ def get(token):
     res.raise_for_status()
     return res.json()    
 
-def create(token, project,workspace, username,
-           registry, extra_envs=[], swarm=True, allow_reuse=False):
+def create(token, project, base_labels, extra_envs=[], 
+           swarm=True, allow_reuse=False):
     url = f'{PROJECT_URL}'
     header = {'token':token}
     with requests.post(url=url,headers=header,
-        json={'project':project,'workspace':workspace, 
-        'username':username,'registry':registry, 'extra_envs':extra_envs},
+        json={'project':project,'base_labels':base_labels,
+              'extra_envs':extra_envs},
         params={'swarm':swarm, 'allow_reuse': allow_reuse}, stream=True) as res:
         for _ in res.iter_content(1024):
             res = _.decode()

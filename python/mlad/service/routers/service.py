@@ -14,30 +14,53 @@ def _check_project_key(project_key, service):
     else:
         raise InvalidServiceError(project_key, service.short_id)
 
+@router.get("/service")
+def services_list(labels: List[str] = Query(None)):
+    cli = ctlr.get_docker_client()
+    labels_dict=dict()
+   
+    if labels:
+        labels_dict = {label.split("=")[0]:label.split("=")[1] 
+                       for label in labels}
+    inspects=[]
+    try:
+        services = ctlr.get_services(cli, extra_filters=labels_dict)
+        for service in services.values():
+            inspect = ctlr.inspect_service(service)
+            inspects.append(inspect)    
+    except InvalidProjectError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return inspects
+
 @router.get("/project/{project_key}/service")
 def service_list(project_key:str, 
                  labels: List[str] = Query(None)):
     cli = ctlr.get_docker_client()
     #TODO check labels validation
     #labels = ["MLAD.PROJECT", "MLAD.PROJECT.NAME=lmai"]
-    labels_dict=dict()    
+    labels_dict=dict()
     if labels:
         labels_dict = {label.split("=")[0]:label.split("=")[1] 
                        for label in labels}
-
+    inspects=[] 
     try:
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(cli, project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
 
-        services = ctlr.get_services(cli, key, extra_filters=labels_dict)        
+        services = ctlr.get_services(cli, key, extra_filters=labels_dict)   
+        for service in services.values():
+            inspect = ctlr.inspect_service(service)
+            inspects.append(inspect)      
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-    return [_.short_id for _ in services.values()]
+    return inspects
+    #return [_.short_id for _ in services.values()]
 
 @router.post("/project/{project_key}/service")
 def service_create(project_key:str, req:service.CreateRequest):

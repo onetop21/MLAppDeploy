@@ -20,7 +20,7 @@ from mlad.api import project as project_api
 from mlad.api import node as node_api
 
 #To be removed
-token = 'YWRtaW47MjAyMS0wMS0yNlQxNzo1Mjo0Ni45NjAwMDArMDk6MDA7YWZlZDg3OTQyMDYwM2IzYWMyZDA3NmE4ODMwYjVlYzk2MjgyZjY2Zg=='
+token = 'YWRtaW47MjAyMS0wMS0yOFQxMTo0MTowNy4xNjAwMDArMDk6MDA7MzNjMWIwNGJmZDgwODc3NmMwOWM5YzkzZDE2MWEzMDVkODVjOWY4Zg=='
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']
@@ -59,24 +59,21 @@ def init(name, version, author):
 
 def list():
     config = utils.read_config()
-    #cli = ctlr.get_docker_client(config['docker']['host'])
     projects = {}
-    for project in project_api.get(token):
-        for service in service_api.get(project['key']):
-            inspect = service_api.inspect(project['key'], service)
-            default = { 
-            'username': inspect['username'], 
-            'project': inspect['name'], 
-            'image': inspect['image'],
-            'services': 0, 'replicas': 0, 'tasks': 0 
-            }
-            project_key = inspect['key']
-            tasks = inspect['tasks'].values()
-            tasks_state = [_['Status']['State'] for _ in tasks]
-            projects[project_key] = projects[project_key] if project_key in projects else default
-            projects[project_key]['services'] += 1
-            projects[project_key]['replicas'] += inspect['replicas']
-            projects[project_key]['tasks'] += tasks_state.count('running')
+    for inspect in service_api.get():
+        default = { 
+        'username': inspect['username'], 
+        'project': inspect['name'], 
+        'image': inspect['image'],
+        'services': 0, 'replicas': 0, 'tasks': 0 
+        }
+        project_key = inspect['key']
+        tasks = inspect['tasks'].values()
+        tasks_state = [_['Status']['State'] for _ in tasks]
+        projects[project_key] = projects[project_key] if project_key in projects else default
+        projects[project_key]['services'] += 1
+        projects[project_key]['replicas'] += inspect['replicas']
+        projects[project_key]['tasks'] += tasks_state.count('running')
     columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
 
     for project in projects:
@@ -86,8 +83,6 @@ def list():
 
 def status(all, no_trunc):
     config = utils.read_config()
-    cli = ctlr.get_docker_client(config['docker']['host'])
-
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
@@ -98,10 +93,9 @@ def status(all, no_trunc):
             sys.exit(1)
 
     task_info = []
-    for service in service_api.get(project_key):
-        service_inspect = service_api.inspect(project_key,service)
+    for inspect in service_api.get(project_key):
         try:
-            for task_id, task in service_api.get_tasks(project_key, service).items():
+            for task_id, task in service_api.get_tasks(project_key, inspect['id']).items():
                 uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
                 if uptime > 24 * 60 * 60:
                     uptime = f"{uptime // (24 * 60 * 60):.0f} days"
@@ -115,13 +109,13 @@ def status(all, no_trunc):
                     node_inspect = node_api.inspect(token, task['NodeID'])
                     task_info.append((
                         task_id,
-                        service_inspect['name'],
+                        inspect['name'],
                         task['Slot'],
                         node_inspect['hostname'] if 'NodeID' in task else '-',
                         task['DesiredState'].title(), 
                         f"{task['Status']['State'].title()}", 
                         uptime,
-                        ', '.join([_ for _ in service_inspect['ports']]),
+                        ', '.join([_ for _ in inspect['ports']]),
                         task['Status']['Err'] if 'Err' in task['Status'] else '-'
                     ))
         except docker.errors.NotFound as e:
@@ -328,19 +322,18 @@ def up(services):
         targets = project['services'] or {}
             
     config = utils.read_config()
-    # base labels -> cli or routers 위치 정해야함
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
+
+    base_labels = ctlr.make_base_labels(utils.get_workspace(), 
+        config['account']['username'], project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
 
     extra_envs = utils.get_service_env(config)
 
     if not services:
-        res = project_api.create(token, project['project'], utils.get_workspace(), 
-            config['account']['username'], config['docker']['registry'],
+        res = project_api.create(token, project['project'], base_labels,
             extra_envs, swarm=True, allow_reuse=False)
     else:
-        res = project_api.create(token, project['project'], utils.get_workspace(), 
-            config['account']['username'], config['docker']['registry'],
+        res = project_api.create(token, project['project'], base_labels,
             extra_envs, swarm=True, allow_reuse=True)
     
     for _ in res:
@@ -350,15 +343,11 @@ def up(services):
             if _['result'] == 'succeed':
                 network_id = _['id']
                 break 
- 
-    #cli = ctlr.get_docker_client(config['docker']['host'])
-    #base_labels = ctlr.make_base_labels(utils.get_workspace(), config['account']['username'], project['project'], config['docker']['registry'])
 
     # Check service status
     running_services = service_api.get(project_key)
     for service_name in targets:
-        running_svc_names = [service_api.inspect(project_key, _)['name'] 
-            for _ in running_services]
+        running_svc_names = [_['name'] for _ in running_services]
         if service_name in running_svc_names:
             print(f'Already running service[{service_name}] in project.', file=sys.stderr)
             del targets[service_name]
@@ -395,8 +384,7 @@ def down(services):
 
     if services:
         running_services = service_api.get(project_key)
-        running_svc_names = [service_api.inspect(project_key,_)['name'] 
-            for _ in running_services]
+        running_svc_names = [ _['name'] for _ in running_services ]
         for service_name in services:
             if not service_name in running_svc_names:
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
@@ -404,10 +392,10 @@ def down(services):
 
     with interrupt_handler(message='Wait.', blocked=True):
         running_services = service_api.get(project_key)
-        def filtering(_):
-            inspect = service_api.inspect(project_key, _)
+
+        def filtering(inspect):
             return not services or inspect['name'] in services
-        targets = [_ for _ in running_services if filtering(_)]
+        targets = [ _['id'] for _ in running_services if filtering(_) ]
         for target in targets:
             res = service_api.remove(project_key, target)
             print(res['message'])
@@ -425,8 +413,6 @@ def down(services):
     print('Done.')
 
 def logs(tail, follow, timestamps, names_or_ids):
-    # config = utils.read_config()
-    # cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
 
     # Block not running.
@@ -447,8 +433,6 @@ def logs(tail, follow, timestamps, names_or_ids):
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
-    #config = utils.read_config()
-    #cli = ctlr.get_docker_client(config['docker']['host'])
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = project_api.inspect(token, project_key)
@@ -457,11 +441,9 @@ def scale(scales):
             print('Cannot find running service.', file=sys.stderr)
             sys.exit(1)
 
-    services = service_api.get(project_key)
-    for service in services:
-        inspect = service_api.inspect(project_key, service)
+    inspects = service_api.get(project_key)
+    for inspect in inspects:
         if inspect['name'] in scale_spec:
-            res = service_api.scale(project_key, service, 
+            res = service_api.scale(project_key, inspect['id'], 
                 scale_spec[inspect['name']])
             print(res['message'])
-

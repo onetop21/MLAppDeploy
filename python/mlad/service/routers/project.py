@@ -13,14 +13,9 @@ def project_create(req: project.CreateRequest,
                    allow_reuse: bool = Query(False), 
                    swarm: bool = Query(True)):
     cli = ctlr.get_docker_client()
-    #workspace = 
-    # f"{socket.gethostname()}:{os.getcwd()}/mlad-project.yml"
-    workspace = req.workspace
-    username = req.username
-    registry = req.registry
+
+    base_labels = req.base_labels
     extra_envs = req.extra_envs
-    base_labels = ctlr.make_base_labels(
-        workspace, username, dict(req.project), registry)
     try:
         res = ctlr.create_project_network(
             cli, base_labels, extra_envs, swarm=swarm, 

@@ -8,7 +8,8 @@ class Project(BaseModel):
 
 class CreateRequest(BaseModel):
     project: Project
-    workspace: str
-    username: str
-    registry: str
+    # workspace: str
+    # username: str
+    # registry: str
+    base_labels: dict
     extra_envs: list
