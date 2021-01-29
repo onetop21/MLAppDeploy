@@ -4,11 +4,23 @@ import click
 import copy
 from mlad.cli import __version__
 from mlad.cli import config_cli as config
+from mlad.cli import auth_cli as auth
 from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
 from mlad.cli import node_cli as node
-
 from mlad.cli.autocompletion import *
+from mlad.cli.libs import utils
+from mlad.api import API
+def has_role(key):
+    if utils.has_config():
+        config = utils.read_config()
+        token = config.mlad.token[key]
+        if token:
+            with API(utils.to_url(config.mlad)) as api:
+                res = api.auth.token_verify(token)
+                if res['result']:
+                    return res['data']['role'] == key
+    return False
 
 class EntryGroup(click.Group):
     def __init__(self, name=None, commands=None, **attrs):
@@ -44,23 +56,27 @@ def main(file, workdir):
     '''Machine Learning Application Deployment Tool. (https://github.com/onetop21/MLAppDeploy.git)'''
     project.cli_args(file, workdir)
 
-main.add_command(node.cli, 'node')
 main.add_command(config.cli, 'config')
+if has_role('admin'):
+    main.add_command(auth.cli, 'auth')
+    main.add_command(node.cli, 'node')
 main.add_command(image.cli, 'image')
-main.add_command(project.cli, 'project')
+if has_role('user'):
+    main.add_command(project.cli, 'project')
 
-main.add_dummy_command()
-main.add_dummy_command('\b\bPrefer:')
+if has_role('user'):
+    main.add_dummy_command()
+    main.add_dummy_command('\b\bPrefer:')
 
-main.add_command(image.ls, 'images')
-main.add_command(project.build, 'build')
-main.add_command(project.test, 'test')
-main.add_command(project.up, 'up')
-main.add_command(project.down, 'down')
-main.add_command(project.logs, 'logs')
-main.add_command(project.ls, 'ls')
-main.add_command(project.ps, 'ps')
-main.add_command(project.scale, 'scale')
+    main.add_command(image.ls, 'images')
+    main.add_command(project.build, 'build')
+    main.add_command(project.test, 'test')
+    main.add_command(project.up, 'up')
+    main.add_command(project.down, 'down')
+    main.add_command(project.logs, 'logs')
+    main.add_command(project.ls, 'ls')
+    main.add_command(project.ps, 'ps')
+    main.add_command(project.scale, 'scale')
 
 if __name__ == '__main__':
     main()

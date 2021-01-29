@@ -10,14 +10,12 @@ from mlad.cli.autocompletion import *
 # mlad config set [key=value]
 # mlad config get [key]
 
-ADDRESS = os.environ.get('DOCKER_HOST', None) or 'unix:///var/run/docker.sock'
-
 @click.command()
-@click.option('--username', '-u', default=getpass.getuser(), prompt='Username', help='Set Username.')
-@click.option('--address', '-a', default=ADDRESS, prompt='Master IP Address', help='Set Master IP Address.')
-def init(username, address):
+@click.option('--address', '-a', default='http://localhost:8440', prompt='MLAppDeploy Service Address', help='Set Service Address.')
+@click.option('--token', '-t', help='Set Administrator Token.')
+def init(address, token):
     '''Initialize Configurations.'''
-    config.init(username, address)
+    config.init(address, token)
 
 @click.command()
 @click.argument('VAR', required=True, nargs=-1, autocompletion=get_config_key_completion)

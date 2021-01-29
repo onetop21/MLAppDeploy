@@ -55,6 +55,9 @@ def get_workspace():
 def project_key(workspace):
     return hash(workspace).hex
 
+def has_config():
+    return os.path.exists(CONFIG_FILE)
+
 def read_config():
     try:
         return OmegaConf.load(CONFIG_FILE)
@@ -126,32 +129,12 @@ def get_advertise_addr():
         s.close()
     return addr
 
-def is_host_wsl2(docker_host=None):
-    # Check WSL2 in Docker Host, Not Local Machine!
-    import docker
-    if not docker_host:
-        config = read_config()
-        docker_host = config['docker']['host']
-    cli = docker.from_env(environment={ 'DOCKER_HOST': docker_host })
-    return 'microsoft' in cli.info()['KernelVersion']
-
-def get_default_service_port(container_name, internal_port, docker_host=None):
-    import docker
-    if not docker_host:
-        config = read_config()
-        docker_host = config['docker']['host']
-    cli = docker.from_env(environment={ 'DOCKER_HOST': docker_host })
-    external_port = None
-    for _ in [_.ports[f'{internal_port}/tcp'] for _ in cli.containers.list() if _.name in [f'{container_name}']]: 
-        external_port = _[0]['HostPort']
-    return external_port
-
 def get_service_env(config):
     env = [
-        f'S3_ENDPOINT={config["s3"]["endpoint"]}',
-        f'S3_USE_HTTPS={1 if config["s3"]["verify"] else 0}',
-        f'AWS_ACCESS_KEY_ID={config["s3"]["accesskey"]}',
-        f'AWS_SECRET_ACCESS_KEY={config["s3"]["secretkey"]}',
+        f'S3_ENDPOINT={config["environment"]["s3"]["endpoint"]}',
+        f'S3_USE_HTTPS={1 if config["environment"]["s3"]["verify"] else 0}',
+        f'AWS_ACCESS_KEY_ID={config["environment"]["s3"]["accesskey"]}',
+        f'AWS_SECRET_ACCESS_KEY={config["environment"]["s3"]["secretkey"]}',
     ]
     return env
 
@@ -214,3 +197,9 @@ def arcfiles(workspace='.', ignores=[]):
                 prune_dirs.append(name)
         for _ in prune_dirs: dirs.remove(_)
 
+def to_url(dic):
+    scheme = 'http://'
+    if dic['port']:
+        return f"{scheme}{dic['host']}:{dic['port']}"
+    else:
+        return f"{scheme}{dic['host']}"
