@@ -2,7 +2,7 @@ import sys
 import os
 import click
 import copy
-from mlad.cli import __version__
+from mlad import __version__
 from mlad.cli import config_cli as config
 from mlad.cli import auth_cli as auth
 from mlad.cli import image_cli as image
