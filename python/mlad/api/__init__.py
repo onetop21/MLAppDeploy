@@ -5,10 +5,15 @@ from .service import Service
 from .project import Project
 
 API_PREFIX = '/api/v1'
+
 class API:
-    def __init__(self, url, token=None):
-        self.url = f"{url}{API_PREFIX}"
+    def __init__(self, url=None, token=None):
         self.token = token
+
+        if not url :
+            self.url = 'http://localhost:8440'
+        else:
+            self.url = f"{url}{API_PREFIX}"
 
     def __enter__(self):
         return self
