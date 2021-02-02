@@ -66,8 +66,10 @@ def create_app():
     admin = Authorization('admin')
 
     #app.include_router(image.router, prefix=APIV1)
-    app.include_router(node.router,prefix=APIV1,
+    app.include_router(node.admin_router,prefix=APIV1,
                        dependencies=[Depends(admin.verify_auth)])
+    app.include_router(node.user_router,prefix=APIV1,
+                       dependencies=[Depends(user.verify_auth)])
     app.include_router(service.router, prefix=APIV1)
     app.include_router(project.router, prefix=APIV1,
                        dependencies=[Depends(user.verify_auth)])

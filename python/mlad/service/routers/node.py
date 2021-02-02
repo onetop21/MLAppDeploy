@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException
 from mlad.service.models import node
 from mlad.core.docker import controller as ctlr
 
-router = APIRouter()
+admin_router = APIRouter()
+user_router = APIRouter()
 
-@router.get("/node")
+@admin_router.get("/node")
 def node_list():
     cli = ctlr.get_docker_client()
     try:
@@ -13,7 +14,7 @@ def node_list():
         raise HTTPException(status_code=500, detail=str(e))
     return list(nodes.keys())
 
-@router.get("/node/{node_id}")
+@user_router.get("/node/{node_id}")
 def node_inspect(node_id:str):
     cli = ctlr.get_docker_client()
     try:
@@ -23,7 +24,7 @@ def node_inspect(node_id:str):
         raise HTTPException(status_code=500, detail=str(e))
     return inspects
 
-@router.post("/node/{node_id}/enable")
+@admin_router.post("/node/{node_id}/enable")
 def node_enable(node_id:str):
     cli = ctlr.get_docker_client()
     try:
@@ -32,7 +33,7 @@ def node_enable(node_id:str):
         raise HTTPException(status_code=500, detail=str(e))
     return {'message': f'{node_id} enabled'}
 
-@router.post("/node/{node_id}/disable")
+@admin_router.post("/node/{node_id}/disable")
 def node_disable(node_id:str):
     cli = ctlr.get_docker_client()
     try:
@@ -41,7 +42,7 @@ def node_disable(node_id:str):
         raise HTTPException(status_code=500, detail=str(e))    
     return {'message': f'{node_id} disabled'}
 
-@router.post("/node/{node_id}/labels")
+@admin_router.post("/node/{node_id}/labels")
 def node_add_label(node_id:str, req:node.AddLabelRequest):
     cli = ctlr.get_docker_client()
     try:
@@ -50,7 +51,7 @@ def node_add_label(node_id:str, req:node.AddLabelRequest):
         raise HTTPException(status_code=500, detail=str(e))  
     return {'message': 'labels added'}
 
-@router.delete("/node/{node_id}/labels")
+@admin_router.delete("/node/{node_id}/labels")
 def node_delete_label(node_id:str, req:node.DeleteLabelRequest):
     cli = ctlr.get_docker_client()
     try:

@@ -14,7 +14,7 @@ class API:
         return self
 
     def __exit__(self, ety, va, tb):
-        return True
+        return False
 
     @property
     def auth(self):

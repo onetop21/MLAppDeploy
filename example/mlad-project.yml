@@ -30,9 +30,9 @@ services:
     client-endpoint:
         command: python client.py
         deploy:
-            replicas: 2
-            constraints:
-                labels.type: master
+            replicas: 1
+            # constraints:
+            #     labels.type: master
     #[SERVICENAME]:
     ## Describe image to run docker service for run not built image from workspace.
     #    image: 
