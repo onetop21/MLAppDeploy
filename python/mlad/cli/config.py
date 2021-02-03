@@ -40,6 +40,8 @@ def init(address, token):
 
     # Registry
     registry_address = input(f"Docker Registry Host [docker.io]: ")
+    if registry_address.startswith('https://') or registry_address.startswith('http://'):
+        registry_address = registry_address.split('//')[1]
 
     # specific controlling docker
     s3_address = input(f'S3 Compatible Address [https://s3.amazonaws.com]: ') or 'https://s3.amazonaws.com'

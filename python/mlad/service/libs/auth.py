@@ -27,7 +27,7 @@ def process_uptime():
 
 def create_datetime():
     if utils.is_debug_mode(): return fixed_datetime()
-    return datetime.datime.now()
+    return datetime.datetime.now()
 
 def get_admin_key(config):
     if utils.is_debug_mode(): return uuid.UUID('0' * 32)

@@ -11,7 +11,7 @@ class API:
         self.token = token
 
         if not url :
-            self.url = 'http://localhost:8440'
+            self.url = f'http://localhost:8440{API_PREFIX}'
         else:
             self.url = f"{url}{API_PREFIX}"
 
