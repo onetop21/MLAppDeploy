@@ -13,3 +13,8 @@ def read_config():
     except FileNotFoundError as e:
         config = {}
     return default_config['service'](config)
+
+def is_debug_mode():
+    if '-d' in sys.argv or '--debug' in sys.argv or os.environ.get('MLAD_DEBUG'):
+        return True
+    return False

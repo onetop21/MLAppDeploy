@@ -17,10 +17,28 @@ from mlad.service.libs import utils
 def ISOFormat(_):
     return _.astimezone().isoformat()
 
+def fixed_datetime():
+    return datetime.datetime.strptime('2021-01-01 00:00:00', '%Y-%m-%d %H:%M:%S')
+
 def process_uptime():
+    if utils.is_debug_mode(): return fixed_datetime().astimezone()
     return datetime.datetime.fromtimestamp(psutil.Process().create_time()).astimezone()
 
+def create_datetime():
+    if utils.is_debug_mode(): return fixed_datetime()
+    return datetime.datime.now()
+
+def get_admin_key(config):
+    if utils.is_debug_mode(): return uuid.UUID('0' * 32)
+    return config['auth_keys']['admin']
+ 
+def get_user_key(config):
+    if utils.is_debug_mode(): return uuid.UUID('0' * 32)
+    return config['auth_keys']['user']
+    
 def decode_token(token):
+    #print(base64.b64decode(token.encode() if isinstance(token, str) else token))
+    #print(base64.b64decode(token.encode() if isinstance(token, str) else token).decode('ascii'))
     decoded = base64.b64decode(token.encode() if isinstance(token, str) else token).decode()
     role, _ = decoded.split(';', 1)
     if role == 'admin':
@@ -45,8 +63,8 @@ def decode_token(token):
 def verify_token(token):
     if not isinstance(token, dict): raise TypeError('Invalid token(decoded) type.')
     config = utils.read_config()
-    admin_key = config['auth_keys']['admin']
-    user_key = config['auth_keys']['user']
+    admin_key = get_admin_key(config)
+    user_key = get_user_key(config)
     if token['role'] == 'admin':
         if token['created'] != process_uptime(): 
             print('Expired token.', file=sys.stderr)
@@ -65,7 +83,7 @@ def verify_token(token):
 
 def generate_admin_token():
     config = utils.read_config()
-    admin_key = config['auth_keys']['admin']
+    admin_key = get_admin_key(config)
     key = f"admin;{ISOFormat(process_uptime())}"
     postfix_hash = hashlib.sha1(f"{key};{admin_key}".encode())
     token = f"{key};{postfix_hash.hexdigest()}"
@@ -73,10 +91,10 @@ def generate_admin_token():
 
 def generate_user_token(username):
     config = utils.read_config()
-    user_key = config['auth_keys']['user']
+    user_key = get_user_key(config)
     expired = '2099-12-31 23:59:59'
     expired_date = datetime.datetime.strptime(expired, '%Y-%m-%d %H:%M:%S')
-    key = f"user;{username};{ISOFormat(datetime.datetime.now())};{ISOFormat(expired_date)}"
+    key = f"user;{username};{ISOFormat(create_datetime())};{ISOFormat(expired_date)}"
     postfix_hash = hashlib.sha1(f"{key};{user_key}".encode())
     token = f"{key};{postfix_hash.hexdigest()}"
     return base64.b64encode(token.encode())
