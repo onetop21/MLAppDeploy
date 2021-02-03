@@ -6,6 +6,7 @@ import hashlib
 import uuid
 import base64
 import psutil
+from mlad.service import exception
 from mlad.service.libs import utils
 
 # #Token
@@ -37,28 +38,29 @@ def get_user_key(config):
     return config['auth_keys']['user']
     
 def decode_token(token):
-    #print(base64.b64decode(token.encode() if isinstance(token, str) else token))
-    #print(base64.b64decode(token.encode() if isinstance(token, str) else token).decode('ascii'))
-    decoded = base64.b64decode(token.encode() if isinstance(token, str) else token).decode()
-    role, _ = decoded.split(';', 1)
-    if role == 'admin':
-        created, hash_key = _.split(';')
-        return {
-            'role': 'admin',
-            'created': datetime.datetime.fromisoformat(created),
-            'hash_key': hash_key
-        }
-    elif role == 'user':
-        username, created, expired, hash_key = _.split(';')
-        return {
-            'role': 'user',
-            'username': username,
-            'created': datetime.datetime.fromisoformat(created),
-            'expired': datetime.datetime.fromisoformat(expired),
-            'hash_key': hash_key
-        }
-    else:
-        raise exception.TokenError('Invalid Role in Token.')
+    try:
+        decoded = base64.b64decode(token.encode() if isinstance(token, str) else token).decode()
+        role, _ = decoded.split(';', 1)
+        if role == 'admin':
+            created, hash_key = _.split(';')
+            return {
+                'role': 'admin',
+                'created': datetime.datetime.fromisoformat(created),
+                'hash_key': hash_key
+            }
+        elif role == 'user':
+            username, created, expired, hash_key = _.split(';')
+            return {
+                'role': 'user',
+                'username': username,
+                'created': datetime.datetime.fromisoformat(created),
+                'expired': datetime.datetime.fromisoformat(expired),
+                'hash_key': hash_key
+            }
+        else:
+            raise exception.TokenError('Invalid role in token.')
+    except UnicodeDecodeError:
+        raise exception.TokenError('Invalid token.')
     
 def verify_token(token):
     if not isinstance(token, dict): raise TypeError('Invalid token(decoded) type.')

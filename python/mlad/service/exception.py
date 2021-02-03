@@ -13,3 +13,6 @@ class InvalidServiceError(Exception):
     def __str__(self):
         return (f'Cannot find service {self.service_id}'
                f'in project {self.project_id}')
+
+class TokenError(Exception):
+    pass

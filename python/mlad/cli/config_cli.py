@@ -12,7 +12,7 @@ from mlad.cli.autocompletion import *
 
 @click.command()
 @click.option('--address', '-a', default='http://localhost:8440', prompt='MLAppDeploy Service Address', help='Set Service Address.')
-@click.option('--token', '-t', help='Set Administrator Token.')
+@click.option('--token', '-t', default='', help='Set Administrator Token.')
 def init(address, token):
     '''Initialize Configurations.'''
     config.init(address, token)
