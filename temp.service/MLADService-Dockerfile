@@ -1,0 +1,12 @@
+FROM    python:latest
+
+RUN     git clone https://github.com/onetop21/MLAppDeploy.git /workspace
+WORKDIR /workspace
+RUN     git checkout -b refactoring origin/refactoring
+WORKDIR /workspace/python
+RUN     python setup.py install
+
+EXPOSE  8440
+
+CMD     python -m mlad.service
+
