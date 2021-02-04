@@ -1,3 +1,4 @@
+import os
 import sys
 from .auth import Auth
 from .node import Node
@@ -9,9 +10,9 @@ API_PREFIX = '/api/v1'
 class API:
     def __init__(self, url=None, token=None):
         self.token = token
-
         if not url :
-            self.url = f'http://localhost:8440{API_PREFIX}'
+            host = os.environ.get('NODE_HOSTNAME', 'localhost')
+            self.url = f'http://{host}:8440{API_PREFIX}'
         else:
             self.url = f"{url}{API_PREFIX}"
 
