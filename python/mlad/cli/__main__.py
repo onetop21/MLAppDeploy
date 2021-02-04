@@ -33,7 +33,8 @@ class EntryGroup(click.Group):
         return self._ordered
 
     def get_command(self, ctx, name):
-        return self._commands[name] if name in self._commands else self._dummy_command
+        return self._commands.get(name)
+        #return self._commands[name] if name in self._commands else self._dummy_command
 
     def add_command(self, cmd, name, hidden=False):
         self._commands[name] = copy.copy(cmd)
