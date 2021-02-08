@@ -1,6 +1,6 @@
 import requests
 from requests.exceptions import HTTPError
-from .exception import APIError
+from .exception import APIError, NotFoundError
 
 class Node():
     def __init__(self, url, token):
@@ -25,7 +25,7 @@ class Node():
             res.raise_for_status()
         except HTTPError as e:
             if e.response.status_code == 404:
-                raise APIError('Failed to get the node. Check the node id.')
+                raise NotFoundError(res.json()['detail'])
             else:
                 APIError('Failed to get the node.')
         return res.json()
@@ -37,7 +37,10 @@ class Node():
             res = requests.post(url=url, headers=header)
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to enable the node.')
+            if e.response.status_code==404:
+                raise NotFoundError(res.json()['detail'])
+            else:
+                raise APIError('Failed to enable the node.')
         return res.json()
 
     def disable(self, node_id):
@@ -47,7 +50,10 @@ class Node():
             res = requests.post(url=url, headers=header)
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to disable the node.')
+            if e.response.status_code==404:
+                raise NotFoundError(res.json()['detail'])
+            else:
+                raise APIError('Failed to disable the node.')
         return res.json()
 
     def add_label(self, node_id, **labels):
@@ -57,7 +63,10 @@ class Node():
             res = requests.post(url=url, headers=header, json={'labels':labels})
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to add label.')
+            if e.response.status_code==404:
+                raise NotFoundError(res.json()['detail'])
+            else:
+                raise APIError('Failed to add label.')
         return res.json()
 
     def delete_label(self, node_id, *keys):
@@ -67,5 +76,8 @@ class Node():
             res = requests.delete(url=url, headers=header, json={'keys':keys})
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to delete label.')
+            if e.response.status_code==404:
+                raise NotFoundError(res.json()['detail'])
+            else:
+                raise APIError('Failed to delete label.')
         return res.json()

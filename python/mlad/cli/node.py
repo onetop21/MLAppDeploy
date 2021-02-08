@@ -5,7 +5,7 @@ from mlad.core.docker import controller as ctlr
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
 from mlad.api import API
-from mlad.api.exception import APIError
+from mlad.api.exception import APIError, NotFoundError
 
 def list():
     config = utils.read_config()
@@ -33,7 +33,7 @@ def enable(ID):
     try:
         with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
             api.node.enable(ID)
-    except APIError as e:
+    except Exception as e:
         print(e)
         sys.exit(1)
     print('Updated.')
@@ -43,7 +43,7 @@ def disable(ID):
     try:
         with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
             api.node.disable(ID)
-    except APIError as e:
+    except Exception as e:
         print(e)
         sys.exit(1)
     print('Updated.')
@@ -53,7 +53,7 @@ def label_add(node, **kvs):
     try:
         with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
             api.node.add_label(node, **kvs)
-    except APIError as e:
+    except Exception as e:
         print(e)
         sys.exit(1)
     print('Added.')
@@ -63,7 +63,7 @@ def label_rm(node, *keys):
     try:
         with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
             api.node.delete_label(node, *keys)
-    except APIError as e:
+    except Exception as e:
         print(e)
         sys.exit(1)
     print('Removed.')

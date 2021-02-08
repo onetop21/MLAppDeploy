@@ -650,7 +650,12 @@ def get_nodes(cli):
 
 def get_node(cli, node_key):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    return cli.nodes.get(node_key)
+    try:
+        node = cli.nodes.get(node_key)
+    except docker.errors.APIError as e:
+        print(f'Cannot find node "{node_key}"', file=sys.stderr)
+        raise exception.NotFound(f'Cannot find node "{node_key}"')
+    return node
 
 def inspect_node(node):
     if not isinstance(node, docker.models.nodes.Node): raise TypeError('Parameter is not valid type.')
@@ -672,6 +677,7 @@ def enable_node(cli, node_key):
         node = cli.nodes.get(node_key)
     except docker.errors.APIError as e:
         print(f'Cannot find node "{node_key}"', file=sys.stderr)
+        raise exception.NotFound(f'Cannot find node "{node_key}"')
         sys.exit(1)
     spec = node.attrs['Spec']
     spec['Availability'] = 'active'
@@ -683,6 +689,7 @@ def disable_node(cli, node_key):
         node = cli.nodes.get(node_key)
     except docker.errors.APIError as e:
         print(f'Cannot find node "{node_key}"', file=sys.stderr)
+        raise exception.NotFound(f'Cannot find node "{node_key}"')
         sys.exit(1)
     spec = node.attrs['Spec']
     spec['Availability'] = 'drain'
@@ -694,6 +701,7 @@ def add_node_labels(cli, node_key, **kv):
         node = cli.nodes.get(node_key)
     except docker.errors.APIError as e:
         print(f'Cannot find node "{node_key}"', file=sys.stderr)
+        raise exception.NotFound(f'Cannot find node "{node_key}"')
         sys.exit(1)
     spec = node.attrs['Spec']
     for key in kv:
@@ -706,6 +714,7 @@ def remove_node_labels(cli, node_key, *keys):
         node = cli.nodes.get(node_key)
     except docker.errors.APIError as e:
         print(f'Cannot find node "{node_key}"', file=sys.stderr)
+        raise exception.NotFound(f'Cannot find node "{node_key}"')
         sys.exit(1)
     spec = node.attrs['Spec']
     for key in keys:

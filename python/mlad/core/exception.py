@@ -12,3 +12,6 @@ class TokenError(Exception):
 
 class NotSupportURL(Exception):
     pass
+
+class NotFound(Exception):
+    pass

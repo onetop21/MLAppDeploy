@@ -126,7 +126,7 @@ def status(all, no_trunc):
                         ', '.join([_ for _ in inspect['ports']]),
                         task['Status']['Err'] if 'Err' in task['Status'] else '-'
                     ))
-        except docker.errors.NotFound as e:
+        except NotFoundError as e:
             pass
     columns = [('ID', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'UPTIME', 'PORTS', 'ERROR')]
     columns_data = []
@@ -370,11 +370,14 @@ def up(services):
 
     with interrupt_handler(message='Wait.', blocked=True) as h:
         target_model = _target_model(targets)
-        instances = api.service.create(project_key, target_model)  
-        for instance in instances:
-            inspect = api.service.inspect(project_key, instance)
-            print(f"Starting {inspect['name']}...")
-            time.sleep(1)
+        try:
+            instances = api.service.create(project_key, target_model)
+            for instance in instances:
+                inspect = api.service.inspect(project_key, instance)
+                print(f"Starting {inspect['name']}...")
+                time.sleep(1)
+        except APIError as e:
+            print(e)
         if h.interrupted:
             pass
 
