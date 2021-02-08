@@ -17,6 +17,7 @@ from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 from mlad.api import API
+from mlad.api.exception import APIError, NotFoundError
 
 @lru_cache(maxsize=None)
 def get_username(config):
@@ -94,10 +95,9 @@ def status(all, no_trunc):
     # Block not running.
     try:
         inspect = api.project.inspect(project_key=project_key)
-    except HTTPError as e:
-        if e.response.status_code == 404:
-            print('Cannot find running service.', file=sys.stderr)
-            sys.exit(1)
+    except NotFoundError as e:
+        print('Cannot find running service.', file=sys.stderr)
+        sys.exit(1)
 
     task_info = []
     for inspect in api.service.get(project_key):
@@ -341,14 +341,17 @@ def up(services):
     else:
         res = api.project.create(project['project'], base_labels,
             extra_envs, swarm=True, allow_reuse=True)
-    
-    for _ in res:
-        if 'stream' in _:
-            sys.stdout.write(_['stream'])
-        if 'result' in _:
-            if _['result'] == 'succeed':
-                network_id = _['id']
-                break 
+    try:
+        for _ in res:
+            if 'stream' in _:
+                sys.stdout.write(_['stream'])
+            if 'result' in _:
+                if _['result'] == 'succeed':
+                    network_id = _['id']
+                    break 
+    except APIError as e:
+        print(e)
+        sys.exit(1)
 
     # Check service status
     running_services = api.service.get(project_key)
@@ -383,8 +386,9 @@ def down(services):
 
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block duplicated running.
-    inspect = api.project.inspect(project_key=project_key)
-    if not inspect:
+    try:
+        inspect = api.project.inspect(project_key=project_key)
+    except NotFoundError as e:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
 
@@ -409,13 +413,17 @@ def down(services):
         #Remove Network
         if not services:
             res = api.project.delete(project_key)
-            for _ in res:
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'status' in _:
-                    if _['status'] == 'succeed':
-                        print('Network removed.')
-                    break
+            try:
+                for _ in res:
+                    if 'stream' in _:
+                        sys.stdout.write(_['stream'])
+                    if 'status' in _:
+                        if _['status'] == 'succeed':
+                            print('Network removed.')
+                        break
+            except APIError as e:
+                print(e)
+                sys.exit(1)
     print('Done.')
 
 def logs(tail, follow, timestamps, names_or_ids):
@@ -427,15 +435,17 @@ def logs(tail, follow, timestamps, names_or_ids):
         project = api.project.inspect(project_key)
         logs = api.project.log(project_key, tail, follow,
             timestamps, names_or_ids)
-    except HTTPError as e:
-        if e.response.status_code == 404:
-            print('Cannot find running service.', file=sys.stderr)
-            sys.exit(1)
-        raise(e)
+    except NotFoundError as e:
+        print('Cannot find running service.', file=sys.stderr)
+        sys.exit(1)
 
-    colorkey = {}   
-    for _ in logs:
-        _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
+    colorkey = {}
+    try:
+        for _ in logs:
+            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
+    except APIError as e:
+        print(e)
+        sys.exit(1)
 
 
 def scale(scales):
@@ -445,14 +455,21 @@ def scale(scales):
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = api.project.inspect(project_key)
-    except HTTPError as e:
-        if e.response.status_code == 404:
-            print('Cannot find running service.', file=sys.stderr)
-            sys.exit(1)
+    except NotFoundError as e:
+        print('Cannot find running service.', file=sys.stderr)
+        sys.exit(1)
 
     inspects = api.service.get(project_key)
-    for inspect in inspects:
-        if inspect['name'] in scale_spec:
-            res = api.service.scale(project_key, inspect['id'], 
-                scale_spec[inspect['name']])
-            print(res['message'])
+
+    services = dict([(_['name'], _['id']) for _ in inspects])
+    for service in scale_spec:
+        if service in services:
+            res = api.service.scale(project_key, services[service],
+                scale_spec[service])
+            print(f'Service scale updated: {service}')
+        else:
+            print(f'Invalid service name: {service}')
+
+    
+    
+

@@ -9,8 +9,12 @@ from mlad.api.exception import APIError
 
 def list():
     config = utils.read_config()
-    with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
-        nodes = [api.node.inspect(_) for _ in api.node.get()]
+    try:
+        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+            nodes = [api.node.inspect(_) for _ in api.node.get()]
+    except APIError as e:
+        print(e)
+        sys.exit(1)
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
         ID = node['id'][:10]

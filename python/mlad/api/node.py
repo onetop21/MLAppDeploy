@@ -24,7 +24,10 @@ class Node():
             res = requests.get(url=url, headers=header)
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to get the node. Check the node id.')
+            if e.response.status_code == 404:
+                raise APIError('Failed to get the node. Check the node id.')
+            else:
+                APIError('Failed to get the node.')
         return res.json()
 
     def enable(self, node_id):
@@ -34,7 +37,7 @@ class Node():
             res = requests.post(url=url, headers=header)
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to enable the node. Check the node id.')
+            raise APIError('Failed to enable the node.')
         return res.json()
 
     def disable(self, node_id):
@@ -44,7 +47,7 @@ class Node():
             res = requests.post(url=url, headers=header)
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to disable the node. Check the node id.')
+            raise APIError('Failed to disable the node.')
         return res.json()
 
     def add_label(self, node_id, **labels):
@@ -54,7 +57,7 @@ class Node():
             res = requests.post(url=url, headers=header, json={'labels':labels})
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to add label. Check the node id.')
+            raise APIError('Failed to add label.')
         return res.json()
 
     def delete_label(self, node_id, *keys):
@@ -64,5 +67,5 @@ class Node():
             res = requests.delete(url=url, headers=header, json={'keys':keys})
             res.raise_for_status()
         except HTTPError as e:
-            raise APIError('Failed to delete label. Check the node id.')
+            raise APIError('Failed to delete label.')
         return res.json()

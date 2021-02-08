@@ -152,8 +152,8 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
             labels.update({
                 'MLAD.PROJECT.NETWORK': network_name, 
                 'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
-                #'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
-                'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'],
+                'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
+                #'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'],
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
 

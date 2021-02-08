@@ -123,7 +123,7 @@ def service_scale(project_key:str, service_id:str,
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {'message':'scale updated'}
+    return {'message':f'service {service_id} scale updated'}
 
 @router.delete("/project/{project_key}/service/{service_id}")
 def service_remove(project_key:str, service_id:str):

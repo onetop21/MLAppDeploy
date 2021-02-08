@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from mlad.service.models import node
 from mlad.core.docker import controller as ctlr
+from requests.exceptions import HTTPError
 
 admin_router = APIRouter()
 user_router = APIRouter()
@@ -19,6 +20,9 @@ def node_inspect(node_id:str):
     cli = ctlr.get_docker_client()
     try:
         node = ctlr.get_node(cli, node_id)
+        if not node:
+            raise HTTPException(status_code=404,
+                detail='Invalid node ID')
         inspects = ctlr.inspect_node(node)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
