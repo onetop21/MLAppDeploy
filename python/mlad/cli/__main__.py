@@ -17,9 +17,13 @@ def has_role(key):
         token = config.mlad.token[key]
         if token:
             with API(utils.to_url(config.mlad)) as api:
-                res = api.auth.token_verify(token)
-                if res['result']:
-                    return res['data']['role'] == key
+                try:
+                    res = api.auth.token_verify(token)
+                    if res['result']:
+                        return res['data']['role'] == key
+                except Exception as e:
+                    #print(f"Exception Handling : {e}", file=sys.stderr)
+                    return False
     return False
 
 class EntryGroup(click.Group):
