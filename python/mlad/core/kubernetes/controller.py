@@ -22,7 +22,7 @@ config.load_kube_config()
 # Docker CLI from HOST
 def get_docker_client(host='unix:///var/run/docker.sock'):
     # docker.client.DockerClient
-    return docker.from_env(environment={'DOCKER_HOST': host})
+    return client.CoreV1Api()
 
 # Manage Project and Network
 def make_base_labels(workspace, username, project, registry):
@@ -44,39 +44,38 @@ def make_base_labels(workspace, username, project, registry):
     }
     return labels
 
-def get_project_networks(cli):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    networks = cli.networks.list(filters={'label':f"MLAD.PROJECT"})
-    return dict([(_.name, _) for _ in networks])
+def get_project_networks(api):
+    if not isinstance(api, client.api.core_v1_api.CoreV1Api): raise TypeError('Parameter is not valid type.')
+    namespaces = v1.list_namespace(label_selector="MLAD.PROJECT")
+    return dict([(_.metadata.name, _) for _ in namespaces.items])
 
-def get_project_network(cli, **kwargs):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+def get_project_network(api, **kwargs):
+    if not isinstance(api, client.api.core_v1_api.CoreV1Api): raise TypeError('Parameter is not valid type.')
     if kwargs.get('project_key'):
-        networks = cli.networks.list(filters={'label':f"MLAD.PROJECT={kwargs.get('project_key')}"})
+        namespaces = v1.list_namespace(label_selector=f"MLAD.PROJECT={kwargs.get('project_key')}")
     elif kwargs.get('project_id'):
-        networks = cli.networks.list(filters={'label':f"MLAD.PROJECT.ID={kwargs.get('project_id')}"})
+        namespaces = v1.list_namespace(label_selector=f"MLAD.PROJECT.ID={kwargs.get('project_id')}")
     elif kwargs.get('network_id'):
-        networks = [cli.networks.get(kwargs.get('network_id'))]
+        namespaces = list(filter(lambda _: _.metadata.uid==kwargs.get('network_id'), v1.list_namespace(label_selector="MLAD.PROJECT")))
     else:
         raise TypeError('At least one parameter is required.')
-    if len(networks) == 1:
-        return networks[0]
-    elif len(networks) == 0:
+    if len(namespaces) == 1:
+        return namespaces[0]
+    elif len(namespaces) == 0:
         return None
     else:
         raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
 
-def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False, stream=False):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+def create_project_network(api, base_labels, extra_envs, swarm=True, allow_reuse=False, stream=False):
+    if not isinstance(api, client.api.core_v1_api.CoreV1Api): raise TypeError('Parameter is not valid type.')
     #workspace = utils.get_workspace()
-    driver = 'overlay' if swarm else 'bridge'
     project_key = base_labels['MLAD.PROJECT']
-    network = get_project_network(cli, project_key=project_key)
+    network = get_project_network(api, project_key=project_key)
     if network:
         if allow_reuse:
             if stream:
                 def resp_stream():
-                    yield {'result': 'exists', 'name': network.name, 'id': network.id}
+                    yield {'result': 'exists', 'name': network.metadata.name, 'id': network.metadata.uid}
                 return resp_stream()
             else:
                 stream_out = (_ for _ in resp_stream())
@@ -89,7 +88,7 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
 
     # Create Docker Network
     def resp_stream():
-        network_name = f"{basename}-{driver}"
+        network_name = f"{basename}-cluster"
         try:
             message = f"Create project network [{network_name}]...\n"
             yield {'stream': message}
@@ -97,54 +96,31 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
             labels.update({
                 'MLAD.PROJECT.NETWORK': network_name, 
                 'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
-                'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
-                #'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'],
+                #'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
 
-            if driver == 'overlay':
-                def address_range(bs=100, be=254, cs=0, ce=255, st=4):
-                    for b in range(bs, be):
-                        for c in range(cs, ce, st):
-                            yield b, c
-                for b, c, in address_range():
-                    subnet = f'10.{b}.{c}.0/22'
-                    ipam_pool = docker.types.IPAMPool(subnet=subnet)
-                    ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
-                    network = cli.networks.create(
-                        network_name, 
-                        labels=labels,
-                        driver='overlay', 
-                        ipam=ipam_config, 
-                        ingress=False)
-                    time.sleep(.1)
-                    network.reload()
-                    if network.attrs['Driver']: 
-                        message = f'Selected Subnet [{subnet}]\n'
-                        yield {'stream': message}
-                        break
-                    network.remove()
-            else:
-                network = cli.networks.create(
-                    network_name, 
-                    labels=labels,
-                    driver='bridge')
-            if network.attrs['Driver']:
-                yield {"result": 'succeed', 'name': network_name, 'id': network.id}
-            else:
-                yield {"result": 'failed', 'stream': 'Cannot find suitable subnet.\n'}
-        except docker.errors.APIError as e:
+            ret = v1.create_namespace(
+                client.V1Namespace(
+                    metadata=client.V1ObjectMeta(
+                        name=network_name, 
+                        labels=labels
+                    )
+                )
+            )
+        except ApiException as e:
             message = f"Failed to create network.\n{e}\n"
             yield {'result': 'failed', 'stream': message}
     if stream:
         return resp_stream()
     else:
         stream_out = (_ for _ in resp_stream())
-        return (get_project_network(cli, project_key=project_key), stream_out)
+        return (get_project_network(api, project_key=project_key), stream_out)
 
 
 if __name__ == '__main__':
     v1 = client.CoreV1Api()
+    # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
     #ret = get_project_networks(cli)
     body = client.V1Namespace(metadata=client.V1ObjectMeta(name="hello-cluster", labels={'MLAD.PROJECT': '123', 'MLAD.PROJECT.NAME':'hello'}))
     try:
@@ -155,6 +131,7 @@ if __name__ == '__main__':
     ret = v1.list_namespace(label_selector="MLAD.PROJECT=123", watch=False)
     print('Project Networks', [_.metadata.name for _ in ret.items])
     namespace = [_.metadata.name for _ in ret.items][-1]
+    print(ret.items[-1])
 
     body = client.V1ReplicationController()
     body.metadata = client.V1ObjectMeta()
