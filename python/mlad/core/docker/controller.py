@@ -61,8 +61,8 @@ def get_auth_headers(cli, image_name=None, auth_configs=None):
             auth_config = docker.auth.resolve_authconfig({'auths': auth_configs}, registry)
             return {'X-Registry-Auth': docker.auth.encode_header(auth_config)}
     else:
-        #headers = {'X-Registry-Config': b''}
-        headers = {'X-Registry-Config': ''}
+        headers = {'X-Registry-Config': b''}
+        print('test')
         docker.api.build.BuildApiMixin._set_auth_headers(cli.api, headers)
         return headers
     # get_all_auth_header(): -> docker.api.build.BuildApiMixin._set_auth_headers(self, headers)
