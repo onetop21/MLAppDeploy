@@ -153,10 +153,8 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
                 'MLAD.PROJECT.NETWORK': network_name, 
                 'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
                 'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
-                #'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'],
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
-            print(labels)
             if driver == 'overlay':
                 def address_range(bs=100, be=254, cs=0, ce=255, st=4):
                     for b in range(bs, be):
