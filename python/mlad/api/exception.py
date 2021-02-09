@@ -8,13 +8,8 @@ class APIError(Exception):
     def __str__(self):
         return self.msg
 
-class NotFoundError(Exception):
-    msg : str
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg    
+class NotFoundError(APIError):
+    pass  
 
 def error_from_http_errors(e):
     detail = e.response.json()['detail']

@@ -3,9 +3,12 @@ from mlad.service.models import node
 from mlad.core.docker import controller as ctlr
 from mlad.core import exception
 from requests.exceptions import HTTPError
+from mlad.service.libs.log import init_logger
 
 admin_router = APIRouter()
 user_router = APIRouter()
+
+logger = init_logger(__name__)
 
 @admin_router.get("/node")
 def node_list():
@@ -13,7 +16,7 @@ def node_list():
     try:
         nodes = ctlr.get_nodes(cli)
     except Exception as e:
-        print(e)
+        logger.error(e)
         raise HTTPException(status_code=500, detail=str(e))
     return list(nodes.keys())
 
@@ -24,9 +27,10 @@ def node_inspect(node_id:str):
         node = ctlr.get_node(cli, node_id)
         inspects = ctlr.inspect_node(node)
     except exception.NotFound as e:
+        logger.error(e)
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(e)
+        logger.error(e)
         raise HTTPException(status_code=500, detail=str(e))
     return inspects
 
@@ -36,9 +40,10 @@ def node_enable(node_id:str):
     try:
         ctlr.enable_node(cli, node_id)
     except exception.NotFound as e:
+        logger.error(e)
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(e)
+        logger.error(e)
         raise HTTPException(status_code=500, detail=str(e))
     return {'message': f'{node_id} enabled'}
 
@@ -48,9 +53,10 @@ def node_disable(node_id:str):
     try:
         ctlr.disable_node(cli, node_id)
     except exception.NotFound as e:
+        logger.error(e)
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(e)
+        logger.error(e)
         raise HTTPException(status_code=500, detail=str(e))    
     return {'message': f'{node_id} disabled'}
 
@@ -60,9 +66,10 @@ def node_add_label(node_id:str, req:node.AddLabelRequest):
     try:
         ctlr.add_node_labels(cli, node_id, **req.labels)
     except exception.NotFound as e:
+        logger.error(e)
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(e)
+        logger.error(e)
         raise HTTPException(status_code=500, detail=str(e))  
     return {'message': 'labels added'}
 
@@ -72,8 +79,9 @@ def node_delete_label(node_id:str, req:node.DeleteLabelRequest):
     try:
         ctlr.remove_node_labels(cli, node_id, *req.keys)
     except exception.NotFound as e:
+        logger.error(e)
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(e)
+        logger.error(e)
         raise HTTPException(status_code=500, detail=str(e))
     return {'message': 'labels deleted'}
