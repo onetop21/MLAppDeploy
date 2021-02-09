@@ -62,7 +62,6 @@ def get_auth_headers(cli, image_name=None, auth_configs=None):
             return {'X-Registry-Auth': docker.auth.encode_header(auth_config)}
     else:
         headers = {'X-Registry-Config': b''}
-        print('test')
         docker.api.build.BuildApiMixin._set_auth_headers(cli.api, headers)
         return headers
     # get_all_auth_header(): -> docker.api.build.BuildApiMixin._set_auth_headers(self, headers)
@@ -157,7 +156,7 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
                 #'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'],
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
-
+            print(labels)
             if driver == 'overlay':
                 def address_range(bs=100, be=254, cs=0, ce=255, st=4):
                     for b in range(bs, be):
