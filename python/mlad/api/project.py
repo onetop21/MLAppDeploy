@@ -1,7 +1,6 @@
 import json
 import requests
-from requests.exceptions import HTTPError
-from .exception import APIError, NotFoundError
+from .exception import APIError, NotFoundError, raise_error
 
 class Project():
     def __init__(self, url, token):
@@ -11,11 +10,8 @@ class Project():
     def get(self):
         url = self.url
         header = {'token': self.token}
-        try:
-            res = requests.get(url=url,headers=header)
-            res.raise_for_status()
-        except HTTPError as e:
-            raise APIError('Failed to get projects.')
+        res = requests.get(url=url,headers=header)
+        raise_error(res)
         return res.json()    
 
     def create(self, project, base_labels, extra_envs=[], 
@@ -37,14 +33,8 @@ class Project():
     def inspect(self, project_key):
         url = f'{self.url}/{project_key}'
         header = {'token': self.token}
-        try:
-            res = requests.get(url=url, headers=header)
-            res.raise_for_status()
-        except HTTPError as e:
-            if e.response.status_code == 404:
-                raise NotFoundError(res.json())
-            else:
-                raise APIError(res.json())
+        res = requests.get(url=url, headers=header)
+        raise_error(res)
         return res.json()
 
     def delete(self, project_key):
