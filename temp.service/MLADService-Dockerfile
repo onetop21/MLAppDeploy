@@ -7,7 +7,6 @@ FROM    python:latest
 COPY    python /workspace
 WORKDIR /workspace
 RUN     python setup.py install
-ENV     PYTHONUNBUFFERED 1
 
 EXPOSE  8440
 
