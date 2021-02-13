@@ -14,6 +14,7 @@ from mlad.core.libs import utils
 from mlad.core.default import project_service as service_default
 from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
+from mlad.core.docker import controller as docker_controller
 
 # https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
 
@@ -47,28 +48,7 @@ def make_base_labels(workspace, username, project, registry):
     return labels
 
 def get_auth_headers(cli, image_name=None, auth_configs=None):
-    if image_name:
-        if not auth_configs:
-            # docker.auth.get_config_header(client, registry)
-            registry, repo_name = docker.auth.resolve_repository_name(image_name)
-            header = docker.auth.get_config_header(cli.api, registry)
-            if header:
-                return {'X-Registry-Auth': header}
-            else:
-                return {'X-Registry-Auth': ''}
-        else:
-            if isinstance(auth_configs, str): 
-                auth_configs = utils.decode_dict(auth_configs)
-            registry, repo_name = docker.auth.resolve_repository_name(image_name)
-            auth_config = docker.auth.resolve_authconfig({'auths': auth_configs}, registry)
-            return {'X-Registry-Auth': docker.auth.encode_header(auth_config)}
-    else:
-        headers = {'X-Registry-Config': b''}
-        docker.api.build.BuildApiMixin._set_auth_headers(cli.api, headers)
-        return headers
-    # get_all_auth_header(): -> docker.api.build.BuildApiMixin._set_auth_headers(self, headers)
-    # or cli.api._auth_configs.get_all_credentials() -> JSON(X-Registry-Config)
-    # and docker.auth.encode_header(JSON) -> X-Registry-Config or X-Registry-Auth
+    return docker_controller.get_auth_headers(docker.from_env(), image_name, auth_configs)
 
 def get_project_networks(cli):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
@@ -124,10 +104,6 @@ def inspect_project_network(network):
         'image': labels['MLAD.PROJECT.IMAGE'],
     }
 
-def is_swarm_mode(network):
-    if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
-    return network.attrs['Driver'] == 'overlay'
-
 def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False, stream=False):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -159,7 +135,7 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
             labels.update({
                 'MLAD.PROJECT.NETWORK': network_name, 
                 'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
-                #'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
+                'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
 
@@ -181,9 +157,10 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
         return (get_project_network(cli, project_key=project_key), stream_out)
 
 def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
     network_info = inspect_project_network(network)
+    cli.delete_namespace(network.metadata.name)
     network.remove()
     def resp_stream():
         removed = False
@@ -763,7 +740,7 @@ if __name__ == '__main__':
         cli = get_api_client()
         print(get_project_networks(cli))
         print(type(get_project_networks(cli)['hello-cluster']))
-        sys.exit(1)
+        #sys.exit(1)
         body = client.V1ReplicationController()
         body.metadata = client.V1ObjectMeta()
         body.metadata.name = name
