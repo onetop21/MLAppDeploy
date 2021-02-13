@@ -9,7 +9,6 @@ from typing import Dict, List
 import docker
 import requests
 import requests_unixsocket
-from docker.types import LogConfig
 from mlad.core import exception
 from mlad.core.libs import utils
 from mlad.core.docker.logs import LogHandler, LogCollector
@@ -20,7 +19,7 @@ CONFIG_PATH = HOME + '/.mlad'
 SHORT_LEN = 10
 
 # Docker CLI from HOST
-def get_docker_client(host='unix:///var/run/docker.sock'):
+def get_api_client(host='unix:///var/run/docker.sock'):
     # docker.client.DockerClient
     return docker.from_env(environment={'DOCKER_HOST': host})
 
@@ -116,10 +115,6 @@ def inspect_project_network(network):
         'base': labels['MLAD.PROJECT.BASE'],
         'image': labels['MLAD.PROJECT.IMAGE'],
     }
-
-def is_swarm_mode(network):
-    if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
-    return network.attrs['Driver'] == 'overlay'
 
 def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -320,7 +315,6 @@ def create_containers(cli, network, services, extra_labels={}):
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     project_info = inspect_project_network(network)
     network_labels = get_labels(network)
-    swarm_mode = is_swarm_mode(network)
     
     # Update Project Name
     project_info = inspect_project_network(network)
@@ -371,7 +365,6 @@ def create_services(cli, network, services, extra_labels={}):
     if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
     project_info = inspect_project_network(network)
     network_labels = get_labels(network)
-    swarm_mode = is_swarm_mode(network)
     
     # Update Project Name
     project_info = inspect_project_network(network)

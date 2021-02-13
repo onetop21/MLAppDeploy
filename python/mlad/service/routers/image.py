@@ -7,7 +7,7 @@ router = APIRouter()
 
 @router.get("/image/list")
 def image_list(project_key:str = Query(None)):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         images = ctlr.get_images(cli, project_key)
     except Exception as e:
@@ -16,7 +16,7 @@ def image_list(project_key:str = Query(None)):
 
 @router.get("/image/{image_id}")
 def image_inspect(image_id:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         image = get_images(cli,image_id)
         inspect = ctlr.inspect(image)
@@ -34,7 +34,7 @@ def image_push():
 
 @router.delete("/image/remove/{image_id}")
 def image_remove(image_id:str, force:bool = Query(False)):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         ctlr.remove_image(cli, list(image_id), force)
     except Exception as e:
@@ -43,7 +43,7 @@ def image_remove(image_id:str, force:bool = Query(False)):
 
 @router.delete("/image/prune")
 def image_prune(project_key:str = Query(None)):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         res = ctlr.prune_images(cli, project_key)
     except Exception as e:

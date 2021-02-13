@@ -143,7 +143,7 @@ def status(all, no_trunc):
 
 def build(tagging, verbose):
     config = utils.read_config()
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     project_key = utils.project_key(utils.get_workspace())
 
     project = utils.get_project(default_project)
@@ -264,7 +264,7 @@ def test(with_build):
     print('Deploying test container image to local...')
     config = utils.read_config()
 
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     

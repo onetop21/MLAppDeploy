@@ -16,7 +16,7 @@ def _check_project_key(project_key, service):
 
 @router.get("/project/service")
 def services_list(labels: List[str] = Query(None)):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     labels_dict=dict()
    
     if labels:
@@ -37,7 +37,7 @@ def services_list(labels: List[str] = Query(None)):
 @router.get("/project/{project_key}/service")
 def service_list(project_key:str, 
                  labels: List[str] = Query(None)):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     #TODO check labels validation
     #labels = ["MLAD.PROJECT", "MLAD.PROJECT.NAME=lmai"]
     labels_dict=dict()
@@ -66,7 +66,7 @@ def service_list(project_key:str,
 def service_create(project_key:str, req:service.CreateRequest):
     targets = req.json
 
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(cli, project_key=key)
@@ -82,7 +82,7 @@ def service_create(project_key:str, req:service.CreateRequest):
 
 @router.get("/project/{project_key}/service/{service_id}")
 def service_inspect(project_key:str, service_id:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         service = ctlr.get_service(cli, service_id)
         key = str(project_key).replace('-','')
@@ -97,7 +97,7 @@ def service_inspect(project_key:str, service_id:str):
 
 @router.get("/project/{project_key}/service/{service_id}/tasks")
 def service_tasks(project_key:str, service_id:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         service = ctlr.get_service(cli, service_id)
         key = str(project_key).replace('-','')
@@ -114,7 +114,7 @@ def service_tasks(project_key:str, service_id:str):
 @router.put("/project/{project_key}/service/{service_id}/scale")
 def service_scale(project_key:str, service_id:str, 
                   req: service.ScaleRequest):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         service = ctlr.get_service(cli, service_id)
         if _check_project_key(project_key, service):
@@ -127,7 +127,7 @@ def service_scale(project_key:str, service_id:str,
 
 @router.delete("/project/{project_key}/service/{service_id}")
 def service_remove(project_key:str, service_id:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         service = ctlr.get_service(cli, service_id)
         if _check_project_key(project_key, service):

@@ -12,7 +12,7 @@ logger = init_logger(__name__)
 
 @admin_router.get("/node")
 def node_list():
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         nodes = ctlr.get_nodes(cli)
     except Exception as e:
@@ -22,7 +22,7 @@ def node_list():
 
 @user_router.get("/node/{node_id}")
 def node_inspect(node_id:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         node = ctlr.get_node(cli, node_id)
         inspects = ctlr.inspect_node(node)
@@ -36,7 +36,7 @@ def node_inspect(node_id:str):
 
 @admin_router.post("/node/{node_id}/enable")
 def node_enable(node_id:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         ctlr.enable_node(cli, node_id)
     except exception.NotFound as e:
@@ -49,7 +49,7 @@ def node_enable(node_id:str):
 
 @admin_router.post("/node/{node_id}/disable")
 def node_disable(node_id:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         ctlr.disable_node(cli, node_id)
     except exception.NotFound as e:
@@ -62,7 +62,7 @@ def node_disable(node_id:str):
 
 @admin_router.post("/node/{node_id}/labels")
 def node_add_label(node_id:str, req:node.AddLabelRequest):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         ctlr.add_node_labels(cli, node_id, **req.labels)
     except exception.NotFound as e:
@@ -75,7 +75,7 @@ def node_add_label(node_id:str, req:node.AddLabelRequest):
 
 @admin_router.delete("/node/{node_id}/labels")
 def node_delete_label(node_id:str, req:node.DeleteLabelRequest):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         ctlr.remove_node_labels(cli, node_id, *req.keys)
     except exception.NotFound as e:

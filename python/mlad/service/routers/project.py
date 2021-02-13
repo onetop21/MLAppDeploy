@@ -12,7 +12,7 @@ router = APIRouter()
 def project_create(req: project.CreateRequest, 
                    allow_reuse: bool = Query(False), 
                    swarm: bool = Query(True)):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
 
     base_labels = req.base_labels
     extra_envs = req.extra_envs
@@ -32,7 +32,7 @@ def project_create(req: project.CreateRequest,
 
 @router.get("/project")
 def projects():
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         networks = ctlr.get_project_networks(cli)
         projects = [ ctlr.inspect_project_network(v) for k, v in networks.items()]
@@ -43,7 +43,7 @@ def projects():
 
 @router.get("/project/{project_key}")
 def project_inspect(project_key:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(cli, project_key=key)
@@ -58,7 +58,7 @@ def project_inspect(project_key:str):
 
 @router.delete("/project/{project_key}")
 def project_remove(project_key:str):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(cli, project_key=key)
@@ -81,7 +81,7 @@ def project_log(project_key: str, tail:str = Query('all'),
                 follow: bool = Query(False),
                 timestamps: bool = Query(False),
                 names_or_ids: list = Query(None)):
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     try:
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(cli, project_key=key)

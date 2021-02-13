@@ -96,16 +96,18 @@ def get_project_network(cli, **kwargs):
         raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
 
 def get_labels(obj):
-    if isinstance(obj, docker.models.networks.Network):
-        return obj.attrs['Labels']
-    elif isinstance(obj, docker.models.services.Service):
-        return obj.attrs['Spec']['Labels']
+    if isinstance(obj, client.models.v1_namespace.V1Namespace):
+        return obj.metadata.labels
+    elif isinstance(obj, client.models.v1_replication_controller.V1ReplicationController):
+        return obj.metadata.labels
+    elif isinstance(obj, client.models.v1_service.V1Service):
+        return obj.metadata.labels
     else:
         raise TypeError('Parameter is not valid type.')
 
 def inspect_project_network(network):
-    if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
-    labels = network.attrs['Labels']
+    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
+    labels = get_labels(network)
     hostname, path = labels['MLAD.PROJECT.WORKSPACE'].split(':')
     return {
         'key': uuid.UUID(labels['MLAD.PROJECT']),
@@ -758,6 +760,10 @@ if __name__ == '__main__':
     print(ret.items[-1])
 
     def create_service(name, *args):
+        cli = get_api_client()
+        print(get_project_networks(cli))
+        print(type(get_project_networks(cli)['hello-cluster']))
+        sys.exit(1)
         body = client.V1ReplicationController()
         body.metadata = client.V1ObjectMeta()
         body.metadata.name = name
@@ -770,8 +776,8 @@ if __name__ == '__main__':
         body.spec.template.metadata.name = body.metadata.name
         body.spec.template.metadata.labels = {'app': body.metadata.name}
         container = client.V1Container(name=body.metadata.name)
-        container.image = 'onetop21/example-5e2277a636:latest'
-        container.image_pull_policy="Never"
+        container.image = 'onetop21/example-029f0590f6:latest'
+        container.image_pull_policy="IfNotPresent"
         container.args=[*args]
         container.restart_policy='Never'
         body.spec.template.spec = client.V1PodSpec(containers=[container], hostname=body.metadata.name, subdomain='hello')
