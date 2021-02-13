@@ -48,6 +48,9 @@ service_config = {
     'docker': {
         'host': 'unix:///var/run/docker.sock',
     },
+    'kubernetes': {
+        'config': '~/.kube/config'
+    },
     'server': {
         'host': os.environ.get('HOST', '0.0.0.0'),
         'port': int(os.environ.get('PORT', 8440)),

@@ -1,10 +1,14 @@
 import json
 from typing import List
 from fastapi import APIRouter, Query, HTTPException
+from fastapi.responses import StreamingResponse
 from mlad.service.models import project
 from mlad.service.exception import InvalidProjectError
-from mlad.core.docker import controller as ctlr
-from fastapi.responses import StreamingResponse
+from mlad.service.libs import utils
+if not utils.is_kube_mode():
+    from mlad.core.docker import controller as ctlr
+else:
+    from mlad.core.kubernetes import controller as ctlr
 
 router = APIRouter()
 

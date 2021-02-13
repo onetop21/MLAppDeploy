@@ -18,3 +18,8 @@ def is_debug_mode():
     if '-d' in sys.argv or '--debug' in sys.argv or os.environ.get('MLAD_DEBUG'):
         return True
     return False
+
+def is_kube_mode():
+    if '-k' in sys.argv or '--kube' in sys.argv or os.environ.get('MLAD_KUBE'):
+        return True
+    return False

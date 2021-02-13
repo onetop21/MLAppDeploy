@@ -7,6 +7,7 @@ import base64
 from pathlib import Path
 from typing import Dict, List
 import docker
+from kubernetes.client import models
 import requests
 from mlad.core import exception
 from mlad.core.libs import utils
@@ -161,7 +162,6 @@ def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
     if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
     network_info = inspect_project_network(network)
     cli.delete_namespace(network.metadata.name)
-    network.remove()
     def resp_stream():
         removed = False
         for tick in range(timeout):
@@ -188,63 +188,29 @@ def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
 
 # Manage services and tasks
 def get_containers(cli, project_key=None, extra_filters={}):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
-    filters += [f'{key}={value}' for key, value in extra_filters.items()]
-    services = cli.containers.list(filters={'label': filters})
-    if project_key:
-        return dict([(_.attrs['Config']['Labels']['MLAD.PROJECT.SERVICE'], _) for _ in services])
-    else:
-        return dict([(_.name, _) for _ in services])
+    return docker_controller.get_containers(docker.from_env(), project_key, extra_filters)
 
 def get_services(cli, project_key=None, extra_filters={}):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
     filters += [f'{key}={value}' for key, value in extra_filters.items()]
-    services = cli.services.list(filters={'label': filters})
+    services = cli.list_service_for_all_namespaces(label_selector=','.join(filters))
     if project_key:
-        return dict([(_.attrs['Spec']['Labels']['MLAD.PROJECT.SERVICE'], _) for _ in services])
+        return dict([(_.metadata.labels['MLAD.PROJECT.SERVICE'], _) for _ in services])
     else:
         return dict([(_.name, _) for _ in services])
 
 def get_service(cli, service_id):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    return cli.services.get(service_id)
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    services = cli.list_service_for_all_namespaces(label_selector='MLAD.PROJECT')
+    return dict([(_.metadata.uid, _) for _ in services]).get(service_id)
 
 def inspect_container(container):
-    if not isinstance(container, docker.models.containers.Container): raise TypeError('Parameter is not valid type.')
-    labels = container.attrs['Config']['Labels']
-    hostname, path = labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
-    inspect = {
-        'key': uuid.UUID(labels['MLAD.PROJECT']) if labels.get('MLAD.VERSION') else '',
-        'workspace': {
-            'hostname': hostname,
-            'path': path
-        },
-        'username': labels.get('MLAD.PROJECT.USERNAME'),
-        'network': labels.get('MLAD.PROJECT.NETWORK'),
-        'project': labels.get('MLAD.PROJECT.NAME'),
-        'project_id': uuid.UUID(labels['MLAD.PROJECT.ID']) if labels.get('MLAD.VERSION') else '',
-        'version': labels.get('MLAD.PROJECT.VERSION'),
-        'base': labels.get('MLAD.PROJECT.BASE'),
-        'image': container.attrs['Config']['Image'], #labels['MLAD.PROJECT.IMAGE'],
-
-        'id': container.id,
-        'name': labels.get('MLAD.PROJECT.SERVICE'),
-        'ports': {}
-    }
-    if 'PortBindings' in container.attrs['HostConfig'] and container.attrs['HostConfig']['PortBindings']:
-        for target, host in container.attrs['HostConfig']['PortBindings'].items():
-            published = ', '.join([f"{_['HostIp']}:{_['HostPort']}" for _ in host])
-            inspect['ports'][f"{target}->{published}"] = {
-                'target': target,
-                'published': published
-            }
-    return inspect
+    return docker_controller.inspect_container(container)
 
 def inspect_service(service):
-    if not isinstance(service, docker.models.services.Service): raise TypeError('Parameter is not valid type.')
-    labels = service.attrs['Spec']['Labels']
+    if not isinstance(service, client.models.v1_service.V1Service): raise TypeError('Parameter is not valid type.')
+    labels = service.metadata.labels
     hostname, path = labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     inspect = {
         'key': uuid.UUID(labels['MLAD.PROJECT']) if labels.get('MLAD.VERSION') else '',
@@ -277,62 +243,13 @@ def inspect_service(service):
     return inspect
 
 def create_containers(cli, network, services, extra_labels={}):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
-    project_info = inspect_project_network(network)
-    network_labels = get_labels(network)
-    swarm_mode = is_swarm_mode(network)
-    
-    # Update Project Name
-    project_info = inspect_project_network(network)
-    image_name = project_info['image']
-    project_base = project_info['base']
-
-    instances = []
-    for name in services:
-        service = service_default(services[name])
-
-        # Check running already
-        if get_containers(cli, project_info['key'], extra_filters={'MLAD.PROJECT.SERVICE': name}):
-            raise exception.Duplicated('Already running container.')
-
-        image = service['image'] or image_name
-        env = utils.decode_dict(network_labels.get('MLAD.PROJECT.ENV'))
-        env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
-        env += [f"PROJECT={project_info['project']}"]
-        env += [f"USERNAME={project_info['username']}"]
-        env += [f"PROJECT_KEY={project_info['key']}"]
-        env += [f"PROJECT_ID={project_info['id']}"]
-        env += [f"SERVICE={name}"]
-        env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
-        command = service['command'] + service['arguments']
-        labels = copy.copy(network_labels)
-        labels.update(extra_labels)
-        labels['MLAD.PROJECT.SERVICE'] = name
-        
-        # Try to run
-        inst_name = f"{project_base}-{name}"
-        instance = cli.containers.run(
-            image, 
-            command=command,
-            name=inst_name,
-            environment=env,
-            labels=labels,
-            runtime='runc',
-            restart_policy={'Name': 'on-failure', 'MaximumRetryCount': 1},
-            detach=True,
-        )
-        network.connect(instance, aliases=[name])
-        instances.append(instance)
-    return instances
-
+    return docker_controller.create_containers(docker.from_env(), network, services, extra_labels)
 
 def create_services(cli, network, services, extra_labels={}):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    if not isinstance(network, docker.models.networks.Network): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
     project_info = inspect_project_network(network)
     network_labels = get_labels(network)
-    swarm_mode = is_swarm_mode(network)
     
     # Update Project Name
     project_info = inspect_project_network(network)
@@ -459,40 +376,70 @@ def create_services(cli, network, services, extra_labels={}):
         headers = get_auth_headers(cli, image, auth_configs) if auth_configs else get_auth_headers(cli, image)
         #headers['Content-Type'] = 'application/json'
         body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
-        #import pprint
-        #pprint.pprint(body)
-        host = utils.get_requests_host(cli)
-        with requests_unixsocket.post(f"{host}/v1.40/services/create", headers=headers, json=body) as resp:
-            if resp.status_code == 201:
-                instance = get_service(cli, inst_name)
-            else:
-                print(resp.text, file=sys.stderr)
-                instance = None
-        instances.append(instance)
-    return instances
+
+        try:
+            ret = v1.create_namespaced_replication_controller(
+                namespace=namespace,
+                body=client.V1ReplicationController(
+                    metadata=client.V1ObjectMeta(
+                        name=name,
+                        labels=kwargs.get('labels', {})
+                    ),
+                    spec=client.V1ReplicationControllerSpec(
+                        replicas=kwargs.get('replicas', 1),
+                        selector={'MLAD.PROJECT.SERVICE': name},
+                        template=client.V1PodTemplateSpec(
+                            metadata=client.V1ObjectMeta(
+                                name=name,
+                                labels=kwargs.get('labels', {})
+                            ),
+                            spec=client.V1PodSpec(
+                                containers=[client.V1Container(
+                                    name=name,
+                                    image=kwargs.get('image', labels['MLAD.PROJECT.IMAGE']),
+                                    env=env,
+                                    #restart_policy,
+                                    #resources;
+                                    #mode
+                                    #constraints
+                                    command=kwargs.get('command', [])
+                                )]
+                            )
+                        )
+                    )
+                )
+            )
+            ret = v1.create_namespaced_service(namespace, client.V1Service(
+                metadata=client.V1ObjectMeta(
+                    name=name,
+                ),
+                spec=client.V1ServiceSpec(
+                    selector={'MLAD.PROJECT.SERVICE': name},
+                    ports=[client.V1ServicePort(port=_) for _ in kwargs.get('ports', [])]
+                )
+            ))
+        except ApiException as e:
+            print(f"Exception Handling v1.create_namespaced_replication_controller => {e}", file=sys.stderr)
+    return ret
 
 def remove_containers(cli, containers):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    for container in containers:
-        print(f"Stop {container.name}...")
-        container.stop()
-    for container in containers:
-        container.wait()
-        container.remove()
-    return True
+    return docker_controller.remove_containers(docker.from_env(), containers)
 
 def remove_services(cli, services, timeout=0xFFFF):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    
     for service in services:
         inspect = inspect_service(service)
         print(f"Stop {inspect['name']}...")
-        service.remove()
+        ret = v1.delete_namespaced_service(inspect['name'], namespace)
+        ret = v1.delete_namespaced_replication_controller(inspect['name'], namespace, propagation_policy='Foreground')
     removed = True
     for service in services:
         service_removed = False
         for _ in range(timeout):
             try:
-                service.reload()
+                #service.reload()
+                pass
             except docker.errors.NotFound:
                 service_removed = True
                 break
@@ -502,132 +449,65 @@ def remove_services(cli, services, timeout=0xFFFF):
 
 # Image Control
 def get_images(cli, project_key=None):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-
-    filters = 'MLAD.PROJECT'
-    if project_key: filters+= f"={project_key}"
-    return cli.images.list(filters={ 'label': filters } )
+    return docker_controller.get_images(docker.from_env(), project_key)
 
 def get_image(cli, image_id):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    return cli.images.get(image_id)    
+    return docker_controller.get_image(docker.from_env(), image_id)
 
 def inspect_image(image):
-    if not isinstance(image, docker.models.images.Image): raise TypeError('Parameter is not valid type.')
-    sorted_tags = sorted(image.tags, key=lambda x: chr(0xFFFF) if x.endswith('latest') else x)
-    headed = False
-    if sorted_tags:
-        latest_tag = sorted_tags[-1]
-        repository, tag = latest_tag.rsplit(':', 1) if ':' in latest_tag else (latest_tag, '')
-        headed = latest_tag.endswith('latest')
-    else:
-        repository, tag = image.short_id.split(':',1)[-1], ''
-    labels = {
-        # for Image
-        'id': image.id.split(':',1)[-1],
-        'short_id': image.short_id.split(':',1)[-1],
-        'repository': repository,
-        'tag': tag,
-        'tags': image.tags,
-        'latest': headed,
-        'author': image.attrs['Author'],
-        'created': image.attrs['Created'],
-        # for Project
-        'workspace': image.labels['MLAD.PROJECT.WORKSPACE'] if 'MLAD.PROJECT.WORKSPACE' in image.labels else 'Not Supported',
-        'project_name': image.labels['MLAD.PROJECT.NAME'],
-    }
-    return labels
+    return docker_controller.inspect_image(image)
 
 def build_image(cli, base_labels, tar, dockerfile, stream=False):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    # Setting path and docker file
-    #os.getcwd() + "/.mlad/"
-    #temporary
-    project_base = base_labels['MLAD.PROJECT.BASE']
-    project_name = base_labels['MLAD.PROJECT.NAME']
-    username = base_labels['MLAD.PROJECT.USERNAME']
-    latest_name = base_labels['MLAD.PROJECT.IMAGE']
-
-    headers = get_auth_headers(cli)
-    headers['content-type'] = 'application/x-tar'
-
-    params = {
-        'dockerfile': dockerfile,
-        't': latest_name,
-        'labels': json.dumps(base_labels),
-        'forcerm': 1,
-    }
-    host = utils.get_requests_host(cli)
-    def _request_build(headers, params, tar):
-        with requests_unixsocket.post(f"{host}/v1.24/build", headers=headers, params=params, data=tar, stream=True) as resp:
-            for _ in resp.iter_lines(decode_unicode=True):
-                line = json.loads(_)
-                yield line
-    if stream:
-        return _request_build(headers, params, tar)
-    else:
-        resp_stream = (_ for _ in _request_build(headers, params, tar))
-        for _ in resp_stream:
-            if 'error' in _: return (None, resp_stream)
-        return (get_image(cli, latest_name), resp_stream)
+    return docker_controller.build_image(docker.from_env(), base_labels, tar, dockerfile, stream)
 
 def remove_image(cli, ids, force=False):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    return [ cli.images.remove(image=id, force=force) for id in ids ]
+    return docker_controller.remove_image(docker.from_env(), ids, force)
 
 def prune_images(cli, project_key=None):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    filters = 'MLAD.PROJECT'
-    if project_key: filters+= f'={project_key}'
-    return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
+    return docker_controller.prune_images(docker.from_env(), project_key)
 
 def push_images(cli, project_key, stream=False):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    def _request_push():
-        for _ in get_images(cli, project_key):
-            inspect = inspect_image(_)
-            if inspect['short_id'] == inspect['repository']: continue
-            repository = inspect['repository']
-            output = cli.images.push(repository, stream=True, decode=True)
-            try:
-                for stream in output:
-                    yield stream
-            except StopIteration:
-                pass
-    if stream:
-        return _request_push()
-    else:
-        resp_stream = (_ for _ in _request_push())
-        for _ in resp_stream:
-            if 'error' in _: return (False, resp_stream)
-        return (True, resp_stream)
-
+    return docker_controller.push_images(docker.from_env(), project_key, stream)
  
 def get_nodes(cli):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    return dict([(_.short_id, _) for _ in cli.nodes.list()])
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    print([(_.metadata.name, _.metadata) for _ in api.list_node().items])
+    return dict(
+        [(_.metadata.name, _.metadata) for _ in api.list_node().items]
+    )
 
 def get_node(cli, node_key):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    try:
-        node = cli.nodes.get(node_key)
-    except docker.errors.APIError as e:
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    nodes = api.list_node(field_selector=f"metadata.name={node_key}")
+    if not nodes.items:
+        nodes = api.list_node(field_selector=f"metadata.uid={node_key}")
+    if nodes.items: 
+        return nodes.items[0]
+    else:
         #print(f'Cannot find node "{node_key}"', file=sys.stderr)
         raise exception.NotFound(f'Cannot find node "{node_key}"')
-    return node
 
 def inspect_node(node):
-    if not isinstance(node, docker.models.nodes.Node): raise TypeError('Parameter is not valid type.')
+    if not isinstance(node, client.models.v1_node.V1Node): raise TypeError('Parameter is not valid type.')
+    hostname = node.metadata.labels['kubernetes.io/hostname']
+    availability = node.spec.taints != None
+    platform = node.metadata.labels['kubernetes.io/os']    
+    resources = node.status.capacity
+    engine_version = node.status.node_info.kubelet_version
+    role = [_.split('/')[-1] for _ in node.metadata.labels if _.startswith('node-role')][-1]
+    status = '-'
     return {
-        'id': node.attrs['ID'],
-        'hostname': node.attrs['Description']['Hostname'],
-        'labels': node.attrs['Spec']['Labels'],
-        'role': node.attrs['Spec']['Role'],
-        'availability': node.attrs['Spec']['Availability'],
-        'platform': node.attrs['Description']['Platform'],
-        'resources': node.attrs['Description']['Resources'],
-        'engine_version': node.attrs['Description']['Engine']['EngineVersion'],
-        'status': node.attrs['Status']
+        'id': node.metadata.uid,
+        'hostname': hostname,#node.metadata.name,
+        'labels': node.metadata.labels,
+        'role': role,
+        'availability': availability,
+        'platform': platform,
+        'resources': resources,
+        'engine_version': engine_version,
+        'status': status,
     }
 
 def enable_node(cli, node_key):
@@ -723,6 +603,11 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
 
 if __name__ == '__main__':
     cli = get_api_client()
+    api_instance = client.CoreV1Api(cli)
+    ret = api_instance.list_node()
+    print(ret.items[-1], type(ret.items[-1]))
+    sys.exit(1)
+
     # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
     v1 = client.CoreV1Api(cli)
     body = client.V1Namespace(metadata=client.V1ObjectMeta(name="hello-cluster", labels={'MLAD.PROJECT': '123', 'MLAD.PROJECT.NAME':'hello'}))
@@ -734,8 +619,10 @@ if __name__ == '__main__':
     ret = v1.list_namespace(label_selector="MLAD.PROJECT=123", watch=False)
     print('Project Networks', [_.metadata.name for _ in ret.items])
     namespace = [_.metadata.name for _ in ret.items][-1]
-    print(ret.items[-1])
 
+    #if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    #if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
+    
     def create_service(name, *args):
         cli = get_api_client()
         print(get_project_networks(cli))
