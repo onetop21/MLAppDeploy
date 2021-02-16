@@ -570,7 +570,7 @@ def inspect_image(image):
     }
     return labels
 
-def build_image(cli, base_labels, tar, dockerfile, stream=False):
+def build_image(cli, base_labels, tar, dockerfile, no_cache=False, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     # Setting path and docker file
     #os.getcwd() + "/.mlad/"
@@ -588,6 +588,7 @@ def build_image(cli, base_labels, tar, dockerfile, stream=False):
         't': latest_name,
         'labels': json.dumps(base_labels),
         'forcerm': 1,
+        'nocache': no_cache
     }
     host = utils.get_requests_host(cli)
     def _request_build(headers, params, tar):

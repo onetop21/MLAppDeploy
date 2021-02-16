@@ -37,9 +37,10 @@ def ps(all, no_trunc):
 @click.command()
 @click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image.')
 @click.option('--verbose', '-v', is_flag=True, help='Print detail-log during build a image.')
-def build(tagging, verbose):
+@click.option('--no-cache', is_flag=True, help='Do not use the cache when building the image.')
+def build(tagging, verbose, no_cache):
     '''Build Project to Image for Deploying on Cluster.'''
-    project.build(tagging, verbose)
+    project.build(tagging, verbose, no_cache)
 
 @click.command()
 @click.option('--build', '-b', is_flag=True, help='Build Project Image before Deploy and Run Project')

@@ -141,9 +141,9 @@ def status(all, no_trunc):
     else:
         utils.print_table(columns, 'Project is not running.')
 
-def build(tagging, verbose):
+def build(tagging, verbose, no_cache):
     config = utils.read_config()
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     project_key = utils.project_key(utils.get_workspace())
 
     project = utils.get_project(default_project)
@@ -207,7 +207,7 @@ def build(tagging, verbose):
     tarbytes.seek(0)
 
     # Build Image
-    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, stream=True) 
+    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
 
     # Print build output
     for _ in build_output:
