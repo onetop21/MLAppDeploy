@@ -69,10 +69,10 @@ def get_project_network(cli, **kwargs):
         namespaces = list(filter(lambda _: _.metadata.uid==kwargs.get('network_id'), all_namespaces))
     else:
         raise TypeError('At least one parameter is required.')
-    if len(namespaces) == 1:
-        return namespaces[0]
-    elif len(namespaces) == 0:
+    if not namespaces.items:
         return None
+    elif len(namespaces.items)==1:
+        return namespace.items[0]
     else:
         raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
 
@@ -139,7 +139,6 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
                 'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
-
             ret = api.create_namespace(
                 client.V1Namespace(
                     metadata=client.V1ObjectMeta(
@@ -497,7 +496,9 @@ def inspect_node(node):
     resources = node.status.capacity
     engine_version = node.status.node_info.kubelet_version
     role = [_.split('/')[-1] for _ in node.metadata.labels if _.startswith('node-role')][-1]
-    status = '-'
+    state = node.status.conditions[-1].type
+    addr = node.status.addresses[0].address
+    
     return {
         'id': node.metadata.uid,
         'hostname': hostname,#node.metadata.name,
@@ -507,7 +508,7 @@ def inspect_node(node):
         'platform': platform,
         'resources': resources,
         'engine_version': engine_version,
-        'status': status,
+        'status': {'State': state, 'Addr':addr},
     }
 
 def enable_node(cli, node_key):
@@ -535,30 +536,30 @@ def disable_node(cli, node_key):
     node.update(spec)
     
 def add_node_labels(cli, node_key, **kv):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    try:
-        node = cli.nodes.get(node_key)
-    except docker.errors.APIError as e:
-        #print(f'Cannot find node "{node_key}"', file=sys.stderr)
-        raise exception.NotFound(f'Cannot find node "{node_key}"')
-        sys.exit(1)
-    spec = node.attrs['Spec']
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    body = {
+        "metadata": {
+            "labels": dict()
+            }
+    }
     for key in kv:
-        spec['Labels'][key] = kv[key]
-    node.update(spec)
+        body['metadata']['labels'][key]=kv[key]
+    api_response = api.patch_node(node_key, body)
+    print(api_response)
 
 def remove_node_labels(cli, node_key, *keys):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    try:
-        node = cli.nodes.get(node_key)
-    except docker.errors.APIError as e:
-        print(f'Cannot find node "{node_key}"', file=sys.stderr)
-        raise exception.NotFound(f'Cannot find node "{node_key}"')
-        sys.exit(1)
-    spec = node.attrs['Spec']
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    body = {
+        "metadata": {
+            "labels": dict()
+            }
+    }
     for key in keys:
-        del spec['Labels'][key]
-    node.update(spec)
+        body['metadata']['labels'][key]=None
+    api_response = api.patch_node(node_key, body)
+    print(api_response)
 
 def container_logs(cli, project_key, tail='all', follow=False, timestamps=False):
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
