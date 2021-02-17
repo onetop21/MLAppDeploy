@@ -603,25 +603,91 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
 
 if __name__ == '__main__':
     cli = get_api_client()
-    api_instance = client.CoreV1Api(cli)
-    ret = api_instance.list_node()
-    print(ret.items[-1], type(ret.items[-1]))
-    sys.exit(1)
 
     # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
     v1 = client.CoreV1Api(cli)
     body = client.V1Namespace(metadata=client.V1ObjectMeta(name="hello-cluster", labels={'MLAD.PROJECT': '123', 'MLAD.PROJECT.NAME':'hello'}))
     try:
         ret = v1.create_namespace(body)
-        print(ret)
+        print(f'Create Namespace [{ret.metadata.name}]')
     except ApiException as e:
-        print(f"Exception Handling v1.create_namespace => {e}", file=sys.stderr)
+        #print(f"Exception Handling v1.create_namespace => {e}", file=sys.stderr)
+        if e.headers['Content-Type'] == 'application/json':
+            body = json.loads(e.body)
+            if body['kind'] == 'Status':
+                print(f"{body['status']} : {body['message']}")
     ret = v1.list_namespace(label_selector="MLAD.PROJECT=123", watch=False)
     print('Project Networks', [_.metadata.name for _ in ret.items])
     namespace = [_.metadata.name for _ in ret.items][-1]
 
     #if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     #if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
+
+    project = {'name': 'test_project', 'author': 'onetop21', 'version': 'v0.0.1'}
+    labels = make_base_labels("onetop21-linux@/home/onetop21/workspace/MLAppDeploy/example", 'onetop21', project, '172.20.41.118:5000')
+    try:
+        v1.create_namespaced_config_map(
+            'hello-cluster', 
+            client.V1ConfigMap(
+                data=labels,
+                metadata=client.V1ObjectMeta(name='what')
+            )
+        )
+    except ApiException as e:
+        #print(f"Exception Handling v1.create_namespace => {e}", file=sys.stderr)
+        if e.headers['Content-Type'] == 'application/json':
+            body = json.loads(e.body)
+            if body['kind'] == 'Status':
+                print(f"{body['status']} : {body['message']}")
+
+    try:
+        ret = v1.read_namespaced_config_map(
+            "what",
+            'hello-cluster', 
+        )
+        print(ret.data)
+    except ApiException as e:
+        #print(f"Exception Handling v1.create_namespace => {e}", file=sys.stderr)
+        if e.headers['Content-Type'] == 'application/json':
+            body = json.loads(e.body)
+            if body['kind'] == 'Status':
+                print(f"{body['status']} : {body['message']}")
+
+    try:
+        ret = v1.replace_namespaced_config_map(
+            "what",
+            'hello-cluster',
+            client.V1ConfigMap(
+                data={
+                    "MLAD.PROJECT.AUTHOR": "kkkdoen"
+                },
+                metadata=client.V1ObjectMeta(name='what')
+            )
+        )
+        print(ret.data)
+    except ApiException as e:
+        #print(f"Exception Handling v1.create_namespace => {e}", file=sys.stderr)
+        if e.headers['Content-Type'] == 'application/json':
+            body = json.loads(e.body)
+            if body['kind'] == 'Status':
+                print(f"{body['status']} : {body['message']}")
+
+    try:
+        ret = v1.delete_namespaced_config_map(
+            "what",
+            'hello-cluster'
+        )
+        print(ret)
+    except ApiException as e:
+        #print(f"Exception Handling v1.create_namespace => {e}", file=sys.stderr)
+        if e.headers['Content-Type'] == 'application/json':
+            body = json.loads(e.body)
+            if body['kind'] == 'Status':
+                print(f"{body['status']} : {body['message']}")
+
+            
+    sys.exit(1)
+
     
     def create_service(name, *args):
         cli = get_api_client()
