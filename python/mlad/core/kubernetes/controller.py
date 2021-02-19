@@ -72,7 +72,7 @@ def get_project_network(cli, **kwargs):
     if not namespaces.items:
         return None
     elif len(namespaces.items)==1:
-        return namespace.items[0]
+        return namespaces.items[0]
     else:
         raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
 
@@ -86,23 +86,47 @@ def get_labels(obj):
     else:
         raise TypeError('Parameter is not valid type.')
 
-def inspect_project_network(network):
+def get_config_labels(cli, obj, key):
+    #key='base_labels', 'service_labels'
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    if isinstance(obj,client.models.v1_namespace.V1Namespace):
+        namespace = obj.metadata.name
+    elif isinstance(obj, client.models.v1_service.V1Service):
+        namespace = obj.metadata.namespace
+    ret = api.read_namespaced_config_map(key, namespace)
+    return ret.data
+
+def create_config_labels(cli, key, namespace, labels):
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    ret = api.create_namespaced_config_map(
+        namespace, 
+        client.V1ConfigMap(
+            data=labels,
+            metadata=client.V1ObjectMeta(name=key)
+        )
+    )
+    return ret.data
+
+def inspect_project_network(cli, network):
     if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
-    labels = get_labels(network)
-    hostname, path = labels['MLAD.PROJECT.WORKSPACE'].split(':')
+    labels = get_labels(network) #labels from namespace
+    config_labels = get_config_labels(cli, network, 'project-labels')
+    hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
     return {
         'key': uuid.UUID(labels['MLAD.PROJECT']),
         'workspace': {
             'hostname': hostname,
             'path': path
         },
-        'username': labels['MLAD.PROJECT.USERNAME'],
-        'name': labels['MLAD.PROJECT.NETWORK'],
+        'username': config_labels['MLAD.PROJECT.USERNAME'],
+        'name': config_labels['MLAD.PROJECT.NETWORK'],
         'project': labels['MLAD.PROJECT.NAME'],
-        'id': uuid.UUID(labels['MLAD.PROJECT.ID']),
-        'version': labels['MLAD.PROJECT.VERSION'],
-        'base': labels['MLAD.PROJECT.BASE'],
-        'image': labels['MLAD.PROJECT.IMAGE'],
+        'id': uuid.UUID(config_labels['MLAD.PROJECT.ID']),
+        'version': config_labels['MLAD.PROJECT.VERSION'],
+        'base': config_labels['MLAD.PROJECT.BASE'],
+        'image': config_labels['MLAD.PROJECT.IMAGE'],
     }
 
 def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False, stream=False):
@@ -139,14 +163,20 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
                 'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
+            keys = {
+                'MLAD.PROJECT':labels['MLAD.PROJECT'],
+                'MLAD.PROJECT.NAME':labels['MLAD.PROJECT.NAME'],
+            }
             ret = api.create_namespace(
                 client.V1Namespace(
                     metadata=client.V1ObjectMeta(
                         name=network_name, 
-                        labels=labels
+                        labels=keys
                     )
                 )
             )
+            config_map_ret=create_config_labels(cli, 'project-labels', 
+                network_name, labels)
         except ApiException as e:
             message = f"Failed to create network.\n{e}\n"
             yield {'result': 'failed', 'stream': message}
@@ -159,8 +189,9 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
 def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
-    network_info = inspect_project_network(network)
-    cli.delete_namespace(network.metadata.name)
+    api = client.CoreV1Api(cli)
+    network_info = inspect_project_network(cli, network)
+    ret = api.delete_namespace(network.metadata.name)
     def resp_stream():
         removed = False
         for tick in range(timeout):
@@ -191,50 +222,72 @@ def get_containers(cli, project_key=None, extra_filters={}):
 
 def get_services(cli, project_key=None, extra_filters={}):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
     filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
     filters += [f'{key}={value}' for key, value in extra_filters.items()]
-    services = cli.list_service_for_all_namespaces(label_selector=','.join(filters))
+    services = api.list_service_for_all_namespaces(label_selector=','.join(filters))
     if project_key:
-        return dict([(_.metadata.labels['MLAD.PROJECT.SERVICE'], _) for _ in services])
+        return dict([(_.metadata.labels['MLAD.PROJECT.SERVICE'], _) for _ in services.items])
     else:
-        return dict([(_.name, _) for _ in services])
+        return dict([(_.metadata.name, _) for _ in services.items])
 
 def get_service(cli, service_id):
+    #service_id = k8s service uid
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
-    services = cli.list_service_for_all_namespaces(label_selector='MLAD.PROJECT')
-    return dict([(_.metadata.uid, _) for _ in services]).get(service_id)
+    api = client.CoreV1Api(cli)
+    service = api.list_service_for_all_namespaces(label_selector=f"uid={service_id}")
+    #service = api.read_namespaced_service(service_name, namespace)
+    #print(dict([(_.metadata.uid, _) for _ in services.items]))
+    #return dict([(_.metadata.uid, _) for _ in services]).get(service_id)
+    return service.items[0]
 
 def inspect_container(container):
     return docker_controller.inspect_container(container)
 
-def inspect_service(service):
+def get_tasks(pod):
+    if not isinstance(pod, client.models.v1_pod.V1Pod): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    return {}
+
+def inspect_service(cli, service):
     if not isinstance(service, client.models.v1_service.V1Service): raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    service_name = service.metadata.name
+    namespace = service.metadata.namespace
+    config_labels = get_config_labels(cli, service, 
+        f'service-{service_name}-labels')
     labels = service.metadata.labels
-    hostname, path = labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
+    replica_ret = api.read_namespaced_replication_controller(service_name, namespace)
+    pod_ret = api.list_namespaced_pod(namespace, label_selector=f'MLAD.PROJECT.SERVICE={service_name}')
+
+    hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
+    #TODO get pod info & parsing for task 
     inspect = {
-        'key': uuid.UUID(labels['MLAD.PROJECT']) if labels.get('MLAD.VERSION') else '',
+        'key': uuid.UUID(config_labels['MLAD.PROJECT']) if config_labels.get('MLAD.VERSION') else '',
         'workspace': {
             'hostname': hostname,
             'path': path
         },
-        'username': labels.get('MLAD.PROJECT.USERNAME'),
-        'network': labels.get('MLAD.PROJECT.NETWORK'),
-        'project': labels.get('MLAD.PROJECT.NAME'),
-        'project_id': uuid.UUID(labels['MLAD.PROJECT.ID']) if labels.get('MLAD.VERSION') else '',
-        'version': labels.get('MLAD.PROJECT.VERSION'),
-        'base': labels.get('MLAD.PROJECT.BASE'),
-        'image': service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image'], # Replace from labels['MLAD.PROJECT.IMAGE']
+        'username': config_labels.get('MLAD.PROJECT.USERNAME'),
+        'network': config_labels.get('MLAD.PROJECT.NETWORK'),
+        'project': config_labels.get('MLAD.PROJECT.NAME'),
+        'project_id': uuid.UUID(config_labels['MLAD.PROJECT.ID']) if config_labels.get('MLAD.VERSION') else '',
+        'version': config_labels.get('MLAD.PROJECT.VERSION'),
+        'base': config_labels.get('MLAD.PROJECT.BASE'),
+        'image': replica_ret.spec.template.spec.containers[0].image, # Replace from labels['MLAD.PROJECT.IMAGE']
 
-        'id': service.id,
-        'name': labels.get('MLAD.PROJECT.SERVICE'), 
-        'replicas': service.attrs['Spec']['Mode']['Replicated']['Replicas'],
-        'tasks': dict([(task['ID'][:SHORT_LEN], task) for task in service.tasks()]),
+        'id': service.metadata.uid,
+        'name': config_labels.get('MLAD.PROJECT.SERVICE'), 
+        'replicas': replica_ret.spec.replicas,
+        #'tasks': dict([(task['ID'][:SHORT_LEN], task) for task in service.tasks()]),
+        'tasks': dict([(pod.metadata.uid[:SHORT_LEN], {}) for pod in pod_ret.items]),
         'ports': {}
     }
-    if 'Ports' in service.attrs['Endpoint']:
-        for _ in service.attrs['Endpoint']['Ports']:
-            target = _['TargetPort']
-            published = _['PublishedPort']
+    #TODO SERVICE PORTS -> swarm에 맞게 치환된건지 확인
+    if service.spec.ports:
+        for _ in service.spec.ports:
+            target = _.target_port
+            published = _.port
             inspect['ports'][f"{target}->{published}"] = {
                 'target': target,
                 'published': published
@@ -247,11 +300,13 @@ def create_containers(cli, network, services, extra_labels={}):
 def create_services(cli, network, services, extra_labels={}):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
-    project_info = inspect_project_network(network)
+    api = client.CoreV1Api(cli)
+    namespace = network.metadata.name
+    project_info = inspect_project_network(cli, network)
+    config_labels = get_config_labels(cli, network, 'project-labels')
     network_labels = get_labels(network)
-    
     # Update Project Name
-    project_info = inspect_project_network(network)
+    #project_info = inspect_project_network(network)
     image_name = project_info['image']
     project_base = project_info['base']
 
@@ -264,7 +319,7 @@ def create_services(cli, network, services, extra_labels={}):
             raise exception.Duplicated('Already running service.')
 
         image = service['image'] or image_name
-        env = utils.decode_dict(network_labels.get('MLAD.PROJECT.ENV'))
+        env = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
@@ -358,26 +413,31 @@ def create_services(cli, network, services, extra_labels={}):
             'image': image, 
             'env': env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
             'mounts': ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro'],
-            'command': command,
+            'command': command.split(),
             'container_labels': labels,
             'labels': labels,
-            'networks': [{'Target': network.name, 'Aliases': [name]}],
+            'networks': [{'Target': namespace, 'Aliases': [name]}],
             'restart_policy': restart_policy,
             'resources': resources,
             'mode': service_mode,
-            'constraints': constraints
+            'constraints': constraints,
+            'ports': [5555]
         }
         #instance = cli.services.create(**kwargs)
 
         ## Create Service by REST API (with AuthConfig)
         #params = 
-        auth_configs = utils.decode_dict(network_labels.get('MLAD.PROJECT.AUTH_CONFIGS'))
+        auth_configs = utils.decode_dict(config_labels['MLAD.PROJECT.AUTH_CONFIGS'])
         headers = get_auth_headers(cli, image, auth_configs) if auth_configs else get_auth_headers(cli, image)
         #headers['Content-Type'] = 'application/json'
-        body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
-
+        #body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
+        #temp_image = kwargs.get('image') if kwargs.get('image') else config_labels['MLAD.PROJECT.IMAGE']
+        envs = [client.V1EnvVar(name=_.split('=')[0], value=_.split('=')[1])
+               for _ in env]
+        config_labels['MLAD.PROJECT.SERVICE']=name
+    
         try:
-            ret = v1.create_namespaced_replication_controller(
+            ret = api.create_namespaced_replication_controller(
                 namespace=namespace,
                 body=client.V1ReplicationController(
                     metadata=client.V1ObjectMeta(
@@ -395,8 +455,8 @@ def create_services(cli, network, services, extra_labels={}):
                             spec=client.V1PodSpec(
                                 containers=[client.V1Container(
                                     name=name,
-                                    image=kwargs.get('image', labels['MLAD.PROJECT.IMAGE']),
-                                    env=env,
+                                    image=image,
+                                    env=envs,
                                     #restart_policy,
                                     #resources;
                                     #mode
@@ -408,42 +468,54 @@ def create_services(cli, network, services, extra_labels={}):
                     )
                 )
             )
-            ret = v1.create_namespaced_service(namespace, client.V1Service(
+            
+            ret = api.create_namespaced_service(namespace, client.V1Service(
                 metadata=client.V1ObjectMeta(
                     name=name,
+                    labels=kwargs.get('labels', {})
                 ),
                 spec=client.V1ServiceSpec(
                     selector={'MLAD.PROJECT.SERVICE': name},
                     ports=[client.V1ServicePort(port=_) for _ in kwargs.get('ports', [])]
                 )
             ))
+            temp_body = {
+                "metadata": {
+                    "labels": {'uid':ret.metadata.uid}
+                    }
+            }
+            temp_ret  = api.patch_namespaced_service(name,namespace,temp_body)
+            instances.append(temp_ret)
+            ret = create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
         except ApiException as e:
             print(f"Exception Handling v1.create_namespaced_replication_controller => {e}", file=sys.stderr)
-    return ret
+    ret = create_config_labels(cli, 'service-labels', namespace, config_labels)
+    return instances
 
 def remove_containers(cli, containers):
     return docker_controller.remove_containers(docker.from_env(), containers)
 
 def remove_services(cli, services, timeout=0xFFFF):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
-    
+    api = client.CoreV1Api(cli)
     for service in services:
-        inspect = inspect_service(service)
+        namespace = service.metadata.namespace
+        inspect = inspect_service(cli, service)
         print(f"Stop {inspect['name']}...")
-        ret = v1.delete_namespaced_service(inspect['name'], namespace)
-        ret = v1.delete_namespaced_replication_controller(inspect['name'], namespace, propagation_policy='Foreground')
+        ret = api.delete_namespaced_service(inspect['name'], namespace)
+        ret = api.delete_namespaced_replication_controller(inspect['name'], namespace, propagation_policy='Foreground')
     removed = True
-    for service in services:
-        service_removed = False
-        for _ in range(timeout):
-            try:
-                #service.reload()
-                pass
-            except docker.errors.NotFound:
-                service_removed = True
-                break
-            time.sleep(1)
-        removed &= service_removed
+    # for service in services:
+    #     service_removed = False
+    #     for _ in range(timeout):
+    #         try:
+    #             #service.reload()
+    #             pass
+    #         except docker.errors.NotFound:
+    #             service_removed = True
+    #             break
+    #         time.sleep(1)
+    #     removed &= service_removed
     return removed
 
 # Image Control
@@ -604,9 +676,9 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
 
 if __name__ == '__main__':
     cli = get_api_client()
-
     # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
     v1 = client.CoreV1Api(cli)
+
     body = client.V1Namespace(metadata=client.V1ObjectMeta(name="hello-cluster", labels={'MLAD.PROJECT': '123', 'MLAD.PROJECT.NAME':'hello'}))
     try:
         ret = v1.create_namespace(body)

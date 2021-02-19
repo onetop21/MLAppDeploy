@@ -53,7 +53,10 @@ def project_inspect(project_key:str):
         network = ctlr.get_project_network(cli, project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
-        inspect = ctlr.inspect_project_network(network)
+        if utils.is_kube_mode():
+            inspect = ctlr.inspect_project_network(cli, network)
+        else:
+            inspect = ctlr.inspect_project_network(network)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

@@ -3,12 +3,20 @@ from typing import List
 from fastapi import APIRouter, Query, HTTPException
 from mlad.service.models import service
 from mlad.service.exception import InvalidProjectError,InvalidServiceError
-from mlad.core.docker import controller as ctlr
+from mlad.service.libs import utils
+if not utils.is_kube_mode():
+    from mlad.core.docker import controller as ctlr
+else:
+    print('kube mode')
+    from mlad.core.kubernetes import controller as ctlr
 
 router = APIRouter()
 
-def _check_project_key(project_key, service):
-    inspect_key = str(ctlr.inspect_service(service)['key']).replace('-','')
+def _check_project_key(project_key, service, cli=None):
+    if utils.is_kube_mode():
+        inspect_key = str(ctlr.inspect_service(cli, service)['key']).replace('-','')
+    else:
+        inspect_key = str(ctlr.inspect_service(service)['key']).replace('-','')
     if project_key == inspect_key:
         return True
     else:
@@ -26,7 +34,10 @@ def services_list(labels: List[str] = Query(None)):
     try:
         services = ctlr.get_services(cli, extra_filters=labels_dict)
         for service in services.values():
-            inspect = ctlr.inspect_service(service)
+            if utils.is_kube_mode:
+                inspect = ctlr.inspect_service(cli, service)
+            else:
+                inspect = ctlr.inspect_service(service)
             inspects.append(inspect)    
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -53,7 +64,10 @@ def service_list(project_key:str,
 
         services = ctlr.get_services(cli, key, extra_filters=labels_dict)   
         for service in services.values():
-            inspect = ctlr.inspect_service(service)
+            if utils.is_kube_mode():
+                inspect = ctlr.inspect_service(cli, service)
+            else:
+                inspect = ctlr.inspect_service(service)
             inspects.append(inspect)      
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -72,13 +86,17 @@ def service_create(project_key:str, req:service.CreateRequest):
         network = ctlr.get_project_network(cli, project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
-
         services = ctlr.create_services(cli, network, targets)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return [_.short_id for _ in services]
+    if utils.is_kube_mode():
+        print([(_.metadata.name, _.metadata.namespace, _.metadata.uid)for _ in services])
+    
+        return [_.metadata.uid for _ in services]
+    else :
+        return [_.short_id for _ in services]
 
 @router.get("/project/{project_key}/service/{service_id}")
 def service_inspect(project_key:str, service_id:str):
@@ -86,8 +104,11 @@ def service_inspect(project_key:str, service_id:str):
     try:
         service = ctlr.get_service(cli, service_id)
         key = str(project_key).replace('-','')
-        if _check_project_key(key, service):
-            inspects = ctlr.inspect_service(service)
+        if _check_project_key(key, service, cli):
+            if utils.is_kube_mode():
+                inspects = ctlr.inspect_service(cli, service)
+            else:
+                inspects = ctlr.inspect_service(service)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -101,7 +122,7 @@ def service_tasks(project_key:str, service_id:str):
     try:
         service = ctlr.get_service(cli, service_id)
         key = str(project_key).replace('-','')
-        if _check_project_key(key, service):
+        if _check_project_key(key, service, cli):
              tasks= ctlr.inspect_service(
                 ctlr.get_service(cli, service_id))['tasks']           
     except InvalidServiceError as e:
@@ -130,7 +151,7 @@ def service_remove(project_key:str, service_id:str):
     cli = ctlr.get_api_client()
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_key(project_key, service):
+        if _check_project_key(project_key, service, cli):
             ctlr.remove_services(cli, [service])
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
