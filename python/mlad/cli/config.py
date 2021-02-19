@@ -66,12 +66,12 @@ def init(address, token):
     get(None)
 
 def set(*args):
-    config = default_config['remote'](utils.read_config())
+    config = default_config['client'](utils.read_config())
     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
     utils.write_config(config)
 
 def get(keys):
-    config = default_config['remote'](utils.read_config())
+    config = default_config['client'](utils.read_config())
     data = get_value(OmegaConf.to_container(config, resolve=True), keys)
     if isinstance(data, list):
         table = [["KEY", "VALUE"]]
@@ -82,7 +82,7 @@ def get(keys):
         print(data)
 
 def env(unset):
-    config = default_config['remote'](utils.read_config())
+    config = default_config['client'](utils.read_config())
     envs = utils.get_service_env(config)
     for line in envs:
         if unset:
