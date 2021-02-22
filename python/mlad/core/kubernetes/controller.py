@@ -22,7 +22,7 @@ from mlad.core.docker import controller as docker_controller
 SHORT_LEN = 10
 
 # Docker CLI from HOST
-def get_api_client(config_file=config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION):
+def get_api_client(config_file='~/.kube/config'):#config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION):
     #from kubernetes.client.api_client import ApiClient
     #config.load_kube_config(config_file=config_file) # configuration to Configuration(global)
     #return ApiClient() # If Need, set configuration parameter from client.Configuration
