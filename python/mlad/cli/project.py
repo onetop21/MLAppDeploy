@@ -67,22 +67,38 @@ def list():
     config = utils.read_config()
     projects = {}
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
-    for inspect in api.service.get():
-        default = { 
-        'username': inspect['username'], 
-        'project': inspect['name'], 
-        'image': inspect['image'],
-        'services': 0, 'replicas': 0, 'tasks': 0 
-        }
-        project_key = inspect['key']
-        tasks = inspect['tasks'].values()
-        tasks_state = [_['Status']['State'] for _ in tasks]
-        projects[project_key] = projects[project_key] if project_key in projects else default
-        projects[project_key]['services'] += 1
-        projects[project_key]['replicas'] += inspect['replicas']
-        projects[project_key]['tasks'] += tasks_state.count('running')
+    res = api.service.get()
+    if res['mode'] == 'swarm':
+        for inspect in res['inspects']:
+            default = { 
+            'username': inspect['username'], 
+            'project': inspect['name'], 
+            'image': inspect['image'],
+            'services': 0, 'replicas': 0, 'tasks': 0 
+            }
+            project_key = inspect['key']
+            tasks = inspect['tasks'].values()
+            tasks_state = [_['Status']['State'] for _ in tasks]
+            projects[project_key] = projects[project_key] if project_key in projects else default
+            projects[project_key]['services'] += 1
+            projects[project_key]['replicas'] += inspect['replicas']
+            projects[project_key]['tasks'] += tasks_state.count('running')
+    else:
+        for inspect in res['inspects']:
+            default = { 
+            'username': inspect['username'], 
+            'project': inspect['name'], 
+            'image': inspect['image'],
+            'services': 0, 'replicas': 0, 'tasks': 0 
+            }
+            project_key = inspect['key']
+            tasks = inspect['tasks'].values()
+            tasks_state = [_['status']['state'] for _ in tasks]
+            projects[project_key] = projects[project_key] if project_key in projects else default
+            projects[project_key]['services'] += 1
+            projects[project_key]['replicas'] += inspect['replicas']
+            projects[project_key]['tasks'] += tasks_state.count('Running')
     columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
-
     for project in projects:
         running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
         columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['services'], f"{running_tasks:>5}"))
@@ -100,41 +116,84 @@ def status(all, no_trunc):
         sys.exit(1)
 
     task_info = []
-    for inspect in api.service.get(project_key):
-        try:
-            for task_id, task in api.service.get_tasks(project_key, inspect['id']).items():
-                uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
-                if uptime > 24 * 60 * 60:
-                    uptime = f"{uptime // (24 * 60 * 60):.0f} days"
-                elif uptime > 60 * 60:
-                    uptime = f"{uptime // (60 * 60):.0f} hours"
-                elif uptime > 60:
-                    uptime = f"{uptime // 60:.0f} minutes"
-                else:
-                    uptime = f"{uptime:.0f} seconds"
-                if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    if 'NodeID' in task:
-                        node_inspect = api.node.inspect(task['NodeID'])
+    res = api.service.get(project_key)
+    if res['mode'] == 'swarm':
+        for inspect in res['inspects']:
+            try:
+                for task_id, task in api.service.get_tasks(project_key, inspect['id']).items():
+                    uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
+                    if uptime > 24 * 60 * 60:
+                        uptime = f"{uptime // (24 * 60 * 60):.0f} days"
+                    elif uptime > 60 * 60:
+                        uptime = f"{uptime // (60 * 60):.0f} hours"
+                    elif uptime > 60:
+                        uptime = f"{uptime // 60:.0f} minutes"
+                    else:
+                        uptime = f"{uptime:.0f} seconds"
+                    if all or task['Status']['State'] not in ['shutdown', 'failed']:
+                        if 'NodeID' in task:
+                            node_inspect = api.node.inspect(task['NodeID'])
+                        task_info.append((
+                            task_id,
+                            inspect['name'],
+                            task['Slot'],
+                            node_inspect['hostname'] if 'NodeID' in task else '-',
+                            task['DesiredState'].title(), 
+                            f"{task['Status']['State'].title()}", 
+                            uptime,
+                            ', '.join([_ for _ in inspect['ports']]),
+                            task['Status']['Err'] if 'Err' in task['Status'] else '-'
+                        ))
+            except NotFoundError as e:
+                pass
+        
+        columns = [('ID', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'UPTIME', 'PORTS', 'ERROR')]
+        columns_data = []
+        for id, service, slot, node, desired_state, current_state, uptime, ports, error in task_info:
+            columns_data.append((id, service, slot, node, desired_state, current_state, uptime, ports, error))
+        columns_data = sorted(columns_data, key=lambda x: f"{x[1]}-{x[2]:08}")
+        columns += columns_data
+    else:
+        for inspect in res['inspects']:
+            try:
+                for pod_name, pod in api.service.get_tasks(project_key, inspect['id']).items():
+                    ready_cnt = 0
+                    restart_cnt = 0
+                    container_cnt = len(pod['container_status'])
+                    for _ in pod['container_status']:
+                        restart_cnt += _['restart']
+                        if _['ready']==True:
+                            ready_cnt+=1
+                    ready = f'{ready_cnt}/{container_cnt}'
+            
+                    uptime = (datetime.utcnow() - parser.parse(pod['created']).replace(tzinfo=None)).total_seconds()
+                    if uptime > 24 * 60 * 60:
+                        uptime = f"{uptime // (24 * 60 * 60):.0f} days"
+                    elif uptime > 60 * 60:
+                        uptime = f"{uptime // (60 * 60):.0f} hours"
+                    elif uptime > 60:
+                        uptime = f"{uptime // 60:.0f} minutes"
+                    else:
+                        uptime = f"{uptime:.0f} seconds"
+                    #if all or task['Status']['State'] not in ['shutdown', 'failed']:
                     task_info.append((
-                        task_id,
+                        pod_name,
                         inspect['name'],
-                        task['Slot'],
-                        node_inspect['hostname'] if 'NodeID' in task else '-',
-                        task['DesiredState'].title(), 
-                        f"{task['Status']['State'].title()}", 
-                        uptime,
-                        ', '.join([_ for _ in inspect['ports']]),
-                        task['Status']['Err'] if 'Err' in task['Status'] else '-'
+                        ready,
+                        pod['node'],
+                        pod['phase'],
+                        'Running' if pod['status']['state'] == 'Running' else pod['status']['detail']['reason'],
+                        restart_cnt,
+                        uptime
                     ))
-        except NotFoundError as e:
-            pass
-    columns = [('ID', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'UPTIME', 'PORTS', 'ERROR')]
-    columns_data = []
-    for id, service, slot, node, desired_state, current_state, uptime, ports, error in task_info:
-        columns_data.append((id, service, slot, node, desired_state, current_state, uptime, ports, error))
-    columns_data = sorted(columns_data, key=lambda x: f"{x[1]}-{x[2]:08}")
-    columns += columns_data
-
+            except NotFoundError as e:
+                pass
+        columns = [('NAME', 'SERVICE', 'READY', 'NODE','PHASE', 'STATUS','RESTART', 'AGE')]
+        columns_data = []
+        for name, service, ready, node,phase, status, restart_cnt, uptime in task_info:
+            columns_data.append((name, service, ready, node, phase, status, restart_cnt, uptime))
+        columns_data = sorted(columns_data, key=lambda x: x[1])
+        columns += columns_data     
     print(f"USERNAME: [{get_username(config)}] / PROJECT: [{inspect['project']}]")
     if no_trunc:
         utils.print_table(columns, 'Project is not running.', -1)
@@ -354,7 +413,7 @@ def up(services):
         sys.exit(1)
 
     # Check service status
-    running_services = api.service.get(project_key)
+    running_services = api.service.get(project_key)['inspects']
     for service_name in targets:
         running_svc_names = [_['name'] for _ in running_services]
         if service_name in running_svc_names:
@@ -396,16 +455,16 @@ def down(services):
         sys.exit(1)
 
     if services:
-        running_services = api.service.get(project_key)
+        running_services = api.service.get(project_key)['inspects']
         running_svc_names = [ _['name'] for _ in running_services ]
         for service_name in services:
             if not service_name in running_svc_names:
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
-
+    
     with interrupt_handler(message='Wait.', blocked=True):
-        running_services = api.service.get(project_key)
-
+        running_services = api.service.get(project_key)['inspects']
+      
         def filtering(inspect):
             return not services or inspect['name'] in services
         targets = [ _['id'] for _ in running_services if filtering(_) ]
@@ -462,7 +521,7 @@ def scale(scales):
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
-    inspects = api.service.get(project_key)
+    inspects = api.service.get(project_key)['inspects']
 
     services = dict([(_['name'], _['id']) for _ in inspects])
     for service in scale_spec:

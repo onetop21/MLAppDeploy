@@ -6,14 +6,14 @@ from mlad.service.exception import InvalidProjectError,InvalidServiceError
 from mlad.service.libs import utils
 if not utils.is_kube_mode():
     from mlad.core.docker import controller as ctlr
+    MODE = 'swarm'
 else:
-    print('kube mode')
     from mlad.core.kubernetes import controller as ctlr
-
+    MODE = 'kube'
 router = APIRouter()
 
 def _check_project_key(project_key, service, cli=None):
-    if utils.is_kube_mode():
+    if MODE=='kube':
         inspect_key = str(ctlr.inspect_service(cli, service)['key']).replace('-','')
     else:
         inspect_key = str(ctlr.inspect_service(service)['key']).replace('-','')
@@ -34,7 +34,7 @@ def services_list(labels: List[str] = Query(None)):
     try:
         services = ctlr.get_services(cli, extra_filters=labels_dict)
         for service in services.values():
-            if utils.is_kube_mode:
+            if MODE=='kube':
                 inspect = ctlr.inspect_service(cli, service)
             else:
                 inspect = ctlr.inspect_service(service)
@@ -43,7 +43,7 @@ def services_list(labels: List[str] = Query(None)):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return inspects
+    return {'mode':MODE, 'inspects':inspects}
 
 @router.get("/project/{project_key}/service")
 def service_list(project_key:str, 
@@ -64,7 +64,7 @@ def service_list(project_key:str,
 
         services = ctlr.get_services(cli, key, extra_filters=labels_dict)   
         for service in services.values():
-            if utils.is_kube_mode():
+            if MODE=='kube':
                 inspect = ctlr.inspect_service(cli, service)
             else:
                 inspect = ctlr.inspect_service(service)
@@ -73,7 +73,7 @@ def service_list(project_key:str,
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return inspects
+    return {'mode':MODE, 'inspects':inspects}
     #return [_.short_id for _ in services.values()]
 
 @router.post("/project/{project_key}/service")
@@ -92,8 +92,6 @@ def service_create(project_key:str, req:service.CreateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     if utils.is_kube_mode():
-        print([(_.metadata.name, _.metadata.namespace, _.metadata.uid)for _ in services])
-    
         return [_.metadata.uid for _ in services]
     else :
         return [_.short_id for _ in services]
@@ -105,7 +103,7 @@ def service_inspect(project_key:str, service_id:str):
         service = ctlr.get_service(cli, service_id)
         key = str(project_key).replace('-','')
         if _check_project_key(key, service, cli):
-            if utils.is_kube_mode():
+            if MODE=='kube':
                 inspects = ctlr.inspect_service(cli, service)
             else:
                 inspects = ctlr.inspect_service(service)
@@ -114,6 +112,7 @@ def service_inspect(project_key:str, service_id:str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return inspects
+    #return {'mode':MODE, 'inspects':inspects}
 
 
 @router.get("/project/{project_key}/service/{service_id}/tasks")
@@ -123,8 +122,10 @@ def service_tasks(project_key:str, service_id:str):
         service = ctlr.get_service(cli, service_id)
         key = str(project_key).replace('-','')
         if _check_project_key(key, service, cli):
-             tasks= ctlr.inspect_service(
-                ctlr.get_service(cli, service_id))['tasks']           
+            if MODE=='kube':
+                tasks= ctlr.inspect_service(cli,service)['tasks']
+            else:
+                tasks= ctlr.inspect_service(service)['tasks']
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

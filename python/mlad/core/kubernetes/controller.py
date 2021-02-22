@@ -244,10 +244,63 @@ def get_service(cli, service_id):
 def inspect_container(container):
     return docker_controller.inspect_container(container)
 
-def get_tasks(pod):
+def get_pod_info(pod):
     if not isinstance(pod, client.models.v1_pod.V1Pod): raise TypeError('Parameter is not valid type.')
-    api = client.CoreV1Api(cli)
-    return {}
+         
+    pod_info = {
+        'name': pod.metadata.name, #pod name
+        'namespace': pod.metadata.namespace,
+        'created': pod.metadata.creation_timestamp,
+        'container_status': list(),
+        'status': dict(),  
+        'node': pod.spec.node_name,
+        'phase': pod.status.phase
+    }
+    def get_status(container_state):
+        if container_state.running:
+            return {'state':'Running', 'detail':None}
+        if container_state.terminated:
+            return {
+                'state':'Terminated', 
+                'detail':{
+                    'reason':container_state.terminated.reason,
+                    'finished': container_state.terminated.finished_at}
+                }
+        if container_state.waiting:
+            return {
+                'state':'Waiting', 
+                'detail':{
+                    'reason':container_state.waiting.reason}
+                }
+    
+    def parse_status(containers):
+        status = {'state':'Running', 'detail':None}
+        # if not running container exits, return that
+        completed = 0
+        for _ in containers:
+            if _['status']['state'] == 'Waiting':
+                return _['status']
+            elif _['status']['state'] == 'Terminated':
+                if _['status']['detail']['reason'] == 'Completed':
+                    completed +=1
+                    if completed == len(containers):
+                        return _['status']
+                    else:
+                        pass
+                else:
+                    return _['status']
+        return status
+
+    for container in pod.status.container_statuses:
+        container_info = {
+            'container_id': container.container_id,
+            'restart': container.restart_count,
+            'status': get_status(container.state),
+            'ready': container.ready
+        }
+        pod_info['container_status'].append(container_info)
+    pod_info['status']=parse_status(pod_info['container_status'])
+    return pod_info
 
 def inspect_service(cli, service):
     if not isinstance(service, client.models.v1_service.V1Service): raise TypeError('Parameter is not valid type.')
@@ -261,7 +314,7 @@ def inspect_service(cli, service):
     pod_ret = api.list_namespaced_pod(namespace, label_selector=f'MLAD.PROJECT.SERVICE={service_name}')
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
-    #TODO get pod info & parsing for task 
+   
     inspect = {
         'key': uuid.UUID(config_labels['MLAD.PROJECT']) if config_labels.get('MLAD.VERSION') else '',
         'workspace': {
@@ -279,8 +332,7 @@ def inspect_service(cli, service):
         'id': service.metadata.uid,
         'name': config_labels.get('MLAD.PROJECT.SERVICE'), 
         'replicas': replica_ret.spec.replicas,
-        #'tasks': dict([(task['ID'][:SHORT_LEN], task) for task in service.tasks()]),
-        'tasks': dict([(pod.metadata.uid[:SHORT_LEN], {}) for pod in pod_ret.items]),
+        'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': {}
     }
     #TODO SERVICE PORTS -> swarm에 맞게 치환된건지 확인
