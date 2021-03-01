@@ -129,12 +129,9 @@ def get_advertise_addr():
         s.close()
     return addr
 
-def get_default_service_port(container_name, internal_port, docker_host=None):
+def get_default_service_port(container_name, internal_port):
     import docker
-    if not docker_host:
-        config = read_config()
-        docker_host = config['docker']['host']
-    cli = docker.from_env(environment={ 'DOCKER_HOST': docker_host })
+    cli = docker.from_env()
     external_port = None
     for _ in [_.ports[f'{internal_port}/tcp'] for _ in cli.containers.list() if _.name in [f'{container_name}']]: 
         external_port = _[0]['HostPort']

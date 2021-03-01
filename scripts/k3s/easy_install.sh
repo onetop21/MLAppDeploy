@@ -209,7 +209,7 @@ if [[ `IsWSL2` == '1' ]]; then
     fi
     ColorEcho INFO "Ready to install MLAppDeploy on your WSL2."
 else
-    MAX_STEP=8
+    MAX_STEP=7
 
     GetPrivileged
 
@@ -224,7 +224,7 @@ else
         sudo install k3sup /usr/local/bin/
     fi
     if [[ `IsInstalled k3s` == '0' ]]; then
-        k3sup install --local --local-path ~/.kube/config #--k3s-extra-args '--no-deploy traefik'
+        k3sup install --local --local-path ~/.kube/config --k3s-extra-args '--docker --no-deploy traefik'
     fi
     export KUBECONFIG=/home/onetop21/.kube/config
     kubectl config set-context default
@@ -269,6 +269,7 @@ PrintStep "Install Load Balancer."
 kubectl get service -A | grep LoadBalancer 2>&1 >> /dev/null
 if [[ "$?" != "0" ]]; then
     kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.44.0/deploy/static/provider/cloud/deploy.yaml
+    kubectl wait --for=condition=available --timeout=120s -n ingress-nginx deployment.apps/ingress-nginx-controller
 else
     ColorEcho "Already Installed LoadBalancer"
 fi
@@ -377,7 +378,7 @@ spec:
               number: 8440
 EOF
 if [[ "$?" == "0" ]]; then
-    kubectl wait --for=condition=available --timeout=30s -n mlad deploy/mlad-service
+    kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service
     while [[ -z "$TOKEN_LOG" ]]; do
         sleep 1
         TOKEN_LOG=`kubectl logs -n mlad deploy/mlad-service 2>&1 | head -n1`
