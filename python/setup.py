@@ -23,7 +23,7 @@ def main():
       packages=find_packages(exclude=['.temp']),
       url='https://github.com/onetop21/MLAppDeploy.git',
       zip_safe=False,
-      python_requires='>3.5',
+      python_requires='>3.6',
       install_requires=[
         'Click>=7.0,<8.0.0', 
         'PyYAML>=3.10,<6.0', 
