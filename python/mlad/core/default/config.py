@@ -24,6 +24,10 @@ client_config = {
             'secretkey': '',
             'verify': True, 
         },
+        'mongodb': {
+            'host': 'localhost',
+            'port': 27017,
+        }
     }
 }
 
