@@ -4,24 +4,7 @@ import uuid
 from distutils.util import strtobool
 from omegaconf import OmegaConf
 
-local_config = {
-    'account': {
-        'username': 'Unknown'
-    },
-    'docker': {
-        'host': 'unix:///var/run/docker.sock',
-        'registry': ''
-    },
-    's3': {
-        'endpoint': '',
-        'region': '',
-        'accesskey': '',
-        'secretkey': '',
-        'verify': True, 
-    },
-}
-
-remote_config = {
+client_config = {
     'mlad': {
         'host': 'localhost',
         'port': 8440,
@@ -67,7 +50,6 @@ service_config = {
 }
 
 sys.modules[__name__] = {
-    'local': lambda x: OmegaConf.merge(OmegaConf.create(local_config), x),
-    'remote': lambda x: OmegaConf.merge(OmegaConf.create(remote_config), x),
+    'client': lambda x: OmegaConf.merge(OmegaConf.create(client_config), x),
     'service': lambda x: OmegaConf.merge(OmegaConf.create(service_config), x),
 }

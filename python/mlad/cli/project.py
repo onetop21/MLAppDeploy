@@ -3,6 +3,8 @@ import os
 import io
 import time
 import tarfile
+import json
+import base64
 import docker
 from pathlib import Path
 from datetime import datetime
@@ -392,6 +394,11 @@ def up(services):
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
+
+    # AuthConfig
+    cli = ctlr.get_api_client()
+    headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config']))}
+    encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
 
     extra_envs = utils.get_service_env(config)
     if not services:

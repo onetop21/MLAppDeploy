@@ -10,7 +10,7 @@ API_PREFIX = '/api/v1'
 class API:
     def __init__(self, url=None, token=None):
         self.token = token
-        if not url :
+        if not url:
             host = os.environ.get('NODE_HOSTNAME', 'localhost')
             self.url = f'http://{host}:8440{API_PREFIX}'
         else:

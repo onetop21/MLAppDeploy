@@ -33,23 +33,42 @@ def init(address, token):
     parsed_url = urlparse(address)
     scheme = parsed_url.scheme
     hostname = parsed_url.hostname
-    port = parsed_url.port
+    port = parsed_url.port or (443 if scheme == 'https' else 80)
 
     # token
     user_token = input(f"MLAppDeploy User Token : ")
 
-    # Registry
-    registry_address = input(f"Docker Registry Host [docker.io]: ")
-    if registry_address.startswith('https://') or registry_address.startswith('http://'):
-        registry_address = registry_address.split('//')[1]
-
     # specific controlling docker
-    s3_address = input(f'S3 Compatible Address [https://s3.amazonaws.com]: ') or 'https://s3.amazonaws.com'
+    service_addr = utils.get_advertise_addr()
+    minio_port = utils.get_default_service_port('mlad_minio', 9000)
+    if minio_port:
+        s3_address = f'http://{service_addr}:{minio_port}'
+        region = 'ap-northeast-2'
+        access_key = 'MLAPPDEPLOY'
+        secret_key = 'MLAPPDEPLOY'
+        #print(f'Detected MinIO Server[{s3_address}] on docker host.')
+    else:
+        s3_address = 'https://s3.amazonaws.com'
+        region = 'us-east-1'
+        access_key = None
+        secret_key = None
+    s3_address = utils.prompt('S3 Compatible Address', s3_address)
+    region = utils.prompt('Region', region)
+    access_key = utils.prompt('Access Key ID', access_key)
+    secret_key = utils.prompt('Secret Access Key', secret_key)
     verifySSL = s3_address.startswith('https://')
-    region = input('Region [us-east-1]: ') or 'us-east-1'
-    access_key = input('Access Key ID: ')
-    secret_key = input('Secret Access Key: ')
-        
+
+    registry_port = utils.get_default_service_port('mlad_registry', 5000)
+    if registry_port:
+        registry_address = f'{service_addr}:{registry_port}'
+        warn_insecure = True
+        #print(f'Detected Docker Registry[{registry_address}] on docker host.')
+    else:
+        registry_address = 'docker.io'
+        warn_insecure = False
+    registry_address = utils.prompt("Docker Registry Host", registry_address)
+    registry_address = registry_address.split('//')[-1] # Remove Scheme
+    
     utils.generate_empty_config()
     set(*(
         f"mlad.host={hostname}",
@@ -64,6 +83,12 @@ def init(address, token):
         f'environment.s3.secretkey={secret_key}',
     ))
     get(None)
+
+    if warn_insecure:
+        print()
+        print(f"Need to add insecure-registry to docker.json on your all nodes.", file=sys.stderr)
+        print(f"/etc/docker/daemon.json:", file=sys.stderr)
+        print(f"  \"insecure-registries\": [\"{registry_address}\"]", file=sys.stderr)
 
 def set(*args):
     config = default_config['client'](utils.read_config())

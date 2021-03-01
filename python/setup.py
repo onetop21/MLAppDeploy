@@ -28,12 +28,14 @@ def main():
         'Click>=7.0,<8.0.0', 
         'PyYAML>=3.10,<6.0', 
         'docker>=4.0.2,<5.0.0',
+        'requests>=2.22.0,<3.0.0',
         'requests-unixsocket>=0.2.0',
         'python-dateutil>=2.8.1,<3.0.0',
         'uvicorn>=0.13.3,<1.0.0',
         'fastapi>=0.63.0,<1.0.0',
         'psutil>=5.8.0,<5.9.0',
         'omegaconf>=2.0.6,<3.0.0',
+        'kubernetes>=12.0.0,<13.0.0',
       ],
       entry_points='''
         [console_scripts]

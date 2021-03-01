@@ -23,10 +23,15 @@ SHORT_LEN = 10
 
 # Docker CLI from HOST
 def get_api_client(config_file='~/.kube/config'):#config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION):
-    #from kubernetes.client.api_client import ApiClient
-    #config.load_kube_config(config_file=config_file) # configuration to Configuration(global)
-    #return ApiClient() # If Need, set configuration parameter from client.Configuration
-    return config.new_client_from_config(config_file=config_file)
+    try:
+        #from kubernetes.client.api_client import ApiClient
+        #config.load_kube_config(config_file=config_file) # configuration to Configuration(global)
+        #return ApiClient() # If Need, set configuration parameter from client.Configuration
+        return config.new_client_from_config(config_file=config_file)
+    except config.config_exception.ConfigException:
+        from kubernetes.client.api_client import ApiClient
+        config.load_incluster_config() # configuration to Configuration(global)
+        return ApiClient() # If Need, set configuration parameter from client.Configuration
 
 # Manage Project and Network
 def make_base_labels(workspace, username, project, registry):
@@ -148,7 +153,7 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
     basename = base_labels['MLAD.PROJECT.BASE']
     project_version = base_labels['MLAD.PROJECT.VERSION']
     #inspect_image(_) for _ in get_images(cli, project_key)
-    default_image = base_labels['MLAD.PROJECT.IMAGE']
+    default_image = base_labels['MLAD.PROJECT.IMAGE'] 
 
     # Create Docker Network
     def resp_stream():
@@ -160,7 +165,6 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
             labels.update({
                 'MLAD.PROJECT.NETWORK': network_name, 
                 'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
-                'MLAD.PROJECT.AUTH_CONFIGS': get_auth_headers(cli)['X-Registry-Config'].decode(),
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
             keys = {
@@ -177,6 +181,16 @@ def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse
             )
             config_map_ret=create_config_labels(cli, 'project-labels', 
                 network_name, labels)
+            # AuthConfig
+            api.create_namespaced_secret(network_name,
+                client.V1Secret(
+                    metadata=client.V1ObjectMeta(
+                       name=f"{basename}-auth"
+                    ),
+                    type='kubernetes.io/dockerconfigjson',
+                    data={'.dockerconfigjson': "TODO: From cli/project.py:401"}
+                )
+            )
         except ApiException as e:
             message = f"Failed to create network.\n{e}\n"
             yield {'result': 'failed', 'stream': message}
@@ -514,6 +528,9 @@ def create_services(cli, network, services, extra_labels={}):
                                     #mode
                                     #constraints
                                     command=kwargs.get('command', [])
+                                )],
+                                image_pull_secrets=i[client.V1LocalObjectReference(
+                                    name=f"{project_base}-auth"
                                 )]
                             )
                         )
