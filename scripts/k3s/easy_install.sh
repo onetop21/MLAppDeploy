@@ -376,6 +376,28 @@ spec:
             name: mlad-service
             port:
               number: 8440
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: controller-role
+rules:
+- apiGroups: ["", "apps", "batch", "extensions", "networking.k8s.io"]
+  resources: ["namespaces", "services", "pods", "pods/log", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "ingresses"]
+  verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+    name: controller-role-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: mlad
+roleRef:
+  kind: ClusterRole
+  name: controller-role
+  apiGroup: rbac.authorization.k8s.io
 EOF
 if [[ "$?" == "0" ]]; then
     kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service
