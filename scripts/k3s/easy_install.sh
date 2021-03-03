@@ -382,8 +382,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: controller-role
 rules:
-- apiGroups: ["", "apps", "batch", "extensions", "networking.k8s.io"]
-  resources: ["nodes", "namespaces", "services", "pods", "pods/log", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "ingresses"]
+- apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io"]
+  resources: ["nodes", "namespaces", "services", "pods", "pods/log", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "rolebindings", "ingresses"]
   verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
 ---
 kind: ClusterRoleBinding
