@@ -14,13 +14,13 @@ class Project():
         raise_error(res)
         return res.json()    
 
-    def create(self, project, base_labels, extra_envs=[], 
+    def create(self, project, base_labels, extra_envs=[], credential=None,
             swarm=True, allow_reuse=False):
         url = self.url
         header = {'token': self.token}
         with requests.post(url=url,headers=header,
             json={'project':project,'base_labels':base_labels,
-                'extra_envs':extra_envs},
+                'extra_envs':extra_envs, 'credential':credential},
             params={'swarm':swarm, 'allow_reuse': allow_reuse}, stream=True) as resp:
             if resp.status_code == 200:
                 for _ in resp.iter_content(1024):

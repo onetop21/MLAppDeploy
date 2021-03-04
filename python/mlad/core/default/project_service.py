@@ -8,10 +8,10 @@ obj = {
     'arguments': '',
     'publish': [],
     'deploy': {
-        'quotes': {},
+        'quota': {},
         'constraints': {},
         'restart_policy': {
-            'condition': 'none',
+            'condition': None,
             'delay': 0,
             'max_attempts': 0,
             'window': 0 

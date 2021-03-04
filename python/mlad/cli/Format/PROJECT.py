@@ -41,7 +41,7 @@ services:
     ## Deploy only options
     #    deploy:
     ## Describe required system resource quote.
-    #        quotes:
+    #        quota:
     #            cpus: 1
     #            mems: 8G
     #            gpus: 0

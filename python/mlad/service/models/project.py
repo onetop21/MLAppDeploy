@@ -13,3 +13,4 @@ class CreateRequest(BaseModel):
     # registry: str
     base_labels: dict
     extra_envs: list
+    credential: str

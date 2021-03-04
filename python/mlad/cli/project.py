@@ -38,7 +38,8 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
     #msg = log['stream'].decode()
     msg = log['stream']
-    timestamp = log['timestamp'].strftime("[%Y-%m-%d %H:%M:%S.%f]") if 'timestamp' in log else None
+    timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
+    #timestamp = log['timestamp'].strftime("[%Y-%m-%d %H:%M:%S.%f]") if 'timestamp' in log else None
     if msg.startswith('Error'):
         sys.stderr.write(f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}')
     else:
@@ -74,7 +75,7 @@ def list():
         for inspect in res['inspects']:
             default = { 
             'username': inspect['username'], 
-            'project': inspect['name'], 
+            'project': inspect['project'], 
             'image': inspect['image'],
             'services': 0, 'replicas': 0, 'tasks': 0 
             }
@@ -89,7 +90,7 @@ def list():
         for inspect in res['inspects']:
             default = { 
             'username': inspect['username'], 
-            'project': inspect['name'], 
+            'project': inspect['project'], 
             'image': inspect['image'],
             'services': 0, 'replicas': 0, 'tasks': 0 
             }
@@ -399,14 +400,15 @@ def up(services):
     cli = ctlr.get_api_client()
     headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config']))}
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
-
+    credential = encoded.decode()
+   
     extra_envs = utils.get_service_env(config)
     if not services:
         res = api.project.create(project['project'], base_labels,
-            extra_envs, swarm=True, allow_reuse=False)
+            extra_envs, credential=credential, swarm=True, allow_reuse=False)
     else:
         res = api.project.create(project['project'], base_labels,
-            extra_envs, swarm=True, allow_reuse=True)
+            extra_envs, credential=encoded, swarm=True, allow_reuse=True)
     try:
         for _ in res:
             if 'stream' in _:
@@ -511,7 +513,7 @@ def logs(tail, follow, timestamps, names_or_ids):
     colorkey = {}
     try:
         for _ in logs:
-            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
+            _print_log(_, colorkey, 32, 20)
     except APIError as e:
         print(e)
         sys.exit(1)

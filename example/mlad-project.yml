@@ -27,10 +27,13 @@ workspace:
 services:
     server:
         command: python server.py
+        deploy:
+            ports: [5555]
     client-endpoint:
         command: python client.py
         deploy:
             replicas: 1
+            ports: [5555]
             # constraints:
             #     labels.type: master
     #[SERVICENAME]:
@@ -49,7 +52,7 @@ services:
     ## Deploy only options
     #    deploy:
     ## Describe required system resource quote.
-    #        quotes:
+    #        quota:
     #            cpus: 1
     #            mems: 8G
     #            gpus: 0

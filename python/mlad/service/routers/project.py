@@ -20,9 +20,11 @@ def project_create(req: project.CreateRequest,
 
     base_labels = req.base_labels
     extra_envs = req.extra_envs
+    credential = req.credential
+
     try:
         res = ctlr.create_project_network(
-            cli, base_labels, extra_envs, swarm=swarm, 
+            cli, base_labels, extra_envs, credential, swarm=swarm, 
             allow_reuse=allow_reuse, stream=True)          
 
         def create_project(gen):

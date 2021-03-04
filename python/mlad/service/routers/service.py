@@ -137,10 +137,16 @@ def service_tasks(project_key:str, service_id:str):
 def service_scale(project_key:str, service_id:str, 
                   req: service.ScaleRequest):
     cli = ctlr.get_api_client()
+    key = str(project_key).replace('-','')
     try:
         service = ctlr.get_service(cli, service_id)
-        if _check_project_key(project_key, service):
-            service.scale(req.scale_spec)
+        if _check_project_key(key, service, cli):
+            if MODE=='kube':
+                ctlr.scale_service(cli, service, req.scale_spec)
+            else:
+                service.scale(req.scale_spec)
+        # if _check_project_key(project_key, service):
+        #     service.scale(req.scale_spec)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

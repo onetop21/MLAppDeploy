@@ -116,7 +116,7 @@ def inspect_project_network(network):
         'image': labels['MLAD.PROJECT.IMAGE'],
     }
 
-def create_project_network(cli, base_labels, extra_envs, swarm=True, allow_reuse=False, stream=False):
+def create_project_network(cli, base_labels, extra_envs, credential=None, swarm=True, allow_reuse=False, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     #workspace = utils.get_workspace()
     driver = 'overlay' if swarm else 'bridge'
@@ -440,11 +440,11 @@ def create_services(cli, network, services, extra_labels={}):
 
         # Resource Spec
         res_spec = {}
-        if 'cpus' in service['deploy']['quotes']: 
-            res_spec['cpu_limit'] = service['deploy']['quotes']['cpus'] * 1000000000
-            res_spec['cpu_reservation'] = service['deploy']['quotes']['cpus'] * 1000000000
-        if 'mems' in service['deploy']['quotes']: 
-            data = str(service['deploy']['quotes']['mems'])
+        if 'cpus' in service['deploy']['quota']: 
+            res_spec['cpu_limit'] = service['deploy']['quota']['cpus'] * 1000000000
+            res_spec['cpu_reservation'] = service['deploy']['quota']['cpus'] * 1000000000
+        if 'mems' in service['deploy']['quota']: 
+            data = str(service['deploy']['quota']['mems'])
             size = int(data[:-1])
             unit = data.lower()[-1:]
             if unit == 'g':
@@ -455,9 +455,9 @@ def create_services(cli, network, services, extra_labels={}):
                 size *= (2**10)
             res_spec['mem_limit'] = size
             res_spec['mem_reservation'] = size
-        if 'gpus' in service['deploy']['quotes']:
-            if service['deploy']['quotes']['gpus'] > 0:
-                res_spec['generic_resources'] = { 'gpu': service['deploy']['quotes']['gpus'] }
+        if 'gpus' in service['deploy']['quota']:
+            if service['deploy']['quota']['gpus'] > 0:
+                res_spec['generic_resources'] = { 'gpu': service['deploy']['quota']['gpus'] }
             else: 
                 env += ['NVIDIA_VISIBLE_DEVICES=void']
         resources = docker.types.Resources(**res_spec)

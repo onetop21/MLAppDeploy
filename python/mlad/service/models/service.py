@@ -7,19 +7,21 @@ class RestartPolicy(BaseModel):
     max_attempts: Optional[int]=None
     window: Optional[int]=None
 
-class Quotes(BaseModel):
+class Quota(BaseModel):
     cpus: Optional[int]=None
     gpus: Optional[int]=None
     mems: Optional[str]=None
 
 class Deploy(BaseModel):
-    quotes: Optional[Quotes]= None
+    quota: Optional[Quota]= None
     constraints: Optional[dict]=None
     restart_policy: Optional[RestartPolicy]=None
     replicas: Optional[int]=None
+    ports: Optional[list]=None #k8s Required
 
 class Service(BaseModel):
     name: str #service_name
+    type: Optional[str] = 'job' #job or rc
     image: Optional[str] = None
     env: Optional[dict] = None
     depends: Optional[list] = None
