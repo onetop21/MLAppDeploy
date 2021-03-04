@@ -217,17 +217,22 @@ else
     PrintStep "Install Requires Utilities."
     RequiresFromApt jq
 
-    # Step 2: Install Kubernetes
-    PrintStep "Install light-weight kubernetes."
-    if [[ `IsInstalled k3sup` == '0' ]]; then
-        curl -sLS https://get.k3sup.dev | sh
-        sudo install k3sup /usr/local/bin/
+    kubectl get node 2>&1 >> /dev/null
+    if [[ "$?" == "1" ]]; then
+        # Step 2: Install Kubernetes
+        PrintStep "Install light-weight kubernetes."
+        if [[ `IsInstalled k3sup` == '0' ]]; then
+            curl -sLS https://get.k3sup.dev | sh
+            sudo install k3sup /usr/local/bin/
+        fi
+        if [[ `IsInstalled k3s` == '0' ]]; then
+            k3sup install --local --local-path ~/.kube/config --k3s-extra-args '--docker --no-deploy traefik'
+        fi
+        export KUBECONFIG=/home/onetop21/.kube/config
+        kubectl config set-context default
+    else
+        ColorEcho INFO "Already Installed Kubernetes."
     fi
-    if [[ `IsInstalled k3s` == '0' ]]; then
-        k3sup install --local --local-path ~/.kube/config --k3s-extra-args '--docker --no-deploy traefik'
-    fi
-    export KUBECONFIG=/home/onetop21/.kube/config
-    kubectl config set-context default
 
     # Step 3: Install Docker
     PrintStep "Install docker."
