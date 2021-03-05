@@ -232,6 +232,7 @@ else
         kubectl config set-context default
     else
         ColorEcho INFO "Already Installed Kubernetes."
+        STEP=$((STEP+1)) # Increase Step
     fi
 
     # Step 3: Install Docker
@@ -281,6 +282,7 @@ fi
 
 INGRESS_ANNOTATIONS_NGINX='
   annotations:
+    kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
@@ -364,7 +366,7 @@ spec:
     port: 8440
     targetPort: 8440
 ---
-apiVersion: networking.k8s.io/v1
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: mlad-service
@@ -375,12 +377,10 @@ spec:
   - http:
       paths:
       - path: /
-        pathType: Prefix
+        #pathType: Prefix
         backend:
-          service:
-            name: mlad-service
-            port:
-              number: 8440
+          serviceName: mlad-service
+          servicePort: 8440
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
