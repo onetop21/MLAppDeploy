@@ -237,6 +237,7 @@ else
 
     # Step 3: Install Docker
     PrintStep "Install docker."
+    DAEMON_JSON=/etc/docker/daemon.json
     UninstallOnSnapWithWarning docker
     if [[ `IsInstalled docker` == '0' ]]; then
         InstallDocker
