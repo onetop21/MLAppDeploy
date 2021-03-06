@@ -88,7 +88,7 @@ class LogCollector():
         object_id = msg['object_id']
         if 'stream' in msg:
             stream = msg['stream'].decode()
-            output = {'name': self.threads[object_id]['name'], 'name_width': self.name_width}
+            output = {'name': self.threads[object_id]['name'], 'name_width': self.name_width+6}
             if not self.threads[object_id]['from_dockerpy']:
                 if self.threads[object_id]['timestamps']:
                     separated = stream.split(' ', 2)
@@ -101,7 +101,7 @@ class LogCollector():
                     if len(separated) < 2: _, body = (*separated, '')
                     else: _, body = separated
                     output['stream'] = body.encode()
-                output['task_id'] = f"{_[_.rfind('=')+1:]}"
+                output['name'] = f"{_[_.rfind('=')+1:]}"
             else:
                 if self.threads[object_id]['timestamps']:
                     separated = stream.split(' ', 1)

@@ -139,10 +139,16 @@ def get_default_service_port(container_name, internal_port):
 
 def get_service_env(config):
     env = [
+        # S3
         f'S3_ENDPOINT={config["environment"]["s3"]["endpoint"]}',
         f'S3_USE_HTTPS={1 if config["environment"]["s3"]["verify"] else 0}',
         f'AWS_ACCESS_KEY_ID={config["environment"]["s3"]["accesskey"]}',
         f'AWS_SECRET_ACCESS_KEY={config["environment"]["s3"]["secretkey"]}',
+        # MongoDB
+        f'MONGO_HOST={config["environment"]["mongodb"]["host"]}',
+        f'MONGO_PORT={config["environment"]["mongodb"]["port"]}',
+        f'MONGO_USERNAME={config["environment"]["mongodb"]["username"]}',
+        f'MONGO_PASSWORD={config["environment"]["mongodb"]["password"]}',
     ]
     return env
 

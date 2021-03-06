@@ -164,4 +164,5 @@ def service_remove(project_key:str, service_id:str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {'message':f'service {service_id} removed'}
+    inspect = ctlr.inspect_service(cli, service)
+    return {'message':f"service {inspect['name']} removed"}

@@ -6,14 +6,13 @@ from mlad.cli import project
 from mlad.cli.libs import utils
 from mlad.cli.autocompletion import *
 
-# mlad project init
-# mlad project ls | mlad ls
-# mlad project ps | mlad ps
-# mlad project build | mlad build
-# mlad project up | mlad up
-# mlad project down | mlad down
-# mlad prjoect logs | mlad logs
-# mlad prjoect scale [service=num]
+# mlad plugin init
+# mlad plugin ls
+# mlad plugin build | mlad build
+# mlad plugin up | mlad up
+# mlad plugin down | mlad down
+# mlad plugin logs | mlad logs
+# mlad plugin scale [service=num]
 @click.command()
 @click.option('--name', '-n', help='Project Name')
 @click.option('--version', '-v', default='0.0.1', help='Project Version')
@@ -52,7 +51,7 @@ def test(build):
 @click.argument('services', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
 def up(services):
     '''Deploy and Run a Project on Local or Cluster.'''
-    project.up(tuple(set(services)))
+    project.up(services)
 
 @click.command()
 @click.argument('services', nargs=-1, required=False, autocompletion=get_running_services_completion)
@@ -81,7 +80,7 @@ def update():
     '''Update Running Project or Service Deployed on Cluster.'''
 
 @click.group('project')
-@click.option('--file', '-f', default=None, help='Specify an alternate project file', autocompletion=get_project_file_completion)
+@click.option('--file', '-f', default=None, help='Specify an alternate project file')
 @click.option('--workdir', default=None, help='Specify an alternate working directory\t\t\t\n(default: the path of the project file)')
 def cli(file, workdir):
     '''Manage Machine Learning Projects.'''

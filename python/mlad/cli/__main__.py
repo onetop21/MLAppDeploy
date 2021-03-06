@@ -11,6 +11,7 @@ from mlad.cli import node_cli as node
 from mlad.cli.autocompletion import *
 from mlad.cli.libs import utils
 from mlad.api import API
+
 def has_role(key):
     if utils.has_config():
         config = utils.read_config()
