@@ -81,17 +81,20 @@ def update():
     '''Update Running Project or Service Deployed on Cluster.'''
 
 @click.group('project')
-@click.option('--file', '-f', default=None, help='Specify an alternate project file', autocompletion=get_project_file_completion)
-@click.option('--workdir', default=None, help='Specify an alternate working directory\t\t\t\n(default: the path of the project file)')
-def cli(file, workdir):
+@click.option('--file', '-f', default=None, help=f"Specify an alternate project file\t\t\t\n\
+        Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable",
+        autocompletion=get_project_file_completion)
+def cli(file):
     '''Manage Machine Learning Projects.'''
-    cli_args(file, workdir)
+    cli_args(file)
 
-def cli_args(file, workdir):
+def cli_args(file):
     if file != None and not os.path.isfile(file):
         click.echo('Project file is not exist.')
         sys.exit(1)
-    utils.apply_project_arguments(file, workdir)
+    file = file or os.environ.get(utils.PROJECT_FILE_ENV_KEY, None)
+    if file:
+        os.environ[utils.PROJECT_FILE_ENV_KEY] = file
 
 cli.add_command(init)
 cli.add_command(ls)

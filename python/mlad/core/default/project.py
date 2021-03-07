@@ -6,7 +6,7 @@ obj = {
         'name': 'Unknown',
         'version': '0.0.0',
         'author': 'Unknown',
-        'working_dir': './', 
+        'workdir': './', 
     },
     'workspace': {
         'base': 'python:latest',

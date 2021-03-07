@@ -226,7 +226,6 @@ def build(tagging, verbose, no_cache):
 
     print('Generating project image...')
 
-    workspace = utils.get_working_dir()
     # Prepare workspace data from project file
     envs = []
     for key in project['workspace']['env'].keys():
@@ -263,7 +262,7 @@ def build(tagging, verbose, no_cache):
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(dockerfile)
     with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-        for name, arcname in utils.arcfiles(workspace, project['workspace']['ignore']):
+        for name, arcname in utils.arcfiles(project['project']['workdir'], project['workspace']['ignore']):
             tar.add(name, arcname)
         tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
     tarbytes.seek(0)
@@ -502,6 +501,7 @@ def down(services):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
+    print(utils.get_workspace())
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block not running.
     try:

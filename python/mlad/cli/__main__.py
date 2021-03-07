@@ -56,11 +56,9 @@ class EntryGroup(click.Group):
 # Below options from project_cli:cli
 @click.option('--file', '-f', default=None, hidden=True, autocompletion=get_project_file_completion,
     help='Specify an alternate project file')
-@click.option('--workdir', default=None, hidden=True, autocompletion=get_dir_completion,
-    help='Specify an alternate working directory\t\t\t\n(default: the path of the project file)')
-def main(file, workdir):
+def main(file):
     '''Machine Learning Application Deployment Tool. (https://github.com/onetop21/MLAppDeploy.git)'''
-    project.cli_args(file, workdir)
+    project.cli_args(file)
 
 main.add_command(config.cli, 'config')
 if has_role('admin'):

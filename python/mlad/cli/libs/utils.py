@@ -4,39 +4,19 @@ import copy
 import fnmatch
 import uuid
 import socket
+import hashlib
+import itertools
 from pathlib import Path
+from functools import lru_cache
 from omegaconf import OmegaConf
 
 HOME = str(Path.home())
 
-CLIENT_CONFIG_PATH = HOME + '/.mlad'
-SERVICE_CONFIG_PATH = '/opt/mlad'
-CONFIG_PATH = CLIENT_CONFIG_PATH
-
-CLIENT_CONFIG_FILE = CLIENT_CONFIG_PATH + '/config.yml'
-SERVICE_CONFIG_FILE = SERVICE_CONFIG_PATH + '/config.yml'
-CONFIG_FILE = CLIENT_CONFIG_FILE
-COMPLETION_FILE = CLIENT_CONFIG_FILE + '/completion.sh'
-PROJECT_PATH = os.getcwd()
-PROJECT_FILE = os.getcwd() + '/mlad-project.yml'
-
-ProjectArgs = {
-    'project_file': PROJECT_FILE,
-    'working_dir': PROJECT_PATH
-}
-
-def apply_project_arguments(project_file=None, workdir=None):
-    if project_file: ProjectArgs['project_file'] = project_file
-    if workdir:
-        ProjectArgs['working_dir'] = workdir
-    else:
-        ProjectArgs['working_dir'] = os.path.dirname(ProjectArgs['project_file']) or '.'
-
-def get_project_file():
-    return ProjectArgs['project_file']
-
-def get_working_dir():
-    return ProjectArgs['working_dir']
+CONFIG_PATH = HOME + '/.mlad'
+CONFIG_FILE = CONFIG_PATH + '/config.yml'
+COMPLETION_FILE = CONFIG_PATH + '/completion.sh'
+PROJECT_FILE_ENV_KEY='MLAD_PRJFILE'
+DEFAULT_PROJECT_FILE = 'mlad-project.yml'
 
 def generate_empty_config():
     if not os.path.exists(CONFIG_PATH):
@@ -49,7 +29,7 @@ def get_workspace():
     '''
     Project Hash: [HOSTNAME]@[PROJECT DIR]
     '''
-    key = f"{socket.gethostname()}:{ProjectArgs['project_file']}"
+    key = f"{socket.gethostname()}:{get_project_file()}"
     return key
 
 def project_key(workspace):
@@ -78,16 +58,21 @@ def write_completion(shell='bash'):
         with open(f"{HOME}/.bash_completion", 'wt') as f:
             f.write(f". {COMPLETION_FILE}")
 
+@lru_cache(maxsize=None)
+def get_project_file():
+    # Patch for WSL2 (/home/... -> /mnt/c/Users...)
+    return os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
+
+@lru_cache(maxsize=None)
 def read_project():
-    if os.path.exists(get_project_file()):
-        try:
-            project = OmegaConf.to_container(OmegaConf.load(get_project_file()), resolve=True)
-        except FileNotFoundError:
-            project = {}
+    project_file = get_project_file()
+    if os.path.isfile(project_file):
+        project = OmegaConf.to_container(OmegaConf.load(project_file), resolve=True)
         return project
     else:
         return None
 
+@lru_cache(maxsize=None)
 def get_project(default_project):
     project = read_project()
     if not project:
@@ -95,7 +80,18 @@ def get_project(default_project):
         print(f'$ {sys.argv[0]} --help', file=sys.stderr)
         sys.exit(1)
 
-    return default_project(project)
+    # replace workdir to abspath
+    project_file = get_project_file()
+    project = default_project(project)
+    path = project['project'].get('workdir', './')
+    if not os.path.isabs(path):
+        project['project']['workdir'] = os.path.normpath(
+            os.path.join(
+                os.path.dirname(project_file),
+                path
+            )
+        )
+    return project
 
 def print_table(data, no_data_msg=None, max_width=32):
     if max_width > 0:
@@ -160,15 +156,12 @@ def generate_unique_id(length=None):
         return UUID
 
 def hash(body: str):
-    import hashlib
     return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
 
 # for Log Coloring
 CLEAR_COLOR = '\x1b[0m'
 ERROR_COLOR = '\x1b[1;31;40m'
 
-import itertools
-from functools import lru_cache
 @lru_cache(maxsize=None)
 def color_table():
     table = []
