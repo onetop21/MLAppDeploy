@@ -6,7 +6,7 @@ obj = {
     'env': {},
     'command': '',
     'arguments': '',
-    'publish': [],
+    'ports': [],
     'deploy': {
         'quota': {},
         'constraints': {},

@@ -12,6 +12,7 @@ from dateutil import parser
 from functools import lru_cache
 from requests.exceptions import HTTPError
 from mlad.core.docker import controller as ctlr
+from mlad.core.default import config as default_config
 from mlad.core.default import project as default_project
 from mlad.core import exception
 from mlad.cli.libs import utils
@@ -36,8 +37,7 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     if 'task_id' in log:
         name = f"{name}.{log['task_id'][:len_short_id]}"
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
-    #msg = log['stream'].decode()
-    msg = log['stream']
+    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
     timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
     #timestamp = log['timestamp'].strftime("[%Y-%m-%d %H:%M:%S.%f]") if 'timestamp' in log else None
     if msg.startswith('Error'):
@@ -226,7 +226,6 @@ def build(tagging, verbose, no_cache):
 
     print('Generating project image...')
 
-    workspace = utils.get_working_dir()
     # Prepare workspace data from project file
     envs = []
     for key in project['workspace']['env'].keys():
@@ -263,7 +262,7 @@ def build(tagging, verbose, no_cache):
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(dockerfile)
     with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-        for name, arcname in utils.arcfiles(workspace, project['workspace']['ignore']):
+        for name, arcname in utils.arcfiles(project['project']['workdir'], project['workspace']['ignore']):
             tar.add(name, arcname)
         tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
     tarbytes.seek(0)
@@ -326,7 +325,7 @@ def test(with_build):
     print('Deploying test container image to local...')
     config = utils.read_config()
 
-    cli = ctlr.get_docker_client()
+    cli = ctlr.get_api_client()
     base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     
@@ -402,13 +401,13 @@ def up(services):
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
     credential = encoded.decode()
    
-    extra_envs = utils.get_service_env(config)
+    extra_envs = utils.get_service_env(default_config['client'](config))
     if not services:
         res = api.project.create(project['project'], base_labels,
             extra_envs, credential=credential, swarm=True, allow_reuse=False)
     else:
         res = api.project.create(project['project'], base_labels,
-            extra_envs, credential=encoded, swarm=True, allow_reuse=True)
+            extra_envs, credential=credential, swarm=True, allow_reuse=True)
     try:
         for _ in res:
             if 'stream' in _:
@@ -423,11 +422,13 @@ def up(services):
 
     # Check service status
     running_services = api.service.get(project_key)['inspects']
+    excludes = []
     for service_name in targets:
         running_svc_names = [_['name'] for _ in running_services]
         if service_name in running_svc_names:
             print(f'Already running service[{service_name}] in project.', file=sys.stderr)
-            del targets[service_name]
+            excludes.append(service_name)
+    for _ in excludes: del targets[_]
 
     def _target_model(targets):
         services = []
@@ -471,7 +472,7 @@ def down(services):
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
     
-    with interrupt_handler(message='Wait.', blocked=True):
+    with interrupt_handler(message='Wait.', blocked=False):
         running_services = api.service.get(project_key)['inspects']
       
         def filtering(inspect):
@@ -500,6 +501,7 @@ def down(services):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
+    print(utils.get_workspace())
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block not running.
     try:

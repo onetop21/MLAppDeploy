@@ -17,17 +17,18 @@ class Deploy(BaseModel):
     constraints: Optional[dict]=None
     restart_policy: Optional[RestartPolicy]=None
     replicas: Optional[int]=None
-    ports: Optional[list]=None #k8s Required
 
 class Service(BaseModel):
     name: str #service_name
-    type: Optional[str] = 'job' #job or rc
+    # Deprecated: decide type by restart policy.
+    #type: Optional[str] = 'job' #job or rc
     image: Optional[str] = None
     env: Optional[dict] = None
     depends: Optional[list] = None
     command: Optional[str] = None
     arguments: Optional[str] = None
     #labels: dict
+    ports: Optional[list]=None #k8s Required
     deploy: Optional[Deploy]=None
 
 

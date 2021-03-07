@@ -37,9 +37,12 @@ services:
     #    command:
     ## Describe arguments to need overwrite.
     #    arguments:
-    #
+    ## Describe expose ports to other services.
+    #    ports: [80,...]
     ## Deploy only options
     #    deploy:
+    ## Describe restart policy. (never, on-failure, always)
+    #        restart_policy: always
     ## Describe required system resource quote.
     #        quota:
     #            cpus: 1
@@ -47,6 +50,8 @@ services:
     #            gpus: 0
     ## Describe target node to run services.
     #        constraints:
+    #            hostname:
+    #            label:
     ## Describe number to run service instances.
     #        replicas: 1
     #...
