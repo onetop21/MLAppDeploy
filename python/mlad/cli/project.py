@@ -497,7 +497,6 @@ def down(services):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
-    rint(utils.get_workspace())
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block not running.
     try:
