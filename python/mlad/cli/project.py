@@ -181,7 +181,7 @@ def status(all, no_trunc):
                     task_info.append((
                         pod_name,
                         inspect['name'],
-                        ready,
+                        #ready,
                         pod['node'],
                         pod['phase'],
                         'Running' if pod['status']['state'] == 'Running' else pod['status']['detail']['reason'],
@@ -190,10 +190,10 @@ def status(all, no_trunc):
                     ))
             except NotFoundError as e:
                 pass
-        columns = [('NAME', 'SERVICE', 'READY', 'NODE','PHASE', 'STATUS','RESTART', 'AGE')]
+        columns = [('NAME', 'SERVICE', 'NODE','PHASE', 'STATUS','RESTART', 'AGE')]
         columns_data = []
-        for name, service, ready, node,phase, status, restart_cnt, uptime in task_info:
-            columns_data.append((name, service, ready, node, phase, status, restart_cnt, uptime))
+        for name, service, node, phase, status, restart_cnt, uptime in task_info:
+            columns_data.append((name, service, node, phase, status, restart_cnt, uptime))
         columns_data = sorted(columns_data, key=lambda x: x[1])
         columns += columns_data     
     print(f"USERNAME: [{get_username(config)}] / PROJECT: [{inspect['project']}]")
