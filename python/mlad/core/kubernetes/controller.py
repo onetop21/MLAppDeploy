@@ -356,7 +356,7 @@ def inspect_service(cli, service):
 
         'id': service.metadata.uid,
         'name': config_labels.get('MLAD.PROJECT.SERVICE'), 
-        'replicas': replica_ret.spec.replicas if type == 'rc' else 0,
+        'replicas': replica_ret.spec.replicas if type == 'rc' else 1,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': {}
     }
@@ -464,7 +464,6 @@ def _create_replication_controller(cli, name, image, command, namespace='default
     return api_response
 
 def create_services(cli, network, services, extra_labels={}):
-    #type = 'job'
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -719,7 +718,6 @@ def enable_node(cli, node_key):
 def disable_node(cli, node_key):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    #how to set key
     body = {
         "spec": {"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/worker"}]}
     }
