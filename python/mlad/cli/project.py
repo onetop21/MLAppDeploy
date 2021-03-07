@@ -66,46 +66,45 @@ def init(name, version, author):
             AUTHOR=author,
         ))
 
-def list():
+def list(no_trunc):
     config = utils.read_config()
     projects = {}
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
-    res = api.service.get()
-    if res['mode'] == 'swarm':
-        for inspect in res['inspects']:
-            default = { 
-            'username': inspect['username'], 
-            'project': inspect['project'], 
-            'image': inspect['image'],
-            'services': 0, 'replicas': 0, 'tasks': 0 
-            }
-            project_key = inspect['key']
-            tasks = inspect['tasks'].values()
-            tasks_state = [_['Status']['State'] for _ in tasks]
-            projects[project_key] = projects[project_key] if project_key in projects else default
-            projects[project_key]['services'] += 1
-            projects[project_key]['replicas'] += inspect['replicas']
-            projects[project_key]['tasks'] += tasks_state.count('running')
-    else:
-        for inspect in res['inspects']:
-            default = { 
-            'username': inspect['username'], 
-            'project': inspect['project'], 
-            'image': inspect['image'],
-            'services': 0, 'replicas': 0, 'tasks': 0 
-            }
-            project_key = inspect['key']
-            tasks = inspect['tasks'].values()
-            tasks_state = [_['status']['state'] for _ in tasks]
-            projects[project_key] = projects[project_key] if project_key in projects else default
-            projects[project_key]['services'] += 1
-            projects[project_key]['replicas'] += inspect['replicas']
-            projects[project_key]['tasks'] += tasks_state.count('Running')
-    columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS')]
-    for project in projects:
-        running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
-        columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['services'], f"{running_tasks:>5}"))
-    utils.print_table(columns, 'Cannot find running project.', 64)
+    networks = api.project.get()
+    for network in networks:
+        project_key = network['key']
+        default = { 
+            'username': network['username'], 
+            'project': network['project'], 
+            'image': network['image'],
+            'services': 0, 'replicas': 0, 'tasks': 0,
+            'hostname': network['workspace']['hostname'],
+            'workspace': network['workspace']['path'],
+        }
+        projects[project_key] = projects[project_key] if project_key in projects else default
+        res = api.service.get(project_key=project_key)
+        if res['mode'] == 'swarm':
+            for inspect in res['inspects']:
+                tasks = inspect['tasks'].values()
+                tasks_state = [_['Status']['State'] for _ in tasks]
+                projects[project_key]['services'] += 1
+                projects[project_key]['replicas'] += inspect['replicas']
+                projects[project_key]['tasks'] += tasks_state.count('running')
+        else:
+            for inspect in res['inspects']:
+                tasks = inspect['tasks'].values()
+                tasks_state = [_['status']['state'] for _ in tasks]
+                projects[project_key]['services'] += 1
+                projects[project_key]['replicas'] += inspect['replicas']
+                projects[project_key]['tasks'] += tasks_state.count('Running')
+        columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS', 'HOSTNAME', 'WORKSPACE')]
+        for project in projects:
+            if projects[project]['services'] > 0:
+                running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
+                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['services'], f"{running_tasks:>5}", projects[project]['hostname'], projects[project]['workspace']))
+            else:
+                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
+    utils.print_table(*([columns, 'Cannot find running project.'] + ([0] if no_trunc else [])))
 
 def status(all, no_trunc):
     config = utils.read_config()
@@ -115,7 +114,7 @@ def status(all, no_trunc):
     try:
         inspect = api.project.inspect(project_key=project_key)
     except NotFoundError as e:
-        print('Cannot find running service.', file=sys.stderr)
+        print('Cannot find running project.', file=sys.stderr)
         sys.exit(1)
 
     task_info = []
@@ -198,10 +197,7 @@ def status(all, no_trunc):
         columns_data = sorted(columns_data, key=lambda x: x[1])
         columns += columns_data     
     print(f"USERNAME: [{get_username(config)}] / PROJECT: [{inspect['project']}]")
-    if no_trunc:
-        utils.print_table(columns, 'Project is not running.', -1)
-    else:
-        utils.print_table(columns, 'Project is not running.')
+    utils.print_table(*([columns, 'Cannot find running services.'] + ([0] if no_trunc else [])))
 
 def build(tagging, verbose, no_cache):
     config = utils.read_config()
@@ -501,7 +497,7 @@ def down(services):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
-    print(utils.get_workspace())
+    rint(utils.get_workspace())
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block not running.
     try:

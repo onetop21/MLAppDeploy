@@ -41,7 +41,10 @@ def projects():
     cli = ctlr.get_api_client()
     try:
         networks = ctlr.get_project_networks(cli)
-        projects = [ ctlr.inspect_project_network(v) for k, v in networks.items()]
+        if utils.is_kube_mode():
+            projects = [ ctlr.inspect_project_network(cli, v) for k, v in networks.items()]
+        else:
+            projects = [ ctlr.inspect_project_network(v) for k, v in networks.items()]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return projects
