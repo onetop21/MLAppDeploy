@@ -8,9 +8,10 @@ from mlad.cli.autocompletion import *
 # //mlad node lable [name] [key=value]
 
 @click.command()
-def ls():
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
+def ls(no_trunc):
     '''Show Connected Nodes.'''
-    node.list()
+    node.list(no_trunc)
 
 @click.command()
 @click.argument('ID', autocompletion=get_node_list_completion)

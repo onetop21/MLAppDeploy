@@ -23,9 +23,10 @@ def init(name, version, author):
     project.init(name, version, author)
 
 @click.command()
-def ls():
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
+def ls(no_trunc):
     '''Show Projects Deployed on Cluster.'''
-    project.list()
+    project.list(no_trunc)
 
 @click.command()
 @click.option('--all', '-a', is_flag=True, help='Show included shutdown service.')

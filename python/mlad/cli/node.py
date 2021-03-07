@@ -6,7 +6,7 @@ from mlad.cli.libs import interrupt_handler
 from mlad.api import API
 from mlad.api.exception import APIError, NotFoundError
 
-def list():
+def list(no_trunc):
     config = utils.read_config()
     try:
         with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
@@ -25,7 +25,7 @@ def list():
         address = node['status']['Addr']
         labels = ', '.join([f'{key}={value}' for key, value in node['labels'].items()])
         columns.append((ID, hostname, address, role.title(), state.title(), activate, engine, labels))
-    utils.print_table(columns, 'No attached node.')
+    utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)
 
 def enable(ID):
     config = utils.read_config()
