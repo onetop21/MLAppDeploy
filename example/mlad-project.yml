@@ -27,13 +27,10 @@ workspace:
 services:
     server:
         command: python server.py
-        deploy:
-            ports: [5555]
     client-endpoint:
         command: python client.py
         deploy:
             replicas: 1
-            ports: [5555]
             # constraints:
             #     labels.type: master
     #[SERVICENAME]:
