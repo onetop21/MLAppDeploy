@@ -398,6 +398,10 @@ def up(services):
     credential = encoded.decode()
    
     extra_envs = utils.get_service_env(default_config['client'](config))
+    service_envs = {}
+    service_envs['MLAD_SERVICE_HOST'] = config['mlad']['host']
+    service_envs['MLAD_SERVICE_PORT'] = config['mlad']['port']
+
     if not services:
         res = api.project.create(project['project'], base_labels,
             extra_envs, credential=credential, swarm=True, allow_reuse=False)
@@ -435,6 +439,11 @@ def up(services):
 
     with interrupt_handler(message='Wait.', blocked=True) as h:
         target_model = _target_model(targets)
+        for target in target_model:
+            if not 'env' in target.keys():
+                target['env'] = {}
+            for k, v in service_envs.items():
+                target['env'][k] = v
         try:
             instances = api.service.create(project_key, target_model)
             for instance in instances:
