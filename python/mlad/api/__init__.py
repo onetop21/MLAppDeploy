@@ -11,9 +11,8 @@ class API:
     def __init__(self, url=None, token=None):
         self.token = token
         if not url:
-            #host = os.environ.get('NODE_HOSTNAME', 'localhost')
-            host = os.environ.get('MLAD_SERVICE_HOST', 'localhost')
-            port = os.environ.get('MLAD_SERVICE_PORT', '8440')
+            host = 'mlad-service.mlad'
+            port = '8440'
             self.url = f'http://{host}:{port}{API_PREFIX}'
         else:
             self.url = f"{url}{API_PREFIX}"
