@@ -161,12 +161,13 @@ def status(all, no_trunc):
                 for pod_name, pod in api.service.get_tasks(project_key, inspect['id']).items():
                     ready_cnt = 0
                     restart_cnt = 0
-                    container_cnt = len(pod['container_status'])
-                    for _ in pod['container_status']:
-                        restart_cnt += _['restart']
-                        if _['ready']==True:
-                            ready_cnt+=1
-                    ready = f'{ready_cnt}/{container_cnt}'
+                    if pod['container_status']:
+                        container_cnt = len(pod['container_status'])
+                        for _ in pod['container_status']:
+                            restart_cnt += _['restart']
+                            if _['ready']==True:
+                                ready_cnt+=1
+                        ready = f'{ready_cnt}/{container_cnt}'
             
                     uptime = (datetime.utcnow() - parser.parse(pod['created']).replace(tzinfo=None)).total_seconds()
                     if uptime > 24 * 60 * 60:
@@ -177,17 +178,17 @@ def status(all, no_trunc):
                         uptime = f"{uptime // 60:.0f} minutes"
                     else:
                         uptime = f"{uptime:.0f} seconds"
-                    #if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                    task_info.append((
-                        pod_name,
-                        inspect['name'],
-                        #ready,
-                        pod['node'],
-                        pod['phase'],
-                        'Running' if pod['status']['state'] == 'Running' else pod['status']['detail']['reason'],
-                        restart_cnt,
-                        uptime
-                    ))
+                    if all or pod['phase'] not in ['Failed']:
+                        task_info.append((
+                            pod_name,
+                            inspect['name'],
+                            #ready,
+                            pod['node'] if pod['node'] else '-',
+                            pod['phase'],
+                            'Running' if pod['status']['state'] == 'Running' else pod['status']['detail']['reason'],
+                            restart_cnt,
+                            uptime
+                        ))
             except NotFoundError as e:
                 pass
         columns = [('NAME', 'SERVICE', 'NODE','PHASE', 'STATUS','RESTART', 'AGE')]
@@ -398,9 +399,6 @@ def up(services):
     credential = encoded.decode()
    
     extra_envs = utils.get_service_env(default_config['client'](config))
-    service_envs = {}
-    service_envs['MLAD_SERVICE_HOST'] = config['mlad']['host']
-    service_envs['MLAD_SERVICE_PORT'] = config['mlad']['port']
 
     if not services:
         res = api.project.create(project['project'], base_labels,
@@ -439,11 +437,6 @@ def up(services):
 
     with interrupt_handler(message='Wait.', blocked=True) as h:
         target_model = _target_model(targets)
-        for target in target_model:
-            if not 'env' in target.keys():
-                target['env'] = {}
-            for k, v in service_envs.items():
-                target['env'][k] = v
         try:
             instances = api.service.create(project_key, target_model)
             for instance in instances:

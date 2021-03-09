@@ -304,16 +304,24 @@ def get_pod_info(pod):
                 else:
                     return _['status']
         return status
-
-    for container in pod.status.container_statuses:
-        container_info = {
-            'container_id': container.container_id,
-            'restart': container.restart_count,
-            'status': get_status(container.state),
-            'ready': container.ready
+    if pod.status.container_statuses:
+        for container in pod.status.container_statuses:
+            container_info = {
+                'container_id': container.container_id,
+                'restart': container.restart_count,
+                'status': get_status(container.state),
+                'ready': container.ready
+            }
+            pod_info['container_status'].append(container_info)
+        pod_info['status'] = parse_status(pod_info['container_status'])
+    else:
+        pod_info['container_status'] = None
+        pod_info['status'] = {
+            'state': 'Waiting',
+            'detail': {
+                'reason': pod.status.conditions[0].reason
+            }
         }
-        pod_info['container_status'].append(container_info)
-    pod_info['status']=parse_status(pod_info['container_status'])
     return pod_info
 
 def _get_job(cli, name, namespace):
@@ -382,6 +390,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
     resources = {}
     if cpu: resources['cpu'] = str(cpu)
     if gpu: resources['nvidia.com/gpu'] = str(gpu)
+    if mem: resources['memory'] = str(mem)
 
     api = client.BatchV1Api(cli)
     body=client.V1Job(
@@ -404,12 +413,10 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
                             env=envs,
                             resources=client.V1ResourceRequirements(
                                 limits=dict(
-                                    list(resources.items())+
-                                    list({'memory': mem or '512Mi'}.items())
+                                    list(resources.items())
                                 ),
                                 requests=dict(
-                                    list(resources.items())+
-                                    list({'memory': mem or '256Mi'}.items())
+                                    list(resources.items())
                                 )
                             )
                         )
@@ -429,6 +436,7 @@ def _create_replication_controller(cli, name, image, command, namespace='default
     resources = {}
     if cpu: resources['cpu'] = str(cpu)
     if gpu: resources['nvidia.com/gpu'] = str(gpu)
+    if mem: resources['memory'] = str(mem)
 
     api = client.CoreV1Api(cli)
     body=client.V1ReplicationController(
@@ -453,12 +461,10 @@ def _create_replication_controller(cli, name, image, command, namespace='default
                         command=command,
                         resources=client.V1ResourceRequirements(
                             limits=dict(
-                                list(resources.items())+
-                                list({'memory': mem or '512Mi'}.items())
+                                list(resources.items())
                             ),
                             requests=dict(
-                                list(resources.items())+
-                                list({'memory': mem or '256Mi'}.items())
+                                list(resources.items())
                             )
                         )
                     )],
