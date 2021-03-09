@@ -396,7 +396,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
     body=client.V1Job(
         metadata=client.V1ObjectMeta(name=name,labels=labels),
         spec=client.V1JobSpec(
-            backoff_limit=6,
+            backoff_limit=0,
             parallelism=replicas,
             selector={'MLAD.PROJECT.SERVICE': name},
             template=client.V1PodTemplateSpec(
