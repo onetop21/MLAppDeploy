@@ -563,7 +563,7 @@ if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>
     NODEPORT=$(kubectl -n ingress-nginx get -o jsonpath="{.spec.ports[0].nodePort}" services ingress-nginx-controller)
     NODES=$(kubectl get nodes -o jsonpath='{ $.items[*].status.addresses[?(@.type=="InternalIP")].address }')
     if [[ "$TYPE" == "LoadBalancer" ]]; then
-        LB_ADDRS=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath={.status.loadBalancer.ingress[*].hostname}`
+        LB_ADDRS=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[*]['hostname','ip']}"`
         for LB_ADDR in $LB_ADDRS; do
             if [[ "$LB_ADDR" == "localhost" ]]; then
                 LB_ADDR=`HostIP`
