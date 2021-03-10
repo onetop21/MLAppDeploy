@@ -266,8 +266,7 @@ if [[ `IsWSL2` == '1' ]]; then
         ColorEcho INFO "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/#kubernetes"
         exit 1
     fi
-    kubectl get node 2>&1 >> /dev/null
-    if [[ "$?" == "1" ]]; then
+    if [[ `kubectl get node 2>&1 >> /dev/null; echo $?` == "1" ]]; then
         ColorEcho WARN "Check kubernetes status or kubeconfig."
         exit 1
     fi
@@ -327,10 +326,10 @@ else
 
     if [[ "$UNINSTALL" == "1" ]]; then
         PrintStep "Uninstall Kubernetes."
-        if [[ `which k3s-uninstall.sh >> /dev/null 2>&1` == "0" ]]; then
+        if [[ `which k3s-uninstall.sh >> /dev/null 2>&1; echo $?` == "0" ]]; then
             sudo k3s-uninstall.sh 
         else
-            if [[ `kubectl version >> /dev/null 2>&1` == "0" ]]; then
+            if [[ `kubectl version >> /dev/null 2>&1; echo $?` == "0" ]]; then
                 ColorEcho ERROR "No have permission to remove kubernetes."
             else
                 ColorEcho INFO "Already removed kubernetes."
@@ -344,7 +343,7 @@ else
     if [[ -z "$ROLE" ]]; then
         ColorEcho INFO "Skip kubernetes installation."
     else
-        if [[ `kubectl get node >> /dev/null 2>&1` == "1" ]]; then
+        if [[ `kubectl get node >> /dev/null 2>&1; echo $?` == "1" ]]; then
             if [[ `IsInstalled k3sup` == '0' ]]; then
                 curl -sLS https://get.k3sup.dev | sh
                 sudo install k3sup /usr/local/bin/
