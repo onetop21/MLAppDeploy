@@ -554,17 +554,32 @@ EOF
             TOKEN_LOG=`kubectl logs -n mlad deploy/mlad-service 2>&1 | head -n1`
         done
         ColorEcho INFO $TOKEN_LOG
-        if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` == "0" ]]; then
-            #kubectl -n ingress-nginx get svc/ingress-nginx-controller | tail -n1 | awk '{print $4}'
-            LB_ADDR=`kubectl get svc -A | grep LoadBalancer | awk '{print $5}'`
-            if [[ "$LB_ADDR" == "localhost" ]]; then
-                LB_ADDR=`HostIP`
-            fi
-            ColorEcho INFO "Service Address : http://$LB_ADDR"
-        else
-            ColorEcho ERROR "Failed to get LoadBalancer IP."
-        fi
     else
         ColorEcho ERROR "Failed to deploy MLApploy Service."
     fi
 fi
+if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` == "0" ]]; then
+    TYPE=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath={.spec.type}`
+    NODEPORT=$(kubectl -n ingress-nginx get -o jsonpath="{.spec.ports[0].nodePort}" services ingress-nginx-controller)
+    NODES=$(kubectl get nodes -o jsonpath='{ $.items[*].status.addresses[?(@.type=="InternalIP")].address }')
+    if [[ "$TYPE" == "LoadBalancer" ]]; then
+        LB_ADDRS=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath={.status.loadBalancer.ingress[*].hostname}`
+        for LB_ADDR in $LB_ADDRS; do
+            if [[ "$LB_ADDR" == "localhost" ]]; then
+                LB_ADDR=`HostIP`
+            fi
+            ColorEcho INFO "Service Address : http://$LB_ADDR"
+        done
+    elif [[ "$TYPE" == "NodePort" ]]; then
+        for NODE in $NODES; do 
+            if [[ `curl --connect-timeout 1 -s $NODE:$NODEPORT; echo $?` == "0" ]]; then
+                ColorEcho INFO "Service Address : http://$NODE:$NODEPORT"
+            fi
+        done
+    else
+        ColorEcho WARN "Not supported ingress service type."
+    fi
+else
+    ColorEcho ERROR "Failed to get LoadBalancer IP."
+fi
+
