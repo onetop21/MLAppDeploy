@@ -236,9 +236,9 @@ function NVIDIAContainerRuntimeConfiguration {
     # Read Daemon.json
     CONFIG=`sudo cat $DAEMON_JSON`
     # Check nvidia runtime in daemon.json
-    if [ "`echo $CONFIG | jq '.default-runtime'`" != "nvidia" ];
+    if [ "`echo $CONFIG | jq '."default-runtime"'`" != "nvidia" ];
     then
-        CONFIG=`echo $CONFIG | jq '.default-runtime="nvidia"'`
+        CONFIG=`echo $CONFIG | jq '."default-runtime"="nvidia"'`
     fi
     if [ "`echo $CONFIG | jq '.runtimes.nvidia'`" == "null" ];
     then
