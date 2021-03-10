@@ -572,7 +572,7 @@ if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>
         done
     elif [[ "$TYPE" == "NodePort" ]]; then
         for NODE in $NODES; do 
-            if [[ `curl --connect-timeout 1 -s $NODE:$NODEPORT; echo $?` == "0" ]]; then
+            if [[ `curl --connect-timeout 1 -s $NODE:$NODEPORT >> /dev/null 2>&1; echo $?` == "0" ]]; then
                 ColorEcho INFO "Service Address : http://$NODE:$NODEPORT"
             fi
         done
