@@ -406,7 +406,7 @@ EOF
 fi
 
 # Check pre-requires
-if [[ `kubectl get node >> /dev/null 2>&1` == "1" ]]; then
+if [[ `kubectl get node >> /dev/null 2>&1; echo $?` == "1" ]]; then
     ColorEcho ERROR "Pre-required kubernetes installation."
     exit 1
 fi
