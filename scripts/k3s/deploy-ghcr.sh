@@ -117,10 +117,11 @@ function HostIP {
 
 function VerCompare () {
     if [[ $1 == $2 ]]; then
-        return 0
+        echo 0
+        return
     fi
     local IFS=.
-    local i ver1=($1) ver2=($2)
+    local i ver1=(${1/v/}) ver2=(${2/v/})
     # fill empty fields in ver1 with zeros
     for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
         ver1[i]=0
@@ -131,13 +132,15 @@ function VerCompare () {
             ver2[i]=0
         fi
         if ((10#${ver1[i]} > 10#${ver2[i]})); then
-            return 1
+            echo 1
+            return
         fi
         if ((10#${ver1[i]} < 10#${ver2[i]})); then
-            return 2
+            echo 2
+            return
         fi
     done
-    return 0
+    echo 0
 }
 
 function RequiresFromApt {
@@ -248,6 +251,11 @@ function NVIDIAContainerRuntimeConfiguration {
 STEP=0
 if [[ `IsWSL2` == '1' ]]; then
     MAX_STEP=3
+    if [[ "$UNINSTALL" == "1" ]]; then
+        ColorEcho ERROR "Cannot support remove kubernetes on WSL2."
+        exit 0
+    fi
+
     if [[ `IsInstalled docker` == '0' ]]; then
         ColorEcho INFO "Need to install Docker Desktop yourself on WSL2."
         ColorEcho INFO "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
@@ -329,7 +337,7 @@ else
 
     # Step 4: Install Kubernetes
     PrintStep "Install Kubernetes."
-    if [[ -z "$ROLE" ]];
+    if [[ -z "$ROLE" ]]; then
         ColorEcho INFO "Skip kubernetes installation."
     else
         if [[ `kubectl get node >> /dev/null 2>&1` == "1" ]]; then
@@ -349,7 +357,7 @@ else
             export KUBECONFIG=$HOME/.kube/config
             kubectl config set-context default
         else
-            ColorEcho INFO "Already Installed Kubernetes."
+            ColorEcho "Already installed kubernetes."
         fi
     fi
 fi
@@ -359,10 +367,10 @@ if [[ `IsInstalled docker` == '0' ]]; then
     ColorEcho ERROR "Pre-required docker installation."
     exit 1
 fi
+IMAGE_NAME=$REGISTRY/mlappdeploy/service
 if [[ "$WITH_BUILD" == "1" ]]; then
     # Step 5: Build Service Package
     PrintStep "Build Service Image."
-    IMAGE_NAME=$REGISTRY/mlappdeploy/service
     if [[ "$BUILD_FROM" == "local" ]]; then
         ColorEcho INFO "Source from Local."
         pushd ../..
@@ -393,19 +401,24 @@ EOF
     docker push $IMAGE_NAME
 fi
 
-# Step 6: Install NVIDIA Device Plugin
-PrintStep "Install NVIDIA Device Plguin."
+# Check pre-requires
 if [[ `kubectl get node >> /dev/null 2>&1` == "1" ]]; then
     ColorEcho ERROR "Pre-required kubernetes installation."
     exit 1
 fi
-kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml
+# Step 6: Install NVIDIA Device Plugin
+PrintStep "Install NVIDIA Device Plguin."
+if [[ `kubectl -n kube-system get ds/nvidia-device-plugin-daemonset >> /dev/null 2>&1; echo $?` == "0" ]]; then
+    ColorEcho 'Already installed NVIDIA device plugin.'
+else
+    kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml
+fi
 
 # Step 5: Install Load Balancer
 #read -p "Type Access Key of MinIO (Default: MLAPPDEPLOY) : " ACCESS_KEY
 PrintStep "Install Load Balancer."
 KUBE_VERSION=`kubectl version --short | grep Server | awk '{print $3}'`
-if [[ `kubectl get ns | grep ingress-nginx >> /dev/null 2>&1` == "0" ]]; then
+if [[ `kubectl get ns | grep ingress-nginx >> /dev/null 2>&1; echo $?` == "0" ]]; then
     ColorEcho "Already installed ingress."
 else
     if [[ `VerCompare $KUBE_VERSION v1.19` == '1' ]]; then
@@ -431,6 +444,8 @@ if [[ `kubectl get ns mlad >> /dev/null 2>&1; echo $?` == "0" ]]; then
     kubectl -n mlad rollout status deployment/mlad-service
 else
     ColorEcho "Deploy MLAppDeploy service."
+    kubectl delete clusterrole controller-role
+    kubectl delete clusterrolebinding controller-role-binding
     cat << EOF | kubectl apply -f -
 apiVersion: v1
 kind: Namespace
@@ -536,8 +551,8 @@ EOF
             TOKEN_LOG=`kubectl logs -n mlad deploy/mlad-service 2>&1 | head -n1`
         done
         ColorEcho INFO $TOKEN_LOG
-        if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller` == "0" ]]; then
-            kubectl -n ingress-nginx get svc/ingress-nginx-controller | tail -n1 | awk '{print $4}'
+        if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` == "0" ]]; then
+            #kubectl -n ingress-nginx get svc/ingress-nginx-controller | tail -n1 | awk '{print $4}'
             LB_ADDR=`kubectl get svc -A | grep LoadBalancer | awk '{print $5}'`
             if [[ "$LB_ADDR" == "localhost" ]]; then
                 LB_ADDR=`HostIP`
