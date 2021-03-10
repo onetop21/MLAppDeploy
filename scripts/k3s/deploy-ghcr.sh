@@ -330,7 +330,11 @@ else
         if [[ `which k3s-uninstall.sh >> /dev/null 2>&1` == "0" ]]; then
             sudo k3s-uninstall.sh 
         else
-            ColorEcho ERROR "No have permission to remove kubernetes."
+            if [[ `kubectl version >> /dev/null 2>&1` == "0" ]]; then
+                ColorEcho ERROR "No have permission to remove kubernetes."
+            else
+                ColorEcho INFO "Already removed kubernetes."
+            fi
         fi
         exit 0
     fi
