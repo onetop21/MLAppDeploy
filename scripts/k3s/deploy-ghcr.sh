@@ -60,6 +60,9 @@ while true; do
     -b|--with-build)
         WITH_BUILD=1
         ;;
+    --build-from) shift
+        BUILD_FROM=$1
+        ;;
     --config) shift
         CONFIG_PATH=$1
         ;;
@@ -376,8 +379,7 @@ if [[ "$WITH_BUILD" == "1" ]]; then
     PrintStep "Build Service Image."
     if [[ "$BUILD_FROM" == "local" ]]; then
         ColorEcho INFO "Source from Local."
-        pushd ../..
-        docker build -t $IMAGE_NAME -<< EOF
+        cat >> /tmp/mlad-service.dockerfile << EOF
 FROM        python:latest
 COPY        python /workspace
 WORKDIR     /workspace
@@ -385,7 +387,7 @@ RUN         python setup.py install
 EXPOSE      8440
 ENTRYPOINT  python -m mlad.service
 EOF
-        popd
+        DOCKER_BUILDKIT=0 docker build -t $IMAGE_NAME -f /tmp/mlad-service.dockerfile ../..
     else
         ColorEcho INFO "Source from Git."
         docker build -t $IMAGE_NAME -<< EOF
