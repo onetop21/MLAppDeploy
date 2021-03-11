@@ -17,7 +17,7 @@ def list(no_trunc):
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
         ID = node['id'][:10]
-        role = node['role']
+        role = ', '.join(node['role'])
         activate = 'Active' if node['availability'] == 'active' else '-'
         hostname = node['hostname']
         engine = node['engine_version']
