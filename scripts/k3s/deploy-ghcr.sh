@@ -420,8 +420,8 @@ fi
 # Step 5: Install Load Balancer
 #read -p "Type Access Key of MinIO (Default: MLAPPDEPLOY) : " ACCESS_KEY
 PrintStep "Install Load Balancer."
-KUBE_VERSION=`kubectl version --short | grep Server | awk '{print $3}'`
-if [[ `kubectl get ns | grep ingress-nginx >> /dev/null 2>&1; echo $?` == "0" ]]; then
+KUBE_VERSION=`kubectl version -o json | jq .serverVersion.gitVersion | tr -d \"`
+if [[ `kubectl get ns ingress-nginx >> /dev/null 2>&1; echo $?` == "0" ]]; then
     ColorEcho "Already installed ingress."
 else
     if [[ `VerCompare $KUBE_VERSION v1.19` == '1' ]]; then
@@ -540,7 +540,7 @@ subjects:
   namespace: mlad
 roleRef:
   kind: ClusterRole
-  name: admin
+  name: controller-role
   apiGroup: rbac.authorization.k8s.io
 EOF
     if [[ "$?" == "0" ]]; then
