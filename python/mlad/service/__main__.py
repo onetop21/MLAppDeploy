@@ -4,6 +4,7 @@ from mlad import __version__
 from mlad.service.libs import utils
 
 from fastapi import FastAPI, Depends, Header
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.logger import logger
 from mlad.service.routers import image, service, project, node, auth
 from mlad.service.auth import Authorization
@@ -60,6 +61,14 @@ def create_app():
         title="MLAppDeploy API Server",
         description="MLAppDeploy is a tool for training and deploying ML code easily.",
         version=__version__,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=['*'],
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*'],
     )
 
     user = Authorization('user')
