@@ -393,7 +393,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
     if mem: resources['memory'] = str(mem)
     # hostname: docker-desktop -> kubernetes.io/hostname: docker-desktop
     # labels.hello: world      -> hello: world
-    constraints = [(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_]) for _ in constraints]
+    constraints = dict([(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_]) for _ in constraints])
 
     api = client.BatchV1Api(cli)
     body=client.V1Job(
@@ -440,7 +440,7 @@ def _create_replication_controller(cli, name, image, command, namespace='default
     if cpu: resources['cpu'] = str(cpu)
     if gpu: resources['nvidia.com/gpu'] = str(gpu)
     if mem: resources['memory'] = str(mem)
-    constraints = [(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_]) for _ in constraints]
+    constraints = dict([(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_]) for _ in constraints])
 
     api = client.CoreV1Api(cli)
     body=client.V1ReplicationController(
