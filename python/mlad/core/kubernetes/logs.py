@@ -50,6 +50,8 @@ class LogHandler:
             for line in resp:
                 line = line.decode()
                 line = f"{target} {line}"
+                sys.stdout.write(f"{line.encode()}")
+                if not (line.endswith('\n') or line.endswith('\r')): line += '\n'
                 line= line.encode()
                 if params.get('timestamps'):
                     separated = line.split(b' ')
