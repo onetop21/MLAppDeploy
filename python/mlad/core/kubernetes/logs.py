@@ -13,7 +13,7 @@ from threading import Thread
 from multiprocessing import Queue, Value
 from mlad.core.libs import utils
 from mlad.core.kubernetes import controller as ctrl
-from kubernetes import client
+from kubernetes import client, watch
 
 class LogHandler:
     def __init__(self, cli):
@@ -44,7 +44,8 @@ class LogHandler:
         cli = ctrl.get_api_client()
         api = client.CoreV1Api(cli)
         try:
-            resp = api.read_namespaced_pod_log(name=target, namespace=namespace, tail_lines=tail, timestamps=timestamps, follow=follow, _preload_content=False)
+            resp = api.read_namespaced_pod_log(name=target, namespace=namespace, tail_lines=tail, timestamps=timestamps,
+                                               follow=follow, _preload_content=False)
             self.responses.append(resp)
             #Thread(target=LogHandler._monitor, args=(self.monitoring, host, target, lambda: self.close(resp)), daemon=True).start()
             for line in resp:
@@ -147,6 +148,10 @@ class LogCollector():
         }
         self.threads[id(iterable)]['thread'].start()
 
+    def remove_iterable(self, object_id):
+        del self.threads[object_id]
+        if not self.threads: raise StopIteration
+
     def release(self):
         self.should_run.value = False
         if self.release_callback:
@@ -161,3 +166,45 @@ class LogCollector():
             if not should_run.value: break
             if _: queue.put({'stream': _, 'object_id': id(iterable)})
         queue.put({'status': 'stopped', 'object_id': id(iterable)})
+
+
+class LogMonitor(Thread):
+
+    def __init__(self, cli, handler, collector, namespace, last_resource, **params):
+        Thread.__init__(self)
+        self.daemon = True
+        self.api = client.CoreV1Api(cli)
+        self.handler = handler
+        self.collector = collector
+        self.namespace = namespace
+        self.resource_version = last_resource
+        self.params = params
+
+    def run(self):
+        api = self.api
+        namespace = self.namespace
+        follow = self.params['follow']
+        tail = self.params['tail']
+        timestamps = self.params['timestamps']
+        added = [] #pending pods of svc
+
+        w = watch.Watch()
+        for e in w.stream(api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
+            event = e['type']
+            pod = e['object'].metadata.name
+            phase = e['object'].status.phase
+            service = e['object'].metadata.labels['MLAD.PROJECT.SERVICE']
+
+            if event == 'ADDED':
+                added.append(pod)
+            elif event == 'MODIFIED' and phase == 'Running':
+                if pod in added:
+                    log = self.handler.logs(namespace, pod, details=True, follow=follow,
+                                            tail=tail, timestamps=timestamps, stdout=True, stderr=True)
+                    self.collector.add_iterable(log, name=service, timestamps=timestamps)
+                    added.remove(pod)
+            elif event == 'DELETED':
+                for id, _ in self.collector.threads.items():
+                    if _['name'] == pod:
+                        self.collector.remove_iterable(id)
+

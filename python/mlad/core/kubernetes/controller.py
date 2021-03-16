@@ -11,7 +11,7 @@ from kubernetes.client import models
 import requests
 from mlad.core import exception
 from mlad.core.libs import utils
-from mlad.core.kubernetes.logs import LogHandler, LogCollector
+from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 from mlad.core.default import project_service as service_default
 from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
@@ -386,7 +386,7 @@ def create_containers(cli, network, services, extra_labels={}):
 
 def _create_job(cli, name, image, command, namespace='default', envs=None, 
                 restart_policy='Never', replicas=1, cpu=None, gpu=None, mem=None, 
-                labels=None, constraints=None):
+                labels=None, constraints={}):
     resources = {}
     if cpu: resources['cpu'] = str(cpu)
     if gpu: resources['nvidia.com/gpu'] = str(gpu)
@@ -435,7 +435,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
 def _create_replication_controller(cli, name, image, command, namespace='default',
                                    envs=None, restart_policy='Always', 
                                    replicas=1, cpu=None, gpu=None, mem=None,
-                                   labels=None, constraints=None):
+                                   labels=None, constraints={}):
     resources = {}
     if cpu: resources['cpu'] = str(cpu)
     if gpu: resources['nvidia.com/gpu'] = str(gpu)
@@ -846,14 +846,22 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
         for _ in sources:
             selected += [(_[0], __) for __ in _[1]]
         #selected = [_[:2] for _ in sources]
+
+    # resources = [api.read_namespaced_pod(name=target, namespace=namespace).metadata.resource_version
+    #              for _, target in selected]
+
     handler = LogHandler(cli)
 
-    logs = [(service_name, handler.logs(namespace ,target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
+    logs = [(service_name, handler.logs(namespace, target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
 
     if len(logs):
         with LogCollector(release_callback=handler.close) as collector:
             for name, log in logs:
                 collector.add_iterable(log, name=name, timestamps=timestamps)
+            last_resource = None
+            monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
+                                 follow=follow, tail=tail, timestamps=timestamps)
+            monitor.start()
             for message in collector:
                 yield message
     else:
@@ -866,6 +874,34 @@ if __name__ == '__main__':
     cli = get_api_client()
     # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
     v1 = client.CoreV1Api(cli)
+
+    name = 'test'
+    image = 'ubuntu'
+    namespace = 'kkkdeon-example-6a7c58fd94-cluster'
+    command= ["/bin/bash", "-ec", "while :; do echo 'test pod log'; sleep 5 ; done"]
+
+    labels = {'MLAD.PROJECT.SERVICE': name}
+
+    _create_job(cli, name, image, command, namespace, labels=labels)
+    ret = v1.create_namespaced_service(namespace, client.V1Service(
+        metadata=client.V1ObjectMeta(
+            name=name,
+            labels=labels
+        ),
+        spec=client.V1ServiceSpec(
+            selector={'MLAD.PROJECT.SERVICE': name},
+            ports=[client.V1ServicePort(port=5555)]
+        )
+    ))
+    sys.exit(1)
+
+    from kubernetes import watch
+
+    w = watch.Watch()
+    namespace = 'kkkdeon-example-6a7c58fd94-cluster'
+    for e in w.stream(v1.list_namespaced_pod, namespace=namespace):
+        print(e['type'])
+        print(e['object'].status.phase)
 
     sys.exit(1)
     body = client.V1Namespace(metadata=client.V1ObjectMeta(name="hello-cluster", labels={'MLAD.PROJECT': '123', 'MLAD.PROJECT.NAME':'hello'}))
