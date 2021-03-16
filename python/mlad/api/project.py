@@ -1,3 +1,4 @@
+import sys
 import json
 import requests
 from .exception import APIError, NotFoundError, raise_error
@@ -61,9 +62,10 @@ class Project():
         with requests.get(url=url,params=params, stream=True, headers=header) as resp:
             if resp.status_code == 200:
                 for _ in resp.iter_content(1024):
-                    log = _.decode()
-                    dict_log = json.loads(log)
-                    yield dict_log
+                    try:
+                        yield json.loads(_.decode())
+                    except json.JSONDecodeError as e:
+                        print(f"[Ignored] Stream Broken : {e}", file=sys.stderr)
             else:
                 raise APIError(f'Failed to get logs : {resp.json()["detail"]}')
 
