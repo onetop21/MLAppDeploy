@@ -864,9 +864,9 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
             monitor.start()
             for message in collector:
                 yield message
+        monitor.stop()
     else:
         print('Cannot find running containers.', file=sys.stderr)
-    monitor.stop()
     handler.release()
 
 
