@@ -148,10 +148,6 @@ class LogCollector():
         }
         self.threads[id(iterable)]['thread'].start()
 
-    def remove_iterable(self, object_id):
-        pass
-
-
     def release(self):
         self.should_run.value = False
         if self.release_callback:
@@ -207,14 +203,6 @@ class LogMonitor(Thread):
                                             tail=tail, timestamps=timestamps, stdout=True, stderr=True)
                     self.collector.add_iterable(log, name=service, timestamps=timestamps)
                     added.remove(pod)
-            elif event == 'DELETED':
-                object_id = None
-                for id, _ in self.collector.threads.items():
-                    if _['name'] == service:
-                        object_id = id
-                        break
-                if object_id:
-                    self.collector.remove_iterable(object_id)
 
     def stop(self):
         self.__stopped = True
