@@ -89,6 +89,7 @@ class LogCollector():
     def __next__(self):
         msg = self.queue.get()
         object_id = msg['object_id']
+
         if 'stream' in msg:
             stream = msg['stream'].decode()
             output = {'name': self.threads[object_id]['name'], 'name_width': self.name_width+6}
@@ -149,8 +150,8 @@ class LogCollector():
         self.threads[id(iterable)]['thread'].start()
 
     def remove_iterable(self, object_id):
-        del self.threads[object_id]
-        if not self.threads: raise StopIteration
+        pass
+
 
     def release(self):
         self.should_run.value = False
@@ -179,6 +180,7 @@ class LogMonitor(Thread):
         self.namespace = namespace
         self.resource_version = last_resource
         self.params = params
+        self.__stopped = False
 
     def run(self):
         api = self.api
@@ -190,6 +192,9 @@ class LogMonitor(Thread):
 
         w = watch.Watch()
         for e in w.stream(api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
+            if self.__stopped:
+                break
+
             event = e['type']
             pod = e['object'].metadata.name
             phase = e['object'].status.phase
@@ -204,7 +209,14 @@ class LogMonitor(Thread):
                     self.collector.add_iterable(log, name=service, timestamps=timestamps)
                     added.remove(pod)
             elif event == 'DELETED':
+                object_id = None
                 for id, _ in self.collector.threads.items():
-                    if _['name'] == pod:
-                        self.collector.remove_iterable(id)
+                    if _['name'] == service:
+                        object_id = id
+                        break
+                if object_id:
+                    self.collector.remove_iterable(object_id)
+
+    def stop(self):
+        self.__stopped = True
 
