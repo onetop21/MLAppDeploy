@@ -59,13 +59,19 @@ class Project():
             'names_or_ids':names_or_ids}
         header = {'token': self.token}
         
-        with requests.get(url=url,params=params, stream=True, headers=header) as resp:
-            if resp.status_code == 200:
-                for _ in resp.iter_content(1024):
-                    try:
-                        yield json.loads(_.decode())
-                    except json.JSONDecodeError as e:
-                        print(f"[Ignored] Stream Broken : {e}", file=sys.stderr)
-            else:
-                raise APIError(f'Failed to get logs : {resp.json()["detail"]}')
+        while True:
+            try:
+                with requests.get(url=url,params=params, stream=True, headers=header) as resp:
+                    if resp.status_code == 200:
+                        for _ in resp.iter_content(1024):
+                            try:
+                                yield json.loads(_.decode())
+                            except json.JSONDecodeError as e:
+                                print(f"[Ignored] Stream Broken : {e}", file=sys.stderr)
+                    else:
+                        raise APIError(f'Failed to get logs : {resp.json()["detail"]}')
+                break
+            except requests.exceptions.ChunkedEncodingError as e:
+                print(f"[Retry] {e}", file=sys.stderr)
+
 
