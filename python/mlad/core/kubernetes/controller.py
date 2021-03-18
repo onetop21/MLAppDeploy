@@ -812,7 +812,7 @@ def scale_service(cli, service, scale_spec):
         }
         ret = api.patch_namespaced_replication_controller_scale(
             name=name, namespace=namespace, body=body)
-    print(ret)
+    return ret
 
 def container_logs(cli, project_key, tail='all', follow=False, timestamps=False):
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
@@ -852,7 +852,8 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
 
     handler = LogHandler(cli)
 
-    logs = [(service_name, handler.logs(namespace, target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
+    #logs = [(service_name, handler.logs(namespace, target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
+    logs = [(target, handler.logs(namespace, target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
 
     if len(logs):
         with LogCollector(release_callback=handler.close) as collector:
@@ -868,8 +869,6 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         print('Cannot find running containers.', file=sys.stderr)
     handler.release()
-
-
 
 if __name__ == '__main__':
     cli = get_api_client()

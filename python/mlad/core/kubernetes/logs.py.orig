@@ -30,10 +30,9 @@ class LogHandler:
     def close(self, resp=None):
         for _ in ([resp] if resp else self.responses):
             try:
-                _.close()
-                #sock = _.raw._fp.fp.raw._sock
-                #sock.shutdown(socket.SHUT_RDWR)
-                #sock.close()
+                sock = _.raw._fp.fp.raw._sock
+                sock.shutdown(socket.SHUT_RDWR)
+                sock.close()
             except AttributeError:
                 pass
 
@@ -92,7 +91,7 @@ class LogCollector():
 
         if 'stream' in msg:
             stream = msg['stream'].decode()
-            output = {'name': self.threads[object_id]['name'], 'name_width': self.name_width}
+            output = {'name': self.threads[object_id]['name'], 'name_width': self.name_width+6}
             if not self.threads[object_id]['from_dockerpy']:
                 if self.threads[object_id]['timestamps']:
                     separated = stream.split(' ', 2)
@@ -118,8 +117,7 @@ class LogCollector():
             return output
         elif 'status' in msg and msg['status'] == 'stopped':
             del self.threads[object_id]
-            print(f"Stream Interable : {len(self.threads)}")
-            if len(self.threads) == 0: raise StopIteration
+            if not self.threads: raise StopIteration
             return self.__next__()
         else: raise RuntimeError('Invalid stream type.')
 
@@ -142,18 +140,20 @@ class LogCollector():
 
     def add_iterable(self, iterable, name=None, timestamps=False):
         self.name_width = max(self.name_width, len(name))
-        if not name in [_['name'] for _ in self.threads.values()]:
-            self.threads[id(iterable)] = {
-                'name': name,
-                'timestamps': timestamps,
-                'from_dockerpy': isinstance(iterable, docker.types.daemon.CancellableStream),
-                'thread': Thread(target=LogCollector._read_stream, args=(iterable, self.queue, self.should_run), daemon=True)
-            }
-            self.threads[id(iterable)]['thread'].start()
-            print(f"Stream Interable : {len(self.threads)}")
-        else:
-            print(f"Failed to add interable. Conflicted name [{name}].")
+        self.threads[id(iterable)] = {
+            'name': name,
+            'timestamps': timestamps,
+            'from_dockerpy': isinstance(iterable, docker.types.daemon.CancellableStream),
+            'thread': Thread(target=LogCollector._read_stream, args=(iterable, self.queue, self.should_run), daemon=True)
+        }
+        self.threads[id(iterable)]['thread'].start()
 
+<<<<<<< Updated upstream
+=======
+    def remove_iterable(self, object_id):
+        pass
+
+>>>>>>> Stashed changes
     def release(self):
         self.should_run.value = False
         if self.release_callback:
@@ -161,14 +161,14 @@ class LogCollector():
         for _ in self.threads.values():
             _['thread'].join()
         self.threads.clear()
-        print(f"Stream Interable : {len(self.threads)}")
 
     @classmethod
     def _read_stream(cls, iterable, queue, should_run):
         for _ in iterable:
             if not should_run.value: break
             if _: queue.put({'stream': _, 'object_id': id(iterable)})
-        #queue.put({'status': 'stopped', 'object_id': id(iterable)})
+        queue.put({'status': 'stopped', 'object_id': id(iterable)})
+
 
 class LogMonitor(Thread):
 
@@ -189,42 +189,59 @@ class LogMonitor(Thread):
         follow = self.params['follow']
         tail = self.params['tail']
         timestamps = self.params['timestamps']
-        #added = [] #pending pods of svc
+        added = [] #pending pods of svc
 
         w = watch.Watch()
+<<<<<<< Updated upstream
+        for e in w.stream(api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
+            if self.__stopped:
+                break
+
+            event = e['type']
+            pod = e['object'].metadata.name
+            phase = e['object'].status.phase
+            service = e['object'].metadata.labels['MLAD.PROJECT.SERVICE']
+
+            if event == 'ADDED':
+                added.append(pod)
+            elif event == 'MODIFIED' and phase == 'Running':
+                if pod in added:
+                    log = self.handler.logs(namespace, pod, details=True, follow=follow,
+                                            tail=tail, timestamps=timestamps, stdout=True, stderr=True)
+                    self.collector.add_iterable(log, name=service, timestamps=timestamps)
+                    added.remove(pod)
+=======
         while not self.__stopped:
             try:
-                for ev in w.stream(api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
+                for e in w.stream(api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
                     if self.__stopped:
                         break
 
-                    event = ev['type']
-                    pod = ev['object'].metadata.name
-                    phase = ev['object'].status.phase
-                    service = ev['object'].metadata.labels['MLAD.PROJECT.SERVICE']
+                    event = e['type']
+                    pod = e['object'].metadata.name
+                    phase = e['object'].status.phase
+                    service = e['object'].metadata.labels['MLAD.PROJECT.SERVICE']
 
-                    # For create pod by CrashLoopBackOff(RestartPolicy: Always)
-                    #if event == 'ADDED':
-                    #    added.append(pod)
-                    #elif event == 'MODIFIED' and phase == 'Running':
-                    #    if pod in added:
-                    #        log = self.handler.logs(namespace, pod, details=True, follow=follow,
-                    #                                tail=tail, timestamps=timestamps, stdout=True, stderr=True)
-                    #        self.collector.add_iterable(log, name=service, timestamps=timestamps)
-                    #        added.remove(pod)
-                    if event == 'MODIFIED' and phase == 'Running':
-                        log = self.handler.logs(namespace, pod, details=True, follow=follow,
-                                                tail=tail, timestamps=timestamps, stdout=True, stderr=True)
-                        self.collector.add_iterable(log, name=pod, timestamps=timestamps)
+                    if event == 'ADDED':
+                        added.append(pod)
+                    elif event == 'MODIFIED' and phase == 'Running':
+                        if pod in added:
+                            log = self.handler.logs(namespace, pod, details=True, follow=follow,
+                                                    tail=tail, timestamps=timestamps, stdout=True, stderr=True)
+                            self.collector.add_iterable(log, name=service, timestamps=timestamps)
+                            added.remove(pod)
                     elif event == 'DELETED':
-                        for oid in [k for k, v in self.collector.threads.items() if v['name'] == pod]:
-                            self.collector.queue.put({'status': 'stopped', 'object_id': oid})
+                        object_id = None
+                        for id, _ in self.collector.threads.items():
+                            if _['name'] == service:
+                                object_id = id
+                                break
+                        if object_id:
+                            self.collector.remove_iterable(object_id)
                 self.stop()
             except kubernetes.client.exceptions.ApiException as e:
-                if e.status == 410: # Gone Error
-                    print(f"[Re-stream] {e}", file=sys.stderr)
-                else:
-                    raise e
+                print(f"[Re-stream] {e}", file=sys.stderr)
+>>>>>>> Stashed changes
 
     def stop(self):
         self.__stopped = True
