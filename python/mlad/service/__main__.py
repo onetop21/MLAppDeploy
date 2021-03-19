@@ -86,8 +86,9 @@ def create_app():
                        dependencies=[Depends(admin.verify_auth)])
     app.include_router(auth.user_router, prefix=APIV1)
 
-    print(f"Admin Token : {generate_admin_token().decode()}")
-
+    print(f"Admin Token  : {generate_admin_token().decode()}")
+    print(f"Orchestrator : {'Kubernetes' if utils.is_kube_mode() else 'Swarm'}") 
+    print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}") 
     return app
 
 app = create_app()

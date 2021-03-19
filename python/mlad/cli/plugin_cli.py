@@ -2,28 +2,34 @@ import sys
 import os
 import getpass
 import click
-from mlad.cli import project
+from mlad.cli import plugin
 from mlad.cli.libs import utils
 from mlad.cli.autocompletion import *
 
+## 플러그인 스크립트 생성
 # mlad plugin init
+# mlad plugin install [PATH|GitRepo|ContainerRepo]
+## 플러그인 검색
 # mlad plugin ls
+## 플러그인 실행
+# mlad plugin run [NAME] [OPTIONS]
+
 # mlad plugin build | mlad build
 # mlad plugin up | mlad up
 # mlad plugin down | mlad down
 # mlad plugin logs | mlad logs
 # mlad plugin scale [service=num]
 @click.command()
-@click.option('--name', '-n', help='Project Name')
-@click.option('--version', '-v', default='0.0.1', help='Project Version')
-@click.option('--author', '-a', default=getpass.getuser(), help='Project Author')
+@click.option('--name', '-n', help='Plugin Name')
+@click.option('--version', '-v', default='0.0.1', help='Plugin Version')
+@click.option('--author', '-a', default=getpass.getuser(), help='Plugin Author')
 def init(name, version, author):
-    '''Initialize MLAppDeploy Project.'''
-    project.init(name, version, author)
+    '''Initialize MLAppDeploy Plugin.'''
+    plugin.init(name, version, author)
 
 @click.command()
 def ls():
-    '''Show Projects Deployed on Cluster.'''
+    '''Show Plugins Deployed on Cluster.'''
     project.list()
 
 @click.command()

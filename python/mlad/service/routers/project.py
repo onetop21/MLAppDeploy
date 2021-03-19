@@ -1,7 +1,9 @@
 import json
 from typing import List
+from multiprocessing import Queue, Value
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.types import Receive
 from mlad.service.models import project
 from mlad.service.exception import InvalidProjectError
 from mlad.service.libs import utils
@@ -100,8 +102,18 @@ def project_log(project_key: str, tail:str = Query('all'),
         if not network:
             raise InvalidProjectError(project_key)
 
+        class disconnectHandler:
+            def __init__(self):
+                self._callbacks = []
+            def add_callback(self, callback):
+                self._callbacks.append(callback)
+            async def __call__(self):
+                for cb in self._callbacks:
+                    cb()
+        handler = disconnectHandler()
+
         logs = ctlr.get_project_logs(cli, key, 
-            tail, follow, timestamps, names_or_ids)
+            tail, follow, timestamps, names_or_ids, handler)
 
         def get_logs(logs):
             for _ in logs:
@@ -110,9 +122,10 @@ def project_log(project_key: str, tail:str = Query('all'),
                     _['timestamp']=str(_['timestamp'])
                 yield json.dumps(_)
 
+
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return StreamingResponse(get_logs(logs))
+    return StreamingResponse(get_logs(logs), background=handler)
 

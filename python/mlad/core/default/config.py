@@ -42,7 +42,7 @@ service_config = {
     },
     'mlad': {
         'orchestrator': 'swarm',
-        'debug': True
+        'debug': False
     },
     'server': {
         'host': os.environ.get('HOST', '0.0.0.0'),

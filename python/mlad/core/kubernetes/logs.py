@@ -6,11 +6,13 @@ import struct
 import itertools
 import socket
 import urllib3
+import traceback
 import docker
 import requests_unixsocket
 from dateutil import parser
 from threading import Thread
 from multiprocessing import Queue, Value
+from urllib3.util import response as response_util
 from mlad.core.libs import utils
 from mlad.core.kubernetes import controller as ctrl
 from kubernetes import client, watch
@@ -18,7 +20,7 @@ from kubernetes import client, watch
 class LogHandler:
     def __init__(self, cli):
         self.cli = cli
-        self.responses = []
+        self.responses = {}
         self.monitoring = Value('b', True)
 
     def __del__(self):
@@ -28,14 +30,14 @@ class LogHandler:
         self.monitoring.value = False
 
     def close(self, resp=None):
-        for _ in ([resp] if resp else self.responses):
+        for _ in ([self.responses[resp]] if resp else list(self.responses.values())):
             try:
-                _.close()
+                sock = _._fp.fp.raw._sock
                 #sock = _.raw._fp.fp.raw._sock
-                #sock.shutdown(socket.SHUT_RDWR)
-                #sock.close()
-            except AttributeError:
-                pass
+                sock.shutdown(socket.SHUT_RDWR)
+                sock.close()
+            except AttributeError as e:
+                print(f'Error on LogHandler::Close! [{e}]')
 
     def logs(self, namespace, target, **params):
         follow = params['follow']
@@ -47,7 +49,7 @@ class LogHandler:
         try:
             resp = api.read_namespaced_pod_log(name=target, namespace=namespace, tail_lines=tail, timestamps=timestamps,
                                                follow=follow, _preload_content=False)
-            self.responses.append(resp)
+            self.responses[target] = resp
             #Thread(target=LogHandler._monitor, args=(self.monitoring, host, target, lambda: self.close(resp)), daemon=True).start()
             for line in resp:
                 line = line.decode()
@@ -59,11 +61,11 @@ class LogHandler:
                     line = b' '.join([separated[0], separated[1], *separated[2:]])
                     #line = b' '.join([separated[1], separated[0], *separated[2:]])
                 yield line
-            self.responses.remove(resp)
         except urllib3.exceptions.ProtocolError:
             pass
         except urllib3.exceptions.ReadTimeoutError:
             pass
+        if target in self.responses: del self.responses[target]
 
     @classmethod
     def _monitor(cls, should_run, host, target, callback):
@@ -118,7 +120,6 @@ class LogCollector():
             return output
         elif 'status' in msg and msg['status'] == 'stopped':
             del self.threads[object_id]
-            print(f"Stream Interable : {len(self.threads)}")
             if len(self.threads) == 0: raise StopIteration
             return self.__next__()
         else: raise RuntimeError('Invalid stream type.')
@@ -133,7 +134,6 @@ class LogCollector():
     def __exit__(self, ty, val, tb):
         self.release()
         if not ty in [None, KeyboardInterrupt]:
-            import traceback
             traceback.print_exception(ty, val, tb)
         return True
 
@@ -150,7 +150,6 @@ class LogCollector():
                 'thread': Thread(target=LogCollector._read_stream, args=(iterable, self.queue, self.should_run), daemon=True)
             }
             self.threads[id(iterable)]['thread'].start()
-            print(f"Stream Interable : {len(self.threads)}")
         else:
             print(f"Failed to add interable. Conflicted name [{name}].")
 
@@ -160,17 +159,28 @@ class LogCollector():
             self.release_callback()
         for _ in self.threads.values():
             _['thread'].join()
-        self.threads.clear()
-        print(f"Stream Interable : {len(self.threads)}")
+        #self.threads.clear()
 
+    thread_count = 0
     @classmethod
     def _read_stream(cls, iterable, queue, should_run):
+        LogCollector.thread_count += 1
+        print(f'Add Log Thread [{id(iterable)}]: {LogCollector.thread_count}')
         for _ in iterable:
             if not should_run.value: break
             if _: queue.put({'stream': _, 'object_id': id(iterable)})
-        #queue.put({'status': 'stopped', 'object_id': id(iterable)})
+        queue.put({'status': 'stopped', 'object_id': id(iterable)})
+        LogCollector.thread_count -= 1
+        print(f'Remove Log Thread [{id(iterable)}]: {LogCollector.thread_count}')
 
 class LogMonitor(Thread):
+    @staticmethod
+    def api_wrapper(fn, callback):
+        def inner(*args, **kwargs):
+            resp = fn(*args, **kwargs)
+            callback(resp)
+            return resp
+        return inner
 
     def __init__(self, cli, handler, collector, namespace, last_resource, **params):
         Thread.__init__(self)
@@ -183,6 +193,8 @@ class LogMonitor(Thread):
         self.params = params
         self.__stopped = False
 
+        self.stream_resp = None
+
     def run(self):
         api = self.api
         namespace = self.namespace
@@ -191,17 +203,27 @@ class LogMonitor(Thread):
         timestamps = self.params['timestamps']
         #added = [] #pending pods of svc
 
+        def assign(x):
+            self.stream_resp = x
+
         w = watch.Watch()
         while not self.__stopped:
             try:
-                for ev in w.stream(api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
+                print(f'Watch Start [{namespace}]')
+                wrapped_api = LogMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
+                #for ev in w.stream(self.api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
+                for ev in w.stream(wrapped_api, namespace=namespace, resource_version=self.resource_version):
+
                     if self.__stopped:
                         break
 
                     event = ev['type']
-                    pod = ev['object'].metadata.name
-                    phase = ev['object'].status.phase
-                    service = ev['object'].metadata.labels['MLAD.PROJECT.SERVICE']
+                    pod = ev['object']['metadata']['name']
+                    phase = ev['object']['status']['phase']
+                    service = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
+                    #pod = ev['object'].metadata.name
+                    #phase = ev['object'].status.phase
+                    #service = ev['object'].metadata.labels['MLAD.PROJECT.SERVICE']
 
                     # For create pod by CrashLoopBackOff(RestartPolicy: Always)
                     #if event == 'ADDED':
@@ -218,14 +240,27 @@ class LogMonitor(Thread):
                         self.collector.add_iterable(log, name=pod, timestamps=timestamps)
                     elif event == 'DELETED':
                         for oid in [k for k, v in self.collector.threads.items() if v['name'] == pod]:
-                            self.collector.queue.put({'status': 'stopped', 'object_id': oid})
-                self.stop()
+                            print(f'Register stopped [{oid}]')
+                            self.handler.close(pod)
+                            #self.collector.queue.put({'status': 'stopped', 'object_id': oid})
+            except urllib3.exceptions.ProtocolError:
+                print(f'Watch Stop [{namespace}]')
             except kubernetes.client.exceptions.ApiException as e:
                 if e.status == 410: # Gone Error
                     print(f"[Re-stream] {e}", file=sys.stderr)
                 else:
                     raise e
+            self.stop()
 
     def stop(self):
         self.__stopped = True
+        if self.stream_resp:
+            try:
+                sock = self.stream_resp._fp.fp.raw._sock
+                sock.shutdown(socket.SHUT_RDWR)
+                sock.close()
+            except AttributeError as e:
+                print(f'Error on LogMonitor::Stop [{e}]')
+            finally:
+                self.stream_resp = None
 

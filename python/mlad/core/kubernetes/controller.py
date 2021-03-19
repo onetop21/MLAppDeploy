@@ -826,7 +826,7 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False)
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[]):
+def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[], disconnHandler=None):
     api = client.CoreV1Api(cli)
     services = get_services(cli, project_key)
     namespace = get_project_network(cli, project_key=project_key).metadata.name
@@ -856,19 +856,22 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     logs = [(target, handler.logs(namespace, target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
 
     if len(logs):
-        with LogCollector(release_callback=handler.close) as collector:
+        with LogCollector() as collector:
             for name, log in logs:
                 collector.add_iterable(log, name=name, timestamps=timestamps)
-            last_resource = None
-            monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
-                                 follow=follow, tail=tail, timestamps=timestamps)
-            monitor.start()
-            for message in collector:
-                yield message
-        monitor.stop()
+            # Register Disconnect Callback
+            disconnHandler.add_callback(lambda: handler.close())
+            if follow:
+                last_resource = None
+                monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
+                                     follow=follow, tail=tail, timestamps=timestamps)
+                monitor.start()
+                disconnHandler.add_callback(lambda: monitor.stop())
+            yield from collector
+            #for message in collector:
+            #    yield message
     else:
         print('Cannot find running containers.', file=sys.stderr)
-    handler.release()
 
 if __name__ == '__main__':
     cli = get_api_client()
