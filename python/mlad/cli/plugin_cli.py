@@ -6,13 +6,15 @@ from mlad.cli import plugin
 from mlad.cli.libs import utils
 from mlad.cli.autocompletion import *
 
-## 플러그인 스크립트 생성
-# mlad plugin init
-# mlad plugin install [PATH|GitRepo|ContainerRepo]
-## 플러그인 검색
-# mlad plugin ls
-## 플러그인 실행
-# mlad plugin run [NAME] [OPTIONS]
+# mlad plugin init                                  # 플러그인 스크립트 생성
+# mlad plugin install [PATH|GitRepo|ContainerRepo]  # 플러그인 설치
+# mlad plugin ls                                    # 현재 실행중인 플러그인 목록
+# mlad plugin search [KEYWORD]                      # 플러그인 검색 (빼자)
+# mlad plugin installed                             # 설치된 플러그인 목록
+# mlad plugin run [NAME] [OPTIONS]                  # 플러그인 실행(BG/FG)
+
+# mlad build : docker build -> docker push | docker build
+# mlad up    : docker service create -> docker push -> docker service create
 
 # mlad plugin build | mlad build
 # mlad plugin up | mlad up
