@@ -8,6 +8,7 @@ import socket
 import urllib3
 import traceback
 import docker
+import kubernetes
 import requests_unixsocket
 from dateutil import parser
 from threading import Thread
@@ -30,14 +31,15 @@ class LogHandler:
         self.monitoring.value = False
 
     def close(self, resp=None):
-        for _ in ([self.responses[resp]] if resp else list(self.responses.values())):
-            try:
-                sock = _._fp.fp.raw._sock
-                #sock = _.raw._fp.fp.raw._sock
-                sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-            except AttributeError as e:
-                print(f'Error on LogHandler::Close! [{e}]')
+        for _ in ([self.responses.get(resp)] if resp else list(self.responses.values())):
+            if _ and _._fp and _._fp.fp:
+                try:
+                    sock = _._fp.fp.raw._sock
+                    #sock = _.raw._fp.fp.raw._sock
+                    sock.shutdown(socket.SHUT_RDWR)
+                    sock.close()
+                except AttributeError as e:
+                    print(f'Error on LogHandler::Close! [{e}]')
 
     def logs(self, namespace, target, **params):
         follow = params['follow']
@@ -213,10 +215,6 @@ class LogMonitor(Thread):
                 wrapped_api = LogMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
                 #for ev in w.stream(self.api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
                 for ev in w.stream(wrapped_api, namespace=namespace, resource_version=self.resource_version):
-
-                    if self.__stopped:
-                        break
-
                     event = ev['type']
                     pod = ev['object']['metadata']['name']
                     phase = ev['object']['status']['phase']
@@ -236,25 +234,28 @@ class LogMonitor(Thread):
                     #        added.remove(pod)
                     if event == 'MODIFIED' and phase == 'Running':
                         log = self.handler.logs(namespace, pod, details=True, follow=follow,
-                                                tail=tail, timestamps=timestamps, stdout=True, stderr=True)
+                                                tail=0, timestamps=timestamps, stdout=True, stderr=True)
                         self.collector.add_iterable(log, name=pod, timestamps=timestamps)
                     elif event == 'DELETED':
                         for oid in [k for k, v in self.collector.threads.items() if v['name'] == pod]:
                             print(f'Register stopped [{oid}]')
                             self.handler.close(pod)
                             #self.collector.queue.put({'status': 'stopped', 'object_id': oid})
-            except urllib3.exceptions.ProtocolError:
+                self.__stopped = True
+            except urllib3.exceptions.ProtocolError as e:
                 print(f'Watch Stop [{namespace}]')
+                self.__stopped = True
             except kubernetes.client.exceptions.ApiException as e:
                 if e.status == 410: # Gone Error
                     print(f"[Re-stream] {e}", file=sys.stderr)
+                    continue
                 else:
                     raise e
-            self.stop()
 
     def stop(self):
         self.__stopped = True
-        if self.stream_resp:
+        print('Request Stop LogMonigor')
+        if self.stream_resp and self.stream_resp._fp and self.stream_resp._fp.fp:
             try:
                 sock = self.stream_resp._fp.fp.raw._sock
                 sock.shutdown(socket.SHUT_RDWR)
