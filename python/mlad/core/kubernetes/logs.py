@@ -175,6 +175,7 @@ class LogCollector():
         for _ in iterable:
             if not should_run.value: break
             if _: queue.put({'stream': _, 'object_id': id(iterable)})
+            time.sleep(.001)
         queue.put({'status': 'stopped', 'object_id': id(iterable)})
         LogCollector.thread_count -= 1
         print(f'Remove Log Thread [{id(iterable)}]: {LogCollector.thread_count}')
