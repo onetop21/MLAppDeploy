@@ -5,6 +5,7 @@ import datetime
 import struct
 import itertools
 import socket
+import ssl
 import urllib3
 import traceback
 import docker
@@ -36,7 +37,10 @@ class LogHandler:
                 try:
                     sock = _._fp.fp.raw._sock
                     #sock = _.raw._fp.fp.raw._sock
-                    sock.shutdown(socket.SHUT_RDWR)
+                    if isinstance(sock, ssl.SSLSocket):
+                        sock.shutdown(socket.SHUT_RDWR)
+                    else:
+                        sock.shutdown()
                     sock.close()
                 except AttributeError as e:
                     print(f'Error on LogHandler::Close! [{e}]')
