@@ -263,7 +263,10 @@ class LogMonitor(Thread):
         if self.stream_resp and self.stream_resp._fp and self.stream_resp._fp.fp:
             try:
                 sock = self.stream_resp._fp.fp.raw._sock
-                sock.shutdown(socket.SHUT_RDWR)
+                if isinstance(sock, ssl.SSLSocket):
+                    sock.shutdown(socket.SHUT_RDWR)
+                else:
+                    sock.shutdown()
                 sock.close()
             except AttributeError as e:
                 print(f'Error on LogMonitor::Stop [{e}]')
