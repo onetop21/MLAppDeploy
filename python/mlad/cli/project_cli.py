@@ -57,9 +57,10 @@ def up(services):
 
 @click.command()
 @click.argument('services', nargs=-1, required=False, autocompletion=get_running_services_completion)
-def down(services):
+@click.option('--no-dump', is_flag=True, help='Save log to file before down service.')
+def down(services, no_dump):
     '''Stop and Remove Current Project Deployed on Cluster.'''
-    project.down(services)
+    project.down(services, no_dump)
 
 @click.command()
 @click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')

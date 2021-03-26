@@ -4,6 +4,7 @@ import io
 import time
 import tarfile
 import json
+import yaml
 import base64
 import docker
 from pathlib import Path
@@ -31,7 +32,8 @@ def get_username(config):
     else:
         raise RuntimeError("Token is not valid.")
 
-def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
+
+def _parse_log(log, max_name_width=32, len_short_id=10):
     name = log['name']
     namewidth = min(max_name_width, log['name_width'])
     if 'task_id' in log:
@@ -39,7 +41,11 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
     msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
     timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
-    #timestamp = log['timestamp'].strftime("[%Y-%m-%d %H:%M:%S.%f]") if 'timestamp' in log else None
+    return name, namewidth,  msg, timestamp
+
+
+def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
+    name, namewidth, msg, timestamp = _parse_log(log, max_name_width, len_short_id)
     if msg.startswith('Error'):
         sys.stderr.write(f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}')
     else:
@@ -48,6 +54,18 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
             sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, timestamp, msg))
         else:
             sys.stdout.write(("{}{:%d}{} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, msg))
+
+
+def _get_default_logs(log):
+    name, _, msg, timestamp = _parse_log(log, len_short_id=20)
+    if msg.startswith('Error'):
+        return msg
+    else:
+        if timestamp:
+            return f'{timestamp} {name}: {msg}'
+        else:
+            return f'{name}: {msg}'
+
 
 # Main CLI Functions
 def init(name, version, author):
@@ -65,6 +83,7 @@ def init(name, version, author):
             VERSION=version,
             AUTHOR=author,
         ))
+
 
 def list(no_trunc):
     config = utils.read_config()
@@ -105,6 +124,7 @@ def list(no_trunc):
             else:
                 columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
     utils.print_table(*([columns, 'Cannot find running project.'] + ([0] if no_trunc else [])))
+
 
 def status(all, no_trunc):
     config = utils.read_config()
@@ -199,6 +219,7 @@ def status(all, no_trunc):
         columns += columns_data     
     print(f"USERNAME: [{get_username(config)}] / PROJECT: [{inspect['project']}]")
     utils.print_table(*([columns, 'Cannot find running services.'] + ([0] if no_trunc else [])))
+
 
 def build(tagging, verbose, no_cache):
     config = utils.read_config()
@@ -314,6 +335,7 @@ def build(tagging, verbose, no_cache):
 
     print('Done.')
 
+
 def test(with_build):
     project = utils.get_project(default_project)
 
@@ -371,6 +393,7 @@ def test(with_build):
         except docker.errors.APIError as e:
             print('Network already removed.', file=sys.stderr)
     print('Done.')
+
 
 def up(services):
     project = utils.get_project(default_project)
@@ -450,9 +473,11 @@ def up(services):
 
     print('Done.')
 
-def down(services):
+
+def down(services, no_dump):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
+    workdir = utils.get_project(default_project)['project']['workdir']
 
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     # Block duplicated running.
@@ -469,15 +494,44 @@ def down(services):
             if not service_name in running_svc_names:
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
-    
+
+    def _get_log_path():
+        timestamp = str(inspect['created'])
+        log_dir = f'{workdir}/.logs/{timestamp}'
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        return log_dir
+
+    def dump_logs(service, log_dir):
+        path = f'{log_dir}/{service}.log'
+        with open(path, 'w') as f:
+            logs = api.project.log(project_key, timestamps=True, names_or_ids=[service])
+            for _ in logs:
+                log = _get_default_logs(_)
+                f.write(log)
+        print(f'service {service} log saved')
+
     with interrupt_handler(message='Wait.', blocked=False):
         running_services = api.service.get(project_key)['inspects']
       
         def filtering(inspect):
             return not services or inspect['name'] in services
-        targets = [ _['id'] for _ in running_services if filtering(_) ]
+        targets = [(_['id'], _['name']) for _ in running_services if filtering(_)]
+
+        #Save desc & log
+        if not no_dump:
+            log_dir = _get_log_path()
+            path = f'{log_dir}/description.yml'
+            print(f'{utils.INFO_COLOR}Project Log Storage: {log_dir}{utils.CLEAR_COLOR}')
+            if not os.path.isfile(path):
+                inspect['created'] = datetime.fromtimestamp(inspect['created'])
+                with open(path, 'w') as f:
+                    yaml.dump(inspect, f)
+
         for target in targets:
-            res = api.service.remove(project_key, target)
+            if not no_dump:
+                dump_logs(target[1], log_dir)
+            res = api.service.remove(project_key, target[0])
             print(res['message'])
 
         #Remove Network
@@ -495,6 +549,7 @@ def down(services):
                 print(e)
                 sys.exit(1)
     print('Done.')
+
 
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()

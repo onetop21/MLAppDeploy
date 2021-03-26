@@ -120,6 +120,7 @@ def inspect_project_network(cli, network):
     labels = get_labels(network) #labels from namespace
     if network.metadata.deletion_timestamp: 
         return {'deleted': True, 'key': uuid.UUID(labels['MLAD.PROJECT'])}
+    created = network.metadata.creation_timestamp
     config_labels = get_config_labels(cli, network, 'project-labels')
     hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
     return {
@@ -135,6 +136,7 @@ def inspect_project_network(cli, network):
         'version': config_labels['MLAD.PROJECT.VERSION'],
         'base': config_labels['MLAD.PROJECT.BASE'],
         'image': config_labels['MLAD.PROJECT.IMAGE'],
+        'created': int(time.mktime(created.timetuple()))
     }
 
 def create_project_network(cli, base_labels, extra_envs, credential, swarm=True, allow_reuse=False, stream=False):

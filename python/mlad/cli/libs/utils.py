@@ -161,6 +161,7 @@ def hash(body: str):
 # for Log Coloring
 CLEAR_COLOR = '\x1b[0m'
 ERROR_COLOR = '\x1b[1;31;40m'
+INFO_COLOR = '\033[38;2;255;140;26m'
 
 @lru_cache(maxsize=None)
 def color_table():

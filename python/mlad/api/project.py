@@ -56,9 +56,9 @@ class Project():
             follow=False, timestamps=False, names_or_ids=[]):
         url = f'{self.url}/{project_key}/logs'
         params = {'tail':tail, 'follow':follow, 'timestamps':timestamps,
-            'names_or_ids':names_or_ids}
+                  'names_or_ids':names_or_ids}
         header = {'token': self.token}
-        
+
         while True:
             try:
                 with requests.get(url=url,params=params, stream=True, headers=header) as resp:
@@ -73,5 +73,4 @@ class Project():
                 break
             except requests.exceptions.ChunkedEncodingError as e:
                 print(f"[Retry] {e}", file=sys.stderr)
-
 
