@@ -1,0 +1,23 @@
+# MLAppDeploy Plugin v0.2
+plugin:
+    name: tensorboard
+    version: 0.1
+    maintainer: onetop21
+    #workdir: .             # Describe workspace directory.
+workspace:
+    base: python:latest    # Describe base docker image tag
+    requires:              # Describe package manager and dependency list to install pre-required.
+        pip: requirements.txt
+    env:                   # Describe environment variables.
+        PYTHONUNBUFFERED: 1    
+    ignore:                # Describe exclude files from plugin application.
+       - "**/.*"
+    command: tensorboard --bind_all --logdir s3://logs --path_prefix /plugins/onetop21/tensorboard
+    # Describe application to execute
+service:
+    #command: tensorboard --bind_all --logdir s3://logs            # Describe arguments to need overwrite.
+    ports: [6006]        # Describe expose ports to other services.
+    ingress: 6007
+    deplo:
+        restart_policy: 
+            condition: always

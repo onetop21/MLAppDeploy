@@ -27,7 +27,14 @@ workspace:
 services:
     server:
         command: python server.py
-    client-endpoint:
+        ports: [5555]
+    client:
+        command: python client.py
+        deploy:
+            replicas: 1
+            restart_policy:
+                condition: always
+    test:
         command: python client.py
         deploy:
             replicas: 1
