@@ -9,11 +9,12 @@ from mlad.cli.autocompletion import *
 # mlad project init
 # mlad project ls | mlad ls
 # mlad project ps | mlad ps
-# mlad project build | mlad build
+# mlad project build | mlad build {to be move}
 # mlad project up | mlad up
 # mlad project down | mlad down
 # mlad prjoect logs | mlad logs
 # mlad prjoect scale [service=num]
+
 @click.command()
 @click.option('--name', '-n', help='Project Name')
 @click.option('--version', '-v', default='0.0.1', help='Project Version')

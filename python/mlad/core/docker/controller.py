@@ -23,26 +23,6 @@ def get_api_client(host='unix:///var/run/docker.sock'):
     # docker.client.DockerClient
     return docker.from_env(environment={'DOCKER_HOST': host})
 
-# Manage Project and Network
-def make_base_labels(workspace, username, project, registry):
-    #workspace = f"{hostname}:{workspace}"
-    # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
-    project_key = utils.project_key(workspace)
-    basename = f"{username}-{project['name'].lower()}-{project_key[:SHORT_LEN]}"
-    default_image = f"{utils.get_repository(basename, registry)}:latest"
-    labels = {
-        'MLAD.VERSION': '1',
-        'MLAD.PROJECT': project_key,
-        'MLAD.PROJECT.WORKSPACE': workspace,
-        'MLAD.PROJECT.USERNAME': username,
-        'MLAD.PROJECT.NAME': project['name'].lower(),
-        'MLAD.PROJECT.AUTHOR': project['author'],
-        'MLAD.PROJECT.VERSION': project['version'].lower(),
-        'MLAD.PROJECT.BASE': basename,
-        'MLAD.PROJECT.IMAGE': default_image,
-    }
-    return labels
-
 def get_auth_headers(cli, image_name=None, auth_configs=None):
     if image_name:
         if not auth_configs:
@@ -533,12 +513,12 @@ def remove_services(cli, services, timeout=0xFFFF):
     return removed
 
 # Image Control
-def get_images(cli, project_key=None):
+def get_images(cli, project_key=None, extra_labels=[]):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
 
-    filters = 'MLAD.PROJECT'
+    filters = f'MLAD.PROJECT'
     if project_key: filters+= f"={project_key}"
-    return cli.images.list(filters={ 'label': filters } )
+    return cli.images.list(filters={ 'label': [filters] + extra_labels } )
 
 def get_image(cli, image_id):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -562,7 +542,7 @@ def inspect_image(image):
         'tag': tag,
         'tags': image.tags,
         'latest': headed,
-        'author': image.attrs['Author'],
+        'maintainer': image.attrs['Author'],
         'created': image.attrs['Created'],
         # for Project
         'workspace': image.labels['MLAD.PROJECT.WORKSPACE'] if 'MLAD.PROJECT.WORKSPACE' in image.labels else 'Not Supported',
@@ -614,10 +594,10 @@ def prune_images(cli, project_key=None):
     if project_key: filters+= f'={project_key}'
     return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
 
-def push_images(cli, project_key, stream=False):
+def push_images(cli, project_key, stream=False, ty='project'):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     def _request_push():
-        for _ in get_images(cli, project_key):
+        for _ in get_images(cli, project_key, ty=ty):
             inspect = inspect_image(_)
             if inspect['short_id'] == inspect['repository']: continue
             repository = inspect['repository']

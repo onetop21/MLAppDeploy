@@ -15,6 +15,7 @@ from requests.exceptions import HTTPError
 from mlad.core.docker import controller as ctlr
 from mlad.core.default import config as default_config
 from mlad.core.default import project as default_project
+from mlad.core.libs import utils as core_utils
 from mlad.core import exception
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
@@ -68,7 +69,7 @@ def _get_default_logs(log):
 
 
 # Main CLI Functions
-def init(name, version, author):
+def init(name, version, maintainer):
     if utils.read_project():
         print('Already generated project file.', file=sys.stderr)
         sys.exit(1)
@@ -77,11 +78,11 @@ def init(name, version, author):
     #if not version: version = input('Project Version : ')
     #if not author: author = input('Project Author : ')
 
-    with open(utils.PROJECT_FILE, 'w') as f:
+    with open(utils.DEFAULT_PROJECT_FILE, 'w') as f:
         f.write(PROJECT.format(
             NAME=name,
             VERSION=version,
-            AUTHOR=author,
+            MAINTAINER=maintainer,
         ))
 
 
@@ -229,7 +230,7 @@ def build(tagging, verbose, no_cache):
     project = utils.get_project(default_project)
     
     # Generate Base Labels
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
+    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
 
     # Prepare Latest Image
     latest_image = None
@@ -345,7 +346,7 @@ def test(with_build):
     config = utils.read_config()
 
     cli = ctlr.get_api_client()
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
+    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
@@ -412,7 +413,7 @@ def up(services):
             
     config = utils.read_config()
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
-    base_labels = ctlr.make_base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
+    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
     project_key = base_labels['MLAD.PROJECT']
 
     # AuthConfig
@@ -461,6 +462,7 @@ def up(services):
     with interrupt_handler(message='Wait.', blocked=True) as h:
         target_model = _target_model(targets)
         try:
+            print(target_model)
             instances = api.service.create(project_key, target_model)
             for instance in instances:
                 inspect = api.service.inspect(project_key, instance)

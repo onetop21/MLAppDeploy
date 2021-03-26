@@ -7,6 +7,7 @@ from mlad.cli import config_cli as config
 from mlad.cli import auth_cli as auth
 from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
+from mlad.cli import plugin_cli as plugin
 from mlad.cli import node_cli as node
 from mlad.cli.autocompletion import *
 from mlad.cli.libs import utils
@@ -67,6 +68,7 @@ if has_role('admin'):
 main.add_command(image.cli, 'image')
 if has_role('user'):
     main.add_command(project.cli, 'project')
+    main.add_command(plugin.cli, 'plugin')
 
 if has_role('user'):
     main.add_dummy_command()

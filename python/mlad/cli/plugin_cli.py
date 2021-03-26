@@ -7,107 +7,72 @@ from mlad.cli.libs import utils
 from mlad.cli.autocompletion import *
 
 # mlad plugin init                                  # 플러그인 스크립트 생성
-# mlad plugin install [PATH|GitRepo|ContainerRepo]  # 플러그인 설치
-# mlad plugin ls                                    # 현재 실행중인 플러그인 목록
-# mlad plugin search [KEYWORD]                      # 플러그인 검색 (빼자)
+# mlad plugin install [PATH|GitRepo]                # 플러그인 설치
 # mlad plugin installed                             # 설치된 플러그인 목록
-# mlad plugin run [NAME] [OPTIONS]                  # 플러그인 실행(BG/FG)
+# mlad plugin enable                                # 플러그인 환경 활성화 (개인용)
+# mlad plugin disable                               # 플러그인 환경 비활성화 (개인용)
+# mlad plugin ls                                    # 현재 실행중인 플러그인 목록
+# mlad plugin run [NAME] [OPTIONS]                  # 플러그인 실행(FG)
+# mlad plugin start [NAME] [OPTIONS]                # 플러그인 실행(BG)
+# mlad plugin stop [NAME] [OPTIONS]                 # 플러그인 종료(BG)
 
-# mlad build : docker build -> docker push | docker build
-# mlad up    : docker service create -> docker push -> docker service create
-
-# mlad plugin build | mlad build
-# mlad plugin up | mlad up
-# mlad plugin down | mlad down
-# mlad plugin logs | mlad logs
-# mlad plugin scale [service=num]
 @click.command()
 @click.option('--name', '-n', help='Plugin Name')
-@click.option('--version', '-v', default='0.0.1', help='Plugin Version')
-@click.option('--author', '-a', default=getpass.getuser(), help='Plugin Author')
-def init(name, version, author):
+@click.option('--version', '-v', default='0.1', help='Plugin Version')
+@click.option('--maintainer', '-m', default=getpass.getuser(), help='Plugin Maintainer')
+def init(name, version, maintainer):
     '''Initialize MLAppDeploy Plugin.'''
-    plugin.init(name, version, author)
+    plugin.init(name, version, maintainer)
 
 @click.command()
-def ls():
-    '''Show Plugins Deployed on Cluster.'''
-    project.list()
+@click.option('--verbose', '-v', is_flag=True, help='Print detail-log during build a plugin.')
+@click.option('--no-cache', is_flag=True, help='Do not use the cache when building the plugin.')
+def install(verbose, no_cache):
+    '''Build and Install MLAppDeploy Plguin.'''
+    plugin.install(verbose, no_cache)
 
 @click.command()
-@click.option('--all', '-a', is_flag=True, help='Show included shutdown service.')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
-def ps(all, no_trunc):
-    '''Show Project Status Deployed on Cluster.'''
-    project.status(all, no_trunc)
+def ls(no_trunc):
+    '''Show Running Plugins on Cluster.'''
+    plugin.list(no_trunc)
 
 @click.command()
-@click.option('--tagging', '-t', is_flag=True, help='Tag version to latest image.')
-@click.option('--verbose', '-v', is_flag=True, help='Print detail-log during build a image.')
-@click.option('--no-cache', is_flag=True, help='Do not use the cache when building the image.')
-def build(tagging, verbose, no_cache):
-    '''Build Project to Image for Deploying on Cluster.'''
-    project.build(tagging, verbose, no_cache)
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
+def installed(no_trunc):
+    '''Show Installed Plugins.'''
+    plugin.installed(no_trunc)
 
 @click.command()
-@click.option('--build', '-b', is_flag=True, help='Build Project Image before Deploy and Run Project')
-def test(build):
-    '''Deploy and Run a Latest Built Project on Local or Cluster.'''
-    project.test(build)
+@click.argument('name', required=True, autocompletion=get_running_services_completion)
+@click.argument('options', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
+def run(name, options):
+    '''Run Deploy and Run a Project on Local or Cluster.'''
+    plugin.run(name, options)
 
 @click.command()
-@click.argument('services', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
-def up(services):
-    '''Deploy and Run a Project on Local or Cluster.'''
-    project.up(services)
+@click.argument('name', required=True, autocompletion=get_running_services_completion)
+@click.argument('options', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
+def start(name, options):
+    '''Run a Plugin on Background.'''
+    plugin.start(name, options)
 
 @click.command()
-@click.argument('services', nargs=-1, required=False, autocompletion=get_running_services_completion)
-def down(services):
-    '''Stop and Remove Current Project Deployed on Cluster.'''
-    project.down(services)
+@click.argument('name', nargs=-1, required=True, autocompletion=get_running_services_completion)
+def stop(name):
+    '''Stop a Running Plugin on Background.'''
+    plugin.stop(name)
 
-@click.command()
-@click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
-@click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs.')
-@click.option('--follow', '-f', is_flag=True, help='Follow log output')
-@click.argument('SERVICES|TASKS', nargs=-1, autocompletion=get_running_services_tasks_completion)
-def logs(tail, follow, timestamps, **kwargs):
-    '''Show Current Project Logs Deployed on Cluster.'''
-    filters = kwargs.get('services|tasks')
-    project.logs(tail, follow, timestamps, filters)
-
-@click.command()
-@click.argument('scales', nargs=-1, autocompletion=get_running_services_completion)
-def scale(scales):
-    '''Change Replicas Count of Running Service in Deployed on Cluster.'''
-    project.scale(scales)
-
-@click.command()
-def update():
-    '''Update Running Project or Service Deployed on Cluster.'''
-
-@click.group('project')
-@click.option('--file', '-f', default=None, help='Specify an alternate project file')
-@click.option('--workdir', default=None, help='Specify an alternate working directory\t\t\t\n(default: the path of the project file)')
-def cli(file, workdir):
+@click.group('plugin')
+def cli():
     '''Manage Machine Learning Projects.'''
-    cli_args(file, workdir)
-
-def cli_args(file, workdir):
-    if file != None and not os.path.isfile(file):
-        click.echo('Project file is not exist.')
-        sys.exit(1)
-    utils.apply_project_arguments(file, workdir)
 
 cli.add_command(init)
+cli.add_command(install)
+cli.add_command(installed)
 cli.add_command(ls)
-cli.add_command(ps)
-cli.add_command(build)
-cli.add_command(up)
-cli.add_command(down)
-cli.add_command(logs)
-cli.add_command(scale)
-cli.add_command(update)
+cli.add_command(run)
+cli.add_command(start)
+cli.add_command(stop)
 
 #sys.modules[__name__] = project

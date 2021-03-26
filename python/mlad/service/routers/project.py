@@ -39,10 +39,10 @@ def project_create(req: project.CreateRequest,
     return StreamingResponse(create_project(res))
 
 @router.get("/project")
-def projects():
+def projects(extra_labels: str = ''):
     cli = ctlr.get_api_client()
     try:
-        networks = ctlr.get_project_networks(cli)
+        networks = ctlr.get_project_networks(cli, extra_labels.split(',') if extra_labels else [])
         if utils.is_kube_mode():
             projects = [ ctlr.inspect_project_network(cli, v) for k, v in networks.items()]
         else:

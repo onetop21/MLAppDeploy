@@ -15,7 +15,7 @@ def list(all, tail):
         project_key = utils.project_key(utils.get_workspace())
         images = ctlr.get_images(cli, project_key)
 
-    data = [('ID', 'REGISTRY', 'BUILD USER', 'PROJECT NAME', 'PROJECT AUTHOR', 'VERSION', 'CREATED')]
+    data = [('ID', 'REGISTRY', 'BUILD USER', 'PROJECT NAME', 'MAINTAINER', 'VERSION', 'CREATED')]
     untagged = 0
     for _ in [ctlr.inspect_image(_) for _ in images[:tail]]:
         if _['short_id'] == _['repository']:
@@ -33,7 +33,7 @@ def list(all, tail):
                 registry,
                 builder,
                 _['project_name'],
-                _['author'],
+                _['maintainer'],
                 f"[{_['tag']}]" if _['latest'] else f"{_['tag']}",
                 _['created']
             ]

@@ -1,59 +1,41 @@
 import sys
 
-FORMAT='''# MLAppDeploy Project v0.1
+FORMAT='''# MLAppDeploy Project v0.2
 project:
     name: {NAME}
     version: {VERSION}
-    author: {AUTHOR}
+    maintainer: {MAINTAINER}
+    #workdir: .                     # Describe workspace directory.
 workspace:
-    ## Describe base docker image tag
-    #base: python:latest
-    ## Describe package manager and dependency list to install pre-required.
-    #requires:
+    #base: python:latest            # Describe base docker image tag
+    #requires:                      # Describe package manager and dependency list to install pre-required.
     #    pip: requirements.txt
-    ## Describe environment variables.
-    #env:  
-    #    PYTHONUNBUFFERED: 1    
-    ## Describe exclude files from project.
-    #ignore:
+    #env:                           # Describe environment variables.
+    #    PYTHONUNBUFFERED: 1        
+    #ignore:                        # Describe exclude files from project.
     #   - "**/.*"
-    ## Describe Pre/Post scripts for preparing.
-    #prescripts: []
-    #postscripts: []
-    ## Describe application to execute
-    #command: python run.py
-    ## Describe arguments for execute application
-    #arguments: --help
+    #prescripts: []                 # Describe Pre-scripts for preparing.
+    #postscripts: []                # Describe Post-scripts for preparing.
+    #command: python run.py         # Describe application to execute
+    #arguments: --help              # Describe arguments for execute application
 services:
     #[SERVICENAME]:
-    ## Describe image to run docker service for run not built image from workspace.
-    #    image: 
-    ## Describe environment variables additionaly.
-    #    env:
+    #    image:                     # Describe image to run docker service for run not built image from workspace.
+    #    env:                       # Describe environment variables additionaly.
     #        [KEY]: [VALUE]
-    ## Describe services before running current service.
-    #    depends: [ SERVICENAME, ... ]
-    ## Describe command to need overwrite.
-    #    command:
-    ## Describe arguments to need overwrite.
-    #    arguments:
-    ## Describe expose ports to other services.
-    #    ports: [80,...]
-    ## Deploy only options
-    #    deploy:
-    ## Describe restart policy. (never, on-failure, always)
-    #        restart_policy: always
-    ## Describe required system resource quote.
-    #        quota:
+    #    command:                   # Describe command to need overwrite.
+    #    arguments:                 # Describe arguments to need overwrite.
+    #    ports: [80,...]            # Describe expose ports to other services.
+    #    deploy:                    # Deploy only options
+    #        restart_policy: always # Describe restart policy. (never, on-failure, always)
+    #        quota:                 # Describe required system resource quota.
     #            cpus: 1
     #            mems: 8G
     #            gpus: 0
-    ## Describe target node to run services.
-    #        constraints:
+    #        constraints:           # Describe target node to run services.
     #            hostname:
     #            label:
-    ## Describe number to run service instances.
-    #        replicas: 1
+    #        replicas: 1            # Describe number to run service instances.
     #...
 '''
 

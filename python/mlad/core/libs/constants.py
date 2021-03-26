@@ -1,0 +1,1 @@
+SHORT_LEN = 10

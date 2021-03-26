@@ -2,7 +2,7 @@ import sys
 
 FORMAT='''# MLAppDeploy Dockerfile
 FROM {BASE}
-MAINTAINER {AUTHOR}
+MAINTAINER {MAINTAINER}
 
 # Environments
 {ENVS}

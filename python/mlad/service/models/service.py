@@ -30,6 +30,9 @@ class Service(BaseModel):
     #labels: dict
     ports: Optional[list]=None #k8s Required
     deploy: Optional[Deploy]=None
+    # For Plugin
+    service_type: Optional[str] = None
+    ingress: Optional[int] = None
 
 
 class CreateRequest(BaseModel):

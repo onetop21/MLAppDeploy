@@ -33,33 +33,14 @@ def get_api_client(config_file='~/.kube/config'):#config.kube_config.KUBE_CONFIG
         config.load_incluster_config() # configuration to Configuration(global)
         return ApiClient() # If Need, set configuration parameter from client.Configuration
 
-# Manage Project and Network
-def make_base_labels(workspace, username, project, registry):
-    #workspace = f"{hostname}:{workspace}"
-    # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
-    project_key = utils.project_key(workspace)
-    basename = f"{username}-{project['name'].lower()}-{project_key[:SHORT_LEN]}"
-    default_image = f"{utils.get_repository(basename, registry)}:latest"
-    labels = {
-        'MLAD.VERSION': '1',
-        'MLAD.PROJECT': project_key,
-        'MLAD.PROJECT.WORKSPACE': workspace,
-        'MLAD.PROJECT.USERNAME': username,
-        'MLAD.PROJECT.NAME': project['name'].lower(),
-        'MLAD.PROJECT.AUTHOR': project['author'],
-        'MLAD.PROJECT.VERSION': project['version'].lower(),
-        'MLAD.PROJECT.BASE': basename,
-        'MLAD.PROJECT.IMAGE': default_image,
-    }
-    return labels
-
 def get_auth_headers(cli, image_name=None, auth_configs=None):
     return docker_controller.get_auth_headers(docker.from_env(), image_name, auth_configs)
 
-def get_project_networks(cli):
+def get_project_networks(cli, extra_labels=[]):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    namespaces = api.list_namespace(label_selector="MLAD.PROJECT")
+    selector = ['MLAD.PROJECT.TYPE'] + (extra_labels or ['MLAD.PROJECT.TYPE=project'])
+    namespaces = api.list_namespace(label_selector=','.join(selector))
     return dict([(_.metadata.name, _) for _ in namespaces.items])
 
 def get_project_network(cli, **kwargs):
@@ -175,6 +156,7 @@ def create_project_network(cli, base_labels, extra_envs, credential, swarm=True,
             keys = {
                 'MLAD.PROJECT':labels['MLAD.PROJECT'],
                 'MLAD.PROJECT.NAME':labels['MLAD.PROJECT.NAME'],
+                'MLAD.PROJECT.TYPE':labels['MLAD.PROJECT.TYPE'],
             }
             ret = api.create_namespace(
                 client.V1Namespace(
@@ -370,7 +352,9 @@ def inspect_service(cli, service):
         'name': config_labels.get('MLAD.PROJECT.SERVICE'), 
         'replicas': replica_ret.spec.parallelism if kind == 'job' else replica_ret.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
-        'ports': {}
+        'ports': {},
+        'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
+        'created': replica_ret.metadata.creation_timestamp,
     }
     #TODO SERVICE PORTS
     if service.spec.ports:
@@ -502,7 +486,7 @@ def create_services(cli, network, services, extra_labels={}):
         # Check running already
         if get_services(cli, project_info['key'], extra_filters={'MLAD.PROJECT.SERVICE': name}):
             raise exception.Duplicated('Already running service.')
-
+    
         image = service['image'] or image_name
         env = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
@@ -591,6 +575,8 @@ def create_services(cli, network, services, extra_labels={}):
 
         config_labels['MLAD.PROJECT.SERVICE']=name
         config_labels['MLAD.PROJECT.SERVICE.KIND']=kind
+        if 'ingress' in service:
+            config_labels['MLAD.PROJECT.INGRESS'] = str(service.get('ingress'))
 
         try:
             if kind == 'job':
@@ -616,12 +602,19 @@ def create_services(cli, network, services, extra_labels={}):
                     ports=[client.V1ServicePort(port=_) for _ in ports]
                 )
             ))
+            if 'ingress' in service:
+                if not 'service_type' in service:
+                    ingress_path = f"/ingress/{project_info['username']}/{project_info['name']}/{name}"
+                elif service['service_type'] == 'plugin':
+                    ingress_path = f"/plugins/{project_info['username']}/{name}"
+                ingress_ret = create_ingress(cli, namespace, name, service['ingress'], ingress_path)
+
             label_body = {
                 "metadata": {
                     "labels": {'uid':ret.metadata.uid}
                     }
             }
-            temp_ret  = api.patch_namespaced_service(name,namespace,label_body)
+            temp_ret = api.patch_namespaced_service(name, namespace, label_body)
             instances.append(temp_ret)
             ret = create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
         except ApiException as e:
@@ -644,6 +637,7 @@ def _delete_replication_controller(cli, name, namespace):
 def remove_services(cli, services, timeout=0xFFFF):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
+    network_api = client.NetworkingV1beta1Api(cli)
     for service in services:
         inspect = inspect_service(cli, service)
         service_name = inspect['name']
@@ -659,6 +653,12 @@ def remove_services(cli, services, timeout=0xFFFF):
             ret = _delete_job(cli, service_name, namespace)
         elif kind == 'rc':
             ret = _delete_replication_controller(cli, service_name, namespace)
+    
+        try:
+            ingress_ret = network_api.delete_namespaced_ingress(service_name, namespace)
+        except ApiException as e:
+            print("Exception when calling ExtensionsV1beta1Api->delete_namespaced_ingress: %s\n" % e)
+
     removed = True
     # for service in services:
     #     service_removed = False
@@ -875,6 +875,37 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
+def create_ingress(cli, namespace, service_name, port, base_path='/'):
+    api = client.NetworkingV1beta1Api(cli)
+    body = client.NetworkingV1beta1Ingress(
+        api_version="networking.k8s.io/v1beta1",
+        kind="Ingress",
+        metadata=client.V1ObjectMeta(name=service_name, annotations={
+            "kubernetes.io/ingress.class": "nginx",
+            "nginx.ingress.kubernetes.io/rewrite-target": "/"
+        }),
+        spec=client.NetworkingV1beta1IngressSpec(
+            rules=[client.NetworkingV1beta1IngressRule(
+                #host="example.com",
+                http=client.NetworkingV1beta1HTTPIngressRuleValue(
+                    paths=[client.NetworkingV1beta1HTTPIngressPath(
+                        path=base_path,
+                        backend=client.NetworkingV1beta1IngressBackend(
+                            service_port=port,
+                            service_name=service_name)
+                        )]
+                    )
+                )
+            ]
+        )
+    )
+    # Creation of the Deployment in specified namespace
+    # (Can replace "default" with a namespace you may have created)
+    return api.create_namespaced_ingress(
+        namespace=namespace,
+        body=body
+    )
+
 if __name__ == '__main__':
     cli = get_api_client()
     # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
@@ -927,7 +958,7 @@ if __name__ == '__main__':
     #if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
 
     project = {'name': 'test_project', 'author': 'onetop21', 'version': 'v0.0.1'}
-    labels = make_base_labels("onetop21-linux@/home/onetop21/workspace/MLAppDeploy/example", 'onetop21', project, '172.20.41.118:5000')
+    labels = utils.base_labels("onetop21-linux@/home/onetop21/workspace/MLAppDeploy/example", 'onetop21', project, '172.20.41.118:5000')
     try:
         v1.create_namespaced_config_map(
             'hello-cluster', 

@@ -17,6 +17,7 @@ CONFIG_FILE = CONFIG_PATH + '/config.yml'
 COMPLETION_FILE = CONFIG_PATH + '/completion.sh'
 PROJECT_FILE_ENV_KEY='MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
+DEFAULT_PLUGIN_FILE = 'mlad-plugin.yml'
 
 def generate_empty_config():
     if not os.path.exists(CONFIG_PATH):
@@ -92,6 +93,43 @@ def get_project(default_project):
             )
         )
     return project
+
+@lru_cache(maxsize=None)
+def manifest_file(ty='project'):
+    # Patch for WSL2 (/home/... -> /mnt/c/Users...)
+    if ty == 'project':
+        return os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
+    elif ty == 'plugin':
+        return os.path.realpath(DEFAULT_PLUGIN_FILE)
+
+@lru_cache(maxsize=None)
+def read_manifest(path):
+    if os.path.isfile(path):
+        manifest = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
+        return manifest
+    else:
+        return None
+
+@lru_cache(maxsize=None)
+def get_manifest(ty, default=lambda x: x):
+    manifest_path = manifest_file(ty)
+    manifest = read_manifest(manifest_path)
+    if not manifest:
+        print(f'Need to generate {ty} manifest file before.', file=sys.stderr)
+        print(f'$ {sys.argv[0]} --help', file=sys.stderr)
+        sys.exit(1)
+
+    # replace workdir to abspath
+    manifest = default(manifest)
+    path = manifest[ty].get('workdir', './')
+    if not os.path.isabs(path):
+        manifest[ty]['workdir'] = os.path.normpath(
+            os.path.join(
+                os.path.dirname(manifest_path),
+                path
+            )
+        )
+    return manifest
 
 def print_table(data, no_data_msg=None, max_width=32):
     if max_width > 0:

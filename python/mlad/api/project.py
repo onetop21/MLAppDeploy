@@ -8,10 +8,11 @@ class Project():
         self.url = f'{url}/project'
         self.token = token
 
-    def get(self):
+    def get(self, extra_labels=[]):
         url = self.url
         header = {'token': self.token}
-        res = requests.get(url=url,headers=header)
+        params={'extra_labels': ','.join(extra_labels)}
+        res = requests.get(url=url,headers=header,params=params)
         raise_error(res)
         return res.json()    
 
