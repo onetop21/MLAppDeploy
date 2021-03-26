@@ -224,6 +224,7 @@ def list(no_trunc):
     projects = {}
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     networks = api.project.get(['MLAD.PROJECT.TYPE=plugin'])
+    columns = [('USERNAME', 'PLUGIN', 'IMAGE', 'VERSION', 'EXPOSE', 'TASKS', 'AGE')]
     for network in networks:
         project_key = network['key']
         default = { 
@@ -257,7 +258,6 @@ def list(no_trunc):
             projects[project_key]['services'] += 1
             projects[project_key]['replicas'] += inspect['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
-        columns = [('USERNAME', 'PLUGIN', 'IMAGE', 'VERSION', 'EXPOSE', 'TASKS', 'AGE')]
         for project in projects:
             if projects[project]['services'] > 0:
                 running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
