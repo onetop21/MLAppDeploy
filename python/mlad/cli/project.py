@@ -118,12 +118,12 @@ def list(no_trunc):
                 projects[project_key]['services'] += 1
                 projects[project_key]['replicas'] += inspect['replicas']
                 projects[project_key]['tasks'] += tasks_state.count('Running')
-        for project in projects:
-            if projects[project]['services'] > 0:
-                running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
-                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['services'], f"{running_tasks:>5}", projects[project]['hostname'], projects[project]['workspace']))
-            else:
-                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
+    for project in projects:
+        if projects[project]['services'] > 0:
+            running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
+            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['services'], f"{running_tasks:>5}", projects[project]['hostname'], projects[project]['workspace']))
+        else:
+            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
     utils.print_table(*([columns, 'Cannot find running project.'] + ([0] if no_trunc else [])))
 
 

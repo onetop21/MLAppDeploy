@@ -875,21 +875,28 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-def create_ingress(cli, namespace, service_name, port, base_path='/'):
+def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=False):
     api = client.NetworkingV1beta1Api(cli)
+    annotations = {
+        "kubernetes.io/ingress.class": "nginx",
+        "nginx.ingress.kubernetes.io/proxy-body-size": "0",
+        "nginx.ingress.kubernetes.io/proxy-read-timeout": "600",
+        "nginx.ingress.kubernetes.io/proxy-send-timeout": "600",
+    }
+    if rewrite:
+        annotations.update({
+            "nginx.ingress.kubernetes.io/rewrite-target": "/$2"
+        })
     body = client.NetworkingV1beta1Ingress(
         api_version="networking.k8s.io/v1beta1",
         kind="Ingress",
-        metadata=client.V1ObjectMeta(name=service_name, annotations={
-            "kubernetes.io/ingress.class": "nginx",
-            "nginx.ingress.kubernetes.io/rewrite-target": "/"
-        }),
+        metadata=client.V1ObjectMeta(name=service_name, annotations=annotations),
         spec=client.NetworkingV1beta1IngressSpec(
             rules=[client.NetworkingV1beta1IngressRule(
                 #host="example.com",
                 http=client.NetworkingV1beta1HTTPIngressRuleValue(
                     paths=[client.NetworkingV1beta1HTTPIngressPath(
-                        path=base_path,
+                        path=f"{base_path}(/|$)(.*)"if rewrite else base_path,
                         backend=client.NetworkingV1beta1IngressBackend(
                             service_port=port,
                             service_name=service_name)

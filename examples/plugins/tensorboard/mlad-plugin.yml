@@ -12,12 +12,10 @@ workspace:
         PYTHONUNBUFFERED: 1    
     ignore:                # Describe exclude files from plugin application.
        - "**/.*"
-    command: tensorboard --bind_all --logdir s3://logs --path_prefix /plugins/onetop21/tensorboard
-    # Describe application to execute
 service:
-    #command: tensorboard --bind_all --logdir s3://logs            # Describe arguments to need overwrite.
+    command: tensorboard --bind_all --logdir s3://logs --path_prefix /plugins/$(USERNAME)/$(SERVICE)
     ports: [6006]        # Describe expose ports to other services.
-    ingress: 6007
-    deplo:
+    ingress: 6006
+    deploy:
         restart_policy: 
             condition: always

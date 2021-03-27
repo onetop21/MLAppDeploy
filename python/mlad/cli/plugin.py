@@ -258,12 +258,12 @@ def list(no_trunc):
             projects[project_key]['services'] += 1
             projects[project_key]['replicas'] += inspect['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
-        for project in projects:
-            if projects[project]['services'] > 0:
-                running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
-                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['version'], projects[project]['expose'], f"{running_tasks:>5}", projects[project]['age']))
-            else:
-                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
+    for project in projects:
+        if projects[project]['services'] > 0:
+            running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
+            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['version'], projects[project]['expose'], f"{running_tasks:>5}", projects[project]['age']))
+        else:
+            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
     utils.print_table(columns, 'Cannot find running plugins.')
 
 def run(with_build):
