@@ -13,7 +13,8 @@ workspace:
     ignore:                # Describe exclude files from plugin application.
        - "**/.*"
 service:
-    command: tensorboard --bind_all --logdir s3://logs --path_prefix /plugins/$(USERNAME)/$(SERVICE)
+    command: tensorboard --bind_all --path_prefix $(INGRESS_PATH)
+    arguments: --logdir s3://logs
     ports: [6006]        # Describe expose ports to other services.
     ingress: 6006
     deploy:

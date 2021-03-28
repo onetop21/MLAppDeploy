@@ -496,7 +496,7 @@ def create_services(cli, network, services, extra_labels={}):
         env += [f"PROJECT_ID={project_info['id']}"]
         env += [f"SERVICE={name}"]
         env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
-        command = service['command'] + service['arguments']
+        command = f"{service['command']} {service['arguments']}".strip()
         labels = copy.copy(network_labels)
         labels.update(extra_labels)
         labels['MLAD.PROJECT.SERVICE'] = name
@@ -575,8 +575,14 @@ def create_services(cli, network, services, extra_labels={}):
 
         config_labels['MLAD.PROJECT.SERVICE']=name
         config_labels['MLAD.PROJECT.SERVICE.KIND']=kind
+        ingress_path = None
         if 'ingress' in service:
             config_labels['MLAD.PROJECT.INGRESS'] = str(service.get('ingress'))
+            if not 'service_type' in service:
+                ingress_path = f"/ingress/{project_info['username']}/{project_info['name']}/{name}"
+            elif service['service_type'] == 'plugin':
+                ingress_path = f"/plugins/{project_info['username']}/{name}"
+            envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
 
         try:
             if kind == 'job':
@@ -602,11 +608,7 @@ def create_services(cli, network, services, extra_labels={}):
                     ports=[client.V1ServicePort(port=_) for _ in ports]
                 )
             ))
-            if 'ingress' in service:
-                if not 'service_type' in service:
-                    ingress_path = f"/ingress/{project_info['username']}/{project_info['name']}/{name}"
-                elif service['service_type'] == 'plugin':
-                    ingress_path = f"/plugins/{project_info['username']}/{name}"
+            if ingress_path:
                 ingress_ret = create_ingress(cli, namespace, name, service['ingress'], ingress_path)
 
             label_body = {

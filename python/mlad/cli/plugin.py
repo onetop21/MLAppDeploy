@@ -280,65 +280,65 @@ def list(no_trunc):
             columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
     utils.print_table(columns, 'Cannot find running plugins.')
 
-def run(with_build):
-    project = utils.get_project(default_project)
+#def run(with_build):
+#    project = utils.get_project(default_project)
+#
+#    if with_build: build(False, True)
+#
+#    print('Deploying test container image to local...')
+#    config = utils.read_config()
+#
+#    cli = ctlr.get_api_client()
+#    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
+#    project_key = base_labels['MLAD.PROJECT']
+#    
+#    with interrupt_handler(message='Wait.', blocked=True) as h:
+#        try:
+#            extra_envs = utils.get_service_env(config)
+#            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
+#                if 'stream' in _:
+#                    sys.stdout.write(_['stream'])
+#                if 'result' in _:
+#                    if _['result'] == 'succeed':
+#                        network = ctlr.get_project_network(cli, network_id=_['id'])
+#                    else:
+#                        print(f"Unknown Stream Result [{_['stream']}]")
+#                    break
+#        except exception.AlreadyExist as e:
+#            print('Already running project.', file=sys.stderr)
+#            sys.exit(1)
+#
+#        # Start Containers
+#        instances = ctlr.create_containers(cli, network, project['services'] or {})  
+#        for instance in instances:
+#            inspect = ctlr.inspect_container(instance)
+#            print(f"Starting {inspect['name']}...")
+#            time.sleep(1)
+#
+#    # Show Logs
+#    with interrupt_handler(blocked=False) as h:
+#        colorkey = {}
+#        for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
+#            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
+#
+#    # Stop Containers and Network
+#    with interrupt_handler(message='Wait.', blocked=True):
+#        containers = ctlr.get_containers(cli, project_key).values()
+#        ctlr.remove_containers(cli, containers)
+#
+#        try:
+#            for _ in ctlr.remove_project_network(cli, network, stream=True):
+#                if 'stream' in _:
+#                    sys.stdout.write(_['stream'])
+#                if 'result' in _:
+#                    if _['result'] == 'succeed':
+#                        print('Network removed.')
+#                    break
+#        except docker.errors.APIError as e:
+#            print('Network already removed.', file=sys.stderr)
+#    print('Done.')
 
-    if with_build: build(False, True)
-
-    print('Deploying test container image to local...')
-    config = utils.read_config()
-
-    cli = ctlr.get_api_client()
-    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
-    project_key = base_labels['MLAD.PROJECT']
-    
-    with interrupt_handler(message='Wait.', blocked=True) as h:
-        try:
-            extra_envs = utils.get_service_env(config)
-            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        network = ctlr.get_project_network(cli, network_id=_['id'])
-                    else:
-                        print(f"Unknown Stream Result [{_['stream']}]")
-                    break
-        except exception.AlreadyExist as e:
-            print('Already running project.', file=sys.stderr)
-            sys.exit(1)
-
-        # Start Containers
-        instances = ctlr.create_containers(cli, network, project['services'] or {})  
-        for instance in instances:
-            inspect = ctlr.inspect_container(instance)
-            print(f"Starting {inspect['name']}...")
-            time.sleep(1)
-
-    # Show Logs
-    with interrupt_handler(blocked=False) as h:
-        colorkey = {}
-        for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
-            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
-
-    # Stop Containers and Network
-    with interrupt_handler(message='Wait.', blocked=True):
-        containers = ctlr.get_containers(cli, project_key).values()
-        ctlr.remove_containers(cli, containers)
-
-        try:
-            for _ in ctlr.remove_project_network(cli, network, stream=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        print('Network removed.')
-                    break
-        except docker.errors.APIError as e:
-            print('Network already removed.', file=sys.stderr)
-    print('Done.')
-
-def start(plugin_name, options):
+def start(plugin_name, arguments):
     print('Deploying services to cluster...')
 
     config = utils.read_config()
@@ -356,6 +356,8 @@ def start(plugin_name, options):
     target = json.loads(base64.urlsafe_b64decode(images[0].labels.get('MLAD.PROJECT.PLUGIN_MANIFEST').encode()).decode())
     target['name'] = plugin_name
     target['service_type'] = 'plugin'
+    if arguments:
+        target['arguments'] = f"{' '.join(arguments)}"
 
     # AuthConfig
     headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config']))}
