@@ -95,49 +95,63 @@ def install(verbose, no_cache):
 
     print('Generating plugin image...')
 
-    # Prepare workspace data from plugin manifest file
-    envs = []
-    for key in plugin['workspace']['env'].keys():
-        envs.append(DOCKERFILE_ENV.format(
-            KEY=key,
-            VALUE=plugin['workspace']['env'][key]
-        ))
-    requires = []
-    for key in plugin['workspace']['requires'].keys():
-        if key == 'apt':
-            requires.append(DOCKERFILE_REQ_APT.format(
-                SRC=plugin['workspace']['requires'][key]
+    if plugin['workspace'] != default_plugin({})['workspace']:
+        # Prepare workspace data from plugin manifest file
+        envs = []
+        for key in plugin['workspace']['env'].keys():
+            envs.append(DOCKERFILE_ENV.format(
+                KEY=key,
+                VALUE=plugin['workspace']['env'][key]
             ))
-        elif key == 'pip':
-            requires.append(DOCKERFILE_REQ_PIP.format(
-                SRC=plugin['workspace']['requires'][key]
-            )) 
+        requires = []
+        for key in plugin['workspace']['requires'].keys():
+            if key == 'apt':
+                requires.append(DOCKERFILE_REQ_APT.format(
+                    SRC=plugin['workspace']['requires'][key]
+                ))
+            elif key == 'pip':
+                requires.append(DOCKERFILE_REQ_PIP.format(
+                    SRC=plugin['workspace']['requires'][key]
+                )) 
 
-    # Dockerfile to memory
-    dockerfile = DOCKERFILE.format(
-        BASE=plugin['workspace']['base'],
-        MAINTAINER=plugin['plugin']['maintainer'],
-        ENVS='\n'.join(envs),
-        PRESCRIPTS=';'.join(plugin['workspace']['prescripts']) if len(plugin['workspace']['prescripts']) else "echo .",
-        REQUIRES='\n'.join(requires),
-        POSTSCRIPTS=';'.join(plugin['workspace']['postscripts']) if len(plugin['workspace']['postscripts']) else "echo .",
-        COMMAND='[{}]'.format(', '.join(
-            [f'"{item}"' for item in plugin['workspace']['command'].split()] + 
-            [f'"{item}"' for item in plugin['workspace']['arguments'].split()]
-        )),
-    )
+        # Dockerfile to memory
+        dockerfile = DOCKERFILE.format(
+            BASE=plugin['workspace']['base'],
+            MAINTAINER=plugin['plugin']['maintainer'],
+            ENVS='\n'.join(envs),
+            PRESCRIPTS=';'.join(plugin['workspace']['prescripts']) if len(plugin['workspace']['prescripts']) else "echo .",
+            REQUIRES='\n'.join(requires),
+            POSTSCRIPTS=';'.join(plugin['workspace']['postscripts']) if len(plugin['workspace']['postscripts']) else "echo .",
+            COMMAND='[{}]'.format(', '.join(
+                [f'"{item}"' for item in plugin['workspace']['command'].split()] + 
+                [f'"{item}"' for item in plugin['workspace']['arguments'].split()]
+            )),
+        )
 
-    tarbytes = io.BytesIO()
-    dockerfile_info = tarfile.TarInfo('.dockerfile')
-    dockerfile_info.size = len(dockerfile)
-    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-        for name, arcname in utils.arcfiles(plugin['plugin']['workdir'], plugin['workspace']['ignore']):
-            tar.add(name, arcname)
-        tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-    tarbytes.seek(0)
+        tarbytes = io.BytesIO()
+        dockerfile_info = tarfile.TarInfo('.dockerfile')
+        dockerfile_info.size = len(dockerfile)
+        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+            for name, arcname in utils.arcfiles(plugin['plugin']['workdir'], plugin['workspace']['ignore']):
+                tar.add(name, arcname)
+            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
+        tarbytes.seek(0)
 
-    # Build Image
-    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
+        # Build Image
+        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
+
+    else:
+        dockerfile = f"FROM {plugin['service']['image']}"
+
+        tarbytes = io.BytesIO()
+        dockerfile_info = tarfile.TarInfo('.dockerfile')
+        dockerfile_info.size = len(dockerfile)
+        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
+        tarbytes.seek(0)
+
+        # Build Image
+        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
 
     # Print build output
     for _ in build_output:
