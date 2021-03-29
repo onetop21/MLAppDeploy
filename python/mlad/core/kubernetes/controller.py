@@ -411,7 +411,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
                         )
                     ],
                     node_selector = constraints,
-                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secret else None
+                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secrets else None
                 )
             )
         )  
@@ -460,7 +460,7 @@ def _create_replication_controller(cli, name, image, command, namespace='default
                         )
                     )],
                     node_selector = constraints,
-                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secret else None
+                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secrets else None
                 )
             )
         )
