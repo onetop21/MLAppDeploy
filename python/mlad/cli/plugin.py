@@ -238,8 +238,11 @@ def list(no_trunc):
         projects[project_key] = projects[project_key] if project_key in projects else default
         res = api.service.get(project_key=project_key)
         for inspect in res['inspects']:
-            base_url = f"http://{config['mlad']['host']}"
-            if not config['mlad']['port'] in [80, 8440] : base_url += f":{config['mlad']['port']}"
+            if no_trunc:
+                base_url = f"http://{config['mlad']['host']}"
+                if not config['mlad']['port'] in [80, 8440] : base_url += f":{config['mlad']['port']}"
+            else:
+                base_url = ''
             projects[project_key]['url'] = f"{base_url}{inspect.get('ingress')}" or '-'
             uptime = (datetime.utcnow() - parser.parse(inspect['created']).replace(tzinfo=None)).total_seconds()
             if uptime > 24 * 60 * 60:
