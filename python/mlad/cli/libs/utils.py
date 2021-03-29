@@ -106,7 +106,7 @@ def get_project(default_project):
                 path
             )
         )
-    if not check_podname_syntax(project['project']['name']) or not check_syntax(project['service']):
+    if not check_podname_syntax(project['project']['name']) or not check_podname_syntax(project['service']):
         print('Syntax Error: Project(Plugin) and service require a name to follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
     return project
