@@ -404,6 +404,7 @@ EOF
     TAGGED_IMAGE=$IMAGE_NAME:$VERSION
     docker tag $IMAGE_NAME $TAGGED_IMAGE
     docker push $IMAGE_NAME
+    kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
 fi
 
 # Check pre-requires
@@ -485,6 +486,8 @@ spec:
           ports:
           - name: http
             containerPort: 8440
+      imagePullSecrets:
+        - name: regcred
 ---
 kind: Service
 apiVersion: v1
