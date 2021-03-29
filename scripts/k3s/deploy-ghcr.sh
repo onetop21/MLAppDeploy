@@ -404,6 +404,8 @@ EOF
     TAGGED_IMAGE=$IMAGE_NAME:$VERSION
     docker tag $IMAGE_NAME $TAGGED_IMAGE
     docker push $IMAGE_NAME
+    kubectl create secret generic regcred --from-file=.dockerconfigjson=~.docker/config.json --type=kubernetes.io/dockerconfigjson
+    kubectl get secret regcred --output=yaml
 fi
 
 # Check pre-requires
