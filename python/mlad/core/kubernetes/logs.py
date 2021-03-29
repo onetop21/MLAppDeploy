@@ -235,7 +235,7 @@ class LogMonitor(Thread):
                     #        added.remove(pod)
                     if event == 'MODIFIED' and phase == 'Running':
                         log = self.handler.logs(namespace, pod, details=True, follow=follow,
-                                                tail=0, timestamps=timestamps, stdout=True, stderr=True)
+                                                tail=5, timestamps=timestamps, stdout=True, stderr=True)
                         self.collector.add_iterable(log, name=pod, timestamps=timestamps)
                     elif event == 'DELETED':
                         for oid in [k for k, v in self.collector.threads.items() if v['name'] == pod]:
