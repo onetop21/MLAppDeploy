@@ -597,7 +597,8 @@ def prune_images(cli, project_key=None):
 def push_images(cli, project_key, stream=False, ty='project'):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     def _request_push():
-        for _ in get_images(cli, project_key, ty=ty):
+        for _ in get_images(cli, project_key):
+        #for _ in get_images(cli, project_key, ty=ty):
             inspect = inspect_image(_)
             if inspect['short_id'] == inspect['repository']: continue
             repository = inspect['repository']

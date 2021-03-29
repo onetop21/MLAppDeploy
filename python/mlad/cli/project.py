@@ -265,6 +265,7 @@ def build(tagging, verbose, no_cache):
 
     # Dockerfile to memory
     dockerfile = DOCKERFILE.format(
+        MAINTAINER=project['project']['author'],
         BASE=project['workspace']['base'],
         AUTHOR=project['project']['author'],
         ENVS='\n'.join(envs),
