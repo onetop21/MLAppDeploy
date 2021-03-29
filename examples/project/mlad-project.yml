@@ -26,8 +26,8 @@ workspace:
     #arguments: --help
 services:
     server:
-        command: python server.py
         ports: [5555]
+        command: python server.py
     client:
         command: python client.py
         deploy:
@@ -36,8 +36,8 @@ services:
                 condition: always
     test:
         command: python client.py
-        deploy:
-            replicas: 1
+#        deploy:
+#            replicas: 1
             # constraints:
             #     labels.type: master
     #[SERVICENAME]:

@@ -101,6 +101,7 @@ def base_labels(workspace, username, manifest, registry, ty='project'):
         f'MLAD.PROJECT.BASE': basename,
         f'MLAD.PROJECT.IMAGE': default_image,
     }
+    print('util test', labels)
     return labels
 #def base_labels(workspace, username, manifest, registry, ty='project'):
 #    #workspace = f"{hostname}:{workspace}"
