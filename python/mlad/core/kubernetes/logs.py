@@ -224,10 +224,6 @@ class LogMonitor(Thread):
                     pod = ev['object']['metadata']['name']
                     phase = ev['object']['status']['phase']
                     service = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
-                    #pod = ev['object'].metadata.name
-                    #phase = ev['object'].status.phase
-                    #service = ev['object'].metadata.labels['MLAD.PROJECT.SERVICE']
-
                     # For create pod by CrashLoopBackOff(RestartPolicy: Always)
                     #if event == 'ADDED':
                     #    added.append(pod)
@@ -246,7 +242,7 @@ class LogMonitor(Thread):
                             print(f'Register stopped [{oid}]')
                             self.handler.close(pod)
                             #self.collector.queue.put({'status': 'stopped', 'object_id': oid})
-                self.__stopped = True
+                #self.__stopped = True
             except urllib3.exceptions.ProtocolError as e:
                 print(f'Watch Stop [{namespace}]')
                 self.__stopped = True

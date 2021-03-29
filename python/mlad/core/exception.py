@@ -15,3 +15,13 @@ class NotSupportURL(Exception):
 
 class NotFound(Exception):
     pass
+
+class APIError(Exception):
+    status_code: int
+    msg: str
+    def __init__(self, msg, status_code):
+        self.msg = msg
+        self.status_code = status_code
+
+    def __str__(self):
+        return self.msg

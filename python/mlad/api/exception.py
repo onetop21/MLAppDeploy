@@ -1,15 +1,25 @@
 from requests.exceptions import HTTPError
 
+
 class APIError(Exception):
-    msg : str
+    msg: str
+
     def __init__(self, msg):
         self.msg = msg
 
     def __str__(self):
         return self.msg
 
+
 class NotFoundError(APIError):
-    pass  
+    msg: str
+
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __str__(self):
+        return self.msg
+
 
 def error_from_http_errors(e):
     detail = e.response.json()['detail']
@@ -18,6 +28,7 @@ def error_from_http_errors(e):
     else:
         cls = APIError
     raise cls(detail)
+
 
 def raise_error(response):
     try:

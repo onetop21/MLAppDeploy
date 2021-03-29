@@ -321,8 +321,8 @@ def inspect_service(cli, service):
     api = client.CoreV1Api(cli)
     service_name = service.metadata.name
     namespace = service.metadata.namespace
-    config_labels = get_config_labels(cli, service, 
-        f'service-{service_name}-labels')
+    config_labels = get_config_labels(cli, service,
+                                      f'service-{service_name}-labels')
     labels = service.metadata.labels
 
     kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
@@ -462,7 +462,7 @@ def _create_replication_controller(cli, name, image, command, namespace='default
                 )
             )
         )
-    )    
+    )
     api_response = api.create_namespaced_replication_controller(namespace, body)
     return api_response
 
@@ -616,10 +616,10 @@ def create_services(cli, network, services, extra_labels={}):
             }
             temp_ret = api.patch_namespaced_service(name, namespace, label_body)
             instances.append(temp_ret)
-            ret = create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
+            create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
         except ApiException as e:
             print(f"Exception Handling v1.create_namespaced_replication_controller => {e}", file=sys.stderr)
-    #ret = create_config_labels(cli, 'service-labels', namespace, config_labels)
+            raise exception.APIError(e, e.status)
     return instances
 
 def remove_containers(cli, containers):

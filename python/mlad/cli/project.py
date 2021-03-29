@@ -462,7 +462,6 @@ def up(services):
     with interrupt_handler(message='Wait.', blocked=True) as h:
         target_model = _target_model(targets)
         try:
-            print(target_model)
             instances = api.service.create(project_key, target_model)
             for instance in instances:
                 inspect = api.service.inspect(project_key, instance)

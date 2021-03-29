@@ -1,6 +1,7 @@
 import json
 from typing import List
 from fastapi import APIRouter, Query, HTTPException
+from mlad.core.exception import APIError
 from mlad.service.models import service
 from mlad.service.exception import InvalidProjectError,InvalidServiceError
 from mlad.service.libs import utils
@@ -79,7 +80,6 @@ def service_list(project_key:str,
 @router.post("/project/{project_key}/service")
 def service_create(project_key:str, req:service.CreateRequest):
     targets = req.json
-
     cli = ctlr.get_api_client()
     try:
         key = str(project_key).replace('-','')
@@ -89,6 +89,8 @@ def service_create(project_key:str, req:service.CreateRequest):
         services = ctlr.create_services(cli, network, targets)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except APIError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e.msg))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     if utils.is_kube_mode():

@@ -18,6 +18,8 @@ class Service():
 
     def create(self, project_key, services):
         url = f'{self.url}/{project_key}/service'
+        for service in services:
+            service['name'] = service['name'].replace('_', '-')
         res = requests.post(url=url, json={'services':services})
         #services = [{'name':'',..},{'name':'',..}]
         raise_error(res)
