@@ -372,7 +372,7 @@ def create_containers(cli, network, services, extra_labels={}):
 
 def _create_job(cli, name, image, command, namespace='default', envs=None, 
                 restart_policy='Never', replicas=1, cpu=None, gpu=None, mem=None, 
-                labels=None, constraints={}):
+                labels=None, constraints={}, secrets=None):
     resources = {}
     if cpu: resources['cpu'] = str(cpu)
     if gpu: resources['nvidia.com/gpu'] = str(gpu)
@@ -410,7 +410,8 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
                             )
                         )
                     ],
-                    node_selector = constraints
+                    node_selector = constraints,
+                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secret else None
                 )
             )
         )  
@@ -421,7 +422,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
 def _create_replication_controller(cli, name, image, command, namespace='default',
                                    envs=None, restart_policy='Always', 
                                    replicas=1, cpu=None, gpu=None, mem=None,
-                                   labels=None, constraints={}):
+                                   labels=None, constraints={}, secrets=None):
     resources = {}
     if cpu: resources['cpu'] = str(cpu)
     if gpu: resources['nvidia.com/gpu'] = str(gpu)
@@ -458,7 +459,8 @@ def _create_replication_controller(cli, name, image, command, namespace='default
                             )
                         )
                     )],
-                    node_selector = constraints
+                    node_selector = constraints,
+                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secret else None
                 )
             )
         )
@@ -584,19 +586,22 @@ def create_services(cli, network, services, extra_labels={}):
                 ingress_path = f"/plugins/{project_info['username']}/{name}"
             envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
 
+        # Secrets
+        secrets = f"{project_base}-auth"
+
         try:
             if kind == 'job':
                 restart_policy = kwargs.get(restart_policy, 'Never')
                 ret = _create_job(
                     cli, name, image, command, 
                     namespace, envs, restart_policy, replicas,
-                    cpu, gpu, mem, labels, constraints)
+                    cpu, gpu, mem, labels, constraints, secrets)
             elif kind == 'rc':
                 restart_policy = kwargs.get(restart_policy, 'Always')
                 ret = _create_replication_controller(
                     cli, name, image, command, 
                     namespace, envs, restart_policy, replicas,
-                    cpu, gpu, mem, labels, constraints)
+                    cpu, gpu, mem, labels, constraints, secrets)
             
             ret = api.create_namespaced_service(namespace, client.V1Service(
                 metadata=client.V1ObjectMeta(
