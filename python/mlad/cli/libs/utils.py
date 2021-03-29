@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import copy
 import fnmatch
 import uuid
@@ -60,6 +61,19 @@ def write_completion(shell='bash'):
             f.write(f". {COMPLETION_FILE}")
 
 @lru_cache(maxsize=None)
+def check_podname_syntax(obj):
+    if isinstance(obj, dict):
+        for _ in project['service']:
+            if not re.match('^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', _):
+                return False
+    elif isinstance(obj, str):
+        if not re.match('^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', obj):
+            return False
+    else:
+        return False
+    return True
+
+@lru_cache(maxsize=None)
 def get_project_file():
     # Patch for WSL2 (/home/... -> /mnt/c/Users...)
     return os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
@@ -92,6 +106,9 @@ def get_project(default_project):
                 path
             )
         )
+    if not check_podname_syntax(project['project']['name']) or not check_syntax(project['service']):
+        print('Syntax Error: Project(Plugin) and service require a name to follow standard as defined in RFC1123.', file=sys.stderr)
+        sys.exit(1)
     return project
 
 @lru_cache(maxsize=None)
@@ -129,6 +146,9 @@ def get_manifest(ty, default=lambda x: x):
                 path
             )
         )
+    if not check_podname_syntax(manifest['plugin']['name']):
+        print('Syntax Error: Project(Plugin) and service require a name to follow standard as defined in RFC1123.', file=sys.stderr)
+        sys.exit(1)
     return manifest
 
 def print_table(data, no_data_msg=None, max_width=32):

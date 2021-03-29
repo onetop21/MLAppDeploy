@@ -10,9 +10,10 @@ sock.setsockopt(zmq.IDENTITY, socket.gethostname().encode())
 sock.connect('tcp://server:5555')
 index = 0
 print('Client Ready v0.0.3')
-while True:
+#while True:
+for _ in range(60):
    sock.send_string(f'Index: {index}')
    index += 1
    print(sock.recv_string())
-   time.sleep(3)
+   time.sleep(1)
     

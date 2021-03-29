@@ -50,12 +50,12 @@ def run(name, options):
     '''Run Deploy and Run a Project on Local or Cluster.'''
     plugin.run(name, options)
 
-@click.command()
+@click.command(context_settings={"ignore_unknown_options": True})
 @click.argument('name', required=True, autocompletion=get_running_services_completion)
-@click.argument('options', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
-def start(name, options):
+@click.argument('arguments', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
+def start(name, arguments):
     '''Run a Plugin on Background.'''
-    plugin.start(name, options)
+    plugin.start(name, arguments)
 
 @click.command()
 @click.argument('name', nargs=-1, required=True, autocompletion=get_running_services_completion)
@@ -71,7 +71,7 @@ cli.add_command(init)
 cli.add_command(install)
 cli.add_command(installed)
 cli.add_command(ls)
-cli.add_command(run)
+#cli.add_command(run)
 cli.add_command(start)
 cli.add_command(stop)
 

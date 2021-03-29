@@ -496,7 +496,7 @@ def create_services(cli, network, services, extra_labels={}):
         env += [f"PROJECT_ID={project_info['id']}"]
         env += [f"SERVICE={name}"]
         env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
-        command = service['command'] + service['arguments']
+        command = f"{service['command']} {service['arguments']}".strip()
         labels = copy.copy(network_labels)
         labels.update(extra_labels)
         labels['MLAD.PROJECT.SERVICE'] = name
@@ -575,8 +575,14 @@ def create_services(cli, network, services, extra_labels={}):
 
         config_labels['MLAD.PROJECT.SERVICE']=name
         config_labels['MLAD.PROJECT.SERVICE.KIND']=kind
+        ingress_path = None
         if 'ingress' in service:
             config_labels['MLAD.PROJECT.INGRESS'] = str(service.get('ingress'))
+            if not 'service_type' in service:
+                ingress_path = f"/ingress/{project_info['username']}/{project_info['name']}/{name}"
+            elif service['service_type'] == 'plugin':
+                ingress_path = f"/plugins/{project_info['username']}/{name}"
+            envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
 
         try:
             if kind == 'job':
@@ -602,11 +608,7 @@ def create_services(cli, network, services, extra_labels={}):
                     ports=[client.V1ServicePort(port=_) for _ in ports]
                 )
             ))
-            if 'ingress' in service:
-                if not 'service_type' in service:
-                    ingress_path = f"/ingress/{project_info['username']}/{project_info['name']}/{name}"
-                elif service['service_type'] == 'plugin':
-                    ingress_path = f"/plugins/{project_info['username']}/{name}"
+            if ingress_path:
                 ingress_ret = create_ingress(cli, namespace, name, service['ingress'], ingress_path)
 
             label_body = {
@@ -875,21 +877,28 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-def create_ingress(cli, namespace, service_name, port, base_path='/'):
+def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=False):
     api = client.NetworkingV1beta1Api(cli)
+    annotations = {
+        "kubernetes.io/ingress.class": "nginx",
+        "nginx.ingress.kubernetes.io/proxy-body-size": "0",
+        "nginx.ingress.kubernetes.io/proxy-read-timeout": "600",
+        "nginx.ingress.kubernetes.io/proxy-send-timeout": "600",
+    }
+    if rewrite:
+        annotations.update({
+            "nginx.ingress.kubernetes.io/rewrite-target": "/$2"
+        })
     body = client.NetworkingV1beta1Ingress(
         api_version="networking.k8s.io/v1beta1",
         kind="Ingress",
-        metadata=client.V1ObjectMeta(name=service_name, annotations={
-            "kubernetes.io/ingress.class": "nginx",
-            "nginx.ingress.kubernetes.io/rewrite-target": "/"
-        }),
+        metadata=client.V1ObjectMeta(name=service_name, annotations=annotations),
         spec=client.NetworkingV1beta1IngressSpec(
             rules=[client.NetworkingV1beta1IngressRule(
                 #host="example.com",
                 http=client.NetworkingV1beta1HTTPIngressRuleValue(
                     paths=[client.NetworkingV1beta1HTTPIngressPath(
-                        path=base_path,
+                        path=f"{base_path}(/|$)(.*)"if rewrite else base_path,
                         backend=client.NetworkingV1beta1IngressBackend(
                             service_port=port,
                             service_name=service_name)

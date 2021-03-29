@@ -1,0 +1,14 @@
+# MLAppDeploy Plugin v0.2
+plugin:
+    name: jupyterlab
+    version: 0.1
+    maintainer: onetop21
+service:
+    image: jupyter/minimal-notebook:latest
+    env:
+        JUPYTER_ENABLE_LAB: yes
+        PYTHONUNBUFFERED: 1    
+    command: /usr/local/bin/start.sh jupyter lab --ServerApp.base_url='$(INGRESS_PATH)'
+    arguments: --NotebookApp.token=''
+    ports: [8888]        # Describe expose ports to other services.
+    ingress: 8888            # Describe ingress port to LoadBalancer

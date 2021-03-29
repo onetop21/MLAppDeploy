@@ -95,49 +95,63 @@ def install(verbose, no_cache):
 
     print('Generating plugin image...')
 
-    # Prepare workspace data from plugin manifest file
-    envs = []
-    for key in plugin['workspace']['env'].keys():
-        envs.append(DOCKERFILE_ENV.format(
-            KEY=key,
-            VALUE=plugin['workspace']['env'][key]
-        ))
-    requires = []
-    for key in plugin['workspace']['requires'].keys():
-        if key == 'apt':
-            requires.append(DOCKERFILE_REQ_APT.format(
-                SRC=plugin['workspace']['requires'][key]
+    if plugin['workspace'] != default_plugin({})['workspace']:
+        # Prepare workspace data from plugin manifest file
+        envs = []
+        for key in plugin['workspace']['env'].keys():
+            envs.append(DOCKERFILE_ENV.format(
+                KEY=key,
+                VALUE=plugin['workspace']['env'][key]
             ))
-        elif key == 'pip':
-            requires.append(DOCKERFILE_REQ_PIP.format(
-                SRC=plugin['workspace']['requires'][key]
-            )) 
+        requires = []
+        for key in plugin['workspace']['requires'].keys():
+            if key == 'apt':
+                requires.append(DOCKERFILE_REQ_APT.format(
+                    SRC=plugin['workspace']['requires'][key]
+                ))
+            elif key == 'pip':
+                requires.append(DOCKERFILE_REQ_PIP.format(
+                    SRC=plugin['workspace']['requires'][key]
+                )) 
 
-    # Dockerfile to memory
-    dockerfile = DOCKERFILE.format(
-        BASE=plugin['workspace']['base'],
-        MAINTAINER=plugin['plugin']['maintainer'],
-        ENVS='\n'.join(envs),
-        PRESCRIPTS=';'.join(plugin['workspace']['prescripts']) if len(plugin['workspace']['prescripts']) else "echo .",
-        REQUIRES='\n'.join(requires),
-        POSTSCRIPTS=';'.join(plugin['workspace']['postscripts']) if len(plugin['workspace']['postscripts']) else "echo .",
-        COMMAND='[{}]'.format(', '.join(
-            [f'"{item}"' for item in plugin['workspace']['command'].split()] + 
-            [f'"{item}"' for item in plugin['workspace']['arguments'].split()]
-        )),
-    )
+        # Dockerfile to memory
+        dockerfile = DOCKERFILE.format(
+            BASE=plugin['workspace']['base'],
+            MAINTAINER=plugin['plugin']['maintainer'],
+            ENVS='\n'.join(envs),
+            PRESCRIPTS=';'.join(plugin['workspace']['prescripts']) if len(plugin['workspace']['prescripts']) else "echo .",
+            REQUIRES='\n'.join(requires),
+            POSTSCRIPTS=';'.join(plugin['workspace']['postscripts']) if len(plugin['workspace']['postscripts']) else "echo .",
+            COMMAND='[{}]'.format(', '.join(
+                [f'"{item}"' for item in plugin['workspace']['command'].split()] + 
+                [f'"{item}"' for item in plugin['workspace']['arguments'].split()]
+            )),
+        )
 
-    tarbytes = io.BytesIO()
-    dockerfile_info = tarfile.TarInfo('.dockerfile')
-    dockerfile_info.size = len(dockerfile)
-    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-        for name, arcname in utils.arcfiles(plugin['plugin']['workdir'], plugin['workspace']['ignore']):
-            tar.add(name, arcname)
-        tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-    tarbytes.seek(0)
+        tarbytes = io.BytesIO()
+        dockerfile_info = tarfile.TarInfo('.dockerfile')
+        dockerfile_info.size = len(dockerfile)
+        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+            for name, arcname in utils.arcfiles(plugin['plugin']['workdir'], plugin['workspace']['ignore']):
+                tar.add(name, arcname)
+            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
+        tarbytes.seek(0)
 
-    # Build Image
-    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
+        # Build Image
+        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
+
+    else:
+        dockerfile = f"FROM {plugin['service']['image']}"
+
+        tarbytes = io.BytesIO()
+        dockerfile_info = tarfile.TarInfo('.dockerfile')
+        dockerfile_info.size = len(dockerfile)
+        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
+        tarbytes.seek(0)
+
+        # Build Image
+        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
 
     # Print build output
     for _ in build_output:
@@ -224,6 +238,7 @@ def list(no_trunc):
     projects = {}
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     networks = api.project.get(['MLAD.PROJECT.TYPE=plugin'])
+    columns = [('USERNAME', 'PLUGIN', 'IMAGE', 'VERSION', 'EXPOSE', 'TASKS', 'AGE')]
     for network in networks:
         project_key = network['key']
         default = { 
@@ -257,74 +272,73 @@ def list(no_trunc):
             projects[project_key]['services'] += 1
             projects[project_key]['replicas'] += inspect['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
-        columns = [('USERNAME', 'PLUGIN', 'IMAGE', 'VERSION', 'EXPOSE', 'TASKS', 'AGE')]
-        for project in projects:
-            if projects[project]['services'] > 0:
-                running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
-                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['version'], projects[project]['expose'], f"{running_tasks:>5}", projects[project]['age']))
-            else:
-                columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
+    for project in projects:
+        if projects[project]['services'] > 0:
+            running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
+            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['version'], projects[project]['expose'], f"{running_tasks:>5}", projects[project]['age']))
+        else:
+            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
     utils.print_table(columns, 'Cannot find running plugins.')
 
-def run(with_build):
-    project = utils.get_project(default_project)
+#def run(with_build):
+#    project = utils.get_project(default_project)
+#
+#    if with_build: build(False, True)
+#
+#    print('Deploying test container image to local...')
+#    config = utils.read_config()
+#
+#    cli = ctlr.get_api_client()
+#    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
+#    project_key = base_labels['MLAD.PROJECT']
+#    
+#    with interrupt_handler(message='Wait.', blocked=True) as h:
+#        try:
+#            extra_envs = utils.get_service_env(config)
+#            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
+#                if 'stream' in _:
+#                    sys.stdout.write(_['stream'])
+#                if 'result' in _:
+#                    if _['result'] == 'succeed':
+#                        network = ctlr.get_project_network(cli, network_id=_['id'])
+#                    else:
+#                        print(f"Unknown Stream Result [{_['stream']}]")
+#                    break
+#        except exception.AlreadyExist as e:
+#            print('Already running project.', file=sys.stderr)
+#            sys.exit(1)
+#
+#        # Start Containers
+#        instances = ctlr.create_containers(cli, network, project['services'] or {})  
+#        for instance in instances:
+#            inspect = ctlr.inspect_container(instance)
+#            print(f"Starting {inspect['name']}...")
+#            time.sleep(1)
+#
+#    # Show Logs
+#    with interrupt_handler(blocked=False) as h:
+#        colorkey = {}
+#        for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
+#            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
+#
+#    # Stop Containers and Network
+#    with interrupt_handler(message='Wait.', blocked=True):
+#        containers = ctlr.get_containers(cli, project_key).values()
+#        ctlr.remove_containers(cli, containers)
+#
+#        try:
+#            for _ in ctlr.remove_project_network(cli, network, stream=True):
+#                if 'stream' in _:
+#                    sys.stdout.write(_['stream'])
+#                if 'result' in _:
+#                    if _['result'] == 'succeed':
+#                        print('Network removed.')
+#                    break
+#        except docker.errors.APIError as e:
+#            print('Network already removed.', file=sys.stderr)
+#    print('Done.')
 
-    if with_build: build(False, True)
-
-    print('Deploying test container image to local...')
-    config = utils.read_config()
-
-    cli = ctlr.get_api_client()
-    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
-    project_key = base_labels['MLAD.PROJECT']
-    
-    with interrupt_handler(message='Wait.', blocked=True) as h:
-        try:
-            extra_envs = utils.get_service_env(config)
-            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        network = ctlr.get_project_network(cli, network_id=_['id'])
-                    else:
-                        print(f"Unknown Stream Result [{_['stream']}]")
-                    break
-        except exception.AlreadyExist as e:
-            print('Already running project.', file=sys.stderr)
-            sys.exit(1)
-
-        # Start Containers
-        instances = ctlr.create_containers(cli, network, project['services'] or {})  
-        for instance in instances:
-            inspect = ctlr.inspect_container(instance)
-            print(f"Starting {inspect['name']}...")
-            time.sleep(1)
-
-    # Show Logs
-    with interrupt_handler(blocked=False) as h:
-        colorkey = {}
-        for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
-            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
-
-    # Stop Containers and Network
-    with interrupt_handler(message='Wait.', blocked=True):
-        containers = ctlr.get_containers(cli, project_key).values()
-        ctlr.remove_containers(cli, containers)
-
-        try:
-            for _ in ctlr.remove_project_network(cli, network, stream=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        print('Network removed.')
-                    break
-        except docker.errors.APIError as e:
-            print('Network already removed.', file=sys.stderr)
-    print('Done.')
-
-def start(plugin_name, options):
+def start(plugin_name, arguments):
     print('Deploying services to cluster...')
 
     config = utils.read_config()
@@ -342,6 +356,8 @@ def start(plugin_name, options):
     target = json.loads(base64.urlsafe_b64decode(images[0].labels.get('MLAD.PROJECT.PLUGIN_MANIFEST').encode()).decode())
     target['name'] = plugin_name
     target['service_type'] = 'plugin'
+    if arguments:
+        target['arguments'] = f"{' '.join(arguments)}"
 
     # AuthConfig
     headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config']))}
