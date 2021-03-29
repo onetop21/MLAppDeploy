@@ -621,7 +621,7 @@ def create_services(cli, network, services, extra_labels={}):
             create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
         except ApiException as e:
             print(f"Exception Handling v1.create_namespaced_replication_controller => {e}", file=sys.stderr)
-            raise exception.APIError(e, e.status)
+            raise exception.APIError(e.body['message'], e.status)
     return instances
 
 def remove_containers(cli, containers):
@@ -657,7 +657,11 @@ def remove_services(cli, services, timeout=0xFFFF):
             ret = _delete_replication_controller(cli, service_name, namespace)
     
         try:
-            ingress_ret = network_api.delete_namespaced_ingress(service_name, namespace)
+            #check ingress exists
+            ingress = network_api.read_namespaced_ingress(service_name, namespace)
+            print('**', ingress)
+            if ingress:
+                ingress_ret = network_api.delete_namespaced_ingress(service_name, namespace)
         except ApiException as e:
             print("Exception when calling ExtensionsV1beta1Api->delete_namespaced_ingress: %s\n" % e)
 
