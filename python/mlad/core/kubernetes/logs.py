@@ -242,7 +242,7 @@ class LogMonitor(Thread):
                             print(f'Register stopped [{oid}]')
                             self.handler.close(pod)
                             #self.collector.queue.put({'status': 'stopped', 'object_id': oid})
-                #self.__stopped = True
+                self.__stopped = True
             except urllib3.exceptions.ProtocolError as e:
                 print(f'Watch Stop [{namespace}]')
                 self.__stopped = True
@@ -255,7 +255,7 @@ class LogMonitor(Thread):
 
     def stop(self):
         self.__stopped = True
-        print('Request Stop LogMonigor')
+        print('Request Stop LogMonitor')
         if self.stream_resp and self.stream_resp._fp and self.stream_resp._fp.fp:
             try:
                 sock = self.stream_resp._fp.fp.raw._sock
