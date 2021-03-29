@@ -139,9 +139,9 @@ def create_project_network(cli, base_labels, extra_envs, credential, swarm=True,
     basename = base_labels['MLAD.PROJECT.BASE']
     project_version = base_labels['MLAD.PROJECT.VERSION']
     #inspect_image(_) for _ in get_images(cli, project_key)
-    default_image = base_labels['MLAD.PROJECT.IMAGE'] 
-    print('ctrl test:', labels)
+    default_image = base_labels['MLAD.PROJECT.IMAGE']
     # Create Docker Network
+    print('ctrl test:', base_labels)
     def resp_stream():
         network_name = f"{basename}-cluster"
         try:
