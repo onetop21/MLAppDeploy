@@ -392,7 +392,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
                 metadata=client.V1ObjectMeta(name=name, labels=labels),
                 spec=client.V1PodSpec(
                     restart_policy=restart_policy,
-                    #termination_grace_period_seconds=30,
+                    termination_grace_period_seconds=10,
                     containers=[
                         client.V1Container(
                             name=name,
@@ -1053,7 +1053,7 @@ if __name__ == '__main__':
                     metadata=client.V1ObjectMeta(name=name, labels=labels),
                     spec=client.V1PodSpec(
                         restart_policy='Never',
-                        #termination_grace_period_seconds=30,
+                        termination_grace_period_seconds=10,
                         containers=[
                             client.V1Container(
                                 name=name,
