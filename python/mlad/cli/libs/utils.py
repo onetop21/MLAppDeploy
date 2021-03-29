@@ -60,10 +60,10 @@ def write_completion(shell='bash'):
         with open(f"{HOME}/.bash_completion", 'wt') as f:
             f.write(f". {COMPLETION_FILE}")
 
-@lru_cache(maxsize=None)
+#@lru_cache(maxsize=None)
 def check_podname_syntax(obj):
     if isinstance(obj, dict):
-        for _ in project['service']:
+        for _ in obj.keys():
             if not re.match('^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', _):
                 return False
     elif isinstance(obj, str):
@@ -106,7 +106,7 @@ def get_project(default_project):
                 path
             )
         )
-    if not check_podname_syntax(project['project']['name']) or not check_podname_syntax(project['service']):
+    if not check_podname_syntax(project['project']['name']) or not check_podname_syntax(project['services']):
         print('Syntax Error: Project(Plugin) and service require a name to follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
     return project
