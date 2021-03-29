@@ -141,7 +141,7 @@ def install(verbose, no_cache):
         build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
 
     else:
-        dockerfile = f"FROM {plugin['service']['image']}"
+        dockerfile = f"FROM {plugin['service']['image']}\nMAINTAINER {plugin['plugin']['maintainer']}"
 
         tarbytes = io.BytesIO()
         dockerfile_info = tarfile.TarInfo('.dockerfile')
@@ -184,22 +184,6 @@ def install(verbose, no_cache):
     if tagged:
         print(f"Built Image: {'/'.join(repository.split('/')[1:])}:{image_version}")
 
-    # Upload Image
-    #print('Update plugin image to registry...')
-    #try:
-    #    for _ in ctlr.push_images(cli, project_key, stream=True):
-    #        if 'error' in _:
-    #            raise docker.errors.APIError(_['error'], None)
-    #        elif 'stream' in _:
-    #            sys.stdout.write(_['stream'])
-    #except docker.errors.APIError as e:
-    #    print(e, file=sys.stderr)
-    #    print('Failed to Update Image to Registry.', file=sys.stderr)
-    #    print('Please Check Registry Server.', file=sys.stderr)
-    #    sys.exit(1)
-    #except StopIteration:
-    #    pass
-
     print('Done.')
 
 def installed(no_trunc):
@@ -229,7 +213,7 @@ def installed(no_trunc):
                 _['created']
             ]
             data.append(row)
-    utils.print_table(data, 'No have built image.')
+    utils.print_table(*([data, 'No have built image.'] + ([0] if no_trunc else [])))
     if untagged:
         print(f'This plugin has {untagged} untagged images. To free disk spaces up by cleaning gabage images.') 
 
@@ -238,7 +222,7 @@ def list(no_trunc):
     projects = {}
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
     networks = api.project.get(['MLAD.PROJECT.TYPE=plugin'])
-    columns = [('USERNAME', 'PLUGIN', 'IMAGE', 'VERSION', 'EXPOSE', 'TASKS', 'AGE')]
+    columns = [('USERNAME', 'PLUGIN', 'VERSION', 'URL', 'TASKS', 'AGE')]
     for network in networks:
         project_key = network['key']
         default = { 
@@ -246,9 +230,7 @@ def list(no_trunc):
             'project': network['project'], 
             'image': network['image'],
             'version': network['version'],
-            'expose': '',
-            'node': '',
-            'status': '',
+            'url': '',
             'age': '',
             'replicas': 0, 'services': 0, 'tasks': 0,
             
@@ -256,7 +238,9 @@ def list(no_trunc):
         projects[project_key] = projects[project_key] if project_key in projects else default
         res = api.service.get(project_key=project_key)
         for inspect in res['inspects']:
-            projects[project_key]['expose'] = inspect.get('ingress') or '-'
+            base_url = f"http://{config['mlad']['host']}"
+            if not config['mlad']['port'] in [80, 8440] : base_url += f":{config['mlad']['port']}"
+            projects[project_key]['url'] = f"{base_url}{inspect.get('ingress')}" or '-'
             uptime = (datetime.utcnow() - parser.parse(inspect['created']).replace(tzinfo=None)).total_seconds()
             if uptime > 24 * 60 * 60:
                 uptime = f"{uptime // (24 * 60 * 60):.0f} days"
@@ -275,10 +259,10 @@ def list(no_trunc):
     for project in projects:
         if projects[project]['services'] > 0:
             running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
-            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['version'], projects[project]['expose'], f"{running_tasks:>5}", projects[project]['age']))
+            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['version'], projects[project]['url'], f"{running_tasks}", projects[project]['age']))
         else:
-            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
-    utils.print_table(columns, 'Cannot find running plugins.')
+            columns.append((projects[project]['username'], projects[project]['project'], '-', '-', '-', '-'))
+    utils.print_table(*([columns, 'Cannot find running plugin.'] + ([0] if no_trunc else [])))
 
 #def run(with_build):
 #    project = utils.get_project(default_project)
@@ -339,8 +323,6 @@ def list(no_trunc):
 #    print('Done.')
 
 def start(plugin_name, arguments):
-    print('Deploying services to cluster...')
-
     config = utils.read_config()
     cli = ctlr.get_api_client()
     basename = f'{get_username(config)}-{plugin_name.lower()}-plugin'
@@ -350,6 +332,23 @@ def start(plugin_name, arguments):
         print('Not installed plugin [{plugin_name}].', file=sys.stderr)
         return
 
+    # Upload Image
+    print('Update plugin image to registry...')
+    try:
+        for _ in ctlr.push_images(cli, project_key, stream=True):
+            if 'error' in _:
+                raise docker.errors.APIError(_['error'], None)
+            elif 'stream' in _:
+                sys.stdout.write(_['stream'])
+    except docker.errors.APIError as e:
+        print(e, file=sys.stderr)
+        print('Failed to Update Image to Registry.', file=sys.stderr)
+        print('Please Check Registry Server.', file=sys.stderr)
+        sys.exit(1)
+    except StopIteration:
+        pass
+
+    print('Deploying services to cluster...')
     # Get Base Labels
     base_labels = dict([(k, v) for k, v in images[0].labels.items() if k.startswith('MLAD.')])
     inspect = ctlr.inspect_image(images[0])

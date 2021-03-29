@@ -24,8 +24,8 @@ service:
     #    [KEY]: [VALUE]
     #command:               # Describe command to need overwrite.
     #arguments:             # Describe arguments to need overwrite.
-    #ports: [80,...]        # Describe expose ports to other services.
-    #ingress: 80            # Describe ingress port to LoadBalancer
+    #ports: [80,...]        # Describe expose ports to other services. (Internal)
+    #expose: 80             # Describe an expose port to LoadBalancer. (External)
     #deploy:                # Deploy only options
     #    quota:             # Describe required system resource quota.
     #        cpus: 1

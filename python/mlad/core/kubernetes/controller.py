@@ -578,13 +578,14 @@ def create_services(cli, network, services, extra_labels={}):
         config_labels['MLAD.PROJECT.SERVICE']=name
         config_labels['MLAD.PROJECT.SERVICE.KIND']=kind
         ingress_path = None
-        if 'ingress' in service:
-            config_labels['MLAD.PROJECT.INGRESS'] = str(service.get('ingress'))
+        if 'expose' in service:
             if not 'service_type' in service:
                 ingress_path = f"/ingress/{project_info['username']}/{project_info['name']}/{name}"
             elif service['service_type'] == 'plugin':
                 ingress_path = f"/plugins/{project_info['username']}/{name}"
             envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
+            config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
+        print(config_labels)
 
         # Secrets
         secrets = f"{project_base}-auth"
@@ -614,7 +615,7 @@ def create_services(cli, network, services, extra_labels={}):
                 )
             ))
             if ingress_path:
-                ingress_ret = create_ingress(cli, namespace, name, service['ingress'], ingress_path)
+                ingress_ret = create_ingress(cli, namespace, name, service['expose'], ingress_path)
 
             label_body = {
                 "metadata": {
