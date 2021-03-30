@@ -30,6 +30,11 @@ def login(token):
     auth.login(token)
 
 @click.command()
+def logout():
+    '''Logout MLAppDeploy Service.'''
+    auth.logout()
+
+@click.command()
 @click.argument('TOKEN', required=False, nargs=1)
 def info(token):
     '''Get Information from Token.'''
@@ -45,11 +50,18 @@ def admin_cli():
     '''Manage Authentication. (Admin Only)'''
 admin_cli.add_command(create)
 admin_cli.add_command(login)
+admin_cli.add_command(logout)
 admin_cli.add_command(info)
 
 @click.group('auth')
 def user_cli():
     '''Manage Authentication.'''
 user_cli.add_command(login)
+user_cli.add_command(logout)
 user_cli.add_command(user_info, 'info')
+
+@click.group('auth')
+def cli():
+    '''Manage Authentication.'''
+cli.add_command(login)
 

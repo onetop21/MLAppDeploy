@@ -95,14 +95,14 @@ def set(*args):
     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
     utils.write_config(config)
 
-def get(keys):
+def get(keys, no_trunc=False):
     config = default_config['client'](utils.read_config())
     data = get_value(OmegaConf.to_container(config, resolve=True), keys)
     if isinstance(data, list):
         table = [["KEY", "VALUE"]]
         for key, value in data:
             if key: table.append([key, str(value)])
-        utils.print_table(table)
+        utils.print_table(*([table, 'No have configuration values.'] + ([0] if no_trunc else [])))
     else:
         print(data)
 

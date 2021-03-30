@@ -61,18 +61,26 @@ def main(file):
     '''Machine Learning Application Deployment Tool. (https://github.com/onetop21/MLAppDeploy.git)'''
     project.cli_args(file)
 
+admin_role = has_role('admin')
+user_role = has_role('user')
+
 main.add_command(config.cli, 'config')
-if has_role('admin'):
+if admin_role:
     main.add_command(auth.admin_cli, 'auth')
-    main.add_command(node.cli, 'node')
-else:
+elif user_role:
     main.add_command(auth.user_cli, 'auth')
-main.add_command(image.cli, 'image')
-if has_role('user'):
+else:
+    main.add_command(auth.cli, 'auth')
+
+if admin_role:
+    main.add_command(node.cli, 'node')
+
+if user_role:
+    main.add_command(image.cli, 'image')
     main.add_command(project.cli, 'project')
     main.add_command(plugin.cli, 'plugin')
 
-if has_role('user'):
+if user_role:
     main.add_dummy_command()
     main.add_dummy_command('\b\bPrefer:')
 

@@ -24,16 +24,31 @@ def login(token):
                     args = f'mlad.token.admin={token}'
                     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
                     utils.write_config(config)
+                    print('Logged in to administrator.')
                 elif v == 'user':
                     config = default_config['client'](utils.read_config())
                     args = f'mlad.token.user={token}'
                     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
                     utils.write_config(config)
+                    info()
                 else:
-                    print('Invalid role.')
+                    print('Invalid role.', file=sys.stderr)
     else:
-        print('Invalid token.')
+        print('Invalid token.', file=sys.stderr)
 
+def logout():
+    config = utils.read_config()
+    with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+        result = api.auth.token_verify(config.mlad.token.user)
+    if result['result']:
+        for k, v in result['data'].items():
+            if k in ['username']:
+                args = f'mlad.token.user='
+                config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
+                utils.write_config(config)
+                print(f"Logged out User[{v}]")
+    else:
+        print('Invalid token or already logged out.', file=sys.stderr)
 
 def info(token=None):
     config = utils.read_config()

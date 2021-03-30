@@ -24,10 +24,11 @@ def set(var):
     config.set(*var) 
 
 @click.command()
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
 @click.argument('KEY', required=False, autocompletion=get_config_key_completion)
-def get(key):
+def get(no_trunc, key):
     '''Get Configurations.'''
-    config.get(key)
+    config.get(key, no_trunc)
 
 @click.command()
 @click.option('--unset', '-u', is_flag=True)
