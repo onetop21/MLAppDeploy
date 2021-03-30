@@ -26,7 +26,7 @@ def create(username, expired):
 def login(token):
     '''Login MLAppDeploy Service by Token.'''
     if not token:
-        token = click.prompt('Please enter a valid integer', type=str)
+        token = click.prompt('User Token', type=str)
     auth.login(token)
 
 @click.command()

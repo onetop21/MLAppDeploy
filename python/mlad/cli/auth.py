@@ -14,6 +14,7 @@ def create(username, expired):
     print('User Token :', user_token)
 
 def login(token):
+    config = utils.read_config()
     with API(utils.to_url(config.mlad), token) as api:
         result = api.auth.token_verify(token)
     if result['result']:
