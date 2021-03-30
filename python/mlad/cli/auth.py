@@ -44,7 +44,7 @@ def logout():
     if result['result']:
         for k, v in result['data'].items():
             if k in ['username']:
-                args = f'mlad.token.user='
+                args = [f'mlad.token.user=']
                 config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
                 utils.write_config(config)
                 print(f"Logged out User[{v}]")
