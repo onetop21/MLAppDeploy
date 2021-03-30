@@ -22,13 +22,13 @@ def login(token):
             if k == 'role':
                 if v == 'admin':
                     config = default_config['client'](utils.read_config())
-                    args = f'mlad.token.admin={token}'
+                    args = [f'mlad.token.admin={token}']
                     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
                     utils.write_config(config)
                     print('Logged in to administrator.')
                 elif v == 'user':
                     config = default_config['client'](utils.read_config())
-                    args = f'mlad.token.user={token}'
+                    args = [f'mlad.token.user={token}']
                     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
                     utils.write_config(config)
                     info()
