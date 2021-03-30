@@ -39,7 +39,7 @@ def login(token):
                     args = [f'mlad.token.user={token}']
                     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
                     utils.write_config(config)
-                    info()
+                    info(token)
                 else:
                     print('Invalid role.', file=sys.stderr)
     else:
@@ -65,17 +65,22 @@ def logout():
 
 def info(token=None):
     config = utils.read_config()
-    base_token = config.mlad.token.user or config.mlad.token.admin
-    try:
-        with API(utils.to_url(config.mlad), base_token) as api:
-            result = api.auth.token_verify(token)
-    except HTTPError as e:
-        print('Failed to decode token.', file=sys.stderr)
-        return
-    if result['result']:
-        for k, v in result['data'].items():
-            if k in ['created', 'expired']:
-                v = datetime.fromisoformat(v)
-            print(f"{k.upper():16} {v}")
+    if not token:
+        for token in [config.mlad.token.admin, '-', config.mlad.token.user]:
+            if token == '-': print('---')
+            elif token: info(token)
     else:
-        print('Invalid token.')
+        try:
+            with API(utils.to_url(config.mlad), config.mlad.token.admin or config.mlad.token.user) as api:
+                result = api.auth.token_verify(token)
+        except HTTPError as e:
+            print('Failed to decode token.', file=sys.stderr)
+            return
+        if result['result']:
+            for k, v in result['data'].items():
+                if k in ['created', 'expired']:
+                    v = datetime.fromisoformat(v)
+                print(f"{k.upper():16} {v}")
+        else:
+            print('Invalid token.')
+

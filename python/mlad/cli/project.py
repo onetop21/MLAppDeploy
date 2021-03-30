@@ -352,7 +352,7 @@ def test(with_build):
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
         try:
-            extra_envs = utils.get_service_env(config)
+            extra_envs = utils.get_datastore_env(config)
             for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
@@ -423,7 +423,7 @@ def up(services):
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
     credential = encoded.decode()
    
-    extra_envs = utils.get_service_env(default_config['client'](config))
+    extra_envs = utils.get_datastore_env(default_config['client'](config))
 
     if not services:
         res = api.project.create(project['project'], base_labels,

@@ -80,10 +80,13 @@ if user_role:
     main.add_command(project.cli, 'project')
     main.add_command(plugin.cli, 'plugin')
 
-if user_role:
-    main.add_dummy_command()
-    main.add_dummy_command('\b\bPrefer:')
+main.add_dummy_command()
+main.add_dummy_command('\b\bPrefer:')
 
+main.add_command(auth.login, 'login')
+main.add_command(auth.logout, 'logout')
+if user_role:
+    main.add_command(auth.user_info, 'account')
     main.add_command(image.ls, 'images')
     main.add_command(project.build, 'build')
     main.add_command(project.test, 'test')

@@ -168,6 +168,7 @@ def print_table(data, no_data_msg=None, max_width=32):
     if len(data) < 2:
         print(no_data_msg, file=sys.stderr)
 
+@lru_cache(maxsize=None)
 def get_advertise_addr():
     # If this local machine is WSL2
     if 'microsoft' in os.uname().release:
@@ -191,18 +192,21 @@ def get_default_service_port(container_name, internal_port):
         external_port = _[0]['HostPort']
     return external_port
 
-def get_service_env(config):
+def get_datastore_env(config):
+    #env = []
+    #for kind, datastore in config['datastore'].items():
+    #    env += [f"{kind.upper()}_{k.upper()}={v}" for k, v in datastore.items()]
     env = [
         # S3
-        f'S3_ENDPOINT={config["environment"]["s3"]["endpoint"]}',
-        f'S3_USE_HTTPS={1 if config["environment"]["s3"]["verify"] else 0}',
-        f'AWS_ACCESS_KEY_ID={config["environment"]["s3"]["accesskey"]}',
-        f'AWS_SECRET_ACCESS_KEY={config["environment"]["s3"]["secretkey"]}',
+        f'S3_ENDPOINT={config["datastore"]["s3"]["endpoint"]}',
+        f'S3_USE_HTTPS={1 if config["datastore"]["s3"]["verify"] else 0}',
+        f'AWS_ACCESS_KEY_ID={config["datastore"]["s3"]["accesskey"]}',
+        f'AWS_SECRET_ACCESS_KEY={config["datastore"]["s3"]["secretkey"]}',
         # MongoDB
-        f'MONGO_HOST={config["environment"]["mongodb"]["host"]}',
-        f'MONGO_PORT={config["environment"]["mongodb"]["port"]}',
-        f'MONGO_USERNAME={config["environment"]["mongodb"]["username"]}',
-        f'MONGO_PASSWORD={config["environment"]["mongodb"]["password"]}',
+        f'MONGO_HOST={config["datastore"]["mongodb"]["host"]}',
+        f'MONGO_PORT={config["datastore"]["mongodb"]["port"]}',
+        f'MONGO_USERNAME={config["datastore"]["mongodb"]["username"]}',
+        f'MONGO_PASSWORD={config["datastore"]["mongodb"]["password"]}',
     ]
     return env
 

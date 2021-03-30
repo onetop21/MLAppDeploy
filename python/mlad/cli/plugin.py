@@ -367,7 +367,7 @@ def start(plugin_name, arguments):
     credential = encoded.decode()
    
     api = API(utils.to_url(config.mlad), config.mlad.token.user)
-    extra_envs = utils.get_service_env(default_config['client'](config))
+    extra_envs = utils.get_datastore_env(default_config['client'](config))
 
     res = api.project.create({'name': '', 'version': '', 'author': ''}, base_labels,
         extra_envs, credential=credential, swarm=True, allow_reuse=False)

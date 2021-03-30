@@ -52,11 +52,18 @@ def completion(install):
     else:
         click.echo(f'Cannot support shell [{shell}].\nSupported Shell: bash, zsh')
 
+@click.command()
+@click.argument('KIND', required=False)
+def datastore(kind):
+    '''Set Configurations for Data Storage.'''
+    config.datastore(kind)
+
 @click.group('config')
 def cli():
     '''Manage Configuration.'''
 
 cli.add_command(init)
+cli.add_command(datastore)
 cli.add_command(set)
 cli.add_command(get)
 cli.add_command(env)

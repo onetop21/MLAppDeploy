@@ -38,26 +38,8 @@ def init(address, token):
     # token
     user_token = input(f"MLAppDeploy User Token : ")
 
-    # specific controlling docker
+    # registry
     service_addr = utils.get_advertise_addr()
-    minio_port = utils.get_default_service_port('mlad_minio', 9000)
-    if minio_port:
-        s3_address = f'http://{service_addr}:{minio_port}'
-        region = 'ap-northeast-2'
-        access_key = 'MLAPPDEPLOY'
-        secret_key = 'MLAPPDEPLOY'
-        #print(f'Detected MinIO Server[{s3_address}] on docker host.')
-    else:
-        s3_address = 'https://s3.amazonaws.com'
-        region = 'us-east-1'
-        access_key = None
-        secret_key = None
-    s3_address = utils.prompt('S3 Compatible Address', s3_address)
-    region = utils.prompt('Region', region)
-    access_key = utils.prompt('Access Key ID', access_key)
-    secret_key = utils.prompt('Secret Access Key', secret_key)
-    verifySSL = s3_address.startswith('https://')
-
     registry_port = utils.get_default_service_port('mlad_registry', 5000)
     if registry_port:
         registry_address = f'{service_addr}:{registry_port}'
@@ -76,12 +58,8 @@ def init(address, token):
         f"mlad.token.admin={token}",
         f"mlad.token.user={user_token}",
         f'docker.registry={registry_address}',
-        f'environment.s3.endpoint={s3_address}',
-        f'environment.s3.verify={verifySSL}',
-        f'environment.s3.region={region}',
-        f'environment.s3.accesskey={access_key}',
-        f'environment.s3.secretkey={secret_key}',
     ))
+    datastore()
     get(None)
 
     if warn_insecure:
@@ -108,7 +86,7 @@ def get(keys, no_trunc=False):
 
 def env(unset):
     config = default_config['client'](utils.read_config())
-    envs = utils.get_service_env(config)
+    envs = utils.get_datastore_env(config)
     for line in envs:
         if unset:
             K, V = line.split('=')
@@ -116,3 +94,85 @@ def env(unset):
         else:
             print(f'export {line}')
     print(f'# To set environment variables, run "eval $(mlad config env)"')
+
+# Extension for DataStore
+datastores = {}
+def datastore(kind=None):
+    if not kind:
+        for _ in datastores.keys():
+            datastore(_)
+        return
+    else:
+        if not kind in datastores:
+            print('Cannot support datastore type.', file=sys.stderr)
+            print(f"Support DataStore Type [{', '.join(datastores.keys())}]", file=sys.stderr)
+            sys.exit(1)
+    store = datastores[kind]
+    config = store['initializer']()
+    for k, v in store['prompt'].items():
+        config[k] = utils.prompt(v, config[k])
+    config = store['finalizer'](config)    
+    set(*[f"datastore.{kind}.{k}={v}" for k, v in config.items()])
+
+def _add_datastore(kind, initializer=lambda: None, finalizer=lambda x: x, **prompt):
+    datastores[kind] = {
+        'prompt': prompt,
+        'initializer': initializer,
+        'finalizer': finalizer
+    }
+
+# S3 DataStore
+def _datastore_s3_initializer():
+    # specific controlling docker
+    service_addr = utils.get_advertise_addr()
+    minio_port = utils.get_default_service_port('mlad_minio', 9000)
+    if minio_port:
+        s3_address = f'http://{service_addr}:{minio_port}'
+        region = 'ap-northeast-2'
+        access_key = 'MLAPPDEPLOY'
+        secret_key = 'MLAPPDEPLOY'
+        verify = False
+    else:
+        s3_address = 'https://s3.amazonaws.com'
+        region = 'us-east-1'
+        access_key = None
+        secret_key = None
+        verify = True
+    return {'endpoint': s3_address, 'region': region, 'accesskey': access_key, 'secretkey': secret_key, 'verify': verify}
+
+def _datastore_s3_finalizer(datastore):
+    datastore['verify'] = datastore['endpoint'].startswith('https://')
+    return datastore
+
+_add_datastore('s3',
+        _datastore_s3_initializer, 
+        _datastore_s3_finalizer, 
+        endpoint='S3 Compatible Address',
+        region='Region',
+        accesskey='Access Key ID',
+        secretkey='Secret Access Key')
+
+# MongoDB DataStore
+def _datastore_mongodb_initializer():
+    # specific controlling docker
+    service_addr = utils.get_advertise_addr()
+    mongo_port = utils.get_default_service_port('mlad_mongodb', 27017)
+    if mongo_port:
+        host = service_addr
+        port = mongo_port
+    else:
+        host = 'localhost'
+        port = 27017
+    return {'host': host, 'port': port, 'username': '', 'password': ''}
+
+def _datastore_mongodb_finalizer(datastore):
+    return datastore
+
+_add_datastore('mongodb',
+        _datastore_mongodb_initializer, 
+        _datastore_mongodb_finalizer, 
+        host='MongoDB Host',
+        port='MongoDB Port',
+        username='MongoDB Username',
+        password='MongoDB Password')
+

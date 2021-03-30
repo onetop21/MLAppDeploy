@@ -2,7 +2,7 @@ import sys
 import os
 import click
 from mlad.cli import image
-from mlad.cli import project
+from mlad.cli import project_cli as project
 from mlad.cli.autocompletion import *
 
 # mlad image ls

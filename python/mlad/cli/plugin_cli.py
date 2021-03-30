@@ -65,7 +65,7 @@ def stop(name):
 
 @click.group('plugin')
 def cli():
-    '''Manage Machine Learning Projects.'''
+    '''Manage Plugin for Helping Machine Learning Projects.'''
 
 cli.add_command(init)
 cli.add_command(install)
