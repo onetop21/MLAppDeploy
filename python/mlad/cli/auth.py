@@ -1,6 +1,7 @@
 import sys
 import os
 from urllib.parse import urlparse
+from request.exceptions import HTTPError
 from datetime import datetime
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
@@ -9,14 +10,21 @@ from mlad.api import API
 
 def create(username, expired):
     config = utils.read_config()
-    with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
-        user_token = api.auth.token_create(username)
-    print('User Token :', user_token)
+    try:
+        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+            user_token = api.auth.token_create(username)
+        print('User Token :', user_token)
+    except HTTPError as e:
+        print('Failed to decode token.', file=sys.stderr)
 
 def login(token):
     config = utils.read_config()
-    with API(utils.to_url(config.mlad), token) as api:
-        result = api.auth.token_verify(token)
+    try:
+        with API(utils.to_url(config.mlad), token) as api:
+            result = api.auth.token_verify(token)
+    except HTTPError as e:
+        print('Failed to decode token.', file=sys.stderr)
+        return
     if result['result']:
         for k, v in result['data'].items():
             if k == 'role':
@@ -39,8 +47,12 @@ def login(token):
 
 def logout():
     config = utils.read_config()
-    with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
-        result = api.auth.token_verify(config.mlad.token.user)
+    try:
+        with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+            result = api.auth.token_verify(config.mlad.token.user)
+    except HTTPError as e:
+        print('Failed to decode token.', file=sys.stderr)
+        return
     if result['result']:
         for k, v in result['data'].items():
             if k in ['username']:
@@ -54,8 +66,12 @@ def logout():
 def info(token=None):
     config = utils.read_config()
     base_token = config.mlad.token.user or config.mlad.token.admin
-    with API(utils.to_url(config.mlad), base_token) as api:
-        result = api.auth.token_verify(token)
+    try:
+        with API(utils.to_url(config.mlad), base_token) as api:
+            result = api.auth.token_verify(token)
+    except HTTPError as e:
+        print('Failed to decode token.', file=sys.stderr)
+        return
     if result['result']:
         for k, v in result['data'].items():
             if k in ['created', 'expired']:
