@@ -63,8 +63,10 @@ def main(file):
 
 main.add_command(config.cli, 'config')
 if has_role('admin'):
-    main.add_command(auth.cli, 'auth')
+    main.add_command(auth.admin_cli, 'auth')
     main.add_command(node.cli, 'node')
+else:
+    main.add_command(auth.user_cli, 'auth')
 main.add_command(image.cli, 'image')
 if has_role('user'):
     main.add_command(project.cli, 'project')

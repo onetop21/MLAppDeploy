@@ -13,7 +13,29 @@ def create(username, expired):
         user_token = api.auth.token_create(username)
     print('User Token :', user_token)
 
-def info(token):
+def login(token):
+    with API(utils.to_url(config.mlad), token) as api:
+        result = api.auth.token_verify(token)
+    if result['result']:
+        for k, v in result['data'].items():
+            if k == 'role':
+                if v == 'admin':
+                    config = default_config['client'](utils.read_config())
+                    args = f'mlad.token.admin={token}'
+                    config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
+                    utils.write_config(config)
+                elif v == 'user':
+                    config = default_config['client'](utils.read_config())
+                    args = f'mlad.token.user={token}'
+                    config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
+                    utils.write_config(config)
+                else:
+                    print('Invalid role.')
+    else:
+        print('Invalid token.')
+
+
+def info(token=None):
     config = utils.read_config()
     base_token = config.mlad.token.user or config.mlad.token.admin
     with API(utils.to_url(config.mlad), base_token) as api:

@@ -23,13 +23,33 @@ def create(username, expired):
 
 @click.command()
 @click.argument('TOKEN', required=False, nargs=1)
+def login(token):
+    '''Login MLAppDeploy Service by Token.'''
+    if not token:
+        token = click.prompt('Please enter a valid integer', type=str)
+    auth.login(token)
+
+@click.command()
+@click.argument('TOKEN', required=False, nargs=1)
 def info(token):
-    '''Get Information from User Token.'''
+    '''Get Information from Token.'''
     auth.info(token) 
 
-@click.group('auth')
-def cli():
-    '''Manage Authentication. (Admin Only)'''
+@click.command()
+def user_info():
+    '''Get User Information from Token.'''
+    auth.info() 
 
-cli.add_command(create)
-cli.add_command(info)
+@click.group('auth')
+def admin_cli():
+    '''Manage Authentication. (Admin Only)'''
+admin_cli.add_command(create)
+admin_cli.add_command(login)
+admin_cli.add_command(info)
+
+@click.group('auth')
+def user_cli():
+    '''Manage Authentication.'''
+user_cli.add_command(login)
+user_cli.add_command(user_info, 'info')
+
