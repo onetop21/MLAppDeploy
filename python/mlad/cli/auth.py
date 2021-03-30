@@ -1,7 +1,7 @@
 import sys
 import os
 from urllib.parse import urlparse
-from request.exceptions import HTTPError
+from requests.exceptions import HTTPError
 from datetime import datetime
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
