@@ -5,6 +5,7 @@ class APIError(Exception):
     msg: str
 
     def __init__(self, msg):
+        print('API ERROR:', msg)
         self.msg = msg
 
     def __str__(self):
@@ -23,9 +24,10 @@ class NotFoundError(APIError):
 
 def error_from_http_errors(e):
     detail = e.response.json()['detail']
-    if e.response.status_code==404:
+    if e.response.status_code == 404:
         cls = NotFoundError
     else:
+        print('API ERROR raise:', detail)
         cls = APIError
     raise cls(detail)
 
