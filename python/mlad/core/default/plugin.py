@@ -26,6 +26,7 @@ obj = {
         'command': '',
         'arguments': '',
         'ports': [],
+        'expose': 80,
         'deploy': {
             'quota': {},
             'constraints': {},

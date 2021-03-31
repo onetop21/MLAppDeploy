@@ -11,4 +11,4 @@ service:
     command: /usr/local/bin/start.sh jupyter lab --ServerApp.base_url='$(INGRESS_PATH)'
     arguments: --NotebookApp.token=''
     ports: [8888]        # Describe expose ports to other services.
-    ingress: 8888            # Describe ingress port to LoadBalancer
+    expose: 8888         # Describe ingress port to LoadBalancer

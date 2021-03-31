@@ -24,10 +24,11 @@ def set(var):
     config.set(*var) 
 
 @click.command()
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
 @click.argument('KEY', required=False, autocompletion=get_config_key_completion)
-def get(key):
+def get(no_trunc, key):
     '''Get Configurations.'''
-    config.get(key)
+    config.get(key, no_trunc)
 
 @click.command()
 @click.option('--unset', '-u', is_flag=True)
@@ -51,11 +52,18 @@ def completion(install):
     else:
         click.echo(f'Cannot support shell [{shell}].\nSupported Shell: bash, zsh')
 
+@click.command()
+@click.argument('KIND', required=False)
+def datastore(kind):
+    '''Set Configurations for Data Storage.'''
+    config.datastore(kind)
+
 @click.group('config')
 def cli():
     '''Manage Configuration.'''
 
 cli.add_command(init)
+cli.add_command(datastore)
 cli.add_command(set)
 cli.add_command(get)
 cli.add_command(env)

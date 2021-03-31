@@ -16,7 +16,7 @@ client_config = {
     'docker': {
         'registry': '',
     },
-    'environment': {
+    'datastore': {
         's3': {
             'endpoint': '',
             'region': '',

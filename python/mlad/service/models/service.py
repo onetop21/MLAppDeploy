@@ -32,7 +32,7 @@ class Service(BaseModel):
     deploy: Optional[Deploy]=None
     # For Plugin
     service_type: Optional[str] = None
-    ingress: Optional[int] = None
+    expose: Optional[int] = None
 
 
 class CreateRequest(BaseModel):
