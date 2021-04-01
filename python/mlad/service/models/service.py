@@ -48,5 +48,10 @@ class CreateRequest(BaseModel):
             del targets[_.name]['name']
         return targets
 
+
 class ScaleRequest(BaseModel):
     scale_spec: int
+
+
+class RemoveRequest(BaseModel):
+    services: List[str]

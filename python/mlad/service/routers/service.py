@@ -1,6 +1,7 @@
 import json
 from typing import List
 from fastapi import APIRouter, Query, HTTPException
+from fastapi.responses import StreamingResponse
 from mlad.core.exception import APIError
 from mlad.service.models import service
 from mlad.service.exception import InvalidProjectError,InvalidServiceError
@@ -102,7 +103,7 @@ def service_create(project_key:str, req:service.CreateRequest):
 def service_inspect(project_key:str, service_id:str):
     cli = ctlr.get_api_client()
     try:
-        service = ctlr.get_service(cli, service_id)
+        service = ctlr.get_service(cli, service_id=service_id)
         key = str(project_key).replace('-','')
         if _check_project_key(key, service, cli):
             if MODE=='kube':
@@ -121,7 +122,7 @@ def service_inspect(project_key:str, service_id:str):
 def service_tasks(project_key:str, service_id:str):
     cli = ctlr.get_api_client()
     try:
-        service = ctlr.get_service(cli, service_id)
+        service = ctlr.get_service(cli, service_id=service_id)
         key = str(project_key).replace('-','')
         if _check_project_key(key, service, cli):
             if MODE=='kube':
@@ -141,7 +142,7 @@ def service_scale(project_key:str, service_id:str,
     cli = ctlr.get_api_client()
     key = str(project_key).replace('-','')
     try:
-        service = ctlr.get_service(cli, service_id)
+        service = ctlr.get_service(cli, service_id=service_id)
         if _check_project_key(key, service, cli):
             if MODE=='kube':
                 ctlr.scale_service(cli, service, req.scale_spec)
@@ -155,16 +156,48 @@ def service_scale(project_key:str, service_id:str,
         raise HTTPException(status_code=500, detail=str(e))
     return {'message':f'service {service_id} scale updated'}
 
+
 @router.delete("/project/{project_key}/service/{service_id}")
-def service_remove(project_key:str, service_id:str):
+def service_remove(project_key: str, service_id: str, stream: bool = Query(False)):
     cli = ctlr.get_api_client()
     try:
-        service = ctlr.get_service(cli, service_id)
+        service = ctlr.get_service(cli, service_id=service_id)
         if _check_project_key(project_key, service, cli):
-            ctlr.remove_services(cli, [service])
+            res = ctlr.remove_services(cli, [service], stream=stream)
+
+        def remove_service(gen):
+            for _ in gen:
+                yield json.dumps(_)
+
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    inspect = ctlr.inspect_service(cli, service)
-    return {'message':f"service {inspect['name']} removed"}
+    if stream:
+        return StreamingResponse(remove_service(res))
+    else:
+        inspect = ctlr.inspect_service(cli, service)
+        return {'message': f"service {inspect['name']} removed"}
+
+
+@router.delete("/project/{project_key}/service")
+def services_remove(project_key: str, req: service.RemoveRequest, stream: bool = Query(False)):
+    cli = ctlr.get_api_client()
+    try:
+        services = [ctlr.get_service(cli, service_id=service_id) for service_id in req.services]
+        for service in services:
+            _check_project_key(project_key, service, cli)
+        res = ctlr.remove_services(cli, services, stream=stream)
+
+        def remove_service(gen):
+            for _ in gen:
+                yield json.dumps(_)
+
+    except InvalidServiceError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if stream:
+        return StreamingResponse(remove_service(res))
+    else:
+        return {'message': f"services removed"}

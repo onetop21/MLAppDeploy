@@ -530,21 +530,36 @@ def down(services, no_dump):
                 with open(path, 'w') as f:
                     yaml.dump(inspect, f)
 
+        #remove services
         for target in targets:
             if not no_dump:
                 dump_logs(target[1], log_dir)
-            res = api.service.remove(project_key, target[0])
-            print(res['message'])
-
+        if targets:
+            res = api.service.remove(project_key, services=[target[0] for target in targets], stream=True)
+            try:
+                for _ in res:
+                    if not 'result' in _:
+                        sys.stdout.write(_['stream'])
+                    if 'result' in _:
+                        if _['result'] == 'succeed':
+                            print(_['stream'])
+                        elif _['result'] == 'failed':
+                            print(_['stream'])
+                        elif _['result'] == 'completed':
+                            break
+            except APIError as e:
+                print(e)
+                sys.exit(1)
+        
         #Remove Network
-        if not services:
+        if not services or not api.service.get(project_key)['inspects']:
             res = api.project.delete(project_key)
             try:
                 for _ in res:
                     if 'stream' in _:
                         sys.stdout.write(_['stream'])
-                    if 'status' in _:
-                        if _['status'] == 'succeed':
+                    if 'result' in _:
+                        if _['result'] == 'succeed':
                             print('Network removed.')
                         break
             except APIError as e:

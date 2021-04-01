@@ -140,8 +140,8 @@ def create_project_network(cli, base_labels, extra_envs, credential, swarm=True,
     project_version = base_labels['MLAD.PROJECT.VERSION']
     #inspect_image(_) for _ in get_images(cli, project_key)
     default_image = base_labels['MLAD.PROJECT.IMAGE']
+
     # Create Docker Network
-    print('ctrl test:', base_labels)
     def resp_stream():
         network_name = f"{basename}-cluster"
         try:
@@ -232,12 +232,36 @@ def get_services(cli, project_key=None, extra_filters={}):
     else:
         return dict([(_.metadata.name, _) for _ in services.items])
 
-def get_service(cli, service_id):
+def get_service(cli, **kwargs):
     #service_id = k8s service uid
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    service = api.list_service_for_all_namespaces(label_selector=f"uid={service_id}")
-    return service.items[0]
+    if kwargs.get('service_id'):
+        service = api.list_service_for_all_namespaces(label_selector=f"uid={kwargs.get('service_id')}")
+    elif kwargs.get('service_name') and kwargs.get('namespace'):
+        service = api.list_namespaced_service(kwargs.get('namespace'),
+                                              label_selector=f"MLAD.PROJECT.SERVICE={kwargs.get('service_name')}" )
+    if not service.items:
+        return None
+    elif len(service.items) == 1:
+        return service.items[0]
+
+def get_service_from_kind(cli, service_name, namespace, kind):
+    # get job or rc of service
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    core_api = client.CoreV1Api(cli)
+    batch_api = client.BatchV1Api(cli)
+    if kind == 'job':
+        service = batch_api.list_namespaced_job(namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
+    elif kind == 'rc':
+        service = core_api.list_namespaced_replication_controller(namespace,
+                                                                  label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
+    if not service.items:
+        return None
+    elif len(service.items) == 1:
+        return service.items[0]
+    else:
+        raise exception.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
 
 def inspect_container(container):
     return docker_controller.inspect_container(container)
@@ -642,18 +666,26 @@ def _delete_replication_controller(cli, name, namespace):
     return api.delete_namespaced_replication_controller(name, 
         namespace, propagation_policy='Foreground')
 
-def remove_services(cli, services, timeout=0xFFFF):
+def remove_services(cli, services, timeout=0xFFFF, stream=False):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     network_api = client.NetworkingV1beta1Api(cli)
-    for service in services:
+
+    def _get_service_info(service):
         inspect = inspect_service(cli, service)
         service_name = inspect['name']
         namespace = service.metadata.namespace
+        targets = list(inspect['tasks'].keys())
 
-        config_labels = get_config_labels(cli, service, 
+        config_labels = get_config_labels(cli, service,
             f'service-{service_name}-labels')
-        kind = config_labels['MLAD.PROJECT.SERVICE.KIND'] 
+        kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
+        return service_name, namespace, kind, targets
+
+    service_to_check=[]
+    for service in services:
+        service_name, namespace, kind, _ = _get_service_info(service)
+        service_to_check.append((service_name, namespace, kind, _))
 
         print(f"Stop {service_name}...")
         ret = api.delete_namespaced_service(service_name, namespace)
@@ -664,26 +696,95 @@ def remove_services(cli, services, timeout=0xFFFF):
     
         try:
             #check ingress exists
-            ingress = network_api.read_namespaced_ingress(service_name, namespace)
-            print('**', ingress)
-            if ingress:
+            ingress = network_api.list_namespaced_ingress(namespace)
+            if service_name in ingress.items:
                 ingress_ret = network_api.delete_namespaced_ingress(service_name, namespace)
         except ApiException as e:
             print("Exception when calling ExtensionsV1beta1Api->delete_namespaced_ingress: %s\n" % e)
 
-    removed = True
-    # for service in services:
-    #     service_removed = False
-    #     for _ in range(timeout):
-    #         try:
-    #             #service.reload()
-    #             pass
-    #         except docker.errors.NotFound:
-    #             service_removed = True
-    #             break
-    #         time.sleep(1)
-    #     removed &= service_removed
-    return removed
+    #TODO TBD : down stream using k8s watch
+    def resp_stream_watch():
+        import urllib3
+        all_targets=[]
+        services={}
+        for service in service_to_check:
+            name, namespace, _, targets = service
+            services[name] = targets
+            all_targets.extend(targets)
+        w = watch.Watch()
+        print(f'Watch start to check service removed')
+        service_removed = False
+        message = f"Wait to remove services..\n"
+        yield {'stream': message}
+        try:
+            for ev in w.stream(api.list_namespaced_pod, namespace=namespace,  _request_timeout=timeout):
+                event = ev['type']
+                pod = ev['object'].metadata.name
+                service = ev['object'].metadata.labels['MLAD.PROJECT.SERVICE']
+                print(event, pod)
+                if event == 'DELETED':
+                    if pod in services[service]:
+                        services[service].remove(pod)
+                        if not services[service]:
+                            message = f"Service {service} removed."
+                            yield {'result': 'succeed', 'stream': message}
+                        all_targets.remove(pod)
+                        if not all_targets:
+                            service_removed = True
+                            break
+        except urllib3.exceptions.ReadTimeoutError as e: #for timeout
+            pass
+        if service_removed:
+            message = f"All Service removed."
+            print(message)
+        else:
+            for svc, target in services.items():
+                if target:
+                    message = f"Failed to remove service {svc}."
+                    yield {'result': 'failed', 'stream': message}
+        yield {'result': 'completed'}
+
+
+    #TODO TBD : down stream using time loop
+    def resp_stream():
+        for service in service_to_check:
+            name, namespace, kind, _ = service
+            service_removed = False
+            for tick in range(timeout):
+                if not get_service_from_kind(cli, name, namespace, kind) and \
+                        not get_service(cli, service_name=name, namespace=namespace):
+                    service_removed = True
+                    break
+                else:
+                    padding = '\033[1A\033[K' if tick else ''
+                    message = f"{padding}Wait to remove service {name} [{tick}s]\n"
+                    yield {'stream': message}
+                    time.sleep(1)
+            if not service_removed:
+                message = f"Failed to remove service {name}."
+                yield {'result': 'failed', 'stream': message}
+            else:
+                message = f"Service {name} removed."
+                yield {'result': 'succeed', 'stream': message}
+        yield {'result': 'completed'}
+
+    if stream:
+        return resp_stream()
+        #return resp_stream_watch()
+    else:
+        #TBD
+        removed = False
+        for service in services:
+            service_removed = False
+            name, namespace, kind = _get_service_info(service)
+            if not get_service_from_kind(cli, name, namespace, kind) and \
+                    not get_service(cli, service_name=name, namespace=namespace):
+                service_removed = True
+            else:
+                service_removed = False
+                removed &= service_removed
+        return (removed, (_ for _ in resp_stream()))
+
 
 # Image Control
 def get_images(cli, project_key=None):
