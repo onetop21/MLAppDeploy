@@ -346,7 +346,7 @@ else
     if [[ -z "$ROLE" ]]; then
         ColorEcho INFO "Skip kubernetes installation."
     else
-        if [[ `kubectl get node >> /dev/null 2>&1; echo $?` == "1" ]]; then
+        if [[ `kubectl get node >> /dev/null 2>&1; echo $?` != "0" ]]; then
             if [[ `IsInstalled k3sup` == '0' ]]; then
                 curl -sLS https://get.k3sup.dev | sh
                 sudo install k3sup /usr/local/bin/
