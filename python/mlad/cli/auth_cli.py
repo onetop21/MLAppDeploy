@@ -15,39 +15,39 @@ expired_type = click.DateTime(formats=['%Y-%m-%d', '%Y-%m-%d %H:%M:%S'])
 expired_default = date.today() + timedelta(days=7)
 
 @click.command()
-@click.option('--expired', '-e', type=expired_type, default=str(expired_default), help='Expired date.')
+@click.option('--expired', '-e', type=expired_type, default=str(expired_default), help='Expired date')
 @click.argument('USERNAME', required=True, nargs=1)
 def create(username, expired):
-    '''Create User Token.'''
+    '''Create user token'''
     auth.create(username, expired)
 
 @click.command()
 @click.argument('TOKEN', required=False, nargs=1)
 def login(token):
-    '''Login MLAppDeploy Service by Token.'''
+    '''Login MLAppDeploy service by token'''
     if not token:
         token = click.prompt('User Token', type=str)
     auth.login(token)
 
 @click.command()
 def logout():
-    '''Logout MLAppDeploy Service.'''
+    '''Logout MLAppDeploy service'''
     auth.logout()
 
 @click.command()
 @click.argument('TOKEN', required=False, nargs=1)
 def info(token):
-    '''Get Information from Token.'''
+    '''Get information from token'''
     auth.info(token) 
 
 @click.command()
 def user_info():
-    '''Get User Information from Token.'''
+    '''Get user information from token'''
     auth.info() 
 
 @click.group('auth')
 def admin_cli():
-    '''Manage Authentication. (Admin Only)'''
+    '''Manage authentication. (Admin Only)'''
 admin_cli.add_command(create)
 admin_cli.add_command(login)
 admin_cli.add_command(logout)
@@ -55,13 +55,13 @@ admin_cli.add_command(info)
 
 @click.group('auth')
 def user_cli():
-    '''Manage Authentication.'''
+    '''Manage authentication'''
 user_cli.add_command(login)
 user_cli.add_command(logout)
 user_cli.add_command(user_info, 'info')
 
 @click.group('auth')
 def cli():
-    '''Manage Authentication.'''
+    '''Manage authentication'''
 cli.add_command(login)
 

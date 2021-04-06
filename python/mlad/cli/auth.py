@@ -11,7 +11,7 @@ from mlad.api import API
 def create(username, expired):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             user_token = api.auth.token_create(username)
         print('User Token :', user_token)
     except HTTPError as e:
@@ -20,7 +20,7 @@ def create(username, expired):
 def login(token):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), token) as api:
+        with API(config.mlad.address, token) as api:
             result = api.auth.token_verify(token)
     except HTTPError as e:
         print('Failed to decode token.', file=sys.stderr)
@@ -48,7 +48,7 @@ def login(token):
 def logout():
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+        with API(config.mlad.address, config.mlad.token.user) as api:
             result = api.auth.token_verify(config.mlad.token.user)
     except HTTPError as e:
         print('Failed to decode token.', file=sys.stderr)
@@ -71,7 +71,7 @@ def info(token=None):
             elif token: info(token)
     else:
         try:
-            with API(utils.to_url(config.mlad), config.mlad.token.admin or config.mlad.token.user) as api:
+            with API(config.mlad.address, config.mlad.token.admin or config.mlad.token.user) as api:
                 result = api.auth.token_verify(token)
         except HTTPError as e:
             print('Failed to decode token.', file=sys.stderr)

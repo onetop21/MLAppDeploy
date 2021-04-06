@@ -21,29 +21,33 @@ from mlad.cli.autocompletion import *
 # mlad image deploy [...]
 
 @click.command()
-@click.option('--all', '-a', is_flag=True, help='Show all project images.')
+@click.option('--all', '-a', is_flag=True, help='Show all project images')
+@click.option('--plugin', '-p', is_flag=True, help='Show Plugin images')
 @click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10")')
-def ls(all, tail):
-    '''Show built image list.'''
-    image.list(all, tail)
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
+def ls(all, plugin, tail, no_trunc):
+    '''Show built image list'''
+    image.list(all, plugin, tail, no_trunc)
 
 @click.command()
-@click.argument('KEYWORD', required=True)
-def search(keyword):
-    '''Search image from registry.'''
-    image.search(keyword)
+@click.option('--verbose', '-v', is_flag=True, help='Print detail-log during build a project or plugin')
+@click.option('--plugin', '-p', is_flag=True, help='Build by plugin manifest')
+@click.option('--no-cache', is_flag=True, help='Do not use the cache when building project or plugin')
+def build(verbose, plugin, no_cache):
+    '''Build MLAppDeploy project or plguin'''
+    image.build(verbose, plugin, no_cache)
 
 @click.command()
-@click.option('--force', '-f', is_flag=True, help='Remove forcely.')
+@click.option('--force', '-f', is_flag=True, help='Remove forcely')
 @click.argument('ID', nargs=-1, required=True, autocompletion=get_image_list_completion)
 def rm(force, id):
-    '''Remove built image.'''
+    '''Remove built image'''
     image.remove(id, force)
 
 @click.command()
-@click.option('--all', '-a', is_flag=True, help='Remove unused all project images.')
+@click.option('--all', '-a', is_flag=True, help='Remove unused all images')
 def prune(all):
-    '''Remove unused and untagged project images.'''
+    '''Remove unused and untagged images'''
     image.prune(all)
 
 @click.group('image')
@@ -51,11 +55,11 @@ def prune(all):
         Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable",
         autocompletion=get_project_file_completion)
 def cli(file):
-    '''Manage Docker Image.'''
+    '''Manage Docker Image'''
     project.cli_args(file)
 
 cli.add_command(ls)
-cli.add_command(search)
+cli.add_command(build)
 cli.add_command(rm)
 cli.add_command(prune)
 

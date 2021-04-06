@@ -18,6 +18,7 @@ from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 from mlad.core import exception
 from mlad.cli.libs import utils
+from mlad.cli.libs import datastore as ds
 from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
@@ -26,7 +27,7 @@ from mlad.api.exception import APIError, NotFoundError
 
 @lru_cache(maxsize=None)
 def get_username(config):
-    with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+    with API(config.mlad.address, config.mlad.token.user) as api:
         res = api.auth.token_verify()
     if res['result']:
         return res['data']['username']
@@ -89,7 +90,7 @@ def init(name, version, maintainer):
 def list(no_trunc):
     config = utils.read_config()
     projects = {}
-    api = API(utils.to_url(config.mlad), config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.token.user)
     networks = api.project.get()
     columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS', 'HOSTNAME', 'WORKSPACE')]
     for network in networks:
@@ -129,7 +130,7 @@ def list(no_trunc):
 
 def status(all, no_trunc):
     config = utils.read_config()
-    api = API(utils.to_url(config.mlad), config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.token.user)
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
@@ -221,124 +222,7 @@ def status(all, no_trunc):
     print(f"USERNAME: [{get_username(config)}] / PROJECT: [{inspect['project']}]")
     utils.print_table(*([columns, 'Cannot find running services.'] + ([0] if no_trunc else [])))
 
-
-def build(tagging, verbose, no_cache):
-    config = utils.read_config()
-    cli = ctlr.get_api_client()
-    project_key = utils.project_key(utils.get_workspace())
-
-    project = utils.get_project(default_project)
-    
-    # Generate Base Labels
-    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
-
-    # Prepare Latest Image
-    latest_image = None
-    commit_number = 1
-    images = ctlr.get_images(cli, project_key)
-    if len(images):
-        latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
-        if latest_image and len(latest_image): latest_image = latest_image[0]
-        tags = sorted(filter(None, [ tag if not tag.endswith('latest') else None for image in images for tag in image.tags ]))
-        if len(tags): commit_number=int(tags[-1].split('.')[-1])+1
-    image_version = f"{base_labels['MLAD.PROJECT.VERSION']}.{commit_number}"
-
-    print('Generating project image...')
-
-    # Prepare workspace data from project file
-    envs = []
-    for key in project['workspace']['env'].keys():
-        envs.append(DOCKERFILE_ENV.format(
-            KEY=key,
-            VALUE=project['workspace']['env'][key]
-        ))
-    requires = []
-    for key in project['workspace']['requires'].keys():
-        if key == 'apt':
-            requires.append(DOCKERFILE_REQ_APT.format(
-                SRC=project['workspace']['requires'][key]
-            ))
-        elif key == 'pip':
-            requires.append(DOCKERFILE_REQ_PIP.format(
-                SRC=project['workspace']['requires'][key]
-            )) 
-
-    # Dockerfile to memory
-    dockerfile = DOCKERFILE.format(
-        MAINTAINER=project['project']['author'],
-        BASE=project['workspace']['base'],
-        AUTHOR=project['project']['author'],
-        ENVS='\n'.join(envs),
-        PRESCRIPTS=';'.join(project['workspace']['prescripts']) if len(project['workspace']['prescripts']) else "echo .",
-        REQUIRES='\n'.join(requires),
-        POSTSCRIPTS=';'.join(project['workspace']['postscripts']) if len(project['workspace']['postscripts']) else "echo .",
-        COMMAND='[{}]'.format(', '.join(
-            [f'"{item}"' for item in project['workspace']['command'].split()] + 
-            [f'"{item}"' for item in project['workspace']['arguments'].split()]
-        )),
-    )
-
-    tarbytes = io.BytesIO()
-    dockerfile_info = tarfile.TarInfo('.dockerfile')
-    dockerfile_info.size = len(dockerfile)
-    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-        for name, arcname in utils.arcfiles(project['project']['workdir'], project['workspace']['ignore']):
-            tar.add(name, arcname)
-        tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-    tarbytes.seek(0)
-
-    # Build Image
-    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
-
-    # Print build output
-    for _ in build_output:
-        if 'error' in _:
-            sys.stderr.write(f"{_['error']}\n")
-            sys.exit(1)
-        elif 'stream' in _:
-            if verbose:
-                sys.stdout.write(_['stream'])
-
-    image = ctlr.get_image(cli, base_labels['MLAD.PROJECT.IMAGE'])
-    # Check duplicated.
-    tagged = False
-    if latest_image != image:
-        if tagging:
-            image.tag(repository, tag=image_version)
-            tagged = True
-        if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
-            latest_image.tag('remove')
-            cli.images.remove('remove')
-    else:
-        if tagging and len(latest_image.tags) < 2:
-            image.tag(repository, tag=image_version)
-            tagged = True
-        else:
-            print('Already built project to image.', file=sys.stderr)
-
-    if tagged:
-        print(f"Built Image: {'/'.join(repository.split('/')[1:])}:{image_version}")
-
-    # Upload Image
-    print('Update project image to registry...')
-    try:
-        for _ in ctlr.push_images(cli, project_key, stream=True):
-            if 'error' in _:
-                raise docker.errors.APIError(_['error'], None)
-            elif 'stream' in _:
-                sys.stdout.write(_['stream'])
-    except docker.errors.APIError as e:
-        print(e, file=sys.stderr)
-        print('Failed to Update Image to Registry.', file=sys.stderr)
-        print('Please Check Registry Server.', file=sys.stderr)
-        sys.exit(1)
-    except StopIteration:
-        pass
-
-    print('Done.')
-
-
-def test(with_build):
+def run(with_build):
     project = utils.get_project(default_project)
 
     if with_build: build(False, True)
@@ -347,12 +231,15 @@ def test(with_build):
     config = utils.read_config()
 
     cli = ctlr.get_api_client()
-    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
+    base_labels = core_utils.base_labels(
+            utils.get_workspace(), 
+            get_username(config), 
+            project['project'])
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
         try:
-            extra_envs = utils.get_datastore_env(config)
+            extra_envs = ds.get_env(config)
             for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
@@ -398,7 +285,55 @@ def test(with_build):
 
 
 def up(services):
+    config = utils.read_config()
+    cli = ctlr.get_api_client()
+    api = API(config.mlad.address, config.mlad.token.user)
     project = utils.get_project(default_project)
+    base_labels = core_utils.base_labels(
+            utils.get_workspace(), 
+            utils.get_username(config), 
+            project['project'])
+    project_key = base_labels['MLAD.PROJECT']
+
+    images = ctlr.get_images(cli, project_key=project_key)
+    tag_key = lambda x: chr(0xFFFF) if x[0].endswith('latest') else x[0].rsplit(':', 1)[-1]
+    images = sorted([(_, i) for i in images for _ in i.tags], key=tag_key)
+    images = [images[-1][1]]
+
+    # select suitable image
+    if not images:
+        print(f"Cannot find built image of project [{project['project']['name']}].", file=sys.stderr)
+        return
+    image = images[0]
+    repository = image.labels['MLAD.PROJECT.IMAGE']
+    inspect = ctlr.inspect_image(image)
+
+    # set prefix to image name
+    parsed_url = utils.parse_url(config.docker.registry.address)
+    registry = parsed_url['hostname']
+    if parsed_url['port']:
+        registry = f"{registry}:{parsed_url['port']}"
+    if config.docker.registry.namespace:
+        registry = f"{registry}/{config.docker.registry.namespace}"
+    full_repository = f"{registry}/{repository}"
+    image.tag(full_repository)
+    base_labels['MLAD.PROJECT.IMAGE']=full_repository
+
+    # Upload Image
+    print('Update plugin image to registry...')
+    try:
+        for _ in ctlr.push_image(cli, full_repository, stream=True):
+            if 'error' in _:
+                raise docker.errors.APIError(_['error'], None)
+            elif 'stream' in _:
+                sys.stdout.write(_['stream'])
+    except docker.errors.APIError as e:
+        print(e, file=sys.stderr)
+        print('Failed to Update Image to Registry.', file=sys.stderr)
+        print('Please Check Registry Server.', file=sys.stderr)
+        sys.exit(1)
+    except StopIteration:
+        pass
 
     print('Deploying services to cluster...')
     if services:
@@ -406,24 +341,20 @@ def up(services):
         for name in services:
             if name in project['services']:
                 targets[name] = project['services'][name]
+                #targets[name]['service_type'] = 'project'
             else:
                 print(f'Cannot find service[{name}] in mlad-project.yaml.', file=sys.stderr)
                 sys.exit(1)
     else:
         targets = project['services'] or {}
-            
-    config = utils.read_config()
-    api = API(utils.to_url(config.mlad), config.mlad.token.user)
-    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
-    project_key = base_labels['MLAD.PROJECT']
-
+ 
     # AuthConfig
     cli = ctlr.get_api_client()
-    headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config']))}
+    headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config'] or b'e30K'))}
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
     credential = encoded.decode()
    
-    extra_envs = utils.get_datastore_env(default_config['client'](config))
+    extra_envs = ds.get_env(default_config['client'](config))
 
     if not services:
         res = api.project.create(project['project'], base_labels,
@@ -481,7 +412,7 @@ def down(services, no_dump):
     project_key = utils.project_key(utils.get_workspace())
     workdir = utils.get_project(default_project)['project']['workdir']
 
-    api = API(utils.to_url(config.mlad), config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.token.user)
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
@@ -571,7 +502,7 @@ def down(services, no_dump):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
-    api = API(utils.to_url(config.mlad), config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.token.user)
     # Block not running.
     try:
         project = api.project.inspect(project_key)
@@ -593,7 +524,7 @@ def logs(tail, follow, timestamps, names_or_ids):
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
     config = utils.read_config()
-    api = API(utils.to_url(config.mlad), config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.token.user)
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = api.project.inspect(project_key)

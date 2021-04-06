@@ -78,17 +78,17 @@ def change_key_style(dct):
     return dict((k.title().replace('_',''), v) for k, v in dct.items())
 
 # Manage Project and Network
-def base_labels(workspace, username, manifest, registry, ty='project'):
+def base_labels(workspace, username, manifest, ty='project'):
     #workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
     if ty == 'plugin':
-        basename = f"{username}-{manifest['name'].lower()}-plugin"
+        basename = f"{username}-{manifest['name']}-plugin".lower()
         key = project_key(basename)
-        default_image = f"{get_repository(basename, registry)}:{str(manifest['version']).lower()}"
+        default_image = f"{basename}:{manifest['version']}"
     else:
         key = project_key(workspace)
-        basename = f"{username}-{manifest['name'].lower()}-{key[:const.SHORT_LEN]}"
-        default_image = f"{get_repository(basename, registry)}:latest"
+        basename = f"{username}-{manifest['name']}-{key[:const.SHORT_LEN]}".lower()
+        default_image = f"{basename}:latest"
     labels = {
         f'MLAD.VERSION': '1',
         f'MLAD.PROJECT': key,

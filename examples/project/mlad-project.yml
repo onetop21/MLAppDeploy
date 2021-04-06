@@ -2,7 +2,7 @@
 project:
     name: example
     version: 0.0.1
-    author: onetop21
+    maintainer: onetop21
 workspace:
     ## Describe base docker image tag
     base: python:latest

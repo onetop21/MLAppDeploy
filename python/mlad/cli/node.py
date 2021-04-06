@@ -9,7 +9,7 @@ from mlad.api.exception import APIError, NotFoundError
 def list(no_trunc):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             nodes = [api.node.inspect(_) for _ in api.node.get()]
     except APIError as e:
         print(e)
@@ -30,7 +30,7 @@ def list(no_trunc):
 def enable(ID):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             api.node.enable(ID)
     except Exception as e:
         print(e)
@@ -40,7 +40,7 @@ def enable(ID):
 def disable(ID):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             api.node.disable(ID)
     except Exception as e:
         print(e)
@@ -50,7 +50,7 @@ def disable(ID):
 def label_add(node, **kvs):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             api.node.add_label(node, **kvs)
     except Exception as e:
         print(e)
@@ -60,7 +60,7 @@ def label_add(node, **kvs):
 def label_rm(node, *keys):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             api.node.delete_label(node, *keys)
     except Exception as e:
         print(e)

@@ -24,28 +24,33 @@ def get_api_client(host='unix:///var/run/docker.sock'):
     return docker.from_env(environment={'DOCKER_HOST': host})
 
 def get_auth_headers(cli, image_name=None, auth_configs=None):
-    if image_name:
-        if not auth_configs:
-            # docker.auth.get_config_header(client, registry)
-            registry, repo_name = docker.auth.resolve_repository_name(image_name)
-            header = docker.auth.get_config_header(cli.api, registry)
-            if header:
-                return {'X-Registry-Auth': header}
+    try:
+        if image_name:
+            if not auth_configs:
+                # docker.auth.get_config_header(client, registry)
+                registry, repo_name = docker.auth.resolve_repository_name(image_name)
+                header = docker.auth.get_config_header(cli.api, registry)
+                if header:
+                    return {'X-Registry-Auth': header}
+                else:
+                    return {'X-Registry-Auth': ''}
             else:
-                return {'X-Registry-Auth': ''}
+                if isinstance(auth_configs, str): 
+                    auth_configs = utils.decode_dict(auth_configs)
+                registry, repo_name = docker.auth.resolve_repository_name(image_name)
+                auth_config = docker.auth.resolve_authconfig({'auths': auth_configs}, registry)
+                return {'X-Registry-Auth': docker.auth.encode_header(auth_config)}
         else:
-            if isinstance(auth_configs, str): 
-                auth_configs = utils.decode_dict(auth_configs)
-            registry, repo_name = docker.auth.resolve_repository_name(image_name)
-            auth_config = docker.auth.resolve_authconfig({'auths': auth_configs}, registry)
-            return {'X-Registry-Auth': docker.auth.encode_header(auth_config)}
-    else:
-        headers = {'X-Registry-Config': b''}
-        docker.api.build.BuildApiMixin._set_auth_headers(cli.api, headers)
-        return headers
-    # get_all_auth_header(): -> docker.api.build.BuildApiMixin._set_auth_headers(self, headers)
-    # or cli.api._auth_configs.get_all_credentials() -> JSON(X-Registry-Config)
-    # and docker.auth.encode_header(JSON) -> X-Registry-Config or X-Registry-Auth
+            headers = {'X-Registry-Config': b''}
+            docker.api.build.BuildApiMixin._set_auth_headers(cli.api, headers)
+            return headers
+        # get_all_auth_header(): -> docker.api.build.BuildApiMixin._set_auth_headers(self, headers)
+        # or cli.api._auth_configs.get_all_credentials() -> JSON(X-Registry-Config)
+        # and docker.auth.encode_header(JSON) -> X-Registry-Config or X-Registry-Auth
+    except docker.credentials.errors.StoreError as e:
+        print(f"Error on Docker Credentials: {e}", file=sys.stderr)
+        print(f"If occupy error continuously, remove ~/.docker/config.json before re-try.", file=sys.stderr)
+        sys.exit(1)
 
 def get_project_networks(cli):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
@@ -526,22 +531,18 @@ def get_image(cli, image_id):
 
 def inspect_image(image):
     if not isinstance(image, docker.models.images.Image): raise TypeError('Parameter is not valid type.')
-    sorted_tags = sorted(image.tags, key=lambda x: chr(0xFFFF) if x.endswith('latest') else x)
-    headed = False
-    if sorted_tags:
-        latest_tag = sorted_tags[-1]
-        repository, tag = latest_tag.rsplit(':', 1) if ':' in latest_tag else (latest_tag, '')
-        headed = latest_tag.endswith('latest')
-    else:
-        repository, tag = image.short_id.split(':',1)[-1], ''
+    headed = len([_ for _ in image.tags if _.endswith('latest')]) > 0
     labels = {
+        # for Manifest
+        'type': image.labels['MLAD.PROJECT.TYPE'], 
         # for Image
         'id': image.id.split(':',1)[-1],
         'short_id': image.short_id.split(':',1)[-1],
-        'repository': repository,
-        'tag': tag,
+        'tag': image.labels['MLAD.PROJECT.IMAGE'].rsplit(':',1)[-1],
         'tags': image.tags,
         'latest': headed,
+        'version': image.labels['MLAD.PROJECT.VERSION'],
+        'username': image.labels['MLAD.PROJECT.USERNAME'],
         'maintainer': image.attrs['Author'],
         'created': image.attrs['Created'],
         # for Project
@@ -594,20 +595,38 @@ def prune_images(cli, project_key=None):
     if project_key: filters+= f'={project_key}'
     return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
 
-def push_images(cli, project_key, stream=False, ty='project'):
+def push_images(cli, project_key, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
     def _request_push():
         for _ in get_images(cli, project_key):
-        #for _ in get_images(cli, project_key, ty=ty):
             inspect = inspect_image(_)
-            if inspect['short_id'] == inspect['repository']: continue
-            repository = inspect['repository']
-            output = cli.images.push(repository, stream=True, decode=True)
-            try:
-                for stream in output:
-                    yield stream
-            except StopIteration:
-                pass
+            for _ in inspect['tags']:
+                #registry, repo_name = docker.auth.resolve_repository_name(_)
+                #print(registry, repo_name)
+                output = cli.images.push(_, stream=True, decode=True)
+                try:
+                    for stream in output:
+                        yield stream
+                except StopIteration:
+                    pass
+    if stream:
+        return _request_push()
+    else:
+        resp_stream = (_ for _ in _request_push())
+        for _ in resp_stream:
+            if 'error' in _: return (False, resp_stream)
+        return (True, resp_stream)
+
+ 
+def push_image(cli, repository, stream=False):
+    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    def _request_push():
+        output = cli.images.push(repository, stream=True, decode=True)
+        try:
+            for stream in output:
+                yield stream
+        except StopIteration:
+            pass
     if stream:
         return _request_push()
     else:

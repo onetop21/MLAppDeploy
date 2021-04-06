@@ -22,7 +22,7 @@ def get_dir_completion(ctx, args, incomplete):
 def get_node_list_completion(ctx, args, incomplete):
     config = utils.read_config()
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             nodes = [api.node.inspect(_) for _ in api.node.get()]
     except APIError as e:
         print(e)
@@ -35,7 +35,7 @@ def get_node_label_completion(ctx, args, incomplete):
     config = utils.read_config()
     node_key = args[args.index('label')+1]
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.admin) as api:
+        with API(config.mlad.address, config.mlad.token.admin) as api:
             node = api.node.inspect(node_key)
     except APIError as e:
         print(e)
@@ -77,7 +77,7 @@ def get_stopped_services_completion(ctx, args, incomplete):
     project = utils.get_project(default_project)
     project_key = utils.project_key(utils.get_workspace())
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+        with API(config.mlad.address, config.mlad.token.user) as api:
             services = [_['name'] for _ in api.service.get(project_key)['inspects']]
     except APIErro as e:
         print(e)
@@ -90,7 +90,7 @@ def get_running_services_completion(ctx, args, incomplete):
     if project_file: utils.apply_project_arguments(project_file[-1], None)
     project_key = utils.project_key(utils.get_workspace())
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+        with API(config.mlad.address, config.mlad.token.user) as api:
             services = [_['name'] for _ in api.service.get(project_key)['inspects']]
     except APIError as e:
         print(e)
@@ -103,7 +103,7 @@ def get_running_services_tasks_completion(ctx, args, incomplete):
     if project_file: utils.apply_project_arguments(project_file[-1], None)
     project_key = utils.project_key(utils.get_workspace())
     try:
-        with API(utils.to_url(config.mlad), config.mlad.token.user) as api:
+        with API(config.mlad.address, config.mlad.token.user) as api:
             services = dict([(_['name'], _['tasks']) for _ in api.service.get(project_key)['inspects']])
     except APIError as e:
         print(e)

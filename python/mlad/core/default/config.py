@@ -6,30 +6,19 @@ from omegaconf import OmegaConf
 
 client_config = {
     'mlad': {
-        'host': 'localhost',
-        'port': 8440,
+        'address': 'http://localhost:8440',
         'token': {
             'admin': '',
             'user': '',
         },
     },
     'docker': {
-        'registry': '',
+        'registry': {
+            'address': 'https://docker.io',
+            'namespace': ''
+        }
     },
     'datastore': {
-        's3': {
-            'endpoint': '',
-            'region': '',
-            'accesskey': '',
-            'secretkey': '',
-            'verify': True, 
-        },
-        'mongodb': {
-            'host': 'localhost',
-            'port': 27017,
-            'username': '',
-            'password': '',
-        }
     }
 }
 

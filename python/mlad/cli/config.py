@@ -1,8 +1,8 @@
 import sys
 import os
-from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
+from mlad.cli.libs import datastore as ds
 from mlad.core.default import config as default_config
 
 def get_value(config, keys, stack=[]):
@@ -29,37 +29,32 @@ def get_value(config, keys, stack=[]):
         sys.exit(1)
 
 def init(address, token):
-    # Health Check?
-    parsed_url = urlparse(address)
-    scheme = parsed_url.scheme
-    hostname = parsed_url.hostname
-    port = parsed_url.port or (443 if scheme == 'https' else 80)
-
     # token
-    user_token = input(f"MLAppDeploy User Token : ")
+    user_token = input(f"MLAppDeploy User Token :")
 
     # registry
+    registry_address = 'https://docker.io'
+    warn_insecure = False
     service_addr = utils.get_advertise_addr()
     registry_port = utils.get_default_service_port('mlad_registry', 5000)
     if registry_port:
-        registry_address = f'{service_addr}:{registry_port}'
-        warn_insecure = True
+        registry_address = f'http://{service_addr}:{registry_port}'
         #print(f'Detected Docker Registry[{registry_address}] on docker host.')
-    else:
-        registry_address = 'docker.io'
-        warn_insecure = False
-    registry_address = utils.prompt("Docker Registry Host", registry_address)
-    registry_address = registry_address.split('//')[-1] # Remove Scheme
-    
+    registry_address = utils.prompt("Docker Registry Address", registry_address)
+    if not registry_address.startswith('https://'):
+        warn_insecure = True
+    registry_namespace = utils.prompt("Docker Registry Namespace")
     utils.generate_empty_config()
     set(*(
-        f"mlad.host={hostname}",
-        f"mlad.port={port}",
+        f"mlad.address={address}",
         f"mlad.token.admin={token}",
         f"mlad.token.user={user_token}",
-        f'docker.registry={registry_address}',
+        f'docker.registry.address={registry_address}',
+        f'docker.registry.namespace={registry_namespace}'
     ))
     datastore()
+
+    print('\nRESULT')
     get(None)
 
     if warn_insecure:
@@ -86,7 +81,7 @@ def get(keys, no_trunc=False):
 
 def env(unset):
     config = default_config['client'](utils.read_config())
-    envs = utils.get_datastore_env(config)
+    envs = ds.get_env(config)
     for line in envs:
         if unset:
             K, V = line.split('=')
@@ -96,30 +91,22 @@ def env(unset):
     print(f'# To set environment variables, run "eval $(mlad config env)"')
 
 # Extension for DataStore
-datastores = {}
 def datastore(kind=None):
     if not kind:
-        for _ in datastores.keys():
+        for _ in ds.datastores.keys():
             datastore(_)
         return
     else:
-        if not kind in datastores:
+        if not kind in ds.datastores:
             print('Cannot support datastore type.', file=sys.stderr)
-            print(f"Support DataStore Type [{', '.join(datastores.keys())}]", file=sys.stderr)
+            print(f"Support DataStore Type [{', '.join(ds.datastores.keys())}]", file=sys.stderr)
             sys.exit(1)
-    store = datastores[kind]
+    store = ds.datastores[kind]
     config = store['initializer']()
     for k, v in store['prompt'].items():
         config[k] = utils.prompt(v, config[k])
     config = store['finalizer'](config)    
     set(*[f"datastore.{kind}.{k}={v}" for k, v in config.items()])
-
-def _add_datastore(kind, initializer=lambda: None, finalizer=lambda x: x, **prompt):
-    datastores[kind] = {
-        'prompt': prompt,
-        'initializer': initializer,
-        'finalizer': finalizer
-    }
 
 # S3 DataStore
 def _datastore_s3_initializer():
@@ -127,26 +114,39 @@ def _datastore_s3_initializer():
     service_addr = utils.get_advertise_addr()
     minio_port = utils.get_default_service_port('mlad_minio', 9000)
     if minio_port:
-        s3_address = f'http://{service_addr}:{minio_port}'
+        endpoint = f'http://{service_addr}:{minio_port}'
         region = 'ap-northeast-2'
         access_key = 'MLAPPDEPLOY'
         secret_key = 'MLAPPDEPLOY'
-        verify = False
     else:
-        s3_address = 'https://s3.amazonaws.com'
+        endpoint = 'https://s3.amazonaws.com'
         region = 'us-east-1'
         access_key = None
         secret_key = None
-        verify = True
-    return {'endpoint': s3_address, 'region': region, 'accesskey': access_key, 'secretkey': secret_key, 'verify': verify}
+    return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
 
 def _datastore_s3_finalizer(datastore):
     datastore['verify'] = datastore['endpoint'].startswith('https://')
     return datastore
 
-_add_datastore('s3',
+def _datastore_s3_translator(kind, key, value):
+    if key == 'endpoint':
+        return f"S3_ENDPOINT={value}"
+    elif key == 'verify':
+        return [f"S3_USE_HTTPS={1 if value else 0}", f"S3_VERIFY_SSL=0"]
+    elif key == 'accesskey':
+        return f"AWS_ACCESS_KEY_ID={value}"
+    elif key == 'secretkey':
+        return f"AWS_SECRET_ACCESS_KEY={value}"
+    elif key == 'region':
+        return f"AWS_REGION={value}"
+    else:
+        return f"{kind.upper()}_{key.upper()}={value}"
+
+ds.add_datastore('s3',
         _datastore_s3_initializer, 
-        _datastore_s3_finalizer, 
+        _datastore_s3_finalizer,
+        _datastore_s3_translator,
         endpoint='S3 Compatible Address',
         region='Region',
         accesskey='Access Key ID',
@@ -158,21 +158,23 @@ def _datastore_mongodb_initializer():
     service_addr = utils.get_advertise_addr()
     mongo_port = utils.get_default_service_port('mlad_mongodb', 27017)
     if mongo_port:
-        host = service_addr
-        port = mongo_port
+        address = f"mongodb://{service_addr}:{mongo_port}"
     else:
-        host = 'localhost'
-        port = 27017
-    return {'host': host, 'port': port, 'username': '', 'password': ''}
+        address = f"mongodb://localhost:27017"
+    return {'address': address, 'username': '', 'password': ''}
 
 def _datastore_mongodb_finalizer(datastore):
+    parsed = utils.parse_url(datastore['address'])
+    if parsed['port']:
+        datastore['address'] = f"mongodb://{parsed['hostname']}:{parsed['port']}"
+    else:
+        datastore['address'] = f"mongodb://{parsed['hostname']}"
     return datastore
 
-_add_datastore('mongodb',
+ds.add_datastore('mongodb',
         _datastore_mongodb_initializer, 
         _datastore_mongodb_finalizer, 
-        host='MongoDB Host',
-        port='MongoDB Port',
+        address='MongoDB Address',
         username='MongoDB Username',
         password='MongoDB Password')
 
