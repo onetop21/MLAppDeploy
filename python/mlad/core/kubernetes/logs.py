@@ -1,7 +1,8 @@
 import sys
 import os
 import time
-import datetime
+import math
+from datetime import datetime
 import struct
 import itertools
 import socket
@@ -50,11 +51,14 @@ class LogHandler:
         timestamps = params['timestamps']
         tail = None if params['tail']=='all' else params['tail']
         timeout = None if params['follow'] else 3
+        since_seconds = None
+        if 'since_seconds' in params.keys():
+            since_seconds = params['since_seconds']
         cli = ctrl.get_api_client()
         api = client.CoreV1Api(cli)
         try:
             resp = api.read_namespaced_pod_log(name=target, namespace=namespace, tail_lines=tail, timestamps=timestamps,
-                                               follow=follow, _preload_content=False)
+                                               follow=follow, since_seconds=since_seconds, _preload_content=False)
             self.responses[target] = resp
             #Thread(target=LogHandler._monitor, args=(self.monitoring, host, target, lambda: self.close(resp)), daemon=True).start()
             for line in resp:
@@ -224,6 +228,8 @@ class LogMonitor(Thread):
                     pod = ev['object']['metadata']['name']
                     phase = ev['object']['status']['phase']
                     service = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
+                    print(f'{pod}/{event}/{phase}')
+
                     # For create pod by CrashLoopBackOff(RestartPolicy: Always)
                     #if event == 'ADDED':
                     #    added.append(pod)
@@ -234,8 +240,24 @@ class LogMonitor(Thread):
                     #        self.collector.add_iterable(log, name=service, timestamps=timestamps)
                     #        added.remove(pod)
                     if event == 'MODIFIED' and phase == 'Running':
+                        container_status = ev['object']['status']['containerStatuses'][0]
+                        restart = container_status['restartCount']
+                        if restart:
+                            print('restart:', restart)
+                            state = container_status['state']
+                            if 'running' in state.keys():
+                                created = state['running']['startedAt']
+                                print('started:', created)
+                            else:
+                                print('state:', state)
+                                continue
+                        else:
+                            created = ev['object']['metadata']['creationTimestamp']
+                        ts = time.mktime(datetime.strptime(created, '%Y-%m-%dT%H:%M:%SZ').timetuple())
+                        since_seconds = math.ceil(datetime.utcnow().timestamp()-ts)
+                        print('since:', since_seconds)
                         log = self.handler.logs(namespace, pod, details=True, follow=follow,
-                                                tail=5, timestamps=timestamps, stdout=True, stderr=True)
+                                                tail='all', since_seconds=since_seconds, timestamps=timestamps, stdout=True, stderr=True)
                         self.collector.add_iterable(log, name=pod, timestamps=timestamps)
                     elif event == 'DELETED':
                         for oid in [k for k, v in self.collector.threads.items() if v['name'] == pod]:
