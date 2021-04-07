@@ -8,28 +8,28 @@ from mlad.cli.autocompletion import *
 # //mlad node lable [name] [key=value]
 
 @click.command()
-@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
 def ls(no_trunc):
-    '''Show Connected Nodes.'''
+    '''Show connected nodes'''
     node.list(no_trunc)
 
 @click.command()
 @click.argument('ID', autocompletion=get_node_list_completion)
 def enable(id):
-    '''Enable to Use Node.'''
+    '''Enable to use node'''
     node.enable(id)
 
 @click.command()
 @click.argument('ID', autocompletion=get_node_list_completion)
 def disable(id):
-    '''Disable to Use Node.'''
+    '''Disable to unuse node'''
     node.disable(id)
 
 @click.command()
 @click.argument('KV', nargs=-1)
 @click.pass_obj
 def add(id, kv):
-    '''Add label to node.'''
+    '''Add label to node'''
     kvdict = dict([ _.split('=') for _ in kv ])
     node.label_add(id, **kvdict)
 
@@ -37,14 +37,14 @@ def add(id, kv):
 @click.argument('KEY', nargs=-1, autocompletion=get_node_label_completion)
 @click.pass_obj
 def rm(id, key):
-    '''Remove label from node.'''
+    '''Remove label from node'''
     node.label_rm(id, *key)
 
 @click.group()
 @click.argument('NODE', autocompletion=get_node_list_completion)
 @click.pass_context
 def label(context, node):
-    '''Manage Docker Image.'''
+    '''Manage node labels'''
     context.obj = node
 
 label.add_command(add)
@@ -52,7 +52,7 @@ label.add_command(rm)
 
 @click.group('node')
 def cli():
-    '''Manage Docker Orchestration Nodes.'''
+    '''Manage docker orchestrator nodes'''
 
 cli.add_command(ls)
 cli.add_command(enable)

@@ -9,7 +9,10 @@ import hashlib
 import itertools
 from pathlib import Path
 from functools import lru_cache
+from urllib.parse import urlparse
 from omegaconf import OmegaConf
+from mlad.api import API
+from mlad.api.exception import APIError, NotFoundError
 
 HOME = str(Path.home())
 
@@ -146,7 +149,7 @@ def get_manifest(ty, default=lambda x: x):
                 path
             )
         )
-    if not check_podname_syntax(manifest['plugin']['name']):
+    if not check_podname_syntax(manifest[ty]['name']):
         print('Syntax Error: Project(Plugin) and service require a name to follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
     return manifest
@@ -176,6 +179,7 @@ def get_advertise_addr():
         import subprocess
         output = subprocess.check_output(['powershell.exe', '-Command', '(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected" }).IPv4Address.IPAddress'])
         addr = output.strip(b'\r\n').decode()
+        sys.stdout.write("\033[1A\033[K")
     else:
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -192,28 +196,22 @@ def get_default_service_port(container_name, internal_port):
         external_port = _[0]['HostPort']
     return external_port
 
-def get_datastore_env(config):
-    #env = []
-    #for kind, datastore in config['datastore'].items():
-    #    env += [f"{kind.upper()}_{k.upper()}={v}" for k, v in datastore.items()]
-    env = [
-        # S3
-        f'S3_ENDPOINT={config["datastore"]["s3"]["endpoint"]}',
-        f'S3_USE_HTTPS={1 if config["datastore"]["s3"]["verify"] else 0}',
-        f'AWS_ACCESS_KEY_ID={config["datastore"]["s3"]["accesskey"]}',
-        f'AWS_SECRET_ACCESS_KEY={config["datastore"]["s3"]["secretkey"]}',
-        # MongoDB
-        f'MONGO_HOST={config["datastore"]["mongodb"]["host"]}',
-        f'MONGO_PORT={config["datastore"]["mongodb"]["port"]}',
-        f'MONGO_USERNAME={config["datastore"]["mongodb"]["username"]}',
-        f'MONGO_PASSWORD={config["datastore"]["mongodb"]["password"]}',
-    ]
-    return env
+def parse_url(url):
+    parsed_url = urlparse(url)
+    return {
+        'scheme':   parsed_url.scheme or 'http',
+        'username': parsed_url.username,
+        'password': parsed_url.password,
+        'hostname': parsed_url.hostname,
+        'port':     parsed_url.port or (443 if parsed_url.scheme == 'https' else 80),
+        'path':     parsed_url.path,
+        'query':    parsed_url.query,
+        'params':   parsed_url.params,
+    }
 
 def get_service_env(config):
     env = [
-        f'MLAD_HOST={config["mlad"]["host"]}',
-        f'MLAD_PORT={config["mlad"]["port"]}',
+        f'MLAD_ADDRESS={config["mlad"]["address"]}',
         f'MLAD_USER_TOKEN={config["mlad"]["token"]["user"]}',
     ]
     return env
@@ -232,6 +230,7 @@ def hash(body: str):
 CLEAR_COLOR = '\x1b[0m'
 ERROR_COLOR = '\x1b[1;31;40m'
 INFO_COLOR = '\033[38;2;255;140;26m'
+
 
 @lru_cache(maxsize=None)
 def color_table():
@@ -275,13 +274,17 @@ def arcfiles(workspace='.', ignores=[]):
                 prune_dirs.append(name)
         for _ in prune_dirs: dirs.remove(_)
 
-def to_url(dic):
-    scheme = 'http://'
-    if dic['port']:
-        return f"{scheme}{dic['host']}:{dic['port']}"
-    else:
-        return f"{scheme}{dic['host']}"
-
-def prompt(msg, default=None, ty=str):
+def prompt(msg, default='', ty=str):
     return ty(input(f"{msg}:" if not default else f"{msg} [{default}]:")) or default
     
+@lru_cache(maxsize=None)
+def get_username(config):
+    with API(config.mlad.address, config.mlad.token.user) as api:
+        res = api.auth.token_verify()
+    if res['result']:
+        return res['data']['username']
+    else:
+        raise RuntimeError("Token is not valid.")
+
+
+

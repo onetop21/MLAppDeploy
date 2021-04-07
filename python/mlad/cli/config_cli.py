@@ -11,23 +11,23 @@ from mlad.cli.autocompletion import *
 # mlad config get [key]
 
 @click.command()
-@click.option('--address', '-a', default='http://localhost:8440', prompt='MLAppDeploy Service Address', help='Set Service Address.')
-@click.option('--token', '-t', default='', help='Set Administrator Token.')
+@click.option('--address', '-a', default='http://localhost:8440', prompt='MLAppDeploy Service Address', help='Set service address')
+@click.option('--token', '-t', default='', help='Set administrator token')
 def init(address, token):
-    '''Initialize Configurations.'''
+    '''Initialize configurations'''
     config.init(address, token)
 
 @click.command()
 @click.argument('VAR', required=True, nargs=-1, autocompletion=get_config_key_completion)
 def set(var):
-    '''Set Configurations. [KEY=VALUE]...'''
+    '''Set configurations. [KEY=VALUE]...'''
     config.set(*var) 
 
 @click.command()
-@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
+@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
 @click.argument('KEY', required=False, autocompletion=get_config_key_completion)
 def get(no_trunc, key):
-    '''Get Configurations.'''
+    '''Get configurations'''
     config.get(key, no_trunc)
 
 @click.command()
@@ -37,9 +37,9 @@ def env(unset):
     config.env(unset)
 
 @click.command()
-@click.option('--install', is_flag=True, help='Install Shell-Completion to Shell(Linux Only).')
+@click.option('--install', is_flag=True, help='Install shell-completion to shell(Linux Only)')
 def completion(install):
-    '''Activate Auto Completion (Linux Only)'''
+    '''Activate auto completion (Linux Only)'''
     shell = os.path.basename(os.environ.get('SHELL'))
     if shell in ['bash', 'zsh']:
         if install:
@@ -55,12 +55,12 @@ def completion(install):
 @click.command()
 @click.argument('KIND', required=False)
 def datastore(kind):
-    '''Set Configurations for Data Storage.'''
+    '''Set configurations for data storage'''
     config.datastore(kind)
 
 @click.group('config')
 def cli():
-    '''Manage Configuration.'''
+    '''Manage configuration'''
 
 cli.add_command(init)
 cli.add_command(datastore)

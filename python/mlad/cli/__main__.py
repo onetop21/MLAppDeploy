@@ -19,7 +19,7 @@ def has_role(key):
         try:
             token = config.mlad.token[key]
             if token:
-                with API(utils.to_url(config.mlad)) as api:
+                with API(config.mlad.address) as api:
                     res = api.auth.token_verify(token)
                     if res['result']:
                         return res['data']['role'] == key
@@ -58,7 +58,7 @@ class EntryGroup(click.Group):
 @click.option('--file', '-f', default=None, hidden=True, autocompletion=get_project_file_completion,
     help='Specify an alternate project file')
 def main(file):
-    '''Machine Learning Application Deployment Tool. (https://github.com/onetop21/MLAppDeploy.git)'''
+    '''Machine Learning Application Deployment Tool (https://github.com/onetop21/MLAppDeploy)'''
     project.cli_args(file)
 
 admin_role = has_role('admin')
@@ -88,8 +88,8 @@ main.add_command(auth.logout, 'logout')
 if user_role:
     main.add_command(auth.user_info, 'account')
     main.add_command(image.ls, 'images')
-    main.add_command(project.build, 'build')
-    main.add_command(project.test, 'test')
+    main.add_command(image.build, 'build')
+    main.add_command(project.run, 'run')
     main.add_command(project.up, 'up')
     main.add_command(project.down, 'down')
     main.add_command(project.logs, 'logs')
