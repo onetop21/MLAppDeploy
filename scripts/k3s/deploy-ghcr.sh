@@ -25,11 +25,15 @@ function Usage {
     ColorEcho      "    -r, --role=(master, worker)   : Choose environment role."
     ColorEcho      "                                    If not define role, skip environment installation."
     ColorEcho      "        --master-ip=[ADDRESS]     : Join to master node if choosed worker role."
+    ColorEcho      "        --master-user=[USERNAME]  : Account name of master node to join if choosed worker role."
+    ColorEcho      "                                    (Default: $USER)"
     ColorEcho      "    -u, --uninstall               : Uninstall kubernetes environments."
     ColorEcho      "                                    But, no remove DOCKER and NVIDIA CONTAINER RUNTIME."
     ColorEcho WARN "Deployments"
     ColorEcho      "        --registry=[REPO/ORG]     : Change target to deploy and pulling service image."
     ColorEcho      "                                    (Default: ghcr.io/onetop21)"
+    ColorEcho      "        --lb-mode                 : Set ingress service to LoadBalancer."
+    ColorEcho      "                                    (Default: NodePort)"
     ColorEcho      "    -b, --with-build              : Build and deploy service image."
     ColorEcho      "        --build-from=(git, local) : Choose source path to build. (Default: git)"
     ColorEcho      "        --config=[PATH]           : Set service configure file. (Not yet)"
@@ -40,7 +44,8 @@ function Usage {
 
 # Default variables
 REGISTRY=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
-OPTIONS=$(getopt -o r:ubh --long role:,master-ip:,uninstall,registry:,with-build,build-from:,config:,redeploy,help -- "$@")
+MASTER_USER=$USER
+OPTIONS=$(getopt -o r:ubh --long role:,master-ip:,master-user:,uninstall,registry:,lb-mode,with-build,build-from:,config:,redeploy,help -- "$@")
 [ $? -eq 0 ] || Usage
 eval set -- "$OPTIONS"
 while true; do
@@ -51,11 +56,17 @@ while true; do
     --master-ip) shift
         MASTER_IP=$1
         ;;
+    --master-user) shift
+        MASTER_USER=$1
+        ;;
     -u|--uninstall)
         UNINSTALL=1
         ;;
     --registry) shift
         REGISTRY=$1
+        ;;
+    --lb-mode)
+        LB_MODE=1
         ;;
     -b|--with-build)
         WITH_BUILD=1
@@ -353,9 +364,9 @@ else
             fi
             if [[ `IsInstalled k3s` == '0' ]]; then
                 if [[ "$ROLE" == "master" ]]; then
-                    k3sup install --local --local-path ~/.kube/config --k3s-extra-args '--docker --no-deploy traefik'
+                    k3sup install --local --local-path ~/.kube/config --k3s-extra-args '--docker --no-deploy traefik --write-kubeconfig-mode 644'
                 elif [[ "$ROLE" == "worker" ]]; then
-                    k3sup join --local --server-ip $MASTER_IP
+                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER
                 else
                     ColorEcho WARN "Skip kubernetes installation. $ROLE is invalid role."
                 fi
@@ -427,7 +438,8 @@ KUBE_VERSION=`kubectl version -o json | jq .serverVersion.gitVersion | tr -d \"`
 if [[ `kubectl get ns ingress-nginx >> /dev/null 2>&1; echo $?` == "0" ]]; then
     ColorEcho "Already installed ingress."
 else
-    if [[ `VerCompare $KUBE_VERSION v1.19` == '1' ]]; then
+    #if [[ `VerCompare $KUBE_VERSION v1.19` == '1' ]]; then
+    if [[ "$LB_MODE" == "1" ]]; then
         ColorEcho INFO "Install Ingress Using LoadBalancer."
         # Install by LoadBalance
         kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.44.0/deploy/static/provider/cloud/deploy.yaml
@@ -473,6 +485,7 @@ spec:
       labels:
         app: mlad-service
     spec:
+      terminationGracePeriodSeconds: 0
       containers:
         - name: mlad-service
           image: $IMAGE_NAME
