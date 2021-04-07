@@ -222,13 +222,11 @@ class LogMonitor(Thread):
             try:
                 print(f'Watch Start [{namespace}]')
                 wrapped_api = LogMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
-                #for ev in w.stream(self.api.list_namespaced_pod, namespace=namespace, resource_version=self.resource_version):
                 for ev in w.stream(wrapped_api, namespace=namespace, resource_version=self.resource_version):
                     event = ev['type']
                     pod = ev['object']['metadata']['name']
                     phase = ev['object']['status']['phase']
                     service = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
-                    print(f'{pod}/{event}/{phase}')
 
                     # For create pod by CrashLoopBackOff(RestartPolicy: Always)
                     #if event == 'ADDED':
@@ -243,19 +241,16 @@ class LogMonitor(Thread):
                         container_status = ev['object']['status']['containerStatuses'][0]
                         restart = container_status['restartCount']
                         if restart:
-                            print('restart:', restart)
                             state = container_status['state']
                             if 'running' in state.keys():
                                 created = state['running']['startedAt']
-                                print('started:', created)
                             else:
-                                print('state:', state)
                                 continue
                         else:
                             created = ev['object']['metadata']['creationTimestamp']
                         ts = time.mktime(datetime.strptime(created, '%Y-%m-%dT%H:%M:%SZ').timetuple())
                         since_seconds = math.ceil(datetime.utcnow().timestamp()-ts)
-                        print('since:', since_seconds)
+
                         log = self.handler.logs(namespace, pod, details=True, follow=follow,
                                                 tail='all', since_seconds=since_seconds, timestamps=timestamps, stdout=True, stderr=True)
                         self.collector.add_iterable(log, name=pod, timestamps=timestamps)

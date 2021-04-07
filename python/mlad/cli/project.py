@@ -422,8 +422,9 @@ def up(services):
     headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config']))}
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
     credential = encoded.decode()
-   
-    extra_envs = utils.get_datastore_env(default_config['client'](config))
+
+    extra_envs = utils.get_datastore_env(default_config['client'](config)) + \
+                 utils.get_service_env(default_config['client'](config))
 
     if not services:
         res = api.project.create(project['project'], base_labels,
