@@ -421,7 +421,7 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
                         client.V1Container(
                             name=name,
                             image=image,
-                            #image_pull_policy='Always',
+                            image_pull_policy='Always', #TODO modify to option
                             command=command,
                             env=envs,
                             resources=client.V1ResourceRequirements(
@@ -472,6 +472,7 @@ def _create_replication_controller(cli, name, image, command, namespace='default
                     containers=[client.V1Container(
                         name=name,
                         image=image,
+                        image_pull_policy='Always',  # TODO modify to option
                         env=envs,
                         command=command,
                         resources=client.V1ResourceRequirements(
@@ -769,8 +770,8 @@ def remove_services(cli, services, timeout=0xFFFF, stream=False):
         yield {'result': 'completed'}
 
     if stream:
-        return resp_stream()
-        #return resp_stream_watch()
+        #return resp_stream()
+        return resp_stream_watch()
     else:
         #TBD
         removed = False
