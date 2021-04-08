@@ -595,7 +595,7 @@ def create_services(cli, network, services, extra_labels={}):
         #headers['Content-Type'] = 'application/json'
         #body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
         #temp_image = kwargs.get('image') if kwargs.get('image') else config_labels['MLAD.PROJECT.IMAGE']
-        envs = [client.V1EnvVar(name=_.split('=')[0], value=_.split('=')[1])
+        envs = [client.V1EnvVar(name=_.split('=', 1)[0], value=_.split('=', 1)[1])
                for _ in env]
         command = kwargs.get('command', [])
         labels = kwargs.get('labels', {})
@@ -1032,9 +1032,9 @@ if __name__ == '__main__':
     # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
     v1 = client.CoreV1Api(cli)
 
-    name = 'test'
+    name = 'test2'
     image = 'ubuntu'
-    namespace = 'kkkdeon-example-6a7c58fd94-cluster'
+    namespace = 'kkkdeon-example-89de634c05-cluster'
     command= ["/bin/bash", "-ec", "while :; do echo 'test pod log'; sleep 5 ; done"]
 
     labels = {'MLAD.PROJECT.SERVICE': name}
