@@ -364,7 +364,10 @@ else
             fi
             if [[ `IsInstalled k3s` == '0' ]]; then
                 if [[ "$ROLE" == "master" ]]; then
-                    k3sup install --local --local-path ~/.kube/config --k3s-extra-args '--docker --no-deploy traefik --write-kubeconfig-mode 644'
+                    k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
+                        '--docker --disable traefik --write-kubeconfig-mode 644 --flannel-backend=none --disable-network-policy --cluster-cidr=10.10.0.0/16'
+                        #'--docker --disable traefik --write-kubeconfig-mode 644 --disable-network-policy --cluster-cidr=10.10.0.0/16'
+                    kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
                 elif [[ "$ROLE" == "worker" ]]; then
                     k3sup join --server-ip $MASTER_IP --user $MASTER_USER
                 else
@@ -462,8 +465,8 @@ if [[ `kubectl get ns mlad >> /dev/null 2>&1; echo $?` == "0" ]]; then
     kubectl -n mlad rollout status deployment/mlad-service
 else
     ColorEcho "Deploy MLAppDeploy service."
-    kubectl delete clusterrole controller-role
-    kubectl delete clusterrolebinding controller-role-binding
+    kubectl delete clusterrole controller-role >> /dev/null 2>&1
+    kubectl delete clusterrolebinding controller-role-binding >> /dev/null 2>&1
     cat << EOF | kubectl apply -f -
 apiVersion: v1
 kind: Namespace
