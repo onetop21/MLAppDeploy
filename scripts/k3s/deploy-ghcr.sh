@@ -452,6 +452,7 @@ else
         ColorEcho INFO "Install Ingress Using NodePort."
         kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.44.0/deploy/static/provider/baremetal/deploy.yaml
     fi
+    ColorEcho INFO "Wait to activate ingress controller...(up to 2mins)"
     kubectl wait --for=condition=available --timeout=120s -n ingress-nginx deployment.apps/ingress-nginx-controller
 fi
 
@@ -566,6 +567,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 EOF
     if [[ "$?" == "0" ]]; then
+        ColorEcho INFO "Wait to activate MLAppDeploy service...(up to 2mins)"
         kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service
         if [[ "$?" != "0" ]]; then
             ColorEcho ERROR "Cannot verify to deploy MLAppDeploy Service."
