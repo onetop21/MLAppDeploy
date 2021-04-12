@@ -365,9 +365,7 @@ else
             if [[ `IsInstalled k3s` == '0' ]]; then
                 if [[ "$ROLE" == "master" ]]; then
                     k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
-                        '--docker --disable traefik --write-kubeconfig-mode 644 --flannel-backend=none --disable-network-policy --cluster-cidr=10.10.0.0/16'
-                        #'--docker --disable traefik --write-kubeconfig-mode 644 --disable-network-policy --cluster-cidr=10.10.0.0/16'
-                    kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+                        '--docker --disable traefik --write-kubeconfig-mode 644'
                 elif [[ "$ROLE" == "worker" ]]; then
                     k3sup join --server-ip $MASTER_IP --user $MASTER_USER
                 else
