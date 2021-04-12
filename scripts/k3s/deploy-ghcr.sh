@@ -341,7 +341,11 @@ else
     if [[ "$UNINSTALL" == "1" ]]; then
         PrintStep "Uninstall Kubernetes."
         if [[ `which k3s-uninstall.sh >> /dev/null 2>&1; echo $?` == "0" ]]; then
+            ColorEcho INFO "Uninstall master node."
             sudo k3s-uninstall.sh 
+        elif [[ `which k3s-agent-uninstall.sh >> /dev/null 2>&1; echo $?` == "0" ]]; then
+            ColorEcho INFO "Uninstall worker node."
+            sudo k3s-agent-uninstall.sh 
         else
             if [[ `kubectl version >> /dev/null 2>&1; echo $?` == "0" ]]; then
                 ColorEcho ERROR "No have permission to remove kubernetes."
@@ -364,13 +368,21 @@ else
             fi
             if [[ `IsInstalled k3s` == '0' ]]; then
                 if [[ "$ROLE" == "master" ]]; then
-                    k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
-                        '--docker --disable traefik --write-kubeconfig-mode 644'
                     # Add priviledged for getting token
                     ColorEcho INFO "Set priviledge for getting token by worker."
                     echo "$USER ALL=NOPASSWD: `which cat`" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
+                    # Install k3s server
+                    k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
+                        '--docker --disable traefik --write-kubeconfig-mode 644'
                 elif [[ "$ROLE" == "worker" ]]; then
-                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER
+                    # Add priviledged for getting token
+                    ColorEcho INFO "Set priviledge for getting token by worker."
+                    echo "$USER ALL=NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
+                    cat /dev/zero | ssh-keygen -q -N "" >> /dev/null 2>&1
+                    ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $USER@127.0.0.1
+                    ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP
+                    # Install k3s agent
+                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER
                 else
                     ColorEcho WARN "Skip kubernetes installation. $ROLE is invalid role."
                 fi
