@@ -366,6 +366,9 @@ else
                 if [[ "$ROLE" == "master" ]]; then
                     k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
                         '--docker --disable traefik --write-kubeconfig-mode 644'
+                    # Add priviledged for getting token
+                    ColorEcho INFO "Set priviledge for getting token by worker."
+                    echo "$USER ALL=NOPASSWD: `which cat`" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
                 elif [[ "$ROLE" == "worker" ]]; then
                     k3sup join --server-ip $MASTER_IP --user $MASTER_USER
                 else
