@@ -29,6 +29,9 @@ def get_value(config, keys, stack=[]):
         sys.exit(1)
 
 def init(address, token):
+    # address
+    address = utils.parse_url(address)['url']
+
     # token
     user_token = input(f"MLAppDeploy User Token :")
 
@@ -41,8 +44,10 @@ def init(address, token):
         registry_address = f'http://{service_addr}:{registry_port}'
         #print(f'Detected Docker Registry[{registry_address}] on docker host.')
     registry_address = utils.prompt("Docker Registry Address", registry_address)
-    if not registry_address.startswith('https://'):
+    parsed_url = utils.parse_url(registry_address)
+    if parsed_url['scheme'] != 'https':
         warn_insecure = True
+    registry_address = parsed_url['url']
     registry_namespace = utils.prompt("Docker Registry Namespace")
     utils.generate_empty_config()
     set(*(
@@ -126,7 +131,9 @@ def _datastore_s3_initializer():
     return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
 
 def _datastore_s3_finalizer(datastore):
-    datastore['verify'] = datastore['endpoint'].startswith('https://')
+    parsed = utils.parse_url(datastore['endpoint'])
+    datastore['endpoint'] = parsed['url']
+    datastore['verify'] = parsed['scheme'] == 'https'
     return datastore
 
 def _datastore_s3_translator(kind, key, value):
@@ -165,10 +172,7 @@ def _datastore_mongodb_initializer():
 
 def _datastore_mongodb_finalizer(datastore):
     parsed = utils.parse_url(datastore['address'])
-    if parsed['port']:
-        datastore['address'] = f"mongodb://{parsed['hostname']}:{parsed['port']}"
-    else:
-        datastore['address'] = f"mongodb://{parsed['hostname']}"
+    datastore['address'] = f"mongodb://{parsed['address']}"
     return datastore
 
 ds.add_datastore('mongodb',

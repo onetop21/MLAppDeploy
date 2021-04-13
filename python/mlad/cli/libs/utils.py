@@ -207,6 +207,8 @@ def parse_url(url):
         'path':     parsed_url.path,
         'query':    parsed_url.query,
         'params':   parsed_url.params,
+        'url':      url if parsed_url.scheme else f"http://{url}",
+        'address':  url.replace(f"{parsed_url.scheme}://","") if parsed_url.scheme else url
     }
 
 def get_service_env(config):

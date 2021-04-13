@@ -201,9 +201,7 @@ def install(name_version, arguments):
 
     # set prefix to image name
     parsed_url = utils.parse_url(config.docker.registry.address)
-    registry = parsed_url['hostname']
-    if parsed_url['port']:
-        registry = f"{registry}:{parsed_url['port']}"
+    registry = parsed_url['address']
     if config.docker.registry.namespace:
         registry = f"{registry}/{config.docker.registry.namespace}"
     repository = f"{registry}/{basename}"
@@ -243,8 +241,9 @@ def install(name_version, arguments):
     credential = encoded.decode()
    
     api = API(config.mlad.address, config.mlad.token.user)
-    extra_envs = ds.get_env(default_config['client'](config)) + \
-                 utils.get_service_env(default_config['client'](config))
+    extra_envs = ds.get_env(default_config['client'](config)) 
+    #extra_envs = ds.get_env(default_config['client'](config)) + \
+    #             utils.get_service_env(default_config['client'](config))
 
     res = api.project.create({'name': inspect['project_name'], 'version': inspect['version'], 'maintainer': inspect['maintainer']},
             base_labels, extra_envs, credential=credential, swarm=True, allow_reuse=False)

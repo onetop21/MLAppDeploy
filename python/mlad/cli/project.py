@@ -310,9 +310,7 @@ def up(services):
 
     # set prefix to image name
     parsed_url = utils.parse_url(config.docker.registry.address)
-    registry = parsed_url['hostname']
-    if parsed_url['port']:
-        registry = f"{registry}:{parsed_url['port']}"
+    registry = parsed_url['address']
     if config.docker.registry.namespace:
         registry = f"{registry}/{config.docker.registry.namespace}"
     full_repository = f"{registry}/{repository}"
@@ -353,8 +351,9 @@ def up(services):
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
     credential = encoded.decode()
 
-    extra_envs = ds.get_env(default_config['client'](config)) + \
-                 utils.get_service_env(default_config['client'](config))
+    extra_envs = ds.get_env(default_config['client'](config))
+    #extra_envs = ds.get_env(default_config['client'](config)) + \
+    #             utils.get_service_env(default_config['client'](config))
 
     if not services:
         res = api.project.create(project['project'], base_labels,
