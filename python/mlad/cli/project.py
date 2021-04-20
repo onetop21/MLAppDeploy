@@ -296,10 +296,8 @@ def up(services):
     project_key = base_labels['MLAD.PROJECT']
 
     images = ctlr.get_images(cli, project_key=project_key)
-    tag_key = lambda x: chr(0xFFFF) if x[0].endswith('latest') else x[0].rsplit(':', 1)[-1]
-    images = sorted([(_, i) for i in images for _ in i.tags], key=tag_key)
-    images = [images[-1][1]]
-
+    images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
+    
     # select suitable image
     if not images:
         print(f"Cannot find built image of project [{project['project']['name']}].", file=sys.stderr)
@@ -316,6 +314,7 @@ def up(services):
     full_repository = f"{registry}/{repository}"
     image.tag(full_repository)
     base_labels['MLAD.PROJECT.IMAGE']=full_repository
+    
     # Upload Image
     print('Update plugin image to registry...')
     try:
