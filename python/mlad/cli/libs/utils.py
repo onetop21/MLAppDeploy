@@ -211,13 +211,6 @@ def parse_url(url):
         'address':  url.replace(f"{parsed_url.scheme}://","") if parsed_url.scheme else url
     }
 
-def get_service_env(config):
-    env = [
-        f'MLAD_ADDRESS={config["mlad"]["address"]}',
-        f'MLAD_USER_TOKEN={config["mlad"]["token"]["user"]}',
-    ]
-    return env
-
 def generate_unique_id(length=None):
     UUID = uuid.uuid4()
     if length:

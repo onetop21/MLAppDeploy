@@ -241,9 +241,8 @@ def install(name_version, arguments):
     credential = encoded.decode()
    
     api = API(config.mlad.address, config.mlad.token.user)
-    extra_envs = ds.get_env(default_config['client'](config)) 
-    #extra_envs = ds.get_env(default_config['client'](config)) + \
-    #             utils.get_service_env(default_config['client'](config))
+    extra_envs = ds.get_env(default_config['client'](config)) + \
+            ["MLAD_USER_TOKEN={config.mlad.token.user}"]
 
     res = api.project.create({'name': inspect['project_name'], 'version': inspect['version'], 'maintainer': inspect['maintainer']},
             base_labels, extra_envs, credential=credential, swarm=True, allow_reuse=False)

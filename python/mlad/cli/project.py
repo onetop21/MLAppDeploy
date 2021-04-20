@@ -351,8 +351,6 @@ def up(services):
     credential = encoded.decode()
 
     extra_envs = ds.get_env(default_config['client'](config))
-    #extra_envs = ds.get_env(default_config['client'](config)) + \
-    #             utils.get_service_env(default_config['client'](config))
 
     if not services:
         res = api.project.create(project['project'], base_labels,
