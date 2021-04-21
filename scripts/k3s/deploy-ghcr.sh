@@ -29,7 +29,7 @@ function Usage {
     ColorEcho      "                                    (Default: $USER)"
     ColorEcho      "    -u, --uninstall               : Uninstall kubernetes environments."
     ColorEcho      "                                    But, no remove DOCKER and NVIDIA CONTAINER RUNTIME."
-    ColorEcho WARN "Deployments"
+    ColorEcho WARN "Deployments (Skip this with worker role)"
     ColorEcho      "        --registry=[REPO/ORG]     : Change target to deploy and pulling service image."
     ColorEcho      "                                    (Default: ghcr.io/onetop21)"
     ColorEcho      "        --lb-mode                 : Set ingress service to LoadBalancer."
@@ -383,6 +383,7 @@ else
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP
                     # Install k3s agent
                     k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER
+                    ColorEcho INFO "Finish join worker node to $MASTER_IP."
                 else
                     ColorEcho WARN "Skip kubernetes installation. $ROLE is invalid role."
                 fi
@@ -393,6 +394,9 @@ else
             ColorEcho "Already installed kubernetes."
         fi
     fi
+fi
+if [[ "$ROLE" == "worker" ]]; then
+    exit 0
 fi
 
 # Check Pre-requires
