@@ -188,9 +188,10 @@ def install(name_version, arguments):
         images = ctlr.get_images(cli, project_key=project_key, extra_labels=[f"MLAD.PROJECT.IMAGE={reponame}"])
     else:
         images = ctlr.get_images(cli, project_key=project_key)
-        tag_key = lambda x: chr(0xFFFF) if x[0].endswith('latest') else x[0].rsplit(':', 1)[-1]
-        images = sorted([(_, i) for i in images for _ in i.tags], key=tag_key)
-        images = [images[-1][1]]
+        images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
+        # tag_key = lambda x: chr(0xFFFF) if x[0].endswith('latest') else x[0].rsplit(':', 1)[-1]
+        # images = sorted([(_, i) for i in images for _ in i.tags], key=tag_key)
+        # images = [images[-1][1]]
 
     # select suitable image
     if not images:
