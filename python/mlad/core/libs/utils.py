@@ -84,7 +84,7 @@ def base_labels(workspace, username, manifest, ty='project'):
     if ty == 'plugin':
         basename = f"{username}-{manifest['name']}-plugin".lower()
         key = project_key(basename)
-        default_image = f"{username}/{manifest['name']}-plugin:{manifest['version']}".lower()
+        default_image = f"{username}-{manifest['name']}-plugin:{manifest['version']}".lower()
         #default_image = f"{basename}:{manifest['version']}"
     else:
         key = project_key(workspace)

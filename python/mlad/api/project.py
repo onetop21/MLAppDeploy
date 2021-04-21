@@ -25,9 +25,15 @@ class Project():
                 'extra_envs':extra_envs, 'credential':credential},
             params={'swarm':swarm, 'allow_reuse': allow_reuse}, stream=True) as resp:
             if resp.status_code == 200:
+                res = ''
                 for _ in resp.iter_content(1024):
-                    res = _.decode()
-                    dict_res = json.loads(res)
+                    res += _.decode()
+                    try:
+                        dict_res = json.loads(res)
+                    except json.decoder.JSONDecodeError:
+                        continue
+                    else:
+                        res = ''
                     yield dict_res
             else:
                 raise APIError(f'Failed to create project : {resp.json()["detail"]}')
