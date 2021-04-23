@@ -184,6 +184,14 @@ def install(name_version, arguments):
     basename = f'{username}-{name.lower()}-plugin'
     reponame = f"{basename}:{version}"
     project_key = core_utils.project_key(basename)
+
+    manifest = utils.get_manifest('plugin', default_plugin)
+    base_labels = core_utils.base_labels(
+            utils.get_workspace(),
+            utils.get_username(config),
+            manifest['plugin'],
+            'plugin')
+
     if version != 'latest':
         images = ctlr.get_images(cli, project_key=project_key, extra_labels=[f"MLAD.PROJECT.IMAGE={reponame}"])
     else:
@@ -261,7 +269,7 @@ def install(name_version, arguments):
 
     # Check service status
     if name in [_['name'] for _ in api.service.get(project_key)['inspects']]:
-        print(f'Already running plugin[{service_name}] in cluster.', file=sys.stderr)
+        print(f'Already running plugin[{name}] in cluster.', file=sys.stderr)
         return 
 
     with interrupt_handler(message='Wait.', blocked=True) as h:
