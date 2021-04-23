@@ -237,6 +237,7 @@ function InstallNVIDIAContainerRuntime {
 
 function GetContainerdNVIDIATemplateFile {
     #sudo wget https://raw.githubusercontent.com/baidu/ote-stack/master/deployments/k3s/config.toml.tmpl -O /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+    sudo mkdir -p /var/lib/rancher/k3s/agent/etc/containerd
     sudo cp nvidia-containerd.config.toml.tmpl /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
 }
 
