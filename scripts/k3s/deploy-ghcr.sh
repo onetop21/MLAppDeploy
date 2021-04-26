@@ -235,6 +235,12 @@ function InstallNVIDIAContainerRuntime {
     sudo apt-get install -y nvidia-container-runtime
 }
 
+function GetContainerdNVIDIATemplateFile {
+    #sudo wget https://raw.githubusercontent.com/baidu/ote-stack/master/deployments/k3s/config.toml.tmpl -O /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+    sudo mkdir -p /var/lib/rancher/k3s/agent/etc/containerd
+    sudo cp nvidia-containerd.config.toml.tmpl /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+}
+
 function TouchDaemonJSON {
     # If no file
     #if [[ ! -f "$DAEMON_JSON" ]]; then
@@ -367,13 +373,18 @@ else
                 sudo install k3sup /usr/local/bin/
             fi
             if [[ `IsInstalled k3s` == '0' ]]; then
+                if [[ `IsInstalled nvidia-container-runtime` != '0' ]];
+                then
+                    GetContainerdNVIDIATemplateFile
+                fi
                 if [[ "$ROLE" == "master" ]]; then
                     # Add priviledged for getting token
                     ColorEcho INFO "Set priviledge for getting token by worker."
                     echo "$USER ALL=NOPASSWD: `which cat`" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
                     # Install k3s server
                     k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
-                        '--docker --disable traefik --write-kubeconfig-mode 644'
+                        '--disable traefik --write-kubeconfig-mode 644'
+                        #'--docker --disable traefik --write-kubeconfig-mode 644'
                 elif [[ "$ROLE" == "worker" ]]; then
                     # Add priviledged for getting token
                     ColorEcho INFO "Set priviledge for getting token by worker."
@@ -382,7 +393,7 @@ else
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $USER@127.0.0.1 >> /dev/null 2>&1
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP >> /dev/null 2>&1
                     # Install k3s agent
-                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER --k3s-extra-args "--docker"
+                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER
                     ColorEcho INFO "Finish join worker node to $MASTER_IP."
                 else
                     ColorEcho WARN "Skip kubernetes installation. $ROLE is invalid role."
