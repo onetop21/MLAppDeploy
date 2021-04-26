@@ -298,7 +298,7 @@ def uninstall(name):
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
-    except ProjectNotFound as e:
+    except NotFoundError as e:
         print(f'Already stopped plugin[{name}].', file=sys.stderr)
         return
 
@@ -326,7 +326,7 @@ def logs(tail, follow, timestamps, names_or_ids):
         project = api.project.inspect(project_key)
         logs = api.project.log(project_key, tail, follow,
             timestamps, names_or_ids)
-    except ServiceNotFound as e:
+    except NotFoundError as e:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
