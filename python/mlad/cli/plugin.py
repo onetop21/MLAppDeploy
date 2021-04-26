@@ -184,7 +184,7 @@ def install(name_version, arguments):
     username = get_username(config)
     basename = f'{username}-{name.lower()}-plugin'
     #reponame = f"{basename}:{version}"
-    image_name = f'{username}-{name.lower()}-plugin:{version}'
+    image_name = f'{username}/{name.lower()}-plugin:{version}'
     project_key = core_utils.project_key(basename)
 
     manifest = utils.get_manifest('plugin', default_plugin)
