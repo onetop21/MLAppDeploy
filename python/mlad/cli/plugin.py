@@ -24,6 +24,7 @@ from mlad.cli.Format import PLUGIN
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 from mlad.api import API
 from mlad.api.exception import APIError, NotFoundError
+#from mlad.api.exception import APIError, ProjectNotFound, ServiceNotFound
 
 @lru_cache(maxsize=None)
 def get_username(config):
@@ -182,7 +183,8 @@ def install(name_version, arguments):
     name, version = name_version.split(':') if ':' in name_version else (name_version, 'latest')
     username = get_username(config)
     basename = f'{username}-{name.lower()}-plugin'
-    reponame = f"{basename}:{version}"
+    #reponame = f"{basename}:{version}"
+    image_name = f'{username}-{name.lower()}-plugin:{version}'
     project_key = core_utils.project_key(basename)
 
     manifest = utils.get_manifest('plugin', default_plugin)
@@ -193,7 +195,7 @@ def install(name_version, arguments):
             'plugin')
 
     if version != 'latest':
-        images = ctlr.get_images(cli, project_key=project_key, extra_labels=[f"MLAD.PROJECT.IMAGE={reponame}"])
+        images = ctlr.get_images(cli, project_key=project_key, extra_labels=[f"MLAD.PROJECT.IMAGE={image_name}"])
     else:
         images = ctlr.get_images(cli, project_key=project_key)
         images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
@@ -213,7 +215,7 @@ def install(name_version, arguments):
     registry = parsed_url['address']
     if config.docker.registry.namespace:
         registry = f"{registry}/{config.docker.registry.namespace}"
-    repository = f"{registry}/{basename}"
+    repository = f"{registry}/{image_name.split(':')[0]}"
     image.tag(repository, tag=inspect['tag'])
     full_repository = f"{repository}:{inspect['tag']}"
 
@@ -296,7 +298,7 @@ def uninstall(name):
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
-    except NotFoundError as e:
+    except ProjectNotFound as e:
         print(f'Already stopped plugin[{name}].', file=sys.stderr)
         return
 
@@ -324,7 +326,7 @@ def logs(tail, follow, timestamps, names_or_ids):
         project = api.project.inspect(project_key)
         logs = api.project.log(project_key, tail, follow,
             timestamps, names_or_ids)
-    except NotFoundError as e:
+    except ServiceNotFound as e:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
