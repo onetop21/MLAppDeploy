@@ -193,15 +193,10 @@ def install(name_version, arguments):
             manifest['plugin'],
             'plugin')
 
-    basename = base_labels['MLAD.PROJECT.BASE']
-    username = base_labels['MLAD.PROJECT.USERNAME']
-    image_name = base_labels['MLAD.PROJECT.IMAGE']
-    project_key = base_labels['MLAD.PROJECT']
-    print('***')
-    print(username)
-    print(basename)
-    print(image_name)
-    print(project_key)
+    # basename = base_labels['MLAD.PROJECT.BASE']
+    # username = base_labels['MLAD.PROJECT.USERNAME']
+    # image_name = base_labels['MLAD.PROJECT.IMAGE']
+    # project_key = base_labels['MLAD.PROJECT']
 
     if version != 'latest':
         images = ctlr.get_images(cli, project_key=project_key, extra_labels=[f"MLAD.PROJECT.IMAGE={image_name}"])
