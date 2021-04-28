@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from starlette.types import Receive
 from mlad.service.models import project
-from mlad.service.exception import InvalidProjectError, InvalidServiceError
+from mlad.service.exception import InvalidProjectError, InvalidServiceError, exception_detail
 from mlad.service.libs import utils
 if not utils.is_kube_mode():
     from mlad.core.docker import controller as ctlr
@@ -34,9 +34,9 @@ def project_create(req: project.CreateRequest,
             for _ in gen:
                 yield json.dumps(_)
     except TypeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e))
     return StreamingResponse(create_project(res))
 
 @router.get("/project")
@@ -49,7 +49,7 @@ def projects(extra_labels: str = ''):
         else:
             projects = [ ctlr.inspect_project_network(v) for k, v in networks.items()]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return projects
 
 
@@ -66,9 +66,9 @@ def project_inspect(project_key:str):
         else:
             inspect = ctlr.inspect_project_network(network)
     except InvalidProjectError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return inspect
 
 @router.delete("/project/{project_key}")
@@ -85,9 +85,9 @@ def project_remove(project_key:str):
             for _ in gen:
                 yield json.dumps(_)
     except InvalidProjectError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return StreamingResponse(remove_project(res))
 
 
@@ -131,10 +131,10 @@ def project_log(project_key: str, tail:str = Query('all'),
 
 
     except InvalidProjectError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidServiceError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return StreamingResponse(get_logs(logs), background=handler)
 

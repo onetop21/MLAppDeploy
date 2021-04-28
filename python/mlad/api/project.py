@@ -36,7 +36,8 @@ class Project():
                         res = ''
                     yield dict_res
             else:
-                raise APIError(f'Failed to create project : {resp.json()["detail"]}', resp)
+                raise APIError(f'Failed to create project : '
+                               f'{resp.json()["detail"]["msg"]}', resp)
 
     def inspect(self, project_key):
         url = f'{self.url}/{project_key}'
@@ -55,9 +56,11 @@ class Project():
                     dict_res = json.loads(res)
                     yield dict_res
             elif resp.status_code == 404: 
-                raise ProjectNotFound(f'Failed to delete project : {resp.json()["detail"]}', resp)
+                raise ProjectNotFound(f'Failed to delete project : '
+                                      f'{resp.json()["detail"]["msg"]}', resp)
             else: 
-                raise APIError(f'Failed to delete project : {resp.json()["detail"]}', resp)
+                raise APIError(f'Failed to delete project : '
+                               f'{resp.json()["detail"]["msg"]}', resp)
 
     def log(self, project_key, tail='all', 
             follow=False, timestamps=False, names_or_ids=[]):
@@ -77,13 +80,16 @@ class Project():
                             except json.JSONDecodeError as e:
                                 print(f"[Ignored] Stream Broken : {e}", file=sys.stderr)
                     elif status_code == 404:
-                        msg = json.loads(resp.text)['detail']
-                        if 'Cannot find project' in msg:
+                        detail = json.loads(resp.text)['detail']
+                        reason = detail['reason']
+                        msg = detail['msg']
+                        if reason == 'ProjectNotFound':
                             raise ProjectNotFound(f'Failed to get logs : {msg}', resp)
                         else:
                             raise ServiceNotFound(f'Failed to get logs : {msg}', resp)
                     else:
-                        msg = json.loads(resp.text)['detail']
+                        detail = json.loads(resp.text)['detail']
+                        msg = detail['msg']
                         raise APIError(f'Failed to get logs : {msg}', resp)
                 break
             except requests.exceptions.ChunkedEncodingError as e:

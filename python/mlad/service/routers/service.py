@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from mlad.core.exception import APIError
 from mlad.service.models import service
-from mlad.service.exception import InvalidProjectError,InvalidServiceError
+from mlad.service.exception import InvalidProjectError,InvalidServiceError, exception_detail
 from mlad.service.libs import utils
 if not utils.is_kube_mode():
     from mlad.core.docker import controller as ctlr
@@ -42,9 +42,9 @@ def services_list(labels: List[str] = Query(None)):
                 inspect = ctlr.inspect_service(service)
             inspects.append(inspect)    
     except InvalidProjectError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'mode':MODE, 'inspects':inspects}
 
 @router.get("/project/{project_key}/service")
@@ -72,9 +72,9 @@ def service_list(project_key:str,
                 inspect = ctlr.inspect_service(service)
             inspects.append(inspect)      
     except InvalidProjectError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'mode':MODE, 'inspects':inspects}
     #return [_.short_id for _ in services.values()]
 
@@ -89,11 +89,11 @@ def service_create(project_key:str, req:service.CreateRequest):
             raise InvalidProjectError(project_key)
         services = ctlr.create_services(cli, network, targets)
     except InvalidProjectError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except APIError as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e.msg))
+        raise HTTPException(status_code=e.status_code, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     if utils.is_kube_mode():
         return [_.metadata.uid for _ in services]
     else :
@@ -111,9 +111,9 @@ def service_inspect(project_key:str, service_id:str):
             else:
                 inspects = ctlr.inspect_service(service)
     except InvalidServiceError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return inspects
     #return {'mode':MODE, 'inspects':inspects}
 
@@ -130,9 +130,9 @@ def service_tasks(project_key:str, service_id:str):
             else:
                 tasks= ctlr.inspect_service(service)['tasks']
     except InvalidServiceError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return tasks
 
 
@@ -151,9 +151,9 @@ def service_scale(project_key:str, service_id:str,
         # if _check_project_key(project_key, service):
         #     service.scale(req.scale_spec)
     except InvalidServiceError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message':f'service {service_id} scale updated'}
 
 
@@ -170,9 +170,9 @@ def service_remove(project_key: str, service_id: str, stream: bool = Query(False
                 yield json.dumps(_)
 
     except InvalidServiceError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
         return StreamingResponse(remove_service(res))
     else:
@@ -194,9 +194,9 @@ def services_remove(project_key: str, req: service.RemoveRequest, stream: bool =
                 yield json.dumps(_)
 
     except InvalidServiceError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
         return StreamingResponse(remove_service(res))
     else:

@@ -55,9 +55,11 @@ class Service():
                         dict_res = json.loads(res)
                         yield dict_res
                 elif resp.status_code == 404:
-                    raise ServiceNotFound(f'Failed to delete service : {resp.json()["detail"]}', resp)
+                    raise ServiceNotFound(f'Failed to delete service : '
+                                          f'{resp.json()["detail"]["msg"]}', resp)
                 else:
-                    raise APIError(f'Failed to delete service : {resp.json()["detail"]}', resp)
+                    raise APIError(f'Failed to delete service : '
+                                   f'{resp.json()["detail"]["msg"]}', resp)
         else:
             res = requests.delete(url=url, params={'stream': stream})
             raise_error(res)
@@ -74,9 +76,11 @@ class Service():
                         dict_res = json.loads(res)
                         yield dict_res
                 elif resp.status_code == 404:
-                    raise ServiceNotFound(f'Failed to delete service : {resp.json()["detail"]}', resp)
+                    raise ServiceNotFound(f'Failed to delete service : '
+                                          f'{resp.json()["detail"]["msg"]}', resp)
                 else:
-                    raise APIError(f'Failed to delete service : {resp.json()["detail"]}', resp)
+                    raise APIError(f'Failed to delete service : '
+                                   f'{resp.json()["detail"]["msg"]}', resp)
         else:
             res = requests.delete(url=url, json={'services': services}, params={'stream': stream})
             raise_error(res)

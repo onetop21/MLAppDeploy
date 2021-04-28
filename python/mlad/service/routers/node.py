@@ -22,7 +22,7 @@ def node_list():
         nodes = ctlr.get_nodes(cli)
     except Exception as e:
         logger.error(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return list(nodes.keys())
 
 @user_router.get("/node/{node_id}")
@@ -33,10 +33,10 @@ def node_inspect(node_id:str):
         inspects = ctlr.inspect_node(node)
     except exception.NotFound as e:
         logger.error(e)
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return inspects
 
 @admin_router.post("/node/{node_id}/enable")
@@ -46,10 +46,10 @@ def node_enable(node_id:str):
         ctlr.enable_node(cli, node_id)
     except exception.NotFound as e:
         logger.error(e)
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': f'{node_id} enabled'}
 
 @admin_router.post("/node/{node_id}/disable")
@@ -59,10 +59,10 @@ def node_disable(node_id:str):
         ctlr.disable_node(cli, node_id)
     except exception.NotFound as e:
         logger.error(e)
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
-        raise HTTPException(status_code=500, detail=str(e))    
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': f'{node_id} disabled'}
 
 @admin_router.post("/node/{node_id}/labels")
@@ -72,10 +72,10 @@ def node_add_label(node_id:str, req:node.AddLabelRequest):
         ctlr.add_node_labels(cli, node_id, **req.labels)
     except exception.NotFound as e:
         logger.error(e)
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
-        raise HTTPException(status_code=500, detail=str(e))  
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': 'labels added'}
 
 @admin_router.delete("/node/{node_id}/labels")
@@ -85,8 +85,8 @@ def node_delete_label(node_id:str, req:node.DeleteLabelRequest):
         ctlr.remove_node_labels(cli, node_id, *req.keys)
     except exception.NotFound as e:
         logger.error(e)
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': 'labels deleted'}

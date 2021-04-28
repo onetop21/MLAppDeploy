@@ -16,3 +16,23 @@ class InvalidServiceError(Exception):
 
 class TokenError(Exception):
     pass
+
+
+def exception_detail(e):
+    exception=e.__class__.__name__
+    msg = str(e)
+
+    if 'NotFound' in exception:
+        exception = 'NotFound'
+
+    if exception == 'InvalidServiceError':
+        reason = 'ServiceNotFound'
+    elif exception == 'InvalidProjectError':
+        reason = 'ProjectNotFound'
+    elif exception == 'TokenError':
+        reason = exception
+    else:
+        reason = 'InternalError'
+        # reason = exception
+
+    return {'msg': msg, 'reason': reason}

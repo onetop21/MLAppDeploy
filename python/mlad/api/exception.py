@@ -30,11 +30,13 @@ class ServiceNotFound(NotFound):
     pass
 
 def error_from_http_errors(e):
-    msg = e.response.json()['detail'] # msg from mlad service http error
+    detail = e.response.json()['detail'] # msg from mlad service http error
+    msg = detail['msg']
+    reason = detail['reason']
     if e.response.status_code == 404:
-        if msg and 'Cannot find project' in str(msg):
+        if reason == 'ProjectNotFound':
             cls = ProjectNotFound
-        elif msg and 'Cannot find service' in str(msg):
+        elif reason == 'ServiceNotFound':
             cls = ServiceNotFound
         else:
             cls = Notfound
