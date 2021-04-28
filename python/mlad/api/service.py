@@ -1,6 +1,6 @@
 import json
 import requests
-from .exception import APIError, NotFoundError, raise_error
+from .exception import APIError, ServiceNotFound, raise_error
 
 class Service():
     def __init__(self, url):
@@ -55,9 +55,9 @@ class Service():
                         dict_res = json.loads(res)
                         yield dict_res
                 elif resp.status_code == 404:
-                    raise NotFoundError(f'Failed to delete service : {resp.json()["detail"]}')
+                    raise ServiceNotFound(f'Failed to delete service : {resp.json()["detail"]}', resp)
                 else:
-                    raise APIError(f'Failed to delete service : {resp.json()["detail"]}')
+                    raise APIError(f'Failed to delete service : {resp.json()["detail"]}', resp)
         else:
             res = requests.delete(url=url, params={'stream': stream})
             raise_error(res)
@@ -74,9 +74,9 @@ class Service():
                         dict_res = json.loads(res)
                         yield dict_res
                 elif resp.status_code == 404:
-                    raise NotFoundError(f'Failed to delete service : {resp.json()["detail"]}')
+                    raise ServiceNotFound(f'Failed to delete service : {resp.json()["detail"]}', resp)
                 else:
-                    raise APIError(f'Failed to delete service : {resp.json()["detail"]}')
+                    raise APIError(f'Failed to delete service : {resp.json()["detail"]}', resp)
         else:
             res = requests.delete(url=url, json={'services': services}, params={'stream': stream})
             raise_error(res)

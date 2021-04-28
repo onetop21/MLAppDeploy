@@ -4,7 +4,7 @@ from pathlib import Path
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
 from mlad.api import API
-from mlad.api.exception import APIError, NotFoundError
+from mlad.api.exception import APIError, NotFound
 
 def list(no_trunc):
     config = utils.read_config()

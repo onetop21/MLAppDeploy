@@ -12,7 +12,7 @@ from functools import lru_cache
 from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from mlad.api import API
-from mlad.api.exception import APIError, NotFoundError
+from mlad.api.exception import APIError
 
 HOME = str(Path.home())
 

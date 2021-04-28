@@ -23,7 +23,7 @@ from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 from mlad.api import API
-from mlad.api.exception import APIError, NotFoundError
+from mlad.api.exception import APIError, NotFound
 
 @lru_cache(maxsize=None)
 def get_username(config):
@@ -135,7 +135,7 @@ def status(all, no_trunc):
     # Block not running.
     try:
         inspect = api.project.inspect(project_key=project_key)
-    except NotFoundError as e:
+    except NotFound as e:
         print('Cannot find running project.', file=sys.stderr)
         sys.exit(1)
 
@@ -168,7 +168,7 @@ def status(all, no_trunc):
                             ', '.join([_ for _ in inspect['ports']]),
                             task['Status']['Err'] if 'Err' in task['Status'] else '-'
                         ))
-            except NotFoundError as e:
+            except ServiceNotFound as e:
                 pass
         
         columns = [('ID', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'UPTIME', 'PORTS', 'ERROR')]
@@ -211,7 +211,7 @@ def status(all, no_trunc):
                             restart_cnt,
                             uptime
                         ))
-            except NotFoundError as e:
+            except NotFound as e:
                 pass
         columns = [('NAME', 'SERVICE', 'NODE','PHASE', 'STATUS','RESTART', 'AGE')]
         columns_data = []
@@ -412,7 +412,7 @@ def down(services, no_dump):
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
-    except NotFoundError as e:
+    except NotFound as e:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
 
@@ -504,7 +504,7 @@ def logs(tail, follow, timestamps, names_or_ids):
         project = api.project.inspect(project_key)
         logs = api.project.log(project_key, tail, follow,
             timestamps, names_or_ids)
-    except NotFoundError as e:
+    except NotFound as e:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
@@ -524,7 +524,7 @@ def scale(scales):
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = api.project.inspect(project_key)
-    except NotFoundError as e:
+    except NotFound as e:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 

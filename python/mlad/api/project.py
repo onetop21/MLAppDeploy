@@ -1,7 +1,7 @@
 import sys
 import json
 import requests
-from .exception import APIError, NotFoundError, raise_error
+from .exception import APIError, ProjectNotFound, ServiceNotFound, raise_error
 
 class Project():
     def __init__(self, url, token):
@@ -36,7 +36,7 @@ class Project():
                         res = ''
                     yield dict_res
             else:
-                raise APIError(f'Failed to create project : {resp.json()["detail"]}')
+                raise APIError(f'Failed to create project : {resp.json()["detail"]}', resp)
 
     def inspect(self, project_key):
         url = f'{self.url}/{project_key}'
@@ -55,9 +55,9 @@ class Project():
                     dict_res = json.loads(res)
                     yield dict_res
             elif resp.status_code == 404: 
-                raise NotFoundError(f'Failed to delete project : {resp.json()["detail"]}')
+                raise ProjectNotFound(f'Failed to delete project : {resp.json()["detail"]}', resp)
             else: 
-                raise APIError(f'Failed to delete project : {resp.json()["detail"]}')
+                raise APIError(f'Failed to delete project : {resp.json()["detail"]}', resp)
 
     def log(self, project_key, tail='all', 
             follow=False, timestamps=False, names_or_ids=[]):
@@ -69,14 +69,22 @@ class Project():
         while True:
             try:
                 with requests.get(url=url,params=params, stream=True, headers=header) as resp:
-                    if resp.status_code == 200:
+                    status_code = resp.status_code
+                    if status_code == 200:
                         for _ in resp.iter_content(1024):
                             try:
                                 yield json.loads(_.decode())
                             except json.JSONDecodeError as e:
                                 print(f"[Ignored] Stream Broken : {e}", file=sys.stderr)
+                    elif status_code == 404:
+                        msg = json.loads(resp.text)['detail']
+                        if 'Cannot find project' in msg:
+                            raise ProjectNotFound(f'Failed to get logs : {msg}', resp)
+                        else:
+                            raise ServiceNotFound(f'Failed to get logs : {msg}', resp)
                     else:
-                        raise APIError(f'Failed to get logs : {resp.json()["detail"]}')
+                        msg = json.loads(resp.text)['detail']
+                        raise APIError(f'Failed to get logs : {msg}', resp)
                 break
             except requests.exceptions.ChunkedEncodingError as e:
                 print(f"[Retry] {e}", file=sys.stderr)

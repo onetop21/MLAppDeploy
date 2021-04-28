@@ -2,34 +2,45 @@ from requests.exceptions import HTTPError
 
 
 class APIError(Exception):
-    msg: str
-
-    def __init__(self, msg):
+    def __init__(self, msg, response=None):
         if isinstance(msg, list):
             msg = str(msg)
         self.msg = msg
+        self.response = response
 
     def __str__(self):
         return self.msg
 
+    @property
+    def status_code(self):
+        if self.response:
+            return self.response.status_code
 
-class NotFoundError(APIError):
-    msg: str
+    @property
+    def reason(self):
+        return self.__class__.__name__
 
-    def __init__(self, msg):
-        self.msg = msg
+class NotFound(APIError):
+    pass
 
-    def __str__(self):
-        return self.msg
+class ProjectNotFound(NotFound):
+    pass
 
+class ServiceNotFound(NotFound):
+    pass
 
 def error_from_http_errors(e):
-    detail = e.response.json()['detail']
+    msg = e.response.json()['detail'] # msg from mlad service http error
     if e.response.status_code == 404:
-        cls = NotFoundError
+        if msg and 'Cannot find project' in str(msg):
+            cls = ProjectNotFound
+        elif msg and 'Cannot find service' in str(msg):
+            cls = ServiceNotFound
+        else:
+            cls = Notfound
     else:
         cls = APIError
-    raise cls(detail)
+    raise cls(msg, e.response)
 
 
 def raise_error(response):

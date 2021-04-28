@@ -610,7 +610,6 @@ def create_services(cli, network, services, extra_labels={}):
                 ingress_path = f"/plugins/{project_info['username']}/{name}"
             envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
             config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
-        print(config_labels)
 
         # Secrets
         secrets = f"{project_base}-auth"
@@ -942,29 +941,39 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False)
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[], disconnHandler=None):
-    api = client.CoreV1Api(cli)
+def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
     services = get_services(cli, project_key)
-    namespace = get_project_network(cli, project_key=project_key).metadata.name
     selected = []
-    
     sources = [(_['name'], list(_['tasks'].keys())) for _ in [inspect_service(cli, _) for _ in services.values()]]
-
     if names_or_ids:
         selected = []
         for _ in sources:
             if _[0] in names_or_ids:
                 selected += [(_[0], __) for __ in _[1]]
-                #selected.append(_[:2])
+                ##selected.append(_[:2])
+                names_or_ids.remove(_[0])
             else:
-                selected += [(_[0], __) for __ in _[1] if __ in names_or_ids]
+                #check task ids of svc
+                for __ in _[1]:
+                    if __ in names_or_ids:
+                        selected += [(_[0], __)]
+                        names_or_ids.remove(__)
+                #selected += [(_[0], __) for __ in _[1] if __ in names_or_ids]
+        #names_or_ids += ['error']
+        if names_or_ids:
+            print(names_or_ids)
+            raise exception.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
+
     else:
         for _ in sources:
             selected += [(_[0], __) for __ in _[1]]
-        #selected = [_[:2] for _ in sources]
 
-    # resources = [api.read_namespaced_pod(name=target, namespace=namespace).metadata.resource_version
-    #              for _, target in selected]
+    return selected
+
+def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[], disconnHandler=None, selected=[]):
+    api = client.CoreV1Api(cli)
+    services = get_services(cli, project_key)
+    namespace = get_project_network(cli, project_key=project_key).metadata.name
 
     handler = LogHandler(cli)
 
@@ -987,6 +996,7 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
             #for message in collector:
             #    yield message
     else:
+        raise exception.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
         print('Cannot find running containers.', file=sys.stderr)
 
 def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=False):

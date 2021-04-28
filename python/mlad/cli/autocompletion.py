@@ -6,7 +6,7 @@ from mlad.core.default import project as default_project
 from mlad.core.docker import controller as ctlr
 from mlad.cli.libs import utils
 from mlad.api import API
-from mlad.api.exception import APIError, NotFoundError
+from mlad.api.exception import APIError
 
 def get_project_file_completion(ctx, args, incomplete):
     files = glob.glob(f"{incomplete}*" or '*')    

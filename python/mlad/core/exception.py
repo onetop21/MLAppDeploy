@@ -17,8 +17,7 @@ class NotFound(Exception):
     pass
 
 class APIError(Exception):
-    status_code: int
-    msg: str
+    #k8s api error
     def __init__(self, msg, status_code):
         self.msg = msg
         self.status_code = status_code

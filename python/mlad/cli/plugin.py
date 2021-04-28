@@ -23,8 +23,7 @@ from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PLUGIN
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 from mlad.api import API
-from mlad.api.exception import APIError, NotFoundError
-#from mlad.api.exception import APIError, ProjectNotFound, ServiceNotFound
+from mlad.api.exception import APIError, NotFound
 
 @lru_cache(maxsize=None)
 def get_username(config):
@@ -194,6 +193,16 @@ def install(name_version, arguments):
             manifest['plugin'],
             'plugin')
 
+    basename = base_labels['MLAD.PROJECT.BASE']
+    username = base_labels['MLAD.PROJECT.USERNAME']
+    image_name = base_labels['MLAD.PROJECT.IMAGE']
+    project_key = base_labels['MLAD.PROJECT']
+    print('***')
+    print(username)
+    print(basename)
+    print(image_name)
+    print(project_key)
+
     if version != 'latest':
         images = ctlr.get_images(cli, project_key=project_key, extra_labels=[f"MLAD.PROJECT.IMAGE={image_name}"])
     else:
@@ -298,7 +307,7 @@ def uninstall(name):
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
-    except NotFoundError as e:
+    except NotFound as e:
         print(f'Already stopped plugin[{name}].', file=sys.stderr)
         return
 
@@ -326,7 +335,7 @@ def logs(tail, follow, timestamps, names_or_ids):
         project = api.project.inspect(project_key)
         logs = api.project.log(project_key, tail, follow,
             timestamps, names_or_ids)
-    except NotFoundError as e:
+    except NotFound as e:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
