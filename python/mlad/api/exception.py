@@ -29,6 +29,9 @@ class ProjectNotFound(NotFound):
 class ServiceNotFound(NotFound):
     pass
 
+class InvalidLogRequest(NotFound):
+    pass
+
 def error_from_http_errors(e):
     detail = e.response.json()['detail'] # msg from mlad service http error
     msg = detail['msg']
@@ -40,6 +43,11 @@ def error_from_http_errors(e):
             cls = ServiceNotFound
         else:
             cls = Notfound
+    elif e.response.status_code == 400:
+        if reason == 'ServiceNotRunning':
+            cls = InvalidLogRequest
+        else:
+            cls = APIError
     else:
         cls = APIError
     raise cls(msg, e.response)

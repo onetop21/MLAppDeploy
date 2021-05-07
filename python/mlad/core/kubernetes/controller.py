@@ -942,7 +942,10 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False)
         print('Cannot find running containers.', file=sys.stderr)
 
 def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
+    api = client.CoreV1Api(cli)
     services = get_services(cli, project_key)
+    namespace = get_project_network(cli, project_key=project_key).metadata.name
+
     selected = []
     sources = [(_['name'], list(_['tasks'].keys())) for _ in [inspect_service(cli, _) for _ in services.values()]]
     if names_or_ids:
@@ -961,14 +964,26 @@ def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
                 #selected += [(_[0], __) for __ in _[1] if __ in names_or_ids]
         #names_or_ids += ['error']
         if names_or_ids:
-            print(names_or_ids)
             raise exception.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
 
     else:
         for _ in sources:
             selected += [(_[0], __) for __ in _[1]]
 
-    return selected
+    # check whether targets are pending or not
+    targets = []
+    for target in selected:
+        pod = api.read_namespaced_pod(name=target[1], namespace=namespace)
+        phase = get_pod_info(pod)['phase']
+        if not phase == 'Pending':
+            targets.append(target)
+        else:
+            print(f'Cannot get logs of pending service: {target[1]}')
+
+    if not targets:
+        raise exception.NotFound("Cannot find running services")
+
+    return targets
 
 def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[], disconnHandler=None, selected=[]):
     api = client.CoreV1Api(cli)
@@ -996,7 +1011,6 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
             #for message in collector:
             #    yield message
     else:
-        raise exception.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
         print('Cannot find running containers.', file=sys.stderr)
 
 def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=False):

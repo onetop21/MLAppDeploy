@@ -14,6 +14,10 @@ class InvalidServiceError(Exception):
         return (f'Cannot find service {self.service_id} '
                f'in project {self.project_id}')
 
+class InvalidLogRequest(Exception):
+    pass
+
+
 class TokenError(Exception):
     pass
 
@@ -29,6 +33,8 @@ def exception_detail(e):
         reason = 'ServiceNotFound'
     elif exception == 'InvalidProjectError':
         reason = 'ProjectNotFound'
+    elif exception == 'InvalidLogRequest':
+        reason = 'ServiceNotRunning'
     elif exception == 'TokenError':
         reason = exception
     else:

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from starlette.types import Receive
 from mlad.service.models import project
-from mlad.service.exception import InvalidProjectError, InvalidServiceError, exception_detail
+from mlad.service.exception import InvalidProjectError, InvalidServiceError, InvalidLogRequest, exception_detail
 from mlad.service.libs import utils
 if not utils.is_kube_mode():
     from mlad.core.docker import controller as ctlr
@@ -106,8 +106,11 @@ def project_log(project_key: str, tail:str = Query('all'),
         try:
             targets = ctlr.get_service_with_names_or_ids(cli, key, names_or_ids)
         except exception.NotFound as e:
-            services = str(e).split(': ')[1]
-            raise InvalidServiceError(project_key, services)
+            if 'running' in str(e):
+                raise InvalidLogRequest("Cannot find running services.")
+            else:
+                services = str(e).split(': ')[1]
+                raise InvalidServiceError(project_key, services)
 
         class disconnectHandler:
             def __init__(self):
@@ -122,6 +125,7 @@ def project_log(project_key: str, tail:str = Query('all'),
         logs = ctlr.get_project_logs(cli, key,
             tail, follow, timestamps, names_or_ids, handler, targets)
 
+
         def get_logs(logs):
             for _ in logs:
                 _['stream']=_['stream'].decode()
@@ -134,6 +138,8 @@ def project_log(project_key: str, tail:str = Query('all'),
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
+    except InvalidLogRequest as e:
+        raise HTTPException(status_code=400, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return StreamingResponse(get_logs(logs), background=handler)

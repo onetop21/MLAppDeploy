@@ -1,7 +1,7 @@
 import sys
 import json
 import requests
-from .exception import APIError, ProjectNotFound, ServiceNotFound, raise_error
+from .exception import APIError, ProjectNotFound, ServiceNotFound, InvalidLogRequest, raise_error
 
 class Project():
     def __init__(self, url, token):
@@ -87,6 +87,10 @@ class Project():
                             raise ProjectNotFound(f'Failed to get logs : {msg}', resp)
                         else:
                             raise ServiceNotFound(f'Failed to get logs : {msg}', resp)
+                    elif status_code == 400:
+                        detail = json.loads(resp.text)['detail']
+                        msg = detail['msg']
+                        raise InvalidLogRequest(f'Failed to get logs : {msg}', resp)
                     else:
                         detail = json.loads(resp.text)['detail']
                         msg = detail['msg']
