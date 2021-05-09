@@ -3,6 +3,28 @@ kind: Namespace
 metadata:
   name: mlad
 ---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: controller-role
+rules:
+- apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io"]
+  resources: ["nodes", "namespaces", "services", "pods", "pods/log", "replicationcontrollers", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "rolebindings", "ingresses"]
+  verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: controller-role-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: mlad
+roleRef:
+  kind: ClusterRole
+  name: controller-role
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,9 +40,10 @@ spec:
       labels:
         app: mlad-service
     spec:
+      terminationGracePeriodSeconds: 10
       containers:
         - name: mlad-service
-          image: $REGISTRY/mlad/service:latest
+          image: ghcr.io/onetop21/mlappdeploy/service
           env:
             - name: MLAD_DEBUG
               value: "1"
@@ -31,6 +54,8 @@ spec:
           ports:
           - name: http
             containerPort: 8440
+      imagePullSecrets:
+        - name: regcred
 ---
 kind: Service
 apiVersion: v1
@@ -57,42 +82,14 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    #kubernetes.io/ingress.class: traefik
+    #traefik.frontend.rule.type: PathPrefixStrip
 spec:
   rules:
   - http:
       paths:
       - path: /
+        #pathType: Prefix
         backend:
           serviceName: mlad-service
           servicePort: 8440
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: controller-role
-rules:
-- apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io"]
-  resources: ["nodes", "namespaces", "services", "pods", "pods/log", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "rolebindings", "ingresses"]
-  verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-    name: controller-role-binding
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: mlad
-roleRef:
-  kind: ClusterRole
-  name: controller-role
-  apiGroup: rbac.authorization.k8s.io
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: service-role
-rules:
-- apiGroups: ["", "apps", "batch", "extensions", "networking.k8s.io"]
-  resources: ["services", "pods", "pods/log", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "ingresses"]
-  verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
