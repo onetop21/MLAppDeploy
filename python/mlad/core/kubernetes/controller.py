@@ -942,6 +942,7 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False)
         print('Cannot find running containers.', file=sys.stderr)
 
 def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
+    # get running services with service or pod name
     api = client.CoreV1Api(cli)
     services = get_services(cli, project_key)
     namespace = get_project_network(cli, project_key=project_key).metadata.name
@@ -985,15 +986,17 @@ def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
 
     return targets
 
-def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False, names_or_ids=[], disconnHandler=None, selected=[]):
+def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False,
+                     selected=False, disconnHandler=None, targets=[]):
     api = client.CoreV1Api(cli)
     services = get_services(cli, project_key)
     namespace = get_project_network(cli, project_key=project_key).metadata.name
 
     handler = LogHandler(cli)
 
-    #logs = [(service_name, handler.logs(namespace, target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
-    logs = [(target, handler.logs(namespace, target, details=True, follow=follow, tail=tail, timestamps=timestamps, stdout=True, stderr=True)) for service_name, target in selected]
+    logs = [(target, handler.logs(namespace, target, details=True, follow=follow,
+                                  tail=tail, timestamps=timestamps, stdout=True, stderr=True))
+            for service_name, target in targets]
 
     if len(logs):
         with LogCollector() as collector:
@@ -1001,7 +1004,7 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
                 collector.add_iterable(log, name=name, timestamps=timestamps)
             # Register Disconnect Callback
             disconnHandler.add_callback(lambda: handler.close())
-            if follow:
+            if follow and not selected:
                 last_resource = None
                 monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
                                      follow=follow, tail=tail, timestamps=timestamps)

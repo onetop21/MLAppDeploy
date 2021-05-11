@@ -97,6 +97,7 @@ def project_log(project_key: str, tail:str = Query('all'),
                 timestamps: bool = Query(False),
                 names_or_ids: list = Query(None)):
     cli = ctlr.get_api_client()
+    selected = True if names_or_ids else False
     try:
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(cli, project_key=key)
@@ -123,7 +124,7 @@ def project_log(project_key: str, tail:str = Query('all'),
         handler = disconnectHandler()
 
         logs = ctlr.get_project_logs(cli, key,
-            tail, follow, timestamps, names_or_ids, handler, targets)
+            tail, follow, timestamps, selected, handler, targets)
 
 
         def get_logs(logs):
