@@ -11,6 +11,7 @@ from kubernetes.client import models
 import requests
 from mlad.core import exception
 from mlad.core.libs import utils
+from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 from mlad.core.default import project_service as service_default
 from kubernetes import client, config, watch
@@ -666,7 +667,7 @@ def _delete_replication_controller(cli, name, namespace):
     return api.delete_namespaced_replication_controller(name, 
         namespace, propagation_policy='Foreground')
 
-def remove_services(cli, services, timeout=0xFFFF, stream=False):
+def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=False):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     network_api = client.NetworkingV1beta1Api(cli)
@@ -687,6 +688,14 @@ def remove_services(cli, services, timeout=0xFFFF, stream=False):
         service_name, namespace, kind, _ = _get_service_info(service)
         service_to_check.append((service_name, namespace, kind, _))
 
+    # For check service deleted
+    collector = Collector()
+    monitor = DelMonitor(cli, collector, service_to_check, namespace)
+    monitor.start()
+    disconnHandler.add_callback(lambda: monitor.stop())
+
+    for service in service_to_check:
+        service_name, namespace, kind, _ = service
         print(f"Stop {service_name}...")
         ret = api.delete_namespaced_service(service_name, namespace)
         if kind == 'job':
@@ -702,48 +711,9 @@ def remove_services(cli, services, timeout=0xFFFF, stream=False):
         except ApiException as e:
             print("Exception when calling ExtensionsV1beta1Api->delete_namespaced_ingress: %s\n" % e)
 
-    #TODO TBD : down stream using k8s watch
-    def resp_stream_watch():
-        import urllib3
-        all_targets=[]
-        services={}
-        for service in service_to_check:
-            name, namespace, _, targets = service
-            services[name] = targets
-            all_targets.extend(targets)
-        w = watch.Watch()
-        print(f'Watch start to check service removed')
-        service_removed = False
-        message = f"Wait to remove services..\n"
-        yield {'stream': message}
-        try:
-            for ev in w.stream(api.list_namespaced_pod, namespace=namespace,  _request_timeout=timeout):
-                event = ev['type']
-                pod = ev['object'].metadata.name
-                service = ev['object'].metadata.labels['MLAD.PROJECT.SERVICE']
-                print(event, pod)
-                if event == 'DELETED':
-                    if pod in services[service]:
-                        services[service].remove(pod)
-                        if not services[service]:
-                            message = f"Service {service} removed."
-                            yield {'result': 'succeed', 'stream': message}
-                        all_targets.remove(pod)
-                        if not all_targets:
-                            service_removed = True
-                            break
-        except urllib3.exceptions.ReadTimeoutError as e: #for timeout
-            pass
-        if service_removed:
-            message = f"All Service removed."
-            print(message)
-        else:
-            for svc, target in services.items():
-                if target:
-                    message = f"Failed to remove service {svc}."
-                    yield {'result': 'failed', 'stream': message}
-        yield {'result': 'completed'}
-
+    def resp_from_collector(collector):
+        for _ in collector:
+            yield  _
 
     #TODO TBD : down stream using time loop
     def resp_stream():
@@ -770,7 +740,7 @@ def remove_services(cli, services, timeout=0xFFFF, stream=False):
 
     if stream:
         #return resp_stream()
-        return resp_stream_watch()
+        return resp_from_collector(collector)
     else:
         #TBD
         removed = False

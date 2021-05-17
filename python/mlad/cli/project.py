@@ -468,12 +468,10 @@ def down(services, no_dump):
                     if not 'result' in _:
                         sys.stdout.write(_['stream'])
                     if 'result' in _:
-                        if _['result'] == 'succeed':
-                            print(_['stream'])
-                        elif _['result'] == 'failed':
-                            print(_['stream'])
-                        elif _['result'] == 'completed':
+                        if _['result'] == 'stopped':
                             break
+                        else:
+                            print(_['stream'])
             except APIError as e:
                 print(e)
                 sys.exit(1)

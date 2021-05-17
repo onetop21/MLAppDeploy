@@ -187,7 +187,18 @@ def services_remove(project_key: str, req: service.RemoveRequest, stream: bool =
         services = [ctlr.get_service(cli, service_id=service_id) for service_id in req.services]
         for service in services:
             _check_project_key(project_key, service, cli)
-        res = ctlr.remove_services(cli, services, stream=stream)
+
+        class disconnectHandler:
+            def __init__(self):
+                self._callbacks = []
+            def add_callback(self, callback):
+                self._callbacks.append(callback)
+            async def __call__(self):
+                for cb in self._callbacks:
+                    cb()
+        handler = disconnectHandler() if stream else None
+
+        res = ctlr.remove_services(cli, services, handler, stream=stream)
 
         def remove_service(gen):
             for _ in gen:
@@ -198,6 +209,6 @@ def services_remove(project_key: str, req: service.RemoveRequest, stream: bool =
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
-        return StreamingResponse(remove_service(res))
+        return StreamingResponse(remove_service(res), background=handler)
     else:
         return {'message': f"services removed"}
