@@ -247,16 +247,21 @@ def color_index():
 def match(filepath, ignores):
     result = False
     normpath = os.path.normpath(filepath)
+    def matcher(path, pattern):
+        patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")] if '**/' in pattern else [])
+        result = map(lambda _: fnmatch.fnmatch(normpath, _) or fnmatch.fnmatch(normpath, os.path.normpath(f"{_}/*")), patterns)
+        return sum(result) > 0
     for ignore in ignores:
         if ignore.startswith('#'):
             pass
         elif ignore.startswith('!'):
-            result &= not fnmatch.fnmatch(normpath, ignore[1:])
+            result &= not matcher(normpath, ignore[1:])
         else:
-            result |= fnmatch.fnmatch(normpath, ignore)
+            result |= matcher(normpath, ignore)
     return result
 
 def arcfiles(workspace='.', ignores=[]):
+    ignores = [os.path.join(os.path.abspath(workspace), _)for _ in ignores]
     for root, dirs, files in os.walk(workspace):
         for name in files:
             filepath = os.path.join(root, name)
