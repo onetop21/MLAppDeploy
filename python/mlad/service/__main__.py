@@ -57,10 +57,12 @@ DELETE  /api/v1/node/[ID]/labels    remove_node_labels
 APIV1 = '/api/v1'
 
 def create_app():
+    root_path = os.environ.get('ROOT_PATH', '')
     app = FastAPI(
         title="MLAppDeploy API Server",
         description="MLAppDeploy is a tool for training and deploying ML code easily.",
         version=__version__,
+        root_path=root_path,
     )
 
     app.add_middleware(
@@ -89,6 +91,7 @@ def create_app():
     print(f"Admin Token  : {generate_admin_token().decode()}")
     print(f"Orchestrator : {'Kubernetes' if utils.is_kube_mode() else 'Swarm'}") 
     print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}") 
+    print(f'Prefix       : {root_path}')
     return app
 
 app = create_app()
