@@ -579,7 +579,7 @@ elif [ $BUILD ]; then
     PrintStep "Build Service Image."
     if [[ "$BUILD_FROM" == "local" ]]; then
         ColorEcho INFO "Source from Local."
-        cat >> /tmp/mlad-service.dockerfile << EOF
+        cat > /tmp/mlad-service.dockerfile << EOF
 FROM        python:latest
 COPY        python /workspace
 WORKDIR     /workspace
@@ -587,7 +587,7 @@ RUN         python setup.py install
 EXPOSE      8440
 ENTRYPOINT  python -m mlad.service
 EOF
-        DOCKER_BUILDKIT=0 docker build -t $IMAGE_NAME -f /tmp/mlad-service.dockerfile ../..
+        DOCKER_BUILDKIT=0 docker build -t $IMAGE_NAME -f /tmp/mlad-service.dockerfile ..
     else
         ColorEcho INFO "Source from Git."
         docker build -t $IMAGE_NAME -<< EOF
