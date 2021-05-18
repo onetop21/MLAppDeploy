@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlad-service-dev
+  namespace: mlad
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlad-service-dev
+  template:
+    metadata:
+      labels:
+        app: mlad-service-dev
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: mlad-service-dev
+          image: ghcr.io/onetop21/mlappdeploy/service
+          env:
+            - name: MLAD_DEBUG
+              value: "1"
+            - name: MLAD_KUBE
+              value: "1"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: ROOT_PATH
+              value: "/dev"
+          ports:
+          - name: http
+            containerPort: 8440
+      imagePullPolicy: Always
+      imagePullSecrets:
+        - name: regcred
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: mlad-service-dev
+  namespace: mlad
+  labels:
+    app: mlad-service-dev
+spec:
+  selector:
+    app: mlad-service-dev
+  ports:
+  - name: http
+    port: 8440
+    targetPort: 8440
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: mlad-service-dev
+  namespace: mlad
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/rewrite-target: '/$2'
+    #kubernetes.io/ingress.class: traefik
+    #traefik.frontend.rule.type: PathPrefixStrip
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /dev(/|$)(.*)
+        #pathType: Prefix
+        backend:
+          serviceName: mlad-service-dev
+          servicePort: 8440
