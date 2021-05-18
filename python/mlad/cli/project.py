@@ -508,7 +508,7 @@ def logs(tail, follow, timestamps, names_or_ids):
         sys.exit(1)
 
     colorkey = {}
-    try::
+    try:
         for _ in logs:
             if '[Ignored]' in _['stream']:
                 continue
