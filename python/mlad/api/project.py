@@ -74,11 +74,24 @@ class Project():
                 with requests.get(url=url,params=params, stream=True, headers=header) as resp:
                     status_code = resp.status_code
                     if status_code == 200:
+                        res = ''
                         for _ in resp.iter_content(1024):
+                            res += _.decode()
                             try:
-                                yield json.loads(_.decode())
+                                dict_res = json.loads(res)
                             except json.JSONDecodeError as e:
-                                print(f"[Ignored] Stream Broken : {e}", file=sys.stderr)
+                                log = _.decode()
+                                if "stream" in log:
+                                    # new log line but error occurs cuz tqdm
+                                    name = log.split('\"name\": \"')[1].split('\"')[0]
+                                    name_width = int(log.split('\"name_width\": ')[1].split(',')[0])
+                                    dict_res = {"name": name, "name_width": name_width,
+                                            "stream": f"[Ignored] Stream Broken : {e}"}
+                                else:
+                                    continue
+                            else:
+                                res = ''
+                            yield dict_res
                     elif status_code == 404:
                         detail = json.loads(resp.text)['detail']
                         reason = detail['reason']

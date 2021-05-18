@@ -52,11 +52,12 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
         sys.stderr.write(f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}')
     else:
         colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
+        if '\r' in msg:
+            msg = msg.split('\r')[-1] + '\n'
         if timestamp:
             sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, timestamp, msg))
         else:
             sys.stdout.write(("{}{:%d}{} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, msg))
-
 
 def _get_default_logs(log):
     name, _, msg, timestamp = _parse_log(log, len_short_id=20)
@@ -507,8 +508,10 @@ def logs(tail, follow, timestamps, names_or_ids):
         sys.exit(1)
 
     colorkey = {}
-    try:
+    try::
         for _ in logs:
+            if '[Ignored]' in _['stream']:
+                continue
             _print_log(_, colorkey, 32, 20)
     except APIError as e:
         print(e)
