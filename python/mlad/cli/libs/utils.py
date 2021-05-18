@@ -250,6 +250,7 @@ def match(filepath, ignores):
     def matcher(path, pattern):
         patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")] if '**/' in pattern else [])
         result = map(lambda _: fnmatch.fnmatch(normpath, _) or fnmatch.fnmatch(normpath, os.path.normpath(f"{_}/*")), patterns)
+        return sum(result) > 0
     for ignore in ignores:
         if ignore.startswith('#'):
             pass
