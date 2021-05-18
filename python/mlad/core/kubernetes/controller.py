@@ -1007,7 +1007,7 @@ def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=Fa
                 #host="example.com",
                 http=client.NetworkingV1beta1HTTPIngressRuleValue(
                     paths=[client.NetworkingV1beta1HTTPIngressPath(
-                        path=f"{base_path}(/|$)(.*)"if rewrite else base_path,
+                        path=f"{base_path}(/|$)(.*)" if rewrite else base_path,
                         backend=client.NetworkingV1beta1IngressBackend(
                             service_port=port,
                             service_name=service_name)
