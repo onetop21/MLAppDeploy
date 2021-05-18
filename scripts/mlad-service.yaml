@@ -54,6 +54,7 @@ spec:
           ports:
           - name: http
             containerPort: 8440
+      imagePullPolicy: IfNotPresent
       imagePullSecrets:
         - name: regcred
 ---
