@@ -99,10 +99,12 @@ function DeployUsage {
     ColorEcho WARN "Arguments"
     ColorEcho      "        --registry=[REPO/ORG]     : Change target to deploy and pulling service image."
     ColorEcho      "                                    (Default: ghcr.io/onetop21)"
-    ColorEcho      "        --lb-mode                 : Set ingress type to LoadBalancer."
+    ColorEcho      "        --ingress=[LB|LOADBALANCER/NP|NODEPORT]"
+    ColorEcho      "                                  : Set ingress type to LoadBalancer or NodePort."
     ColorEcho      "                                    (Default: NodePort)"
+    ColorEcho      "    -b, --beta                    : Deploy service beta mode. (prefix: /beta)"
     ColorEcho      "        --config=[PATH]           : Set service configure file. (Not yet)"
-    ColorEcho      "    -u, --update                  : Update service image."
+    ColorEcho      "    -r, --reset                   : Reset MLAppDeploy namespace."
     ColorEcho      "    -h, --help                    : This page"
     exit 1
 }
@@ -235,7 +237,7 @@ elif [ $BUILD ]; then
 
 elif [ $DEPLOY ]; then
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
-    OPTIONS=$(getopt -o uh --long registry:,lb-mode,config:,update,help -- "$@")
+    OPTIONS=$(getopt -o brh --long registry:,ingress:,beta,config:,reset,help -- "$@")
     [ $? -eq 0 ] || DeployUsage
     eval set -- "$OPTIONS"
     while true; do
@@ -243,15 +245,29 @@ elif [ $DEPLOY ]; then
         --registry) shift
             REGISTRY_ADDR=$1
             ;;
-        --lb-mode)
-            LOADBALANCER=1
+        --ingress) shift
+            INGRESS=1
+            case "$(1,,)" in
+            lb|loadbalancer)
+                LOADBALANCER=1
+                ;;
+            np|nodeport)
+                NODEPORT=1
+                ;;
+            *)
+                ColorEcho WARN "Not support ingres type [$1]."
+                ;;
+            esac
+            ;;
+        -b|--beta)
+            BETA=1
             ;;
         --config) shift
             ColorEcho ERROR "Config option is not support yet."
             exit 1
             ;;
-        -u|--update)
-            UPDATE=1
+        -r|--reset)
+            RESET=1
             ;;
         -h|--help)
             DeployUsage
@@ -579,7 +595,7 @@ elif [ $BUILD ]; then
     PrintStep "Build Service Image."
     if [[ "$BUILD_FROM" == "local" ]]; then
         ColorEcho INFO "Source from Local."
-        cat >> /tmp/mlad-service.dockerfile << EOF
+        cat > /tmp/mlad-service.dockerfile << EOF
 FROM        python:latest
 COPY        python /workspace
 WORKDIR     /workspace
@@ -587,7 +603,7 @@ RUN         python setup.py install
 EXPOSE      8440
 ENTRYPOINT  python -m mlad.service
 EOF
-        DOCKER_BUILDKIT=0 docker build -t $IMAGE_NAME -f /tmp/mlad-service.dockerfile ../..
+        DOCKER_BUILDKIT=0 docker build -t $IMAGE_NAME -f /tmp/mlad-service.dockerfile ..
     else
         ColorEcho INFO "Source from Git."
         docker build -t $IMAGE_NAME -<< EOF
@@ -629,32 +645,33 @@ elif [ $DEPLOY ]; then
     fi
 
     PrintStep "Install Ingress Controller (NGINX)."
-    INGRESS=1
-    if [[ `kubectl get ns ingress-nginx >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        SERVICE_TYPE=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o go-template={{.spec.type}}`
-        case "${SERVICE_TYPE,,}" in
-        loadbalancer)
-            if [ $LOADBALANCER ]; then
-                ColorEcho "Already installed ingress controller."
-                INGRESS=0
-            else
-                ColorEcho INFO "Replace ingress controller to NodePort type."
-            fi
-            ;;
-        nodeport)
-            if [ $LOADBALANCER ]; then
-                ColorEcho INFO "Replace ingress controller to LoadBalancer type."
-            else
-                ColorEcho "Already installed ingress controller."
-                INGRESS=0
-            fi
-            ;;
-        esac
-    else
-        if [ $LOADBALANCER ]; then
-            ColorEcho INFO "Install Ingress Controller with LoadBalancer Service."
+    if [ $INGRESS ]; then
+        if [[ `kubectl get ns ingress-nginx >> /dev/null 2>&1; echo $?` == "0" ]]; then
+            SERVICE_TYPE=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o go-template={{.spec.type}}`
+            case "${SERVICE_TYPE,,}" in
+            loadbalancer)
+                if [ $LOADBALANCER ]; then
+                    ColorEcho "Already installed ingress controller."
+                    INGRESS=0
+                else
+                    ColorEcho INFO "Replace ingress controller to NodePort type."
+                fi
+                ;;
+            nodeport)
+                if [ $LOADBALANCER ]; then
+                    ColorEcho INFO "Replace ingress controller to LoadBalancer type."
+                else
+                    ColorEcho "Already installed ingress controller."
+                    INGRESS=0
+                fi
+                ;;
+            esac
         else
-            ColorEcho INFO "Install Ingress Controller with NodePort Service."
+            if [ $LOADBALANCER ]; then
+                ColorEcho INFO "Install Ingress Controller with LoadBalancer Service."
+            else
+                ColorEcho INFO "Install Ingress Controller with NodePort Service."
+            fi
         fi
     fi
     if [ $INGRESS ]; then
@@ -670,7 +687,7 @@ elif [ $DEPLOY ]; then
     fi
 
     PrintStep "Deploy MLAppDeploy Service."
-    if [[ "$UPDATE" == "1" ]]; then
+    if [[ "$RESET" == "1" ]]; then
         ColorEcho "Remove installed previous service."
         kubectl delete ns mlad >> /dev/null 2>&1
         kubectl delete clusterrole controller-role >> /dev/null 2>&1
@@ -679,37 +696,78 @@ elif [ $DEPLOY ]; then
     fi
 
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/service
+    VERSION=`docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r'`
+    TAGGED_IMAGE=$IMAGE_NAME:$VERSION
     if [[ `kubectl get ns mlad >> /dev/null 2>&1; echo $?` == "0" ]]; then
         ColorEcho INFO "Rolling Update..."
-        kubectl -n mlad set image deployment/mlad-service mlad-service=$IMAGE_NAME --record
+        
+        kubectl -n mlad set image deployment/mlad-service mlad-service=$TAGGED_IMAGE --record
+        if [ $BETA ]; then
+            if [ `kubectl get deploy/mlad-service-beta -n mlad >> /dev/null 2>&1; echo $?` ]; then
+                if [ -f mlad-service-beta.yaml ]; then
+                    mkdir -p .temp
+                    cp mlad-service-beta.yaml .temp/
+                    cat >> .temp/kustomization.yaml << EOF
+resources:
+- mlad-service-beta.yaml
+images:
+- name: ghcr.io/onetop21/mlappdeploy/service
+  newName: $IMAGE_NAME
+EOF
+                    kubectl apply -k .temp
+                else
+                    ColorEcho WARN "Beta service deployment only supports git clone status."
+                fi
+            else
+                kubectl -n mlad set image deployment/mlad-service-beta mlad-service=$IMAGE_NAME --record
+            fi
+        fi
         kubectl -n mlad rollout status deployment/mlad-service
     else
         ColorEcho "Deploy MLAppDeploy service."
         kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
-        if [ -f mlad-service.yaml ]; then
-            mkdir -p .temp
-            cp mlad-service.yaml .temp/
-            cat >> .temp/kustomization.yaml << EOF
+        if [ ! $BETA ]; then
+            if [ -f mlad-service.yaml ]; then
+                mkdir -p .temp
+                cp mlad-service.yaml .temp/
+                cat >> .temp/kustomization.yaml << EOF
 resources:
 - mlad-service.yaml
 images:
 - name: ghcr.io/onetop21/mlappdeploy/service
-  newName: $IMAGE_NAME
+  newName: $TAGGED_IMAGE
 EOF
-             kubectl apply -k .temp
-#            kubectl apply -f mlad-service.yaml
-        else
-            mkdir -p /tmp/mlad-service
-            cat >> /tmp/mlad-service/kustomization.yaml << EOF
+                 kubectl apply -k .temp
+    #            kubectl apply -f mlad-service.yaml
+            else
+                mkdir -p /tmp/mlad-service
+                cat >> /tmp/mlad-service/kustomization.yaml << EOF
 resources:
 - https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
 images:
 - name: ghcr.io/onetop21/mlappdeploy/service
+  newName: $TAGGED_IMAGE
+EOF
+                 kubectl apply -k /tmp/mlad-service
+    #            kubectl apply -f https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
+            fi
+        else
+            if [ -f mlad-service-beta.yaml ]; then
+                mkdir -p .temp
+                cp mlad-service-beta.yaml .temp/
+                cat >> .temp/kustomization.yaml << EOF
+resources:
+- mlad-service-beta.yaml
+images:
+- name: ghcr.io/onetop21/mlappdeploy/service
   newName: $IMAGE_NAME
 EOF
-             kubectl apply -k /tmp/mlad-service
-#            kubectl apply -f https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
+                kubectl apply -k .temp
+            else
+                ColorEcho WARN "Beta service deployment only supports git clone status."
+            fi
         fi
+
         if [[ "$?" == "0" ]]; then
             ColorEcho INFO "Wait to activate MLAppDeploy service...(up to 2mins)"
             kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service

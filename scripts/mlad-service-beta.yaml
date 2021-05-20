@@ -1,48 +1,21 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mlad
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: controller-role
-rules:
-- apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io"]
-  resources: ["nodes", "namespaces", "services", "pods", "pods/log", "replicationcontrollers", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "rolebindings", "ingresses"]
-  verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: controller-role-binding
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: mlad
-roleRef:
-  kind: ClusterRole
-  name: controller-role
-  apiGroup: rbac.authorization.k8s.io
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mlad-service
+  name: mlad-service-beta
   namespace: mlad
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mlad-service
+      app: mlad-service-beta
   template:
     metadata:
       labels:
-        app: mlad-service
+        app: mlad-service-beta
     spec:
       terminationGracePeriodSeconds: 10
       containers:
-        - name: mlad-service
+        - name: mlad-service-beta
           image: ghcr.io/onetop21/mlappdeploy/service
           env:
             - name: MLAD_DEBUG
@@ -51,23 +24,25 @@ spec:
               value: "1"
             - name: PYTHONUNBUFFERED
               value: "1"
+            - name: ROOT_PATH
+              value: "/beta"
           ports:
           - name: http
             containerPort: 8440
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
       imagePullSecrets:
         - name: regcred
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: mlad-service
+  name: mlad-service-beta
   namespace: mlad
   labels:
-    app: mlad-service
+    app: mlad-service-beta
 spec:
   selector:
-    app: mlad-service
+    app: mlad-service-beta
   ports:
   - name: http
     port: 8440
@@ -76,21 +51,22 @@ spec:
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-  name: mlad-service
+  name: mlad-service-beta
   namespace: mlad
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/rewrite-target: '/$2'
     #kubernetes.io/ingress.class: traefik
     #traefik.frontend.rule.type: PathPrefixStrip
 spec:
   rules:
   - http:
       paths:
-      - path: /
+      - path: /beta(/|$)(.*)
         #pathType: Prefix
         backend:
-          serviceName: mlad-service
+          serviceName: mlad-service-beta
           servicePort: 8440
