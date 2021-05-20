@@ -1,10 +1,11 @@
 import json
 from typing import List
 from multiprocessing import Queue, Value
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from starlette.types import Receive
 from mlad.service.models import project
+from mlad.service.auth import Authorization
 from mlad.service.exception import InvalidProjectError, InvalidServiceError, InvalidLogRequest, exception_detail
 from mlad.service.libs import utils
 if not utils.is_kube_mode():
@@ -14,6 +15,7 @@ else:
 from mlad.core import exception
 
 router = APIRouter()
+user = Authorization('user')
 
 @router.post("/project")
 def project_create(req: project.CreateRequest, 
@@ -39,13 +41,19 @@ def project_create(req: project.CreateRequest,
         raise HTTPException(status_code=400, detail=exception_detail(e))
     return StreamingResponse(create_project(res))
 
+
 @router.get("/project")
-def projects(extra_labels: str = ''):
+def projects(extra_labels: str = '', auth = Depends((user.verify_auth))):
+    user = auth['username']
     cli = ctlr.get_api_client()
     try:
         networks = ctlr.get_project_networks(cli, extra_labels.split(',') if extra_labels else [])
         if utils.is_kube_mode():
-            projects = [ ctlr.inspect_project_network(cli, v) for k, v in networks.items()]
+            projects = []
+            for k, v in networks.items():
+                inspect = ctlr.inspect_project_network(cli, v)
+                if inspect['username'] == user:
+                    projects.append(inspect)
         else:
             projects = [ ctlr.inspect_project_network(v) for k, v in networks.items()]
     except Exception as e:

@@ -16,10 +16,10 @@ class Authorization():
                                 detail="Unauthorized request : expired token")
         else:
             if decoded['role']=='admin':
-                return True
+                return decoded
             else:
                 if self.role == "user":
-                    return True
+                    return decoded
                 else:
                     raise HTTPException(status_code=403, 
                                         detail="Forbidden request")
