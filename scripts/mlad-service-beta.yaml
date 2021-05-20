@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mlad-service-dev
+  name: mlad-service-beta
   namespace: mlad
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mlad-service-dev
+      app: mlad-service-beta
   template:
     metadata:
       labels:
-        app: mlad-service-dev
+        app: mlad-service-beta
     spec:
       terminationGracePeriodSeconds: 10
       containers:
-        - name: mlad-service-dev
+        - name: mlad-service-beta
           image: ghcr.io/onetop21/mlappdeploy/service
           env:
             - name: MLAD_DEBUG
@@ -25,24 +25,24 @@ spec:
             - name: PYTHONUNBUFFERED
               value: "1"
             - name: ROOT_PATH
-              value: "/dev"
+              value: "/beta"
           ports:
           - name: http
             containerPort: 8440
-      imagePullPolicy: Always
+          imagePullPolicy: Always
       imagePullSecrets:
         - name: regcred
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: mlad-service-dev
+  name: mlad-service-beta
   namespace: mlad
   labels:
-    app: mlad-service-dev
+    app: mlad-service-beta
 spec:
   selector:
-    app: mlad-service-dev
+    app: mlad-service-beta
   ports:
   - name: http
     port: 8440
@@ -51,7 +51,7 @@ spec:
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-  name: mlad-service-dev
+  name: mlad-service-beta
   namespace: mlad
   annotations:
     kubernetes.io/ingress.class: nginx
@@ -65,8 +65,8 @@ spec:
   rules:
   - http:
       paths:
-      - path: /dev(/|$)(.*)
+      - path: /beta(/|$)(.*)
         #pathType: Prefix
         backend:
-          serviceName: mlad-service-dev
+          serviceName: mlad-service-beta
           servicePort: 8440
