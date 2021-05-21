@@ -296,6 +296,32 @@ def up(services):
             project['project'])
     project_key = base_labels['MLAD.PROJECT']
 
+    # AuthConfig
+    cli = ctlr.get_api_client()
+    headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config'] or b'e30K'))}
+    encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
+    credential = encoded.decode()
+
+    extra_envs = ds.get_env(default_config['client'](config))
+
+    if not services:
+        res = api.project.create(project['project'], base_labels,
+            extra_envs, credential=credential, swarm=True, allow_reuse=False)
+    else:
+        res = api.project.create(project['project'], base_labels,
+            extra_envs, credential=credential, swarm=True, allow_reuse=True)
+    try:
+        for _ in res:
+            if 'stream' in _:
+                sys.stdout.write(_['stream'])
+            if 'result' in _:
+                if _['result'] == 'succeed':
+                    network_id = _['id']
+                    break
+    except APIError as e:
+        print(e)
+        sys.exit(1)
+
     images = ctlr.get_images(cli, project_key=project_key)
     images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
     
@@ -344,32 +370,6 @@ def up(services):
                 sys.exit(1)
     else:
         targets = project['services'] or {}
- 
-    # AuthConfig
-    cli = ctlr.get_api_client()
-    headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config'] or b'e30K'))}
-    encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
-    credential = encoded.decode()
-
-    extra_envs = ds.get_env(default_config['client'](config))
-
-    if not services:
-        res = api.project.create(project['project'], base_labels,
-            extra_envs, credential=credential, swarm=True, allow_reuse=False)
-    else:
-        res = api.project.create(project['project'], base_labels,
-            extra_envs, credential=credential, swarm=True, allow_reuse=True)
-    try:
-        for _ in res:
-            if 'stream' in _:
-                sys.stdout.write(_['stream'])
-            if 'result' in _:
-                if _['result'] == 'succeed':
-                    network_id = _['id']
-                    break 
-    except APIError as e:
-        print(e)
-        sys.exit(1)
 
     # Check service status
     running_services = api.service.get(project_key)['inspects']
