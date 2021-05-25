@@ -62,7 +62,11 @@ class LogHandler:
             self.responses[target] = resp
             #Thread(target=LogHandler._monitor, args=(self.monitoring, host, target, lambda: self.close(resp)), daemon=True).start()
             for line in resp:
-                line = line.decode()
+                try:
+                    line = line.decode()
+                except UnicodeDecodeError as e:
+                    print(f"[Ignored] Log Decode Error : {e}")
+                    continue
                 line = f"{target} {line}"
                 if not (line.endswith('\n') or line.endswith('\r')): line += '\n'
                 line= line.encode()
