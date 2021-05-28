@@ -1,5 +1,7 @@
 # MLAppDeploy
 Machine Learning Application Deployment Tool by Docker Swarm
+
+[![Docker Image CI](https://github.com/onetop21/MLAppDeploy/actions/workflows/docker-image.yml/badge.svg)](https://github.com/onetop21/MLAppDeploy/actions/workflows/docker-image.yml)
 ## Environment Installation
 ### 1. Install MLAppDeploy Environment
 ``` bash
