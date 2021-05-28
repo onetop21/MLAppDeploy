@@ -255,7 +255,7 @@ elif [ $DEPLOY ]; then
                 NODEPORT=1
                 ;;
             *)
-                ColorEcho WARN "Not support ingres type [$1]."
+                ColorEcho WARN "Not support ingress type [$1]."
                 ;;
             esac
             ;;
@@ -702,6 +702,8 @@ elif [ $DEPLOY ]; then
         ColorEcho INFO "Rolling Update..."
         
         kubectl -n mlad set image deployment/mlad-service mlad-service=$TAGGED_IMAGE --record
+        kubectl -n mlad rollout restart deployment/mlad-service
+        kubectl -n mlad rollout status deployment/mlad-service
         if [ $BETA ]; then
             if [ `kubectl get deploy/mlad-service-beta -n mlad >> /dev/null 2>&1; echo $?` ]; then
                 if [ -f mlad-service-beta.yaml ]; then
@@ -720,9 +722,10 @@ EOF
                 fi
             else
                 kubectl -n mlad set image deployment/mlad-service-beta mlad-service=$IMAGE_NAME --record
+                kubectl -n mlad rollout restart deployment/mlad-service-beta
+                kubectl -n mlad rollout status deployment/mlad-service-beta
             fi
         fi
-        kubectl -n mlad rollout status deployment/mlad-service
     else
         ColorEcho "Deploy MLAppDeploy service."
         kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
