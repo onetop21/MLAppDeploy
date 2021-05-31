@@ -1,25 +1,26 @@
 # MLAppDeploy
-Machine Learning Application Deployment Tool by Docker Swarm
+Machine Learning Application Deployment Tool by Kubernetes
 
 [![Docker Image CI](https://github.com/onetop21/MLAppDeploy/actions/workflows/docker-image.yml/badge.svg)](https://github.com/onetop21/MLAppDeploy/actions/workflows/docker-image.yml)
 
 ## Environment Installation
 ### 1. Install MLAppDeploy Environment
+You need docker to use MLAD.
 ``` bash
-$ bash scripts/install-mlad-env.sh                  # Install as master node
-$ bash scripts/install-mlad-env.sh -b <Master Node> # Install as worker node
-$ bash scripts/install-mlad-env.sh -r <Remote Host> # Install at remote host
+$ bash scripts/docker-install.sh
 ```
-### 2. Deploy Default Services
+Install MLAD environments as master node.
 ``` bash
-$ bash scripts/deploy-mlad-service.sh                # Deploy services to local master
-$ bash scripts/deploy-mlad-service.sh -H <Master IP> # Deploy services to remote master
-$ bash scripts/deploy-mlad-service.sh minio          # Deploy minio service only.
+$ bash scripts/cluster-install.sh master
 ```
-### 3. Add Insecure Registries (Optional)
+You can install MLAD environments as worker node with master IP.
+``` bash
+$ bash scripts/cluster-install.sh worker -i <Master node IP>
 ```
-$ bash scripts/add-insecure-registries.sh <Address with Port>                   # Add insecure registries to all nodes connected with local master
-$ bash scripts/add-insecure-registries.sh -H <Remote Host> <Address with Port>  # Add insecure registries to all nodes connected with remote master
+Build and deploy MLAD service with specified registry.
+``` bash
+$ bash scripts/cluster-install.sh build --registry <Registry>
+$ bash scripts/cluster-install.sh deploy --registry <Registry>
 ```
 ## Frontend Installation
 ### 1. Install Virtual Environment
@@ -38,62 +39,90 @@ $ source <EnvDir>/bin/activate # Enable
 (EnvDir) $ python setup.py install
 ```
 
-## How to use
+## How to use MLAD Project
 ### 1. Initialize Configuration
 ``` bash
 (EnvDir) $ mlad config init
-Username [<USER>]:
-Master IP Address [unix:///var/run/docker.sock]:
+MLAppDeploy Service Address [http://localhost:8440]:
+MLAppDeploy User Token:
+Docker Registry Host [docker.io]:
 ```
-### 2. Connect External MinIO(S3 Compatible Storage) and Private Docker Registry (Optional)
+
+#### 1-1. Set User Token
+Ask administrator for your user token and login with the token.
+``` bash
+(EnvDir) $ mlad login
+User Token: <user token>
+```
+If you want to initialize the token, you can logout.
+``` bash
+(EnvDir) $ mlad logout
+```
+#### 1-2. Connect External MinIO(S3 Compatible Storage) and Private Docker Registry (Optional)
 If you want to connect to your S3 storage and registry, you can attach to external those by modify configurations.
 ``` bash
 (EnvDir) $ mlad config set s3.endpoint=s3.amazonaws.com # Change S3 endpoint
 (EnvDir) $ mlad config get                              # Show current configuration
 ```
-### 3. Generate Project File
+### 2. Generate Project File
 ``` bash
 (EnvDir) $ cd <YOUR PROJECT DIR>
 (EnvDir) $ mlad project init
 Project Name : <Enter Your Project Name>
 ```
-### 4. Customize Project File
+### 3. Customize Project File
 Customize project file(**mlad-project.yml**).
-### 5. Build Project Image
+### 4. Build Project Image
 ``` bash
 (EnvDir) $ mlad build
 ```
-### 6. Deploy Services on MLAppDeploy
+### 5. Deploy Services on MLAppDeploy
 ``` bash
 (EnvDir) $ mlad up                # Deploy whole services in project.
 (EnvDir) $ mlad up <services...>  # Deploy services in project partialy.
 ```
-### 7. Down Service from MLAppDeploy
+### 6. Down Service from MLAppDeploy
 ``` bash
 (EnvDir) $ mlad down                # Down whole services in project.
+(EnvDir) $ mlad down --no-dump      # Do not save service logs before down.
 (EnvDir) $ mlad down <services...>  # Down services in project partialy.
 ```
-### 8. Show Logs
+### 7. Show Logs
 ``` bash
 (EnvDir) $ mlad logs                # Show logs til now.
 (EnvDir) $ mlad logs -f             # Show logs with follow.
 (EnvDir) $ mlad logs -t             # Show logs with timestamp.
 (EnvDir) $ mlad logs <service name> # show logs filtered by service name.
 ```
-### 9. Show Running Service in Project
+### 8. Show Running Service in Project
 ``` bash
 (EnvDir) $ cd <YOUR PROJECT DIR>
 (EnvDir) $ mlad ps      # Show running services in project.
 (EnvDir) $ mlad ps -a   # Show all services in project
 ```
-### 10. Show All Deployed Project
+### 9. Show All Deployed Project
 ``` bash
 (EnvDir) $ mlad ls
 ```
-### 11. And so on.
+### 10. And so on.
 You can show more information by below command.
 ``` bash
 (EnvDir) $ mlad --help
+```
+## How to use MLAD Plugin
+### 1. Initialize Configuration
+Same as project. 
+### 2. Generate Plugin Project File
+``` bash
+(EnvDir) $ cd <YOUR Plugin PROJECT DIR>
+(EnvDir) $ mlad plugin init
+Project Name : <Enter Your Project Name>
+```
+### 3. Customize Project File
+Customize project file(**mlad-plugin.yml**).
+### 4. Install Plugin
+``` bash
+(EnvDir) $ TODO
 ```
 
 ## Appendix
@@ -146,20 +175,23 @@ Modifying project file.
 services:
   operator:
     ...
+    ports: [6666]
     deploy:
       constraints:
         hostname: operator-node
   learner:
     ...
+    ports: [6666]
     deploy:
       constraints:
         hostname: learner-node
 
   actor:
     ...
+    ports: [6666]
     deploy:
       constraints:
-        replicas: 10
         labels.type: actor
+      replicas: 10
 ```
 
