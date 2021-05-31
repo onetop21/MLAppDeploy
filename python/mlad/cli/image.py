@@ -53,7 +53,7 @@ def list(all, plugin, tail, no_trunc):
     if untagged:
         print(f'This project has {untagged} untagged images. To free disk spaces up by cleaning gabage images.') 
 
-def build(verbose, plugin, no_cache):
+def build(verbose, plugin, no_cache, pull):
     config = utils.read_config()
     cli = ctlr.get_api_client()
     
@@ -127,7 +127,7 @@ def build(verbose, plugin, no_cache):
         tarbytes.seek(0)
 
         # Build Image
-        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
+        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
 
     else:
         dockerfile = f"FROM {manifest['service']['image']}\nMAINTAINER {manifest[manifest_type]['maintainer']}"
@@ -140,7 +140,7 @@ def build(verbose, plugin, no_cache):
         tarbytes.seek(0)
 
         # Build Image
-        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, stream=True) 
+        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
 
     # Print build output
     for _ in build_output:
