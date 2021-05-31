@@ -296,6 +296,9 @@ def uninstall(name):
     config = utils.read_config()
     api = API(config.mlad.address, config.mlad.token.user)
 
+    name = name.split(":")[0]
+    print(f'Uninstall plugin [{name}]...')
+
     basename = f'{get_username(config)}-{name.lower()}-plugin'
     project_key = core_utils.project_key(basename)
 
@@ -303,7 +306,7 @@ def uninstall(name):
     try:
         inspect = api.project.inspect(project_key=project_key)
     except NotFound as e:
-        print(f'Already stopped plugin[{name}].', file=sys.stderr)
+        print(f'Already stopped plugin [{name}].', file=sys.stderr)
         return
 
     with interrupt_handler(message='Wait.', blocked=False):
