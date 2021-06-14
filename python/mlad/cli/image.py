@@ -53,7 +53,7 @@ def list(all, plugin, tail, no_trunc):
     if untagged:
         print(f'This project has {untagged} untagged images. To free disk spaces up by cleaning gabage images.') 
 
-def build(verbose, plugin, no_cache, pull):
+def build(quiet, plugin, no_cache, pull):
     config = utils.read_config()
     cli = ctlr.get_api_client()
     
@@ -148,7 +148,7 @@ def build(verbose, plugin, no_cache, pull):
             sys.stderr.write(f"{_['error']}\n")
             sys.exit(1)
         elif 'stream' in _:
-            if verbose:
+            if not quiet:
                 sys.stdout.write(_['stream'])
 
     image = ctlr.get_image(cli, base_labels['MLAD.PROJECT.IMAGE'])

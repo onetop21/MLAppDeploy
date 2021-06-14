@@ -30,13 +30,13 @@ def ls(all, plugin, tail, no_trunc):
     image.list(all, plugin, tail, no_trunc)
 
 @click.command()
-@click.option('--verbose', '-v', is_flag=True, help='Print detail-log during build a project or plugin')
+@click.option('--quiet', '-q', is_flag=True, help='Do not print detail-log during build a project or plugin')
 @click.option('--plugin', '-p', is_flag=True, help='Build by plugin manifest')
 @click.option('--no-cache', is_flag=True, help='Do not use the cache when building project or plugin')
 @click.option('--pull', is_flag=True, help='Attempt to pull the base image even if an older image exists locally.')
-def build(verbose, plugin, no_cache, pull):
+def build(quiet, plugin, no_cache, pull):
     '''Build MLAppDeploy project or plguin'''
-    image.build(verbose, plugin, no_cache, pull)
+    image.build(quiet, plugin, no_cache, pull)
 
 @click.command()
 @click.option('--force', '-f', is_flag=True, help='Remove forcely')
