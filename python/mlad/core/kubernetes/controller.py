@@ -1024,6 +1024,63 @@ def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=Fa
         body=body
     )
 
+def get_node_resources(node):
+    if not isinstance(node, client.models.v1_node.V1Node): raise TypeError('Parameter is not valid type.')
+    api = client.CustomObjectsApi(cli)
+    nodes = api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
+    name = node.metadata.name
+
+    def parse_mem(str_mem):
+        # Ki to Mi
+        if str_mem.endswith('Ki'):
+            mem = float(str_mem[:-2]) / 1024
+        else:
+            #TODO Other units may need to be considered
+            mem = float(mem)
+        return mem
+
+    def parse_cpu(str_cpu):
+        # nano to core
+        if str_cpu.endswith('n'):
+            cpu = float(str_cpu[:-1]) / 10 ** 9
+        else:
+            # TODO Other units may need to be considered
+            cpu = float(cpu)
+        return cpu
+
+    # capacity
+    allocatable = node.status.allocatable
+    mem = parse_mem(allocatable['memory']) #Mi
+    cpu = int(allocatable['cpu']) #core
+    gpu = int(allocatable['nvidia.com/gpu']) if 'nvidia.com/gpu' in allocatable else 0 #cnt
+
+    #used
+    #nodes = custom_api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
+    metric = custom_api.get_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", name)
+    used_mem = parse_mem(metric['usage']['memory']) # Ki
+    used_cpu = parse_cpu(metric['usage']['cpu']) # core
+    used_gpu = 0
+
+    selector = f'spec.nodeName={name}'
+    pods = v1.list_pod_for_all_namespaces(field_selector=selector)
+    from collections import defaultdict
+    for pod in pods.items:
+        for container in pod.spec.containers:
+            requests = defaultdict(lambda: '0', container.resources.requests or {})
+            used_gpu += int(requests['nvidia.com/gpu'])
+
+    return {
+        'mem': {'capacity': mem, 'used': used_mem, 'allocatable': mem-used_mem},
+        'cpu': {'capacity': cpu, 'used': used_cpu, 'allocatable': cpu-used_cpu},
+        'gpu': {'capacity': gpu, 'used': used_gpu, 'allocatable': gpu-used_gpu},
+    }
+
+def get_project_resources(cli):
+    #TODO
+    api = client.CustomObjectsApi(cli)
+    pods = api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods")
+    pass
+
 if __name__ == '__main__':
     cli = get_api_client()
     # print(type(v1)) == kubernetes.client.api.core_v1_api.CoreV1Api
