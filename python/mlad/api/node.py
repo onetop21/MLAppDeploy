@@ -47,3 +47,11 @@ class Node():
         res = requests.delete(url=url, headers=header, json={'keys':keys})
         raise_error(res)
         return res.json()
+
+    def resource(self, nodes=[]):
+        url = f'{self.url}/node/resource'
+        header = {'token': self.token}
+        params = {'nodes': nodes}
+        res = requests.get(url=url, params=params, headers=header)
+        raise_error(res)
+        return res.json()

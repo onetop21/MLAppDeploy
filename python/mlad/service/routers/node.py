@@ -90,3 +90,24 @@ def node_delete_label(node_id:str, req:node.DeleteLabelRequest):
         logger.error(e)
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': 'labels deleted'}
+
+@admin_router.get("/node/resource")
+def resource_nodes(nodes: List[str] = Query(None)):
+    cli = ctlr.get_api_client()
+    res={}
+    try:
+        if not nodes:
+            nodes = ctlr.get_nodes(cli)
+        for node in nodes:
+            node = ctlr.get_node(cli, node)
+            name = node.metadata.name
+            print('++', name)
+            resource = ctlr.get_node_resources(cli, node)
+            res[name] = resource
+    except exception.NotFound as e:
+        logger.error(e)
+        raise HTTPException(status_code=400, detail=exception_detail(e))
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=500, detail=exception_detail(e))
+    return res

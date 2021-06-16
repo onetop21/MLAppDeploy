@@ -9,6 +9,7 @@ from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
 from mlad.cli import plugin_cli as plugin
 from mlad.cli import node_cli as node
+from mlad.cli import resource_cli as resource
 from mlad.cli.autocompletion import *
 from mlad.cli.libs import utils
 from mlad.api import API
@@ -79,6 +80,7 @@ if user_role:
     main.add_command(image.cli, 'image')
     main.add_command(project.cli, 'project')
     main.add_command(plugin.cli, 'plugin')
+    main.add_command(resource.cli, 'top')
 
 main.add_dummy_command()
 main.add_dummy_command('\b\bPrefer:')
