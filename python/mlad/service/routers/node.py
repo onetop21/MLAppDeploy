@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from typing import List
+from fastapi import APIRouter, Query, HTTPException
 from mlad.service.models import node
 from mlad.core import exception
 from requests.exceptions import HTTPError
@@ -101,7 +102,6 @@ def resource_nodes(nodes: List[str] = Query(None)):
         for node in nodes:
             node = ctlr.get_node(cli, node)
             name = node.metadata.name
-            print('++', name)
             resource = ctlr.get_node_resources(cli, node)
             res[name] = resource
     except exception.NotFound as e:
