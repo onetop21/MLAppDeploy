@@ -153,3 +153,11 @@ def project_log(project_key: str, tail:str = Query('all'),
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return StreamingResponse(get_logs(logs), background=handler)
 
+@router.get("/project/{project_key}/resource")
+def project_resource(project_key: str):
+    cli = ctlr.get_api_client()
+    try:
+        res = ctlr.get_project_resources(cli, project_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=exception_detail(e))
+    return res

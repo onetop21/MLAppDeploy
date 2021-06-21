@@ -154,7 +154,7 @@ def get_manifest(ty, default=lambda x: x):
         sys.exit(1)
     return manifest
 
-def print_table(data, no_data_msg=None, max_width=32):
+def print_table(data, no_data_msg=None, max_width=32, upper=True):
     if max_width > 0:
         widths = [max(_) for _ in zip(*[[min(len(str(value)), max_width) for value in datum] for datum in data])]
     else:
@@ -164,7 +164,10 @@ def print_table(data, no_data_msg=None, max_width=32):
     for datum in data:
         datum = [_ if not isinstance(_, str) or len(_) <= w else f"{_[:w-3]}..." for _, w in zip(datum, widths)]
         if firstline:
-            print(format.format(*datum).upper())
+            if upper:
+                print(format.format(*datum).upper())
+            else:
+                print(format.format(*datum))
             firstline = False
         else:
             print(format.format(*datum))

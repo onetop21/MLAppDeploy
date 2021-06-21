@@ -112,3 +112,9 @@ class Project():
             except requests.exceptions.ChunkedEncodingError as e:
                 print(f"[Retry] {e}", file=sys.stderr)
 
+    def resource(self, project_key):
+        url = f'{self.url}/{project_key}/resource'
+        header = {'token': self.token}
+        res = requests.get(url=url, headers=header)
+        raise_error(res)
+        return res.json()

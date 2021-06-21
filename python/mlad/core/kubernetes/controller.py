@@ -6,6 +6,7 @@ import uuid
 import base64
 from pathlib import Path
 from typing import Dict, List
+from collections import defaultdict
 import docker
 from kubernetes.client import models
 import requests
@@ -1024,6 +1025,24 @@ def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=Fa
         body=body
     )
 
+def parse_mem(str_mem):
+    # Ki to Mi
+    if str_mem.endswith('Ki'):
+        mem = float(str_mem[:-2]) / 1024
+    else:
+        #TODO Other units may need to be considered
+        mem = float(str_mem)
+    return mem
+
+def parse_cpu(str_cpu):
+    # nano to core
+    if str_cpu.endswith('n'):
+        cpu = float(str_cpu[:-1]) / 10 ** 9
+    else:
+        # TODO Other units may need to be considered
+        cpu = float(str_cpu)
+    return cpu
+
 def get_node_resources(cli, node):
     if not isinstance(node, client.models.v1_node.V1Node): raise TypeError('Parameter is not valid type.')
     api = client.CustomObjectsApi(cli)
@@ -1031,40 +1050,18 @@ def get_node_resources(cli, node):
     nodes = api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
     name = node.metadata.name
 
-    def parse_mem(str_mem):
-        # Ki to Mi
-        if str_mem.endswith('Ki'):
-            mem = float(str_mem[:-2]) / 1024
-        else:
-            #TODO Other units may need to be considered
-            mem = float(str_mem)
-        return mem
-
-    def parse_cpu(str_cpu):
-        # nano to core
-        if str_cpu.endswith('n'):
-            cpu = float(str_cpu[:-1]) / 10 ** 9
-        else:
-            # TODO Other units may need to be considered
-            cpu = float(str_cpu)
-        return cpu
-
-    # capacity
     allocatable = node.status.allocatable
     mem = parse_mem(allocatable['memory']) #Mi
     cpu = int(allocatable['cpu']) #core
     gpu = int(allocatable['nvidia.com/gpu']) if 'nvidia.com/gpu' in allocatable else 0 #cnt
 
-    #used
-    #nodes = custom_api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
     metric = api.get_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", name)
-    used_mem = parse_mem(metric['usage']['memory']) # Ki
-    used_cpu = parse_cpu(metric['usage']['cpu']) # core
+    used_mem = parse_mem(metric['usage']['memory'])
+    used_cpu = parse_cpu(metric['usage']['cpu'])
     used_gpu = 0
 
     selector = (f'spec.nodeName={name},status.phase!=Succeeded,status.phase!=Failed')
     pods = v1_api.list_pod_for_all_namespaces(field_selector=selector)
-    from collections import defaultdict
     for pod in pods.items:
         for container in pod.spec.containers:
             requests = defaultdict(lambda: '0', container.resources.requests or {})
@@ -1076,11 +1073,34 @@ def get_node_resources(cli, node):
         'gpu': {'capacity': gpu, 'used': used_gpu, 'allocatable': gpu-used_gpu},
     }
 
-def get_project_resources(cli):
-    #TODO
+def get_project_resources(cli, project_key):
     api = client.CustomObjectsApi(cli)
-    pods = api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods")
-    pass
+    v1_api = client.CoreV1Api(cli)
+    res = {}
+    services = get_services(cli, project_key)
+
+    for name, service in services.items():
+        resource = defaultdict(lambda: 0)
+        namespace = service.metadata.namespace
+
+        field_selector = (f'status.phase!=Succeeded,status.phase!=Failed')
+        pods = v1_api.list_namespaced_pod(namespace,
+                                          label_selector=f'MLAD.PROJECT.SERVICE={name}',
+                                          field_selector=field_selector)
+        for pod in pods.items:
+            pod_name = pod.metadata.name
+            metric = api.get_namespaced_custom_object("metrics.k8s.io", "v1beta1", namespace,
+                                                      "pods", pod_name)
+            for _ in metric['containers']:
+                resource['cpu'] += parse_cpu(_['usage']['cpu'])
+                resource['mem'] += parse_mem(_['usage']['memory'])
+
+            for container in pod.spec.containers:
+                requests = defaultdict(lambda: '0', container.resources.requests or {})
+                resource['gpu'] += int(requests['nvidia.com/gpu'])
+
+        res[name] = {'mem': resource['mem'], 'cpu': resource['cpu'], 'gpu': resource['gpu']}
+    return res
 
 if __name__ == '__main__':
     cli = get_api_client()
