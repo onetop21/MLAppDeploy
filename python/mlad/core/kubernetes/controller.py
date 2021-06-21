@@ -652,8 +652,17 @@ def create_services(cli, network, services, extra_labels={}):
             instances.append(temp_ret)
             create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
         except ApiException as e:
-            print(f"Exception Handling v1.create_namespaced_replication_controller => {e}", file=sys.stderr)
-            raise exception.APIError(e.body['message'], e.status)
+            print(f"Exception Handling CoreV1Api => {e}", file=sys.stderr)
+            if e.headers['Content-Type'] == 'application/json':
+                body = json.loads(e.body)
+                if body['kind'] == 'Status':
+                    msg = body['message']
+                    status = body['code']
+                else:
+                    msg = str(e)
+                    status = 500
+            err_msg = f'Failed to create services: {msg}'
+            raise exception.APIError(err_msg, status)
     return instances
 
 def remove_containers(cli, containers):
