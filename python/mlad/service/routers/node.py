@@ -3,6 +3,7 @@ from fastapi import APIRouter, Query, HTTPException
 from mlad.service.models import node
 from mlad.core import exception
 from requests.exceptions import HTTPError
+from mlad.service.exception import exception_detail
 from mlad.service.libs.log import init_logger
 from mlad.service.libs import utils
 if not utils.is_kube_mode():
@@ -92,8 +93,8 @@ def node_delete_label(node_id:str, req:node.DeleteLabelRequest):
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': 'labels deleted'}
 
-@admin_router.get("/node/resource")
-def resource_nodes(nodes: List[str] = Query(None)):
+@user_router.get("/node/resource")
+def node_resource(nodes: List[str] = Query(None)):
     cli = ctlr.get_api_client()
     res={}
     try:
