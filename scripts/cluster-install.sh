@@ -552,7 +552,7 @@ if [ $MASTER ] || [ $WORKER ]; then
                     echo "$USER ALL=NOPASSWD: `which cat`" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
                     # Install k3s server
                     k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
-                        '--disable traefik --write-kubeconfig-mode 644 $NODE_LABELS'
+                        "--disable traefik --write-kubeconfig-mode 644 $NODE_LABELS"
                 elif [ $WORKER ]; then
                     # Add priviledged for getting token
                     ColorEcho INFO "Set priviledge for getting token by worker."
@@ -562,7 +562,7 @@ if [ $MASTER ] || [ $WORKER ]; then
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP >> /dev/null 2>&1
                     # Install k3s agent
                     k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER --k3s-extra-args \
-                        '$NODE_LABELS'
+                        "$NODE_LABELS"
                     ColorEcho INFO "Finish join worker node with $MASTER_IP."
                 else
                     ColorEcho ERROR "Failed to install kubernetes. You need to run with master or worker command."
