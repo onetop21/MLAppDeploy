@@ -87,9 +87,7 @@ function WorkerUsage {
 function BuildUsage {
     UsageHeader build
     ColorEcho WARN "Arguments"
-    ColorEcho      "        --registry=[REPO/ORG]     : Change target to deploy and pulling service image."
-    ColorEcho      "                                    (Default: ghcr.io/onetop21)"
-    ColorEcho      "    -f, --build-from=(git, local) : Choose source path to build. (Default: git)"
+    ColorEcho      "        --registry=[REPO/ORG]     : Target to deploy service image. (Required)"
     ColorEcho      "    -h, --help                    : This page"
     exit 1
 }
@@ -97,7 +95,7 @@ function BuildUsage {
 function DeployUsage {
     UsageHeader deploy
     ColorEcho WARN "Arguments"
-    ColorEcho      "        --registry=[REPO/ORG]     : Change target to deploy and pulling service image."
+    ColorEcho      "        --registry=[REPO/ORG]     : Change target to pull service image."
     ColorEcho      "                                    (Default: ghcr.io/onetop21)"
     ColorEcho      "        --ingress=[LB|LOADBALANCER/NP|NODEPORT]"
     ColorEcho      "                                  : Set ingress type to LoadBalancer or NodePort."
@@ -204,8 +202,7 @@ elif [ $WORKER ]; then
     fi
 
 elif [ $BUILD ]; then
-    REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
-    OPTIONS=$(getopt -o f:h --long registry:,build-from:,help -- "$@")
+    OPTIONS=$(getopt -o f:h --long registry:,help -- "$@")
     [ $? -eq 0 ] || BuildUsage
     eval set -- "$OPTIONS"
     while true; do
@@ -213,17 +210,6 @@ elif [ $BUILD ]; then
         --registry) shift
             REGISTRY_ADDR=$1
             ;;
-        #-f|--build-from) shift
-        #    case "$1" in
-        #    local|git)
-        #        BUILD_FROM=$1
-        #        ;;
-        #    *)
-        #        ColorEcho ERROR "Only support value 'local' or 'git'."
-        #        exit 1
-        #        ;;
-        #    esac
-        #    ;;
         -h|--help)
             BuildUsage
             ;;
@@ -234,6 +220,11 @@ elif [ $BUILD ]; then
         esac
         shift
     done
+    if [ ! $REGISTRY_ADDR ]; then
+        ColorEcho ERROR "Required to build with target registry(--registry)."
+        BuildUsage
+        exit 1
+    fi
 
 elif [ $DEPLOY ]; then
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
@@ -622,6 +613,7 @@ EOF
     docker tag $IMAGE_NAME $TAGGED_IMAGE
     PrintStep "Push Image to Registry [$REGISTRY_ADDR]."
     docker push $TAGGED_IMAGE
+    docker push $IMAGE_NAME:latest --quiet
     if [ $? -ne 0 ]; then
         ColorEcho ERROR 'Failed to upload image. Please check your authentication.'
         ColorEcho ERROR "  $ docker login `echo $REGISTRY_ADDR | awk -F '/' '{print $1}'`"
@@ -629,7 +621,9 @@ EOF
 
 elif [ $DEPLOY ]; then
     GetPrivileged
-    MAX_STEP=3
+
+    [ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` -ne 0 ] && INGRESS=1
+    MAX_STEP=$((2+INGRESS))
     
     if [[ `kubectl get node >> /dev/null 2>&1; echo $?` != "0" ]]; then
         ColorEcho ERROR "Need to install MLAppDeploy environment as master first."
@@ -789,7 +783,7 @@ EOF
             ColorEcho ERROR "Failed to deploy MLApploy Beta Service."
         fi
     fi
-    if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` == "0" ]]; then
+    if [ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` -eq 0 ]; then
         TYPE=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath={.spec.type}`
         NODEPORT=$(kubectl -n ingress-nginx get -o jsonpath="{.spec.ports[0].nodePort}" services ingress-nginx-controller)
         NODES=$(kubectl get nodes -o jsonpath='{ $.items[*].status.addresses[?(@.type=="InternalIP")].address }')
@@ -799,12 +793,20 @@ EOF
                 if [[ "$LB_ADDR" == "localhost" ]]; then
                     LB_ADDR=`HostIP`
                 fi
-                ColorEcho INFO "Service Address : http://$LB_ADDR"
+                if [ ! $BETA ]; then
+                    ColorEcho INFO "Service Address : http://$LB_ADDR"
+                else
+                    ColorEcho INFO "Service Address : http://$LB_ADDR/beta"
+                fi
             done
         elif [[ "$TYPE" == "NodePort" ]]; then
             for NODE in $NODES; do 
                 if [[ `curl --connect-timeout 1 -s $NODE:$NODEPORT >> /dev/null 2>&1; echo $?` == "0" ]]; then
-                    ColorEcho INFO "Service Address : http://$NODE:$NODEPORT"
+                    if [ ! $BETA ]; then
+                        ColorEcho INFO "Service Address : http://$NODE:$NODEPORT"
+                    else
+                        ColorEcho INFO "Service Address : http://$NODE:$NODEPORT/beta"
+                    fi
                 fi
             done
         else
