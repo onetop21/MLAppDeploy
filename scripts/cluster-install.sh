@@ -495,25 +495,41 @@ if [ $MASTER ] || [ $WORKER ]; then
         # Step 1: Install NVIDIA Container Runtine
         PrintStep Install NVIDIA Container Runtime.
         # Check Nvidia Driver status
-        if [ `IsInstalled nvidia-smi` == "0" ];
-        then
+        if [ `IsInstalled nvidia-smi` == "0" ]; then
             ColorEcho WARN "Cannot find NVIDIA Graphic Card."
-        elif [ `IsInstalled nvidia-container-runtime` == "1" ];
-        then
-            ColorEcho INFO "Already installed NVIDIA container runtime."
         else
-            ColorEcho INFO "Install NVIDIA container runtime."
-
-            InstallNVIDIAContainerRuntime
-        
-            if [ `IsInstalled nvidia-container-runtime` == "1" ];
-            then
-                ColorEcho INFO "Completed installation NVIDIA container runtime."
+            if [ `IsInstalled nvidia-container-runtime` == "1" ]; then
+                ColorEcho INFO "Already installed NVIDIA container runtime."
             else
-                ColorEcho ERROR "Failed to install NVIDIA container runtime."
-                ColorEcho ERROR "Pass this installation..." 
-                ColorEcho ERROR "If you want to use GPU on node, install NVIDIA container runtime at this node manually."
+                ColorEcho INFO "Install NVIDIA container runtime."
+
+                InstallNVIDIAContainerRuntime
+
+                if [ `IsInstalled nvidia-container-runtime` == "1" ];
+                then
+                    ColorEcho INFO "Completed installation NVIDIA container runtime."
+                else
+                    ColorEcho ERROR "Failed to install NVIDIA container runtime."
+                    ColorEcho ERROR "Pass this installation..." 
+                    ColorEcho ERROR "If you want to use GPU on node, install NVIDIA container runtime at this node manually."
+                fi
             fi
+        
+            # NVIDIA Node Label
+            declare -A GPU_COUNT
+            GPU_LIST=`nvidia-smi -L`
+            IFS=$'\n'
+            for GPU in $GPU_LIST; do
+              PATTERN="GPU ([0-9]+): ([A-Za-z0-9 ]+) \(UUID: ([A-Za-z0-9-]+)\)"
+              [[ $GPU =~ $PATTERN ]]
+              PRODUCT=`echo ${BASH_REMATCH[2],,} | tr ' ' '_'`
+              GPU_COUNT[$PRODUCT]=$((${GPU_COUNT[$PRODUCT]}+1))
+            done
+            NODE_LABELS=
+            for DEVICE in ${!GPU_COUNT[@]};
+            do
+                NODE_LABELS="$NODE_LABELS --node-label nvidia/$DEVICE=${GPU_COUNT[$DEVICE]}"
+            done
         fi
 
         # Step 4: Install Kubernetes
@@ -536,7 +552,7 @@ if [ $MASTER ] || [ $WORKER ]; then
                     echo "$USER ALL=NOPASSWD: `which cat`" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
                     # Install k3s server
                     k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
-                        '--disable traefik --write-kubeconfig-mode 644'
+                        '--disable traefik --write-kubeconfig-mode 644 $NODE_LABELS'
                 elif [ $WORKER ]; then
                     # Add priviledged for getting token
                     ColorEcho INFO "Set priviledge for getting token by worker."
@@ -545,7 +561,8 @@ if [ $MASTER ] || [ $WORKER ]; then
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $USER@127.0.0.1 >> /dev/null 2>&1
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP >> /dev/null 2>&1
                     # Install k3s agent
-                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER
+                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER --k3s-extra-args \
+                        '$NODE_LABELS'
                     ColorEcho INFO "Finish join worker node with $MASTER_IP."
                 else
                     ColorEcho ERROR "Failed to install kubernetes. You need to run with master or worker command."
