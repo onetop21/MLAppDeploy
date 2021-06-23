@@ -247,7 +247,7 @@ elif [ $DEPLOY ]; then
             ;;
         --ingress) shift
             INGRESS=1
-            case "$(1,,)" in
+            case "${1,,}" in
             lb|loadbalancer)
                 LOADBALANCER=1
                 ;;
@@ -709,7 +709,7 @@ elif [ $DEPLOY ]; then
                 if [ -f mlad-service-beta.yaml ]; then
                     mkdir -p .temp
                     cp mlad-service-beta.yaml .temp/
-                    cat >> .temp/kustomization.yaml << EOF
+                    cat > .temp/kustomization.yaml << EOF
 resources:
 - mlad-service-beta.yaml
 images:
@@ -733,7 +733,7 @@ EOF
             if [ -f mlad-service.yaml ]; then
                 mkdir -p .temp
                 cp mlad-service.yaml .temp/
-                cat >> .temp/kustomization.yaml << EOF
+                cat > .temp/kustomization.yaml << EOF
 resources:
 - mlad-service.yaml
 images:
@@ -744,7 +744,7 @@ EOF
     #            kubectl apply -f mlad-service.yaml
             else
                 mkdir -p /tmp/mlad-service
-                cat >> /tmp/mlad-service/kustomization.yaml << EOF
+                cat > /tmp/mlad-service/kustomization.yaml << EOF
 resources:
 - https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
 images:
@@ -758,7 +758,7 @@ EOF
             if [ -f mlad-service-beta.yaml ]; then
                 mkdir -p .temp
                 cp mlad-service-beta.yaml .temp/
-                cat >> .temp/kustomization.yaml << EOF
+                cat > .temp/kustomization.yaml << EOF
 resources:
 - mlad-service-beta.yaml
 images:
