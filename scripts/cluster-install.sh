@@ -766,7 +766,7 @@ EOF
                 kubectl apply -k .temp
             else
                 ColorEcho INFO "Rolling Update..."
-                kubectl -n mlad set image deployment/mlad-service-beta mlad-service=$IMAGE_NAME --record
+                kubectl -n mlad set image deployment/mlad-service-beta mlad-service-beta=$IMAGE_NAME --record
                 kubectl -n mlad rollout restart deployment/mlad-service-beta
                 kubectl -n mlad rollout status deployment/mlad-service-beta
             fi
