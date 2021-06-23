@@ -213,17 +213,17 @@ elif [ $BUILD ]; then
         --registry) shift
             REGISTRY_ADDR=$1
             ;;
-        -f|--build-from) shift
-            case "$1" in
-            local|git)
-                BUILD_FROM=$1
-                ;;
-            *)
-                ColorEcho ERROR "Only support value 'local' or 'git'."
-                exit 1
-                ;;
-            esac
-            ;;
+        #-f|--build-from) shift
+        #    case "$1" in
+        #    local|git)
+        #        BUILD_FROM=$1
+        #        ;;
+        #    *)
+        #        ColorEcho ERROR "Only support value 'local' or 'git'."
+        #        exit 1
+        #        ;;
+        #    esac
+        #    ;;
         -h|--help)
             BuildUsage
             ;;
@@ -593,7 +593,7 @@ elif [ $BUILD ]; then
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/service
     # Step 5: Build Service Package
     PrintStep "Build Service Image."
-    if [[ "$BUILD_FROM" == "local" ]]; then
+#    if [[ "$BUILD_FROM" == "local" ]]; then
         ColorEcho INFO "Source from Local."
         cat > /tmp/mlad-service.dockerfile << EOF
 FROM        python:latest
@@ -604,18 +604,18 @@ EXPOSE      8440
 ENTRYPOINT  python -m mlad.service
 EOF
         DOCKER_BUILDKIT=0 docker build -t $IMAGE_NAME -f /tmp/mlad-service.dockerfile ..
-    else
-        ColorEcho INFO "Source from Git."
-        docker build -t $IMAGE_NAME -<< EOF
-FROM        python:latest
-RUN         git clone https://github.com/onetop21/MLAppDeploy.git
-WORKDIR     /MLAppDeploy/python
-RUN         git checkout -b refactoring origin/refactoring
-RUN         python setup.py install
-EXPOSE      8440
-ENTRYPOINT  python -m mlad.service
-EOF
-    fi
+#    else
+#        ColorEcho INFO "Source from Git."
+#        docker build -t $IMAGE_NAME -<< EOF
+#FROM        python:latest
+#RUN         git clone https://github.com/onetop21/MLAppDeploy.git
+#WORKDIR     /MLAppDeploy/python
+#RUN         git checkout -b refactoring origin/refactoring
+#RUN         python setup.py install
+#EXPOSE      8440
+#ENTRYPOINT  python -m mlad.service
+#EOF
+#    fi
     VERSION=`docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r'`
     TAGGED_IMAGE=$IMAGE_NAME:$VERSION
     PrintStep "Tag Version to Image [$VERSION]."
@@ -644,8 +644,8 @@ elif [ $DEPLOY ]; then
         kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml
     fi
 
-    PrintStep "Install Ingress Controller (NGINX)."
     if [ $INGRESS ]; then
+        PrintStep "Install Ingress Controller (NGINX)."
         if [[ `kubectl get ns ingress-nginx >> /dev/null 2>&1; echo $?` == "0" ]]; then
             SERVICE_TYPE=`kubectl -n ingress-nginx get svc/ingress-nginx-controller -o go-template={{.spec.type}}`
             case "${SERVICE_TYPE,,}" in
@@ -698,39 +698,14 @@ elif [ $DEPLOY ]; then
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/service
     VERSION=`docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r'`
     TAGGED_IMAGE=$IMAGE_NAME:$VERSION
-    if [[ `kubectl get ns mlad >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        ColorEcho INFO "Rolling Update..."
-        
-        kubectl -n mlad set image deployment/mlad-service mlad-service=$TAGGED_IMAGE --record
-        kubectl -n mlad rollout restart deployment/mlad-service
-        kubectl -n mlad rollout status deployment/mlad-service
-        if [ $BETA ]; then
-            if [ `kubectl get deploy/mlad-service-beta -n mlad >> /dev/null 2>&1; echo $?` ]; then
-                if [ -f mlad-service-beta.yaml ]; then
-                    mkdir -p .temp
-                    cp mlad-service-beta.yaml .temp/
-                    cat > .temp/kustomization.yaml << EOF
-resources:
-- mlad-service-beta.yaml
-images:
-- name: ghcr.io/onetop21/mlappdeploy/service
-  newName: $IMAGE_NAME
-EOF
-                    kubectl apply -k .temp
-                else
-                    ColorEcho WARN "Beta service deployment only supports git clone status."
-                fi
-            else
-                kubectl -n mlad set image deployment/mlad-service-beta mlad-service=$IMAGE_NAME --record
-                kubectl -n mlad rollout restart deployment/mlad-service-beta
-                kubectl -n mlad rollout status deployment/mlad-service-beta
-            fi
-        fi
-    else
-        ColorEcho "Deploy MLAppDeploy service."
-        kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
-        if [ ! $BETA ]; then
+    [ `kubectl get ns mlad >> /dev/null 2>&1; echo $?` -eq 0 ] && IS_EXIST_NS=1
+    [ `kubectl get deploy/mlad-service -n mlad >> /dev/null 2>&1; echo $?` -eq 0 ] && IS_RUNNING_SERVICE=1
+    [ `kubectl get deploy/mlad-service-beta -n mlad >> /dev/null 2>&1; echo $?` -eq 0 ] && IS_RUNNING_SERVICE_BETA=1
+    if [ ! $BETA ]; then
+        if [ ! $IS_RUNNING_SERVICE ]; then
             if [ -f mlad-service.yaml ]; then
+                ColorEcho "Deploy MLAppDeploy service."
+                kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
                 mkdir -p .temp
                 cp mlad-service.yaml .temp/
                 cat > .temp/kustomization.yaml << EOF
@@ -741,8 +716,8 @@ images:
   newName: $TAGGED_IMAGE
 EOF
                  kubectl apply -k .temp
-    #            kubectl apply -f mlad-service.yaml
             else
+                # Deploy script from stream. (No have script on local.)
                 mkdir -p /tmp/mlad-service
                 cat > /tmp/mlad-service/kustomization.yaml << EOF
 resources:
@@ -752,25 +727,13 @@ images:
   newName: $TAGGED_IMAGE
 EOF
                  kubectl apply -k /tmp/mlad-service
-    #            kubectl apply -f https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
             fi
         else
-            if [ -f mlad-service-beta.yaml ]; then
-                mkdir -p .temp
-                cp mlad-service-beta.yaml .temp/
-                cat > .temp/kustomization.yaml << EOF
-resources:
-- mlad-service-beta.yaml
-images:
-- name: ghcr.io/onetop21/mlappdeploy/service
-  newName: $IMAGE_NAME
-EOF
-                kubectl apply -k .temp
-            else
-                ColorEcho WARN "Beta service deployment only supports git clone status."
-            fi
+            ColorEcho INFO "Rolling Update..."
+            kubectl -n mlad set image deployment/mlad-service mlad-service=$TAGGED_IMAGE --record
+            kubectl -n mlad rollout restart deployment/mlad-service
+            kubectl -n mlad rollout status deployment/mlad-service
         fi
-
         if [[ "$?" == "0" ]]; then
             ColorEcho INFO "Wait to activate MLAppDeploy service...(up to 2mins)"
             kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service
@@ -785,6 +748,45 @@ EOF
             ColorEcho INFO $TOKEN_LOG
         else
             ColorEcho ERROR "Failed to deploy MLApploy Service."
+        fi
+    else
+        if [ -f mlad-service-beta.yaml ]; then
+            if [ ! $IS_RUNNING_SERVICE_BETA ]; then
+                ColorEcho "Deploy MLAppDeploy service."
+                kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
+                mkdir -p .temp
+                cp mlad-service-beta.yaml .temp/
+                cat > .temp/kustomization.yaml << EOF
+resources:
+- mlad-service-beta.yaml
+images:
+- name: ghcr.io/onetop21/mlappdeploy/service
+  newName: $IMAGE_NAME
+EOF
+                kubectl apply -k .temp
+            else
+                ColorEcho INFO "Rolling Update..."
+                kubectl -n mlad set image deployment/mlad-service-beta mlad-service=$IMAGE_NAME --record
+                kubectl -n mlad rollout restart deployment/mlad-service-beta
+                kubectl -n mlad rollout status deployment/mlad-service-beta
+            fi
+        else
+            ColorEcho WARN "Beta service deployment only supports git clone status."
+        fi
+        if [[ "$?" == "0" ]]; then
+            ColorEcho INFO "Wait to activate MLAppDeploy beta service...(up to 2mins)"
+            kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service-beta
+            if [[ "$?" != "0" ]]; then
+                ColorEcho ERROR "Cannot verify to deploy MLAppDeploy Beta Service."
+                exit 1
+            fi
+            while [[ -z "$TOKEN_LOG" ]]; do
+                sleep 1
+                TOKEN_LOG=`kubectl logs -n mlad deploy/mlad-service-beta 2>&1 | head -n1`
+            done
+            ColorEcho INFO $TOKEN_LOG
+        else
+            ColorEcho ERROR "Failed to deploy MLApploy Beta Service."
         fi
     fi
     if [[ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` == "0" ]]; then
