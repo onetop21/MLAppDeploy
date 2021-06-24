@@ -800,8 +800,8 @@ def get_node(cli, node_key):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     nodes = api.list_node(field_selector=f"metadata.name={node_key}")
-    if not nodes.items:
-        nodes = api.list_node(field_selector=f"metadata.uid={node_key}")
+    #if not nodes.items:
+    #    nodes = api.list_node(field_selector=f"metadata.uid={node_key}")
     if nodes.items: 
         return nodes.items[0]
     else:
