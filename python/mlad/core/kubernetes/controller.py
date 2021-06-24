@@ -1098,8 +1098,22 @@ def get_project_resources(cli, project_key):
                                           field_selector=field_selector)
         for pod in pods.items:
             pod_name = pod.metadata.name
-            metric = api.get_namespaced_custom_object("metrics.k8s.io", "v1beta1", namespace,
-                                                      "pods", pod_name)
+            try:
+                metric = api.get_namespaced_custom_object("metrics.k8s.io", "v1beta1", namespace,
+                                                        "pods", pod_name)
+            except ApiException as e:
+                if e.headers['Content-Type'] == 'application/json':
+                    body = json.loads(e.body)
+                    if body['kind'] == 'Status':
+                        print(f"{body['status']} : {body['message']}")
+                resource['cpu'] = 'None'
+                resource['mem'] = 'None'
+
+                for container in pod.spec.containers:
+                    requests = defaultdict(lambda: '0', container.resources.requests or {})
+                    resource['gpu'] += int(requests['nvidia.com/gpu'])
+                break
+
             for _ in metric['containers']:
                 resource['cpu'] += parse_cpu(_['usage']['cpu'])
                 resource['mem'] += parse_mem(_['usage']['memory'])

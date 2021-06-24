@@ -52,13 +52,17 @@ def service_list(no_trunc):
     columns = [('SERVICE', 'MEMORY(Mi)', 'CPU(cores)', 'GPU(#)')]
 
     for service, resources in res.items():
-        if not no_trunc:
-            mem = round(resources['mem'], 1)
-            cpu = round(resources['cpu'], 1)
-            gpu = round(resources['gpu'], 1)
-            columns.append((service, mem, cpu, gpu))
+        if resources['mem'] == 'None':
+            gpu = round(resources['gpu'], 1) if not no_trunc else resources['gpu']
+            columns.append((service, 'NotReady', 'NotReady', gpu))
         else:
-            columns.append((service, resources['mem'], resources['cpu'], resources['gpu']))
+            if not no_trunc:
+                mem = round(resources['mem'], 1)
+                cpu = round(resources['cpu'], 1)
+                gpu = round(resources['gpu'], 1)
+                columns.append((service, mem, cpu, gpu))
+            else:
+                columns.append((service, resources['mem'], resources['cpu'], resources['gpu']))
     utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
 
 
@@ -83,13 +87,19 @@ def project_list(no_trunc):
         from collections import defaultdict
         collect = defaultdict(lambda: 0)
         for service, resources in services.items():
-            collect['mem'] += resources['mem']
-            collect['cpu'] += resources['cpu']
+            if resources['mem'] == 'None':
+                collect['mem'] = 'NotReady'
+                collect['cpu'] = 'NotReady'
+            else:
+                collect['mem'] = collect['mem'] if collect['mem'] == 'NotReady' \
+                    else collect['mem']+resources['mem']
+                collect['cpu'] = collect['cpu'] if collect['cpu'] == 'NotReady' \
+                    else collect['cpu']+resources['cpu']
             collect['gpu'] += resources['gpu']
-
+        status = collect['mem']
         if not no_trunc:
-            mem = round(collect['mem'], 1)
-            cpu = round(collect['cpu'], 1)
+            mem = round(collect['mem'], 1) if not status =='NotReady' else collect['mem']
+            cpu = round(collect['cpu'], 1) if not status =='NotReady' else collect['cpu']
             gpu = round(collect['gpu'], 1)
             columns.append((project, mem, cpu, gpu))
         else:
