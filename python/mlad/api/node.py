@@ -49,7 +49,7 @@ class Node():
         return res.json()
 
     def resource(self, nodes=[]):
-        url = f'{self.url}/node/resource'
+        url = f'{self.url}/nodes/resource'
         header = {'token': self.token}
         params = {'nodes': nodes}
         res = requests.get(url=url, params=params, headers=header)

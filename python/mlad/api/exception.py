@@ -42,7 +42,7 @@ def error_from_http_errors(e):
         elif reason == 'ServiceNotFound':
             cls = ServiceNotFound
         else:
-            cls = Notfound
+            cls = NotFound
     elif e.response.status_code == 400:
         if reason == 'ServiceNotRunning':
             cls = InvalidLogRequest

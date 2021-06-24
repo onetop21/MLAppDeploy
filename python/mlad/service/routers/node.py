@@ -93,7 +93,7 @@ def node_delete_label(node_id:str, req:node.DeleteLabelRequest):
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': 'labels deleted'}
 
-@user_router.get("/node/resource")
+@user_router.get("/nodes/resource")
 def node_resource(nodes: List[str] = Query(None)):
     cli = ctlr.get_api_client()
     res={}
