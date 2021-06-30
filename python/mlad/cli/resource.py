@@ -1,7 +1,10 @@
 import sys
+from collections import defaultdict
 from mlad.cli.libs import utils
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
+
+
 
 def node_list(nodes, no_trunc):
     config = utils.read_config()
@@ -26,14 +29,15 @@ def node_list(nodes, no_trunc):
     for node, resources in res.items():
         for i, type in enumerate(resources):
             status = resources[type]
+            capacity = status['capacity']
+            used = status['used']
+            allocatable = status['allocatable']
             if not no_trunc:
-                capacity = round(status['capacity'], 1)
-                used = round(status['used'], 1)
-                allocatable = round(status['allocatable'], 1)
+                capacity = round(capacity, 1)
+                used = round(used, 1) if not used == None else 'NotReady'
+                allocatable = round(allocatable, 1)
             else:
-                capacity = status['capacity']
-                used = status['used']
-                allocatable = status['allocatable']
+                used = status['used'] if not used == None else 'NotReady'
             percentage = int(allocatable / capacity * 100) if capacity else 0
             type = get_unit(type)
             columns.append((node if not i else '', type, capacity, used,
@@ -52,7 +56,7 @@ def service_list(no_trunc):
     columns = [('SERVICE', 'MEMORY(Mi)', 'CPU(cores)', 'GPU(#)')]
 
     for service, resources in res.items():
-        if resources['mem'] == 'None':
+        if resources['mem'] == None:
             gpu = round(resources['gpu'], 1) if not no_trunc else resources['gpu']
             columns.append((service, 'NotReady', 'NotReady', gpu))
         else:
@@ -68,7 +72,7 @@ def service_list(no_trunc):
 
 def project_list(no_trunc):
     config = utils.read_config()
-    columns = [('PROJECT', 'MEMORY(Mi)', 'CPU(cores)', 'GPU(#)')]
+    columns = [('PROJECT', 'MEMORY(Mi)', 'CPU(cores)', 'GPU(#)', 'STATUS')]
     res = {}
     try:
         with API(config.mlad.address, config.mlad.token.user) as api:
@@ -84,24 +88,23 @@ def project_list(no_trunc):
         sys.exit(1)
 
     for project, services in res.items():
-        from collections import defaultdict
-        collect = defaultdict(lambda: 0)
-        for service, resources in services.items():
-            if resources['mem'] == 'None':
-                collect['mem'] = 'NotReady'
-                collect['cpu'] = 'NotReady'
-            else:
-                collect['mem'] = collect['mem'] if collect['mem'] == 'NotReady' \
-                    else collect['mem']+resources['mem']
-                collect['cpu'] = collect['cpu'] if collect['cpu'] == 'NotReady' \
-                    else collect['cpu']+resources['cpu']
-            collect['gpu'] += resources['gpu']
-        status = collect['mem']
-        if not no_trunc:
-            mem = round(collect['mem'], 1) if not status =='NotReady' else collect['mem']
-            cpu = round(collect['cpu'], 1) if not status =='NotReady' else collect['cpu']
-            gpu = round(collect['gpu'], 1)
-            columns.append((project, mem, cpu, gpu))
-        else:
-            columns.append((project, collect['mem'], collect['cpu'], collect['gpu']))
+       used = defaultdict(lambda: 0)
+       collect = {'used': used, 'status': 'Collected'}
+       for service, resources in services.items():
+           if resources['mem'] == None:
+               collect['status'] = 'NotReady'
+           else:
+               collect['used']['mem'] += resources['mem']
+               collect['used']['cpu'] += resources['cpu']
+           collect['used']['gpu'] += resources['gpu']
+
+       mem = collect['used']['mem']
+       cpu = collect['used']['cpu']
+       gpu = collect['used']['gpu']
+
+       mem = mem if no_trunc else round(mem, 1)
+       cpu = cpu if no_trunc else round(cpu, 1)
+       gpu = gpu if no_trunc else round(gpu, 1)
+
+       columns.append((project, mem, cpu, gpu, collect['status']))
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)

@@ -1064,9 +1064,18 @@ def get_node_resources(cli, node):
     cpu = int(allocatable['cpu']) #core
     gpu = int(allocatable['nvidia.com/gpu']) if 'nvidia.com/gpu' in allocatable else 0 #cnt
 
-    metric = api.get_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", name)
-    used_mem = parse_mem(metric['usage']['memory'])
-    used_cpu = parse_cpu(metric['usage']['cpu'])
+    try:
+        metric = api.get_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", name)
+    except ApiException as e:
+        if e.headers['Content-Type'] == 'application/json':
+            body = json.loads(e.body)
+            if body['kind'] == 'Status':
+                print(f"{body['status']} : {body['message']}")
+        used_mem = None
+        used_cpu = None
+    else:
+        used_mem = parse_mem(metric['usage']['memory'])
+        used_cpu = parse_cpu(metric['usage']['cpu'])
     used_gpu = 0
 
     selector = (f'spec.nodeName={name},status.phase!=Succeeded,status.phase!=Failed')
@@ -1088,6 +1097,14 @@ def get_project_resources(cli, project_key):
     res = {}
     services = get_services(cli, project_key)
 
+    def gpu_usage(pod):
+        used = 0
+        for container in pod.spec.containers:
+            requests = defaultdict(lambda: '0', container.resources.requests or {})
+            used += int(requests['nvidia.com/gpu'])
+        return used
+
+
     for name, service in services.items():
         resource = defaultdict(lambda: 0)
         namespace = service.metadata.namespace
@@ -1106,21 +1123,15 @@ def get_project_resources(cli, project_key):
                     body = json.loads(e.body)
                     if body['kind'] == 'Status':
                         print(f"{body['status']} : {body['message']}")
-                resource['cpu'] = 'None'
-                resource['mem'] = 'None'
-
-                for container in pod.spec.containers:
-                    requests = defaultdict(lambda: '0', container.resources.requests or {})
-                    resource['gpu'] += int(requests['nvidia.com/gpu'])
+                resource['cpu'] = None
+                resource['mem'] = None
+                resource['gpu'] += gpu_usage(pod)
                 break
 
             for _ in metric['containers']:
                 resource['cpu'] += parse_cpu(_['usage']['cpu'])
                 resource['mem'] += parse_mem(_['usage']['memory'])
-
-            for container in pod.spec.containers:
-                requests = defaultdict(lambda: '0', container.resources.requests or {})
-                resource['gpu'] += int(requests['nvidia.com/gpu'])
+            resource['gpu'] += gpu_usage(pod)
 
         res[name] = {'mem': resource['mem'], 'cpu': resource['cpu'], 'gpu': resource['gpu']}
     return res
