@@ -514,22 +514,6 @@ if [ $MASTER ] || [ $WORKER ]; then
                     ColorEcho ERROR "If you want to use GPU on node, install NVIDIA container runtime at this node manually."
                 fi
             fi
-        
-            # NVIDIA Node Label
-            declare -A GPU_COUNT
-            GPU_LIST=`nvidia-smi -L`
-            IFS=$'\n'
-            for GPU in $GPU_LIST; do
-              PATTERN="GPU ([0-9]+): ([A-Za-z0-9 ]+) \(UUID: ([A-Za-z0-9-]+)\)"
-              [[ $GPU =~ $PATTERN ]]
-              PRODUCT=`echo ${BASH_REMATCH[2],,} | tr ' ' '_'`
-              GPU_COUNT[$PRODUCT]=$((${GPU_COUNT[$PRODUCT]}+1))
-            done
-            NODE_LABELS=
-            for DEVICE in ${!GPU_COUNT[@]};
-            do
-                NODE_LABELS="$NODE_LABELS --node-label nvidia/$DEVICE=${GPU_COUNT[$DEVICE]}"
-            done
         fi
 
         # Step 4: Install Kubernetes
@@ -552,7 +536,7 @@ if [ $MASTER ] || [ $WORKER ]; then
                     echo "$USER ALL=NOPASSWD: `which cat`" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
                     # Install k3s server
                     k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
-                        "--disable traefik --write-kubeconfig-mode 644 $NODE_LABELS"
+                        "--disable traefik --write-kubeconfig-mode 644"
                 elif [ $WORKER ]; then
                     # Add priviledged for getting token
                     ColorEcho INFO "Set priviledge for getting token by worker."
@@ -561,8 +545,7 @@ if [ $MASTER ] || [ $WORKER ]; then
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $USER@127.0.0.1 >> /dev/null 2>&1
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP >> /dev/null 2>&1
                     # Install k3s agent
-                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER --k3s-extra-args \
-                        "$NODE_LABELS"
+                    k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER
                     ColorEcho INFO "Finish join worker node with $MASTER_IP."
                 else
                     ColorEcho ERROR "Failed to install kubernetes. You need to run with master or worker command."
@@ -640,7 +623,7 @@ elif [ $DEPLOY ]; then
     GetPrivileged
 
     [ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` -ne 0 ] && INGRESS=1
-    MAX_STEP=$((2+INGRESS))
+    MAX_STEP=$((3+INGRESS))
     
     if [[ `kubectl get node >> /dev/null 2>&1; echo $?` != "0" ]]; then
         ColorEcho ERROR "Need to install MLAppDeploy environment as master first."
@@ -653,6 +636,18 @@ elif [ $DEPLOY ]; then
         ColorEcho 'Already installed NVIDIA device plugin.'
     else
         kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml
+    fi
+
+    PrintStep "Install Node Feature Discovery."
+    if [[ `kubect -n node-feature-discovery get ds/nfd >> /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho 'Already installed node feature discovery.'
+    else
+        kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml
+    fi
+    if [[ `kubect -n node-feature-discovery get ds/gpu-feature-discovery >> /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho 'Already installed GPU feature discovery.'
+    else
+        kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/gpu-feature-discovery-daemonset.yaml -n node-feature-discovery
     fi
 
     if [ $INGRESS ]; then
