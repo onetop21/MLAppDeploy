@@ -736,25 +736,21 @@ elif [ $DEPLOY ]; then
                 kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
                 mkdir -p .temp
                 cp mlad-service.yaml .temp/
-                cat > .temp/kustomization.yaml << EOF
-resources:
-- mlad-service.yaml
-images:
-- name: ghcr.io/onetop21/mlappdeploy/service
-  newName: $TAGGED_IMAGE
-EOF
-                 kubectl apply -k .temp
+                pushd .temp
+                rm kustomization.yaml >> /dev/null 2>&1
+                kustomize create --resources mlad-service.yaml
+                kustomize edit set image ghcr.io/onetop21/mlappdeploy/service=$TAGGED_IMAGE
+                popd
+                kubectl apply -k .temp
             else
                 # Deploy script from stream. (No have script on local.)
                 mkdir -p /tmp/mlad-service
-                cat > /tmp/mlad-service/kustomization.yaml << EOF
-resources:
-- https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
-images:
-- name: ghcr.io/onetop21/mlappdeploy/service
-  newName: $TAGGED_IMAGE
-EOF
-                 kubectl apply -k /tmp/mlad-service
+                pushd /tmp/mlad-service
+                rm kustomization.yaml >> /dev/null 2>&1
+                kustomize create --resources https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
+                kustomize edit set image ghcr.io/onetop21/mlappdeploy/service=$TAGGED_IMAGE
+                popd
+                kubectl apply -k /tmp/mlad-service
             fi
         else
             ColorEcho INFO "Rolling Update..."
@@ -784,13 +780,11 @@ EOF
                 kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
                 mkdir -p .temp
                 cp mlad-service-beta.yaml .temp/
-                cat > .temp/kustomization.yaml << EOF
-resources:
-- mlad-service-beta.yaml
-images:
-- name: ghcr.io/onetop21/mlappdeploy/service
-  newName: $IMAGE_NAME
-EOF
+                pushd .temp
+                rm kustomization.yaml >> /dev/null 2>&1
+                kustomize create --resources mlad-service-beta.yaml
+                kustomize edit set image ghcr.io/onetop21/mlappdeploy/service=$IMAGE_NAME
+                popd
                 kubectl apply -k .temp
             else
                 ColorEcho INFO "Rolling Update..."
