@@ -534,6 +534,18 @@ if [ $MASTER ] || [ $WORKER ]; then
                     # Add priviledged for getting token
                     ColorEcho INFO "Set priviledge for getting token by worker."
                     echo "$USER ALL=NOPASSWD: `which cat`" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
+                    # Create registries.yaml for insecure private registry
+                    RUNNING_CONTAINER=`sudo docker ps -q -f label=mlappdeploy.type=registry | wc -l`
+                    MASTER_IP=`HostIP`
+                    if [ $RUNNING_CONTAINER ]; then
+                        ColorEcho "Register insecure registry."
+                        cat << EOF | sudo tee /etc/rancher/k3s/registries.yaml
+mirrors:
+  "$MASTER_IP:5000":
+    endpoint:
+      - "http://$MASTER_IP:5000"
+EOF
+                    fi
                     # Install k3s server
                     k3sup install --local --local-path ~/.kube/config --k3s-extra-args \
                         "--disable traefik --write-kubeconfig-mode 644"
@@ -544,6 +556,16 @@ if [ $MASTER ] || [ $WORKER ]; then
                     cat /dev/zero | ssh-keygen -q -N "" >> /dev/null 2>&1
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $USER@127.0.0.1 >> /dev/null 2>&1
                     ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP >> /dev/null 2>&1
+                    # Create registries.yaml for insecure private registry
+                    if [ `curl -s -o /dev/null -w "%{http_code}" http://$MASTER_IP:5000/v2/_catalog` -eq "200" ]; then
+                        ColorEcho "Register insecure registry."
+                        cat << EOF | sudo tee /etc/rancher/k3s/registries.yaml
+mirrors:
+  "$MASTER_IP:5000":
+    endpoint:
+      - "$MASTER_IP:5000"
+EOF
+                    fi
                     # Install k3s agent
                     k3sup join --server-ip $MASTER_IP --user $MASTER_USER --ip 127.0.0.1 --user $USER
                     ColorEcho INFO "Finish join worker node with $MASTER_IP."
