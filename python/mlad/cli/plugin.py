@@ -118,94 +118,25 @@ def installed(no_trunc):
             columns.append((projects[project]['username'], projects[project]['project'], '-', '-', '-', '-', '-'))
     utils.print_table(*([columns, 'Cannot find running plugin.'] + ([0] if no_trunc else [])))
 
-#def instance(with_build):
-#    project = utils.get_project(default_project)
-#
-#    if with_build: build(False, True)
-#
-#    print('Deploying test container image to local...')
-#    config = utils.read_config()
-#
-#    cli = ctlr.get_api_client()
-#    base_labels = core_utils.base_labels(utils.get_workspace(), get_username(config), project['project'], config['docker']['registry'])
-#    project_key = base_labels['MLAD.PROJECT']
-#    
-#    with interrupt_handler(message='Wait.', blocked=True) as h:
-#        try:
-#            extra_envs = utils.get_service_env(config)
-#            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
-#                if 'stream' in _:
-#                    sys.stdout.write(_['stream'])
-#                if 'result' in _:
-#                    if _['result'] == 'succeed':
-#                        network = ctlr.get_project_network(cli, network_id=_['id'])
-#                    else:
-#                        print(f"Unknown Stream Result [{_['stream']}]")
-#                    break
-#        except exception.AlreadyExist as e:
-#            print('Already running project.', file=sys.stderr)
-#            sys.exit(1)
-#
-#        # Start Containers
-#        instances = ctlr.create_containers(cli, network, project['services'] or {})  
-#        for instance in instances:
-#            inspect = ctlr.inspect_container(instance)
-#            print(f"Starting {inspect['name']}...")
-#            time.sleep(1)
-#
-#    # Show Logs
-#    with interrupt_handler(blocked=False) as h:
-#        colorkey = {}
-#        for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
-#            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
-#
-#    # Stop Containers and Network
-#    with interrupt_handler(message='Wait.', blocked=True):
-#        containers = ctlr.get_containers(cli, project_key).values()
-#        ctlr.remove_containers(cli, containers)
-#
-#        try:
-#            for _ in ctlr.remove_project_network(cli, network, stream=True):
-#                if 'stream' in _:
-#                    sys.stdout.write(_['stream'])
-#                if 'result' in _:
-#                    if _['result'] == 'succeed':
-#                        print('Network removed.')
-#                    break
-#        except docker.errors.APIError as e:
-#            print('Network already removed.', file=sys.stderr)
-#    print('Done.')
 
 def install(name_version, arguments):
     config = utils.read_config()
     cli = ctlr.get_api_client()
     name, version = name_version.split(':') if ':' in name_version else (name_version, 'latest')
-    username = get_username(config)
-    basename = f'{username}-{name.lower()}-plugin'
-    #reponame = f"{basename}:{version}"
-    image_name = f'{username}/{name.lower()}-plugin:{version}'
-    project_key = core_utils.project_key(basename)
-
     manifest = utils.get_manifest('plugin', default_plugin)
     base_labels = core_utils.base_labels(
             utils.get_workspace(),
             utils.get_username(config),
             manifest['plugin'],
             'plugin')
-
-    # basename = base_labels['MLAD.PROJECT.BASE']
-    # username = base_labels['MLAD.PROJECT.USERNAME']
-    # image_name = base_labels['MLAD.PROJECT.IMAGE']
-    # project_key = base_labels['MLAD.PROJECT']
+    image_name = f'{base_labels["MLAD.PROJECT.IMAGE"].rsplit(":", 1)[0]}:{version}'
+    project_key = base_labels['MLAD.PROJECT']
 
     if version != 'latest':
         images = ctlr.get_images(cli, project_key=project_key, extra_labels=[f"MLAD.PROJECT.IMAGE={image_name}"])
     else:
         images = ctlr.get_images(cli, project_key=project_key)
         images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
-        # tag_key = lambda x: chr(0xFFFF) if x[0].endswith('latest') else x[0].rsplit(':', 1)[-1]
-        # images = sorted([(_, i) for i in images for _ in i.tags], key=tag_key)
-        # images = [images[-1][1]]
 
     # select suitable image
     if not images:

@@ -436,7 +436,8 @@ def down(services, no_dump):
 
     def _get_log_path():
         timestamp = str(inspect['created'])
-        log_dir = f'{workdir}/.logs/{timestamp}'
+        time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
+        log_dir = f'{workdir}/.logs/{time}'
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         return log_dir

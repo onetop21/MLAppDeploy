@@ -5,7 +5,6 @@ from .exception import APIError, ServiceNotFound, raise_error
 class Service():
     def __init__(self, url):
         self.url = f'{url}/project'
-        #self.token = token
 
     def get(self, project_key=None, labels=None):
         if project_key:
@@ -22,7 +21,6 @@ class Service():
         for service in services:
             service['name'] = service['name'].replace('_', '-')
         res = requests.post(url=url, json={'services':services})
-        #services = [{'name':'',..},{'name':'',..}]
         raise_error(res)
         return res.json()
 

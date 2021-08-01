@@ -125,7 +125,6 @@ def inspect_project_network(cli, network):
 def create_project_network(cli, base_labels, extra_envs, credential, swarm=True, allow_reuse=False, stream=False):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    #workspace = utils.get_workspace()
     project_key = base_labels['MLAD.PROJECT']
     network = get_project_network(cli, project_key=project_key)
     if network:
@@ -140,10 +139,8 @@ def create_project_network(cli, base_labels, extra_envs, credential, swarm=True,
         raise exception.AlreadyExist('Already exist project network.')
     basename = base_labels['MLAD.PROJECT.BASE']
     project_version = base_labels['MLAD.PROJECT.VERSION']
-    #inspect_image(_) for _ in get_images(cli, project_key)
     default_image = base_labels['MLAD.PROJECT.IMAGE']
 
-    # Create Docker Network
     def resp_stream():
         network_name = f"{basename}-cluster"
         try:
@@ -210,10 +207,9 @@ def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
             message = f"Failed to remove network.\n"
             #print(message, file=sys.stderr)
             yield {'result': 'failed', 'stream': message}
-            #return False
         else:
             yield {'result': 'succeed'}
-            #return True
+
     if stream:
         return resp_stream()
     else:
@@ -382,7 +378,7 @@ def inspect_service(cli, service):
         'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
         'created': replica_ret.metadata.creation_timestamp,
     }
-    #TODO SERVICE PORTS
+
     if service.spec.ports:
         for _ in service.spec.ports:
             target = _.target_port
@@ -567,7 +563,6 @@ def create_services(cli, network, services, extra_labels={}):
         }
 
         restart_policy = RESTART_POLICY_STORE.get(restart_policy.lower(), 'Never')
-        #kind = 'rc' if replicas > 1 else service['type']
         kind = CONTROLLER_STORE.get(restart_policy, 'job')
         ports = service['ports'] or [80]
         
@@ -586,17 +581,7 @@ def create_services(cli, network, services, extra_labels={}):
             'restart_policy': restart_policy,
             'constraints': constraints,
         }
-        #instance = cli.services.create(**kwargs)
 
-        ## Create Service by REST API (with AuthConfig)
-        #params = 
-        
-        #auth_configs = utils.decode_dict(config_labels['MLAD.PROJECT.AUTH_CONFIGS'])
-        #headers = get_auth_headers(cli, image, auth_configs) if auth_configs else get_auth_headers(cli, image)
-        
-        #headers['Content-Type'] = 'application/json'
-        #body = utils.change_key_style(docker.models.services._get_create_service_kwargs('create', kwargs))
-        #temp_image = kwargs.get('image') if kwargs.get('image') else config_labels['MLAD.PROJECT.IMAGE']
         envs = [client.V1EnvVar(name=_.split('=', 1)[0], value=_.split('=', 1)[1])
                for _ in env]
         command = kwargs.get('command', [])
@@ -725,31 +710,7 @@ def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=F
         for _ in collector:
             yield  _
 
-    #TODO TBD : down stream using time loop
-    def resp_stream():
-        for service in service_to_check:
-            name, namespace, kind, _ = service
-            service_removed = False
-            for tick in range(timeout):
-                if not get_service_from_kind(cli, name, namespace, kind) and \
-                        not get_service(cli, service_name=name, namespace=namespace):
-                    service_removed = True
-                    break
-                else:
-                    padding = '\033[1A\033[K' if tick else ''
-                    message = f"{padding}Wait to remove service {name} [{tick}s]\n"
-                    yield {'stream': message}
-                    time.sleep(1)
-            if not service_removed:
-                message = f"Failed to remove service {name}."
-                yield {'result': 'failed', 'stream': message}
-            else:
-                message = f"Service {name} removed."
-                yield {'result': 'succeed', 'stream': message}
-        yield {'result': 'completed'}
-
     if stream:
-        #return resp_stream()
         return resp_from_collector(collector)
     else:
         #TBD
@@ -791,7 +752,6 @@ def push_images(cli, project_key, stream=False):
 def get_nodes(cli):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    #print([(_.metadata.name, _.metadata) for _ in api.list_node().items])
     return dict(
         [(_.metadata.name, _.metadata) for _ in api.list_node().items]
     )
@@ -800,8 +760,6 @@ def get_node(cli, node_key):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     nodes = api.list_node(field_selector=f"metadata.name={node_key}")
-    #if not nodes.items:
-    #    nodes = api.list_node(field_selector=f"metadata.uid={node_key}")
     if nodes.items: 
         return nodes.items[0]
     else:
@@ -823,7 +781,7 @@ def inspect_node(node):
 
     return {
         'id': node.metadata.uid,
-        'hostname': hostname,#node.metadata.name,
+        'hostname': hostname,
         'labels': labels,
         'role': role,
         'availability': availability,
@@ -886,7 +844,6 @@ def scale_service(cli, service, scale_spec):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     name = service.metadata.name
     namespace = service.metadata.namespace
-    #TODO validate service RC or job
     config_labels = get_config_labels(cli, service, f'service-{name}-labels')
     kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
     if kind == 'job':
@@ -934,7 +891,6 @@ def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
         for _ in sources:
             if _[0] in names_or_ids:
                 selected += [(_[0], __) for __ in _[1]]
-                ##selected.append(_[:2])
                 names_or_ids.remove(_[0])
             else:
                 #check task ids of svc
@@ -942,8 +898,6 @@ def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
                     if __ in names_or_ids:
                         selected += [(_[0], __)]
                         names_or_ids.remove(__)
-                #selected += [(_[0], __) for __ in _[1] if __ in names_or_ids]
-        #names_or_ids += ['error']
         if names_or_ids:
             raise exception.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
 
@@ -991,8 +945,6 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
                 monitor.start()
                 disconnHandler.add_callback(lambda: monitor.stop())
             yield from collector
-            #for message in collector:
-            #    yield message
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
