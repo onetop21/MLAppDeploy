@@ -1,0 +1,16 @@
+!include preset-definitions.yaml
+
+############################
+# MLAppDeploy Project v0.2 #
+############################
+<<: *metadata
+workspace:
+  <<: *workspace
+ingress:
+  TEST_INGRESS:
+    <<: *ingress
+app:
+  TEST-COMP: *component
+#  TEST-APP: *app
+#  TEST-JOB: *job
+#  TEST-SERVICE: *service

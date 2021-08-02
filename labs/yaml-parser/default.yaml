@@ -1,0 +1,106 @@
+# Anchor
+x-definitions: 
+  - definition: &metadata
+      apiVersion: v1
+      kind: Project               # Project/Component
+      name: 
+      version: 0.0.1
+      maintainer: ${USER}
+      workdir: .                  # Describe workspace directory.
+  - definition: &workspace
+      kind: Workspace
+      base: python:latest         # Describe base docker image tag
+      preps:                      # Describe preparations for making envorinment.
+        - run: |
+            apt update
+            apt upgrade -y
+        - add: requirements.txt
+          run: pip install -r requirements.txt
+        - pip: requirements.txt   # requires: [ { 'pip': 'requirements.txt'} ]
+        - apt: apt-list.txt
+        - yum: yum-list.txt
+        - apk: apk-list.txt
+      ignores:                    # Describe exclude files from project.
+        - "**/.*"
+      script: |                   # Describe script run after copy files.
+        cat >> hello.py << EOF
+        import sys
+        print(f"Hello World. [{sys.argv}]")
+        EOF
+      env:                    # Describe environment variables.
+        PYTHONUNBUFFERED: 1       
+      command: python hello.py    # Describe application to execute
+      args: [1, 2, 3,]            # Describe arguments for execute application
+  - definition: &dockerfile
+      kind: Dockerfile
+      script: |
+        FROM python:latest
+      dockerfile: FILENAME
+  - definition: &ingress
+      target: $service:port       
+      rewritePath: true
+      #path: /ingress/${username}/${project_key}/$name
+  - definition: &component
+      kind: Component
+      image:                      # Describe image to run docker service for run not built image from workspace.
+      env:                        # Describe environment variables additionaly.
+        KEY: VALUE
+      ports: [80]                 # Describe expose ports to other services.
+      command:                    # Describe command to need overwrite.
+      args:                       # Describe arguments to need overwrite.
+                                  # never, on-failure, job
+                                  # always - replicaSet
+      mounts:
+        - ${datastore:URL}:/storage
+  - definition: &_app_base
+      <<: *component
+      kind: App                   # component
+      constraints:                # Describe placement constraints.
+        hostname: STRING
+        label: KEY=VALUE
+  - definition: &app
+      <<: *_app_base
+      restartPolicy: never        # Describe restart policy. (never, on-failure, always)
+      scale: 1                    # Describe number of replicas or parallelism
+      quota:                      # Describe required system resource quota.
+        cpu: 1.0
+        gpu: 1
+        mem: 1G
+  - definition: &_advanced_base
+      resources:
+        limits:
+          cpu: 1
+        requests:
+          cpu: 1
+  - definition: &job
+      <<: *_app_base
+      <<: *_advanced_base
+      kind: Job                 # job
+      runSpec:
+        restartPolicy: never    # never, onFailure
+        parallelism: 1
+        completion: 1
+  - definition: &service
+      <<: *_app_base
+      <<: *_advanced_base
+      kind: Service             # Deployment
+      runSpec:
+        replicas: 1             # Describe number to run service instances.
+        autoscaler:
+          enable: False
+          min: 1
+          max: 10
+          metrics:
+            - resource: cpu
+  - definition: &daemon
+      <<: *_app_base
+      <<: *_advanced_base
+      kind: Daemon              # DaemonSet
+      runSpec:
+        replicas: 1             # Describe number to run service instances.
+        autoscaler:
+          enable: False
+          min: 1
+          max: 10
+          metrics:
+            - resource: cpu

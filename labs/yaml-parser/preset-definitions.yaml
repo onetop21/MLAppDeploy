@@ -1,0 +1,64 @@
+# Anchor
+x-definitions: 
+  - definition: &metadata
+      name: Your Project
+      version: 0.0.1
+      maintainer: ${USER}
+  - definition: &workspace
+      base: pytorch/pytorch:1.9.0-cuda10.2-cudnn7-runtime
+      preps:
+        - pip: requirements.txt
+  - definition: &dockerfile
+      kind: Dockerfile
+      script: |
+        FROM pytorch/pytorch:1.9.0-cuda10.2-cudnn7-runtime
+        COPY . .
+        RUN  pip install -r requirements.txt
+  - definition: &ingress
+      target: TEST-SERVICE:8080
+  - definition: &component
+      kind: Component
+      ports: 
+        - 8080
+      command: python run.py 
+  - definition: &_app_base
+      <<: *component
+      kind: App 
+  - definition: &app
+      <<: *_app_base
+      quota: 
+        gpu: 1
+  - definition: &_advanced_base
+      resources:
+        limits:
+          mem: 10Gi
+        requests:
+          mem: 5Gi
+  - definition: &job
+      <<: *_app_base
+      <<: *_advanced_base
+      kind: Job
+      runSpec:
+        restartPolicy: onFailure
+        parallelism: 1
+        completion: 1
+  - definition: &service
+      <<: *_app_base
+      <<: *_advanced_base
+      kind: Service
+      runSpec:
+        replicas: 1
+        autoscaler:
+          enable: true
+          min: 1
+          max: 10
+          metrics:
+            - resources: cpu
+  - definition: &daemon
+      <<: *_app_base
+      <<: *_advanced_base
+      kind: DaemonSet
+      # runSpec:
+      #   type: dict
+      #   excludes: restartPolicy
+      #   schema:
