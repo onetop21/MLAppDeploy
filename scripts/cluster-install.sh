@@ -399,7 +399,7 @@ function GetContainerdNVIDIATemplateFile {
     if [ -f nvidia-containerd.config.toml.tmpl ]; then
         sudo cp nvidia-containerd.config.toml.tmpl /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
     else
-        sudo wget https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/nvidia-containerd.config.toml.tmpl -O /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+        sudo wget https://raw.githubusercontent.com/onetop21/MLAppDeploy/master/scripts/nvidia-containerd.config.toml.tmpl -O /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
     fi
 }
 
@@ -623,7 +623,6 @@ EOF
 #FROM        python:latest
 #RUN         git clone https://github.com/onetop21/MLAppDeploy.git
 #WORKDIR     /MLAppDeploy/python
-#RUN         git checkout -b refactoring origin/refactoring
 #RUN         python setup.py install
 #EXPOSE      8440
 #ENTRYPOINT  python -m mlad.service
@@ -747,7 +746,7 @@ elif [ $DEPLOY ]; then
                 mkdir -p /tmp/mlad-service
                 pushd /tmp/mlad-service
                 rm kustomization.yaml >> /dev/null 2>&1
-                kustomize create --resources https://raw.githubusercontent.com/onetop21/MLAppDeploy/refactoring/scripts/mlad-service.yaml
+                kustomize create --resources https://raw.githubusercontent.com/onetop21/MLAppDeploy/master/scripts/mlad-service.yaml
                 kustomize edit set image ghcr.io/onetop21/mlappdeploy/service=$TAGGED_IMAGE
                 popd
                 kubectl apply -k /tmp/mlad-service
