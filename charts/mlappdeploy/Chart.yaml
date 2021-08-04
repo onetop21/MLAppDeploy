@@ -2,7 +2,7 @@ apiVersion: v2
 name: mlappdeploy
 description: Machine Learning Application Deployment Tool by Kubernetes
 home: https://github.com/onetop21/MLAppDeploy
-kubeVersion: ">=1.18.0"
+#kubeVersion: ">=1.18.0"
 maintainers:
   - name: Hyoil LEE
     email: onetop21@gmail.com
