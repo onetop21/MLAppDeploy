@@ -27,3 +27,12 @@ version: 0.1.0
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "0.1.0"
+
+# Dependencies
+dependencies: 
+  - name: gpu-operator
+    version: v1.7.1
+    repository: https://nvidia.github.io/gpu-operator
+  - name: ingress-nginx
+    version: 3.35.0
+    repository: https://kubernetes.github.io/ingress-nginx
