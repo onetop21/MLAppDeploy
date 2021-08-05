@@ -1,9 +1,8 @@
-name: Docker Image CI
+name: API Server Image CI
 
 on:
   push:
-    # branches: [ dev ]
-    branches: [ dev ]
+    branches: [ dev, master ]
     # Publish `v1.2.3` tags as releases.
     tags:
     - v*
@@ -47,7 +46,7 @@ jobs:
         [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
         
         # Use Docker `latest` tag convention
-        [ "$VERSION" == "dev" ] && VERSION=latest
+        [[ "$VERSION" =~ [A-Za-z0-9_-]+ ]] && VERSION=latest
         
         echo GITHUB_IMAGE_ID=$GITHUB_IMAGE_ID
         echo DOCKERHUB_IMAGE_ID=$DOCKERHUB_IMAGE_ID
