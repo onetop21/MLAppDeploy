@@ -79,7 +79,7 @@
   * admin만 가능 
   * 개발용, 배포용 선택?
 * config or export ? (고민만 해보고 있음)
-  * 현재 mlad-project.yaml -> kube CRD로 바꿔주는 용도
+  * 현재 mlad-project.yaml -> kube Workload로 바꿔주는 용도
 ## 분산 처리를 NCML에서 지원이 가능할까?
   * Result <- Job <-> Job <-> Job (MapReduce) 
   * 고민 해보면 좋을 듯.
@@ -113,3 +113,48 @@
 * SDK
   * Project내 App 생성, 삭제
   * Project내 App List, Status, Log 취합
+
+
+# 역할 나누기
+* 일감
+  * Admin API를 CLI로 옮기기 (도연님)
+  * Admin Authorize를 Kubeconfig로 판단하기 (도연님)
+  * replication controller -> deployment로 교체 (도연님)
+  * build (mlad image build) (도연님)
+    * build -> local image만 만들기?
+    * project/deploy/dashboard에서 up,install 시 retag해서 적용하기
+  * Plugin Command -> dashboard? component로 옮기기 (준회님)
+    * mlad dashboard
+      * mlad dashboard up
+      * mlad dashboard down
+      * mlad dashboard install [COMPONENT]
+      * mlad dashboard uninstall [COMPONENT]
+      * mlad dashbaord ls
+      * mlad dashboard ps
+  * project (도연님)
+    * run 개발
+      * YAML의 app사용 안할 때
+        mlad run -- python app.py --test-args 1 -- test-arg-name Hello
+    * ls
+      * 기본적으로 클러스터 내 모든 잡 보여주기
+      * ls를 통해 내 프로젝트를 보여주기?
+        * --all? --own
+    * top
+      * node -> node에 node top 생성
+      * project -> ls ps에 통합
+  * deploy(command, admin 전용)  (도연님)
+    * Ingress 주소
+    * up: rolling update
+    * down: kill
+    * undo: revert
+    * history: ?
+    * config ?? - 나중에 생각하기로.
+  * context (준회님)
+    mlad --context/-c 지원 ? 이건 오케
+    * use
+    * add
+    * del
+    * ls
+    * set
+  * auto completion (준회님)
+    * 유지보수
