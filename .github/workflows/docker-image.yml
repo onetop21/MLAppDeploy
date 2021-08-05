@@ -3,7 +3,7 @@ name: Docker Image CI
 on:
   push:
     # branches: [ dev ]
-    branches: [ master, dev ]
+    branches: [ dev ]
     # Publish `v1.2.3` tags as releases.
     tags:
     - v*
@@ -30,8 +30,6 @@ jobs:
       run: |
         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 
         echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ github.actor }} --password-stdin
-        
-        cat $HOME/.docker/config.json
 
     - name: Push image
       run: |
