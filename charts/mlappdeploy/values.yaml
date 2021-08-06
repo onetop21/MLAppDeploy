@@ -2,10 +2,52 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Dependencies
+ingress-nginx:
+  enabled: false
+kube-prometheus-stack:
+  enabled: true
+  namespaceOverride: kube-prometheus-stack
+gpu-operator:
+  enabled: true
+  #namespaceOverride: gpu-operator
+  validator:
+    repository: docker.io/nvidia
+  operator:
+    repository: docker.io/nvidia
+    initContainer:
+      repository: docker.io/nvidia
+  driver:
+    repository: docker.io/nvidia
+  toolkit:
+    repository: docker.io/nvidia
+  dcgmExporter:
+    repository: docker.io/nvidia
+  gfd:
+    repository: docker.io/nvidia
+  migManager:
+    repository: docker.io/nvidia
+dcgm-exporter:
+  enabled: false
+  #namespaceOverride: gpu-operator
+  image:
+    repository: docker.io/nvidia/dcgm-exporter
+nvidia-device-plugin:
+  enabled: false
+  #namespaceOverride: nvidia-device-plugin
+  image:
+    repository: docker.io/nvidia/k8s-device-plugin
+gpu-feature-discovery:
+  enabled: false
+  image:
+    repository: docker.io/nvidia/gpu-feature-discovery
+###################
+
 replicaCount: 1
 
 image:
-  repository: ghcr.io/onetop21/mlappdeploy/service
+  fromDockerhub: false
+  repository: ghcr.io/onetop21/mlappdeploy/api-server
   pullPolicy: IfNotPresent
 
 port: 8440
@@ -66,6 +108,11 @@ ingress:
         backend:
           serviceName: mlad-service
           servicePort: 8440
+          
+tls: []
+#  - secretName: chart-example-tls
+#    hosts:
+#      - chart-example.local
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious

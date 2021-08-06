@@ -31,7 +31,11 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if not .Values.image.fromDockerhub }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- else }}
+          image: "docker.io/onetop21/mlad-api-server:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- end}}
           env: 
             {{- range $key, $val := .Values.env }}
             - name: {{ $key }}

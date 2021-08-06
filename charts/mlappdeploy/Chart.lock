@@ -1,9 +1,21 @@
 dependencies:
-- name: gpu-operator
-  repository: https://nvidia.github.io/gpu-operator
-  version: v1.7.1
 - name: ingress-nginx
   repository: https://kubernetes.github.io/ingress-nginx
   version: 3.35.0
-digest: sha256:7b443659406390dc91c8aad185bfb5d205f936504b76a793d29b5ec84b973666
-generated: "2021-08-04T05:12:50.332396218Z"
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 17.1.1
+- name: gpu-operator
+  repository: https://nvidia.github.io/gpu-operator
+  version: v1.7.1
+- name: dcgm-exporter
+  repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
+  version: 2.4.0
+- name: nvidia-device-plugin
+  repository: https://nvidia.github.io/k8s-device-plugin
+  version: 0.9.0
+- name: gpu-feature-discovery
+  repository: https://nvidia.github.io/gpu-feature-discovery
+  version: 0.4.1
+digest: sha256:b3ab55746461b36f4d97960a5dc80c778248d772431a57081b68c908891af915
+generated: "2021-08-06T15:51:02.574148945Z"
