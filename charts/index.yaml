@@ -3,16 +3,34 @@ entries:
   mlappdeploy:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-08-04T09:41:48.489724133Z"
+    created: "2021-08-06T16:13:39.754139829Z"
     dependencies:
-    - name: gpu-operator
-      repository: https://nvidia.github.io/gpu-operator
-      version: v1.7.1
-    - name: ingress-nginx
+    - condition: ingress-nginx.enabled
+      name: ingress-nginx
       repository: https://kubernetes.github.io/ingress-nginx
       version: 3.35.0
+    - condition: kube-prometheus-stack.enabled
+      name: kube-prometheus-stack
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 17.1.1
+    - condition: gpu-operator.enabled
+      name: gpu-operator
+      repository: https://nvidia.github.io/gpu-operator
+      version: v1.7.1
+    - condition: dcgm-exporter.enabled
+      name: dcgm-exporter
+      repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
+      version: 2.4.0
+    - condition: nvidia-device-plugin.enabled
+      name: nvidia-device-plugin
+      repository: https://nvidia.github.io/k8s-device-plugin
+      version: 0.9.0
+    - condition: gpu-feature-discovery.enabled
+      name: gpu-feature-discovery
+      repository: https://nvidia.github.io/gpu-feature-discovery
+      version: 0.4.1
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: 6481473d87c566ce81919155971cc199c17baae64a49fd434fc46a7c7407fdda
+    digest: fb44e63b8c85394804fb61fb4b12955701f3b9bca2b1eace3439edee544088b7
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -22,4 +40,4 @@ entries:
     urls:
     - mlappdeploy-0.1.0.tgz
     version: 0.1.0
-generated: "2021-08-04T09:41:48.469136042Z"
+generated: "2021-08-06T16:13:39.723751384Z"
