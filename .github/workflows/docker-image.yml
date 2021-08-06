@@ -2,7 +2,7 @@ name: API Server Image CI
 
 on:
   push:
-    branches: [ dev, master ]
+    branches: [ dev ]
     # Publish `v1.2.3` tags as releases.
     tags:
     - v*
@@ -25,20 +25,8 @@ jobs:
     - name: Build the Docker image
       run: docker build . --file scripts/Dockerfile_CI --tag $IMAGE_NAME
       
-    - name: Log into registry
+    - name: Generate version tag
       run: |
-        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 
-        echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ github.actor }} --password-stdin
-
-    - name: Push image
-      run: |
-        GITHUB_IMAGE_ID=ghcr.io/${{ github.repository }}/$IMAGE_NAME
-        DOCKERHUB_IMAGE_ID=docker.io/${{ github.actor }}/mlad-$IMAGE_NAME
-
-        # Change all uppercase to lowercase
-        GITHUB_IMAGE_ID=$(echo $GITHUB_IMAGE_ID | tr '[A-Z]' '[a-z]')
-        DOCKERHUB_IMAGE_ID=$(echo $DOCKERHUB_IMAGE_ID | tr '[A-Z]' '[a-z]')
-
         # Strip git ref prefix from version
         VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
 
@@ -47,14 +35,36 @@ jobs:
         
         # Use Docker `latest` tag convention
         [[ "$VERSION" =~ [A-Za-z0-9_-]+ ]] && VERSION=latest
-        
-        echo GITHUB_IMAGE_ID=$GITHUB_IMAGE_ID
-        echo DOCKERHUB_IMAGE_ID=$DOCKERHUB_IMAGE_ID
-        echo VERSION=$VERSION
+    
+    - name: "GitHub: Log into registry"
+      run: >
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 
+
+    - name: "GitHub: Push image"
+      run: |
+        GITHUB_IMAGE_ID=ghcr.io/${{ github.repository }}/$IMAGE_NAME
+
+        # Change all uppercase to lowercase
+        GITHUB_IMAGE_ID=$(echo $GITHUB_IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+        echo GITHUB_IMAGE_ID=$GITHUB_IMAGE_ID:$VERSION
         
         docker tag $IMAGE_NAME $GITHUB_IMAGE_ID:$VERSION
         docker images
         docker push $GITHUB_IMAGE_ID:$VERSION
+        
+    - name: "DockerHub: Log into registry"
+      run: >
+        echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ github.actor }} --password-stdin
+
+    - name: "DockerHub: Push image"
+      run: |
+        DOCKERHUB_IMAGE_ID=docker.io/${{ github.actor }}/mlad-$IMAGE_NAME
+
+        # Change all uppercase to lowercase
+        DOCKERHUB_IMAGE_ID=$(echo $DOCKERHUB_IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+        echo DOCKERHUB_IMAGE_ID=$DOCKERHUB_IMAGE_ID:$VERSION
         
         docker tag $IMAGE_NAME $DOCKERHUB_IMAGE_ID:$VERSION
         docker images
