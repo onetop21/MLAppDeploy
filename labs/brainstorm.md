@@ -8,13 +8,25 @@
 * 별도의 인증은 없다. 다만, 간단한 방식을 통해 user/hostname을 통해 구분 필요.
   * As-Is: User: $User
   * To-Be: User: $...
+* ID는 없다 -> 누구나 권한이 있음
+* Public -> Private 전환은? Admin이 Key 생성할 수 있음.
+  * python -m mlad.service --key
+* 기본적으로 공동 계정에 개별 세션
+* 그럼 다른 사람이 띄운 Project는 어떻게 Protected할 것인가?
+  * 프로젝트를 띄울 때 사용한 ProjectKey = user@hostname:<projectfile path>
+* 정책
+  * 세션: mlad config init 하면 hash 생성해서 자동 채우기?
+    -> config.session_id = uuid.uuid4() if not config.session_id else config.session_id
+    -> 같은 컴퓨터, 같은 계정은 같은 세션 사용
+  * 같은 유저가, 다른 컴퓨터를 사용 시?
+    * 세션 ID 복사 기능 있으면 좋을 듯?
+    * mlad config export 같은 기능 고민 해보고 추가 하면 될듯.
 ## 개인/관리자 어떻게 R&R을 나눌 것인가?
 * 별도 R&R은 없고 관리 권한이 있는 클라이언트에서 관리 기능 사용 가능
 * 관리 기능
   * 노드 레이블 추가/삭제
   * 프로젝트 강제 내림
-  * 프로젝트 리소스 강제제한
-  * (진짜 최소한의 인증 허가?)
+  * 프로젝트 리소스 강제제한 (ResourceQuota)
   * 플러그인 설치? (좀 더 고민해보고)
     * JupyterHub
     * PromStack
@@ -158,3 +170,16 @@
     * set
   * auto completion (준회님)
     * 유지보수
+  * Helm/Installer (효일님)
+  * YAML Editor (효일님)
+  * MLAD Config 정의 (효일님)
+    * Datastore
+  * 다국어 지원 (전혀 급한거 아님)
+    * 이 포맷에 맞게 준비만 해 줄것
+    * MESSAGE: Failed to run.
+    
+    * multilingual
+
+## Git Flow 
+master -> hotfix_<ISSUE> -> master (x.y.z+1)
+dev -> dev_<feature> -> dev -> master (x.y+1.z)
