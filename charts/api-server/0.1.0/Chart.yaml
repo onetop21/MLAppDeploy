@@ -1,5 +1,5 @@
 apiVersion: v2
-name: mlappdeploy
+name: api-server
 description: Machine Learning Application Deployment Tool by Kubernetes
 home: https://github.com/onetop21/MLAppDeploy
 #kubeVersion: ">=1.18.0"

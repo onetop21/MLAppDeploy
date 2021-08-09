@@ -1,4 +1,11 @@
 questions:
+- variable: image.fromDockerhub
+  default: "false"
+  description:  "Docker image location to pull."
+  type: boolean
+  required: true
+  label: Docker Image from DockerHub
+  group: "Settings"
 - variable: ingress-nginx.enabled
   default: "false"
   description:  "Enable Ingress-NGINX."
