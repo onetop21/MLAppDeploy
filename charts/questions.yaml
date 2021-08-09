@@ -1,0 +1,33 @@
+questions:
+- variable: ingress-nginx.enabled
+  default: "false"
+  description:  "Enable Ingress-NGINX."
+  type: boolean
+  required: true
+  label: Enable Ingress-NGINX
+  group: "Ingress-NGINX Settings"
+- variable: kube-prometheus-stack.enabled
+- variable: gpu-operator.enabled:
+  default: "true"
+  description:  "Enable NVIDIA GPU Operator."
+  type: boolean
+  required: true
+  label: Enable NVIDIA GPU Operator
+  group: "NVIDIA GPU Settings"
+  show_subquestion_if: false
+  subquestions:
+  - variable: dcgm-exporter.enabled:
+    default: "true"
+    description:  "Enable NVIDIA DCGM Exporter for K8S Prometheus Stack."
+    type: boolean
+    label: Enable NVIDIA DCGM Exporter
+  - variable: nvidia-device-plugin.enabled:
+    default: "true"
+    description:  "Enable NVIDIA Device Plugin."
+    type: boolean
+    label: Enable NVIDIA Device Plugin
+  - variable: gpu-feature-discovery.enabled:
+    default: "true"
+    description:  "Enable NVIDIA GPU Feature Discovery."
+    type: boolean
+    label: Enable NVIDIA GPU Feature Discovery
