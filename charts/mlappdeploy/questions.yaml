@@ -7,8 +7,14 @@ questions:
   label: Enable Ingress-NGINX
   group: "Ingress-NGINX Settings"
 - variable: kube-prometheus-stack.enabled
+  default: "false"
+  description:  "Enable Prometheus Stack for Kubernetes."
+  type: boolean
+  required: true
+  label: Enable Prometheus Stack
+  group: "Prometheus Stack Settings"
 - variable: gpu-operator.enabled:
-  default: "true"
+  default: "false"
   description:  "Enable NVIDIA GPU Operator."
   type: boolean
   required: true

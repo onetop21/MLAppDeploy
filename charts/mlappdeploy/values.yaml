@@ -4,13 +4,13 @@
 
 # Dependencies
 ingress-nginx:
-  enabled: false
+  enabled: true
 kube-prometheus-stack:
   enabled: true
   namespaceOverride: kube-prometheus-stack
 gpu-operator:
   enabled: true
-  #namespaceOverride: gpu-operator
+  namespaceOverride: gpu-operator
   validator:
     repository: docker.io/nvidia
   operator:
@@ -29,12 +29,10 @@ gpu-operator:
     repository: docker.io/nvidia
 dcgm-exporter:
   enabled: false
-  #namespaceOverride: gpu-operator
   image:
     repository: docker.io/nvidia/dcgm-exporter
 nvidia-device-plugin:
   enabled: false
-  #namespaceOverride: nvidia-device-plugin
   image:
     repository: docker.io/nvidia/k8s-device-plugin
 gpu-feature-discovery:
