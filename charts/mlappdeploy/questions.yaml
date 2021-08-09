@@ -14,7 +14,7 @@ questions:
   label: Enable Prometheus Stack
   group: "Prometheus Stack Settings"
 - variable: gpu-operator.enabled:
-  default: "false"
+  default: "false"git s
   description:  "Enable NVIDIA GPU Operator."
   type: boolean
   required: true
