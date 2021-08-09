@@ -3,7 +3,7 @@ entries:
   api-server:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-08-09T09:17:01.664250414Z"
+    created: "2021-08-09T09:38:17.573638261Z"
     dependencies:
     - condition: ingress-nginx.enabled
       name: ingress-nginx
@@ -30,7 +30,7 @@ entries:
       repository: https://nvidia.github.io/gpu-feature-discovery
       version: 0.4.1
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: 147b6346892244dfd01e8f7539a96d5b262043b8cbfefc898b5bc03b61d2370e
+    digest: ef1d012aa28b76a805128ba99cdd9a71f12523d182dd03e5ed9b21f9009334dc
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -40,4 +40,4 @@ entries:
     urls:
     - api-server-0.1.0.tgz
     version: 0.1.0
-generated: "2021-08-09T09:17:01.63230322Z"
+generated: "2021-08-09T09:38:17.54489303Z"
