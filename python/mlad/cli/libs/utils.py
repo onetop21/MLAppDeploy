@@ -7,18 +7,21 @@ import uuid
 import socket
 import hashlib
 import itertools
+
 from pathlib import Path
 from functools import lru_cache
 from urllib.parse import urlparse
 from omegaconf import OmegaConf
+
 from mlad.api import API
 from mlad.api.exception import APIError
+from mlad.cli.libs.exceptions import InvalidURLError
 
 HOME = str(Path.home())
 
-CONFIG_PATH = HOME + '/.mlad'
-CONFIG_FILE = CONFIG_PATH + '/config.yml'
-COMPLETION_FILE = CONFIG_PATH + '/completion.sh'
+CONFIG_PATH = f'{Path.home()}/.mlad'
+CONFIG_FILE = f'{CONFIG_PATH}/config.yml'
+COMPLETION_FILE = f'{CONFIG_PATH}/completion.sh'
 PROJECT_FILE_ENV_KEY='MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
 DEFAULT_PLUGIN_FILE = 'mlad-plugin.yml'
@@ -200,7 +203,12 @@ def get_default_service_port(container_name, internal_port):
     return external_port
 
 def parse_url(url):
-    parsed_url = urlparse(url)
+    try:
+        parsed_url = urlparse(url)
+        if not parsed_url.netloc:
+            raise InvalidURLError
+    except Exception:
+        raise InvalidURLError
     return {
         'scheme':   parsed_url.scheme or 'http',
         'username': parsed_url.username,
