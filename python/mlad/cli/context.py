@@ -1,3 +1,5 @@
+import sys
+
 from pathlib import Path
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
@@ -17,12 +19,12 @@ def add(name, address):
     registry_port = utils.get_default_service_port('mlad_registry', 5000)
     if registry_port:
         registry_address = f'http://{service_addr}:{registry_port}'
-    registry_address = utils.prompt("Docker Registry Address", registry_address)
+    registry_address = utils.prompt('Docker Registry Address', registry_address)
     parsed_url = utils.parse_url(registry_address)
     if parsed_url['scheme'] != 'https':
         warn_insecure = True
     registry_address = parsed_url['url']
-    registry_namespace = utils.prompt("Docker Registry Namespace")
+    registry_namespace = utils.prompt('Docker Registry Namespace')
 
     base_config = OmegaConf.from_dotlist([
         f'apiserver.address={address}',
@@ -47,6 +49,12 @@ def add(name, address):
 
     config = OmegaConf.merge(base_config, s3_config, db_config)
     OmegaConf.save(config=config, f=f'{DIR_PATH}/{name}.yml')
+
+    if warn_insecure:
+        print('Need to add insecure-registry to docker.json on your all nodes.', file=sys.stderr)
+        print('/etc/docker/daemon.json:', file=sys.stderr)
+        print(f'  \"insecure-registries\": [\"{registry_address}\"]', file=sys.stderr)
+
     return config
 
 
@@ -54,6 +62,7 @@ def set_default(name):
     config = OmegaConf.create({'target': f'{DIR_PATH}/{name}.yml'})
     OmegaConf.save(config=config, f=f'{MLAD_HOME_PATH}/target.yml')
     return config
+
 
 def _parse_datastore(kind, initializer, finalizer, prompts):
     config = initializer()
@@ -64,7 +73,7 @@ def _parse_datastore(kind, initializer, finalizer, prompts):
         f'datastore.{kind}.{k}={v}' for k, v in config.items()
     ])
 
-# S3 DataStore
+
 def _s3_initializer():
     # specific controlling docker
     service_addr = utils.get_advertise_addr()
@@ -81,38 +90,41 @@ def _s3_initializer():
         secret_key = None
     return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
 
+
 def _s3_finalizer(datastore):
     parsed = utils.parse_url(datastore['endpoint'])
     datastore['endpoint'] = parsed['url']
     datastore['verify'] = parsed['scheme'] == 'https'
     return datastore
 
+
 def _datastore_s3_translator(kind, key, value):
     if key == 'endpoint':
-        return f"S3_ENDPOINT={value}"
+        return f'S3_ENDPOINT={value}'
     elif key == 'verify':
-        return [f"S3_USE_HTTPS={1 if value else 0}", f"S3_VERIFY_SSL=0"]
+        return [f'S3_USE_HTTPS={1 if value else 0}', 'S3_VERIFY_SSL=0']
     elif key == 'accesskey':
-        return f"AWS_ACCESS_KEY_ID={value}"
+        return f'AWS_ACCESS_KEY_ID={value}'
     elif key == 'secretkey':
-        return f"AWS_SECRET_ACCESS_KEY={value}"
+        return f'AWS_SECRET_ACCESS_KEY={value}'
     elif key == 'region':
-        return f"AWS_REGION={value}"
+        return f'AWS_REGION={value}'
     else:
-        return f"{kind.upper()}_{key.upper()}={value}"
+        return f'{kind.upper()}_{key.upper()}={value}'
 
-# MongoDB DataStore
+
 def _db_initializer():
     # specific controlling docker
     service_addr = utils.get_advertise_addr()
     mongo_port = utils.get_default_service_port('mlad_mongodb', 27017)
     if mongo_port:
-        address = f"mongodb://{service_addr}:{mongo_port}"
+        address = f'mongodb://{service_addr}:{mongo_port}'
     else:
-        address = f"mongodb://localhost:27017"
+        address = 'mongodb://localhost:27017'
     return {'address': address, 'username': '', 'password': ''}
+
 
 def _db_finalizer(datastore):
     parsed = utils.parse_url(datastore['address'])
-    datastore['address'] = f"mongodb://{parsed['address']}"
+    datastore['address'] = f'mongodb://{parsed["address"]}'
     return datastore

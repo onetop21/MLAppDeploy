@@ -112,7 +112,7 @@ def test_invalid_input():
         '',
         ''
     ]
-    with pytest.raises(InvalidURLError) as e:
+    with pytest.raises(InvalidURLError):
         sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
         context.add('test-invalid', inputs[0])
 
@@ -130,6 +130,6 @@ def test_invalid_input2():
         '',
         ''
     ]
-    with pytest.raises(InvalidURLError) as e:
+    with pytest.raises(InvalidURLError):
         sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
         context.add('test-invalid2', inputs[0])

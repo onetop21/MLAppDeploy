@@ -1,7 +1,6 @@
 import sys
 import io
 import os
-import pytest
 
 from omegaconf import OmegaConf
 from mlad.cli import context
