@@ -11,34 +11,41 @@ kube-prometheus-stack:
 gpu-operator:
   enabled: true
   namespaceOverride: gpu-operator
+
   validator:
     repository: docker.io/nvidia
   operator:
     repository: docker.io/nvidia
+    defaultRuntime: containerd
     initContainer:
       repository: docker.io/nvidia
   driver:
+    enabled: false
     repository: docker.io/nvidia
   toolkit:
+    enabled: true
     repository: docker.io/nvidia
+  dcgm:
+    enabled: true
   dcgmExporter:
     repository: docker.io/nvidia
   gfd:
     repository: docker.io/nvidia
   migManager:
+    enabled: false
     repository: docker.io/nvidia
-dcgm-exporter:
-  enabled: false
-  image:
-    repository: docker.io/nvidia/dcgm-exporter
-nvidia-device-plugin:
-  enabled: false
-  image:
-    repository: docker.io/nvidia/k8s-device-plugin
-gpu-feature-discovery:
-  enabled: false
-  image:
-    repository: docker.io/nvidia/gpu-feature-discovery
+# dcgm-exporter:
+#   enabled: false
+#   image:
+#     repository: docker.io/nvidia/dcgm-exporter
+# nvidia-device-plugin:
+#   enabled: false
+#   image:
+#     repository: docker.io/nvidia/k8s-device-plugin
+# gpu-feature-discovery:
+#   enabled: false
+#   image:
+#     repository: docker.io/nvidia/gpu-feature-discovery
 ###################
 
 replicaCount: 1
