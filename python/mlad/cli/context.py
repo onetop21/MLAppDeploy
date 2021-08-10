@@ -1,8 +1,10 @@
 import sys
+import os
 
 from pathlib import Path
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
+from mlad.cli.exceptions import NotExistContextError
 
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
@@ -59,7 +61,11 @@ def add(name, address):
 
 
 def set_default(name):
-    config = OmegaConf.create({'target': f'{DIR_PATH}/{name}.yml'})
+    target_path = f'{DIR_PATH}/{name}.yml'
+
+    if not os.path.isfile(target_path):
+        raise NotExistContextError(name)
+    config = OmegaConf.create({'target': target_path})
     OmegaConf.save(config=config, f=f'{MLAD_HOME_PATH}/target.yml')
     return config
 
@@ -75,7 +81,6 @@ def _parse_datastore(kind, initializer, finalizer, prompts):
 
 
 def _s3_initializer():
-    # specific controlling docker
     service_addr = utils.get_advertise_addr()
     minio_port = utils.get_default_service_port('mlad_minio', 9000)
     if minio_port:
@@ -114,7 +119,6 @@ def _datastore_s3_translator(kind, key, value):
 
 
 def _db_initializer():
-    # specific controlling docker
     service_addr = utils.get_advertise_addr()
     mongo_port = utils.get_default_service_port('mlad_mongodb', 27017)
     if mongo_port:

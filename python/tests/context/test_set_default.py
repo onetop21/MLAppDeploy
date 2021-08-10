@@ -1,9 +1,11 @@
 import sys
 import io
 import os
+import pytest
 
 from omegaconf import OmegaConf
 from mlad.cli import context
+from mlad.cli.exceptions import NotExistContextError
 
 origin_stdin = None
 HOME_PATH = context.MLAD_HOME_PATH
@@ -44,3 +46,8 @@ def test_set_default():
     context.set_default('set-default')
     config = OmegaConf.load(f'{HOME_PATH}/target.yml')
     assert config.target == f'{DIR_PATH}/set-default.yml'
+
+
+def test_invalid_default():
+    with pytest.raises(NotExistContextError):
+        context.set_default('invalid-default')
