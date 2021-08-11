@@ -52,7 +52,7 @@ questions:
     label: NVIDIA Container Toolkit
   - variable: gpu-operator.dcgm.enabled
     default: true
-    description:  "Deploy DCGM Exporter as a container on the system for monitoring GPU status.""
+    description:  "Deploy DCGM Exporter as a container on the system for monitoring GPU status."
     type: boolean
     label: NVIDIA DCGM Exporter
   - variable: gpu-operator.migManager.enabled
