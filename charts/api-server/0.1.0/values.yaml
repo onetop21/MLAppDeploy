@@ -39,7 +39,7 @@ gpu-operator:
     repository: docker.io/nvidia
 ###################
 
-serviceMonitors:
+serviceMonitor:
   enabled: false
   namespace: 
 
