@@ -5,26 +5,18 @@ import pytest
 
 from omegaconf import OmegaConf
 from mlad.cli import context
+from mlad.cli.exceptions import ContextAlreadyExistError
 from mlad.cli.libs.exceptions import InvalidURLError
 
-origin_stdin = None
-DIR_PATH = context.DIR_PATH
+from . import mock
 
 
 def setup_module():
-    global origin_stdin
-    origin_stdin = sys.stdin
+    mock.setup()
 
 
 def teardown_module():
-    global origin_stdin
-    sys.stdin = origin_stdin
-    filenames = ['test-valid', 'test-valid2', 'test-invalid']
-    for filename in filenames:
-        try:
-            os.remove(f'{DIR_PATH}/{filename}.yml')
-        except OSError:
-            continue
+    mock.teardown()
 
 
 def test_valid_input():
@@ -60,7 +52,7 @@ def test_valid_input():
         }
     }
     assert expected == OmegaConf.to_object(context.add('test-valid', inputs[0]))
-    assert os.path.isfile(f'{DIR_PATH}/test-valid.yml')
+    assert os.path.isfile(context.ctx_path('test-valid'))
 
 
 def test_valid_input2():
@@ -96,7 +88,7 @@ def test_valid_input2():
         }
     }
     assert expected == OmegaConf.to_object(context.add('test-valid2', inputs[0]))
-    assert os.path.isfile(f'{DIR_PATH}/test-valid2.yml')
+    assert os.path.isfile(context.ctx_path('test-valid2'))
 
 
 def test_invalid_input():
@@ -133,3 +125,9 @@ def test_invalid_input2():
     with pytest.raises(InvalidURLError):
         sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
         context.add('test-invalid2', inputs[0])
+
+
+def test_dupilicate():
+    mock.add('test')
+    with pytest.raises(ContextAlreadyExistError):
+        mock.add('test')
