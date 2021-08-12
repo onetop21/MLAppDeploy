@@ -37,19 +37,11 @@ gpu-operator:
   migManager:
     enabled: false
     repository: docker.io/nvidia
-# dcgm-exporter:
-#   enabled: false
-#   image:
-#     repository: docker.io/nvidia/dcgm-exporter
-# nvidia-device-plugin:
-#   enabled: false
-#   image:
-#     repository: docker.io/nvidia/k8s-device-plugin
-# gpu-feature-discovery:
-#   enabled: false
-#   image:
-#     repository: docker.io/nvidia/gpu-feature-discovery
 ###################
+
+serviceMonitors:
+  enabled: false
+  namespace: 
 
 replicaCount: 1
 

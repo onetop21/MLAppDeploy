@@ -3,7 +3,7 @@ entries:
   api-server:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-08-11T14:57:11.755157419Z"
+    created: "2021-08-12T14:59:03.69431646Z"
     dependencies:
     - condition: ingress-nginx.enabled
       name: ingress-nginx
@@ -18,7 +18,7 @@ entries:
       repository: https://nvidia.github.io/gpu-operator
       version: v1.7.1
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: dc9b4aee543111934046a852f63b6e2572635e40338bc64b024fe20fdd67d426
+    digest: 739b65d6388a596c04d8fc5f26690d28e35fac366d548b28352c2493c1d66022
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -28,4 +28,4 @@ entries:
     urls:
     - api-server-0.1.0.tgz
     version: 0.1.0
-generated: "2021-08-11T14:57:11.729651827Z"
+generated: "2021-08-12T14:59:03.6668388Z"
