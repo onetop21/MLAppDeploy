@@ -7,10 +7,7 @@ from omegaconf import OmegaConf
 client_config = {
     'mlad': {
         'address': 'http://localhost:8440',
-        'token': {
-            'admin': '',
-            'user': '',
-        },
+        'session': ''
     },
     'docker': {
         'registry': {

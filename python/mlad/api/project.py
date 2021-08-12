@@ -1,16 +1,17 @@
 import sys
 import json
 import requests
-from .exception import APIError, ProjectNotFound, ServiceNotFound, InvalidLogRequest, raise_error
+from .exception import APIError, ProjectNotFound, ServiceNotFound, \
+    InvalidLogRequest, InvalidSession, raise_error
 
-class Project():
-    def __init__(self, url, token):
+class Project:
+    def __init__(self, url, session):
         self.url = f'{url}/project'
-        self.token = token
+        self.session = session
 
     def get(self, extra_labels=[]):
         url = self.url
-        header = {'token': self.token}
+        header = {'session': self.session}
         params={'extra_labels': ','.join(extra_labels)}
         res = requests.get(url=url,headers=header,params=params)
         raise_error(res)
@@ -19,7 +20,7 @@ class Project():
     def create(self, project, base_labels, extra_envs=[], credential=None,
             swarm=True, allow_reuse=False):
         url = self.url
-        header = {'token': self.token}
+        header = {'session': self.session}
         with requests.post(url=url,headers=header,
             json={'project':project,'base_labels':base_labels,
                 'extra_envs':extra_envs, 'credential':credential},
@@ -41,14 +42,14 @@ class Project():
 
     def inspect(self, project_key):
         url = f'{self.url}/{project_key}'
-        header = {'token': self.token}
+        header = {'session': self.session}
         res = requests.get(url=url, headers=header)
         raise_error(res)
         return res.json()
 
     def delete(self, project_key):
         url = f'{self.url}/{project_key}'
-        header = {'token': self.token}
+        header = {'session': self.session}
         with requests.delete(url=url, stream=True, headers=header) as resp:
             if resp.status_code == 200:
                 for _ in resp.iter_content(1024):
@@ -57,6 +58,9 @@ class Project():
                     yield dict_res
             elif resp.status_code == 404: 
                 raise ProjectNotFound(f'Failed to delete project : '
+                                      f'{resp.json()["detail"]["msg"]}', resp)
+            elif resp.status_code == 401:
+                raise ServiceNotFound(f'Failed to delete service : '
                                       f'{resp.json()["detail"]["msg"]}', resp)
             else: 
                 raise APIError(f'Failed to delete project : '
@@ -67,7 +71,7 @@ class Project():
         url = f'{self.url}/{project_key}/logs'
         params = {'tail':tail, 'follow':follow, 'timestamps':timestamps,
                   'names_or_ids':names_or_ids}
-        header = {'token': self.token}
+        header = {'session': self.session}
 
         while True:
             try:
@@ -113,8 +117,9 @@ class Project():
                 print(f"[Retry] {e}", file=sys.stderr)
 
     def resource(self, project_key):
+        project_key = project_key.replace('-', '')
         url = f'{self.url}/{project_key}/resource'
-        header = {'token': self.token}
+        header = {'session': self.session}
         res = requests.get(url=url, headers=header)
         raise_error(res)
         return res.json()

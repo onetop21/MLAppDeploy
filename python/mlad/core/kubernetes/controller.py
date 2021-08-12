@@ -35,6 +35,13 @@ def get_api_client(config_file='~/.kube/config'):#config.kube_config.KUBE_CONFIG
         config.load_incluster_config() # configuration to Configuration(global)
         return ApiClient() # If Need, set configuration parameter from client.Configuration
 
+def get_current_context():
+    try:
+        current_context = config.list_kube_config_contexts()[1]
+    except config.config_exception.ConfigException as e:
+        raise exception.APIError(str(e), 404)
+    return current_context
+
 def get_auth_headers(cli, image_name=None, auth_configs=None):
     return docker_controller.get_auth_headers(docker.from_env(), image_name, auth_configs)
 
@@ -76,7 +83,7 @@ def get_labels(obj):
         raise TypeError('Parameter is not valid type.')
 
 def get_config_labels(cli, obj, key):
-    #key='base_labels', 'service_labels'
+    #key='project-labels', 'service-{name}-labels'
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     if isinstance(obj,client.models.v1_namespace.V1Namespace):
@@ -121,6 +128,13 @@ def inspect_project_network(cli, network):
         'image': config_labels['MLAD.PROJECT.IMAGE'],
         'created': int(time.mktime(created.timetuple()))
     }
+
+def get_project_session(cli, network):
+    if not isinstance(network, client.models.v1_namespace.V1Namespace):
+        raise TypeError('Parameter is not valid type.')
+    config_labels = get_config_labels(cli, network, 'project-labels')
+    return config_labels['MLAD.PROJECT.SESSION']
+
 
 def create_project_network(cli, base_labels, extra_envs, credential, swarm=True, allow_reuse=False, stream=False):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
@@ -687,17 +701,19 @@ def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=F
     collector = Collector()
     monitor = DelMonitor(cli, collector, service_to_check, namespace)
     monitor.start()
-    disconnHandler.add_callback(lambda: monitor.stop())
+
+    if disconnHandler:
+        disconnHandler.add_callback(lambda: monitor.stop())
 
     for service in service_to_check:
         service_name, namespace, kind, _ = service
-        print(f"Stop {service_name}...")
+        #print(f"Stop {service_name}...")
         ret = api.delete_namespaced_service(service_name, namespace)
         if kind == 'job':
             ret = _delete_job(cli, service_name, namespace)
         elif kind == 'rc':
             ret = _delete_replication_controller(cli, service_name, namespace)
-    
+
         try:
             #check ingress exists
             ingress = network_api.list_namespaced_ingress(namespace)
@@ -793,7 +809,8 @@ def inspect_node(node):
     }
 
 def enable_node(cli, node_key):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
@@ -801,21 +818,34 @@ def enable_node(cli, node_key):
     try:
         api_response = api.patch_node(node_key, body)
     except ApiException as e:
-        print(e)
+        msg, status = exception.handle_k8s_api_error(e)
+        if status == 404:
+            raise exception.NotFound(f'Cannot find node {node_key}.')
+        else:
+            raise exception.APIError(msg, status)
+
     
 def disable_node(cli, node_key):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
-        "spec": {"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/worker"}]}
+        "spec": {"taints":[{"effect":"NoSchedule",
+                            "key":"node-role.kubernetes.io/worker"}]}
     }
     try:
         api_response = api.patch_node(node_key, body)
     except ApiException as e:
-        print(e)
-    
+        msg, status = exception.handle_k8s_api_error(e)
+        if status == 404:
+            raise exception.NotFound(f'Cannot find node {node_key}.')
+        else:
+            raise exception.APIError(msg, status)
+
+
 def add_node_labels(cli, node_key, **kv):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -824,11 +854,19 @@ def add_node_labels(cli, node_key, **kv):
     }
     for key in kv:
         body['metadata']['labels'][key]=kv[key]
-    api_response = api.patch_node(node_key, body)
-    print(api_response)
+    try:
+        api_response = api.patch_node(node_key, body)
+    except ApiException as e:
+        msg, status = exception.handle_k8s_api_error(e)
+        if status == 404:
+            raise exception.NotFound(f'Cannot find node {node_key}.')
+        else:
+            raise exception.APIError(msg, status)
+
 
 def remove_node_labels(cli, node_key, *keys):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -837,8 +875,15 @@ def remove_node_labels(cli, node_key, *keys):
     }
     for key in keys:
         body['metadata']['labels'][key]=None
-    api_response = api.patch_node(node_key, body)
-    print(api_response)
+    try:
+        api_response = api.patch_node(node_key, body)
+    except ApiException as e:
+        msg, status = exception.handle_k8s_api_error(e)
+        if status == 404:
+            raise exception.NotFound(f'Cannot find node {node_key}.')
+        else:
+            raise exception.APIError(msg, status)
+
 
 def scale_service(cli, service, scale_spec):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
@@ -937,13 +982,15 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
             for name, log in logs:
                 collector.add_iterable(log, name=name, timestamps=timestamps)
             # Register Disconnect Callback
-            disconnHandler.add_callback(lambda: handler.close())
+            if disconnHandler:
+                disconnHandler.add_callback(lambda: handler.close())
             if follow and not selected:
                 last_resource = None
                 monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
                                      follow=follow, tail=tail, timestamps=timestamps)
                 monitor.start()
-                disconnHandler.add_callback(lambda: monitor.stop())
+                if disconnHandler:
+                    disconnHandler.add_callback(lambda: monitor.stop())
             yield from collector
     else:
         print('Cannot find running containers.', file=sys.stderr)

@@ -25,14 +25,6 @@ from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCK
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
 
-@lru_cache(maxsize=None)
-def get_username(config):
-    with API(config.mlad.address, config.mlad.token.user) as api:
-        res = api.auth.token_verify()
-    if res['result']:
-        return res['data']['username']
-    else:
-        raise RuntimeError("Token is not valid.")
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
     name = log['name']

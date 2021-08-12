@@ -12,10 +12,9 @@ from mlad.cli.autocompletion import *
 
 @click.command()
 @click.option('--address', '-a', default='http://localhost:8440', prompt='MLAppDeploy Service Address', help='Set service address')
-@click.option('--token', '-t', default='', help='Set administrator token')
-def init(address, token):
+def init(address):
     '''Initialize configurations'''
-    config.init(address, token)
+    config.init(address)
 
 @click.command()
 @click.argument('VAR', required=True, nargs=-1, autocompletion=get_config_key_completion)

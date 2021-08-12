@@ -20,17 +20,26 @@ class APIError(Exception):
     def reason(self):
         return self.__class__.__name__
 
+
 class NotFound(APIError):
     pass
+
 
 class ProjectNotFound(NotFound):
     pass
 
+
 class ServiceNotFound(NotFound):
     pass
 
+
 class InvalidLogRequest(NotFound):
     pass
+
+
+class InvalidSession(APIError):
+    pass
+
 
 def error_from_http_errors(e):
     detail = e.response.json()['detail'] # msg from mlad service http error
@@ -43,6 +52,8 @@ def error_from_http_errors(e):
             cls = ServiceNotFound
         else:
             cls = NotFound
+    elif e.response.status_code == 401:
+        cls = InvalidSession
     elif e.response.status_code == 400:
         if reason == 'ServiceNotRunning':
             cls = InvalidLogRequest

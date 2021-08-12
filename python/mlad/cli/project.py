@@ -11,8 +11,10 @@ from pathlib import Path
 from datetime import datetime
 from dateutil import parser
 from functools import lru_cache
+from collections import defaultdict
 from requests.exceptions import HTTPError
 from mlad.core.docker import controller as ctlr
+from mlad.core.kubernetes import controller as k8s_ctlr
 from mlad.core.default import config as default_config
 from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
@@ -20,19 +22,11 @@ from mlad.core import exception
 from mlad.cli.libs import utils
 from mlad.cli.libs import datastore as ds
 from mlad.cli.libs import interrupt_handler
+from mlad.cli.libs.auth import get_k8s_config_path
 from mlad.cli.Format import PROJECT
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
-
-@lru_cache(maxsize=None)
-def get_username(config):
-    with API(config.mlad.address, config.mlad.token.user) as api:
-        res = api.auth.token_verify()
-    if res['result']:
-        return res['data']['username']
-    else:
-        raise RuntimeError("Token is not valid.")
 
 
 def _parse_log(log, max_name_width=32, len_short_id=10):
@@ -92,8 +86,15 @@ def list(no_trunc):
     config = utils.read_config()
     projects = {}
     api = API(config.mlad.address, config.mlad.token.user)
-    networks = api.project.get()
-    columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES', 'TASKS', 'HOSTNAME', 'WORKSPACE')]
+    try:
+        networks = api.project.get()
+    except APIError as e:
+        print(e)
+        sys.exit(1)
+
+    columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES',
+                'TASKS', 'HOSTNAME', 'WORKSPACE',
+                'MEM(Mi)', 'CPU', 'GPU')]
     for network in networks:
         project_key = network['key']
         default = { 
@@ -104,29 +105,42 @@ def list(no_trunc):
             'hostname': network['workspace']['hostname'],
             'workspace': network['workspace']['path'],
         }
-        projects[project_key] = projects[project_key] if project_key in projects else default
-        res = api.service.get(project_key=project_key)
-        if res['mode'] == 'swarm':
-            for inspect in res['inspects']:
-                tasks = inspect['tasks'].values()
-                tasks_state = [_['Status']['State'] for _ in tasks]
-                projects[project_key]['services'] += 1
-                projects[project_key]['replicas'] += inspect['replicas']
-                projects[project_key]['tasks'] += tasks_state.count('running')
-        else:
-            for inspect in res['inspects']:
-                tasks = inspect['tasks'].values()
-                tasks_state = [_['status']['state'] for _ in tasks]
-                projects[project_key]['services'] += 1
-                projects[project_key]['replicas'] += inspect['replicas']
-                projects[project_key]['tasks'] += tasks_state.count('Running')
+        projects[project_key] = projects[project_key] \
+            if project_key in projects else default
+        services = api.service.get(project_key=project_key)
+
+        for inspect in services['inspects']:
+            tasks = inspect['tasks'].values()
+            tasks_state = [_['status']['state'] for _ in tasks]
+            projects[project_key]['services'] += 1
+            projects[project_key]['replicas'] += inspect['replicas']
+            projects[project_key]['tasks'] += tasks_state.count('Running')
+
+        used = defaultdict(lambda: 0)
+        resources = api.project.resource(project_key)
+        for service, resource in resources.items():
+            used['mem'] += resource['mem'] if not resource['mem'] == None else 0
+            used['cpu'] += resource['cpu'] if not resource['cpu'] == None else 0
+            used['gpu'] += resource['gpu']
+        for k in used:
+            used[k] = used[k] if no_trunc else round(used[k], 1)
+
+        projects[project_key].update(used)
+
     for project in projects:
         if projects[project]['services'] > 0:
             running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
-            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], projects[project]['services'], f"{running_tasks:>5}", projects[project]['hostname'], projects[project]['workspace']))
+            columns.append((projects[project]['username'], projects[project]['project'],
+                            projects[project]['image'], projects[project]['services'],
+                            f"{running_tasks:>5}", projects[project]['hostname'],
+                            projects[project]['workspace'], projects[project]['mem'],
+                            projects[project]['cpu'], projects[project]['gpu']))
         else:
-            columns.append((projects[project]['username'], projects[project]['project'], projects[project]['image'], '-', '-', projects[project]['hostname'], projects[project]['workspace']))
-    utils.print_table(*([columns, 'Cannot find running project.'] + ([0] if no_trunc else [])))
+            columns.append((projects[project]['username'], projects[project]['project'],
+                            projects[project]['image'], '-', '-', projects[project]['hostname'],
+                            projects[project]['workspace'], projects[project]['mem'],
+                            projects[project]['cpu'], projects[project]['gpu']))
+    utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
 def status(all, no_trunc):
@@ -136,92 +150,76 @@ def status(all, no_trunc):
     # Block not running.
     try:
         inspect = api.project.inspect(project_key=project_key)
+        resources = api.project.resource(project_key)
     except NotFound as e:
         print('Cannot find running project.', file=sys.stderr)
         sys.exit(1)
 
     task_info = []
     res = api.service.get(project_key)
-    if res['mode'] == 'swarm':
-        for inspect in res['inspects']:
-            try:
-                for task_id, task in api.service.get_tasks(project_key, inspect['id']).items():
-                    uptime = (datetime.utcnow() - parser.parse(task['Status']['Timestamp']).replace(tzinfo=None)).total_seconds()
-                    if uptime > 24 * 60 * 60:
-                        uptime = f"{uptime // (24 * 60 * 60):.0f} days"
-                    elif uptime > 60 * 60:
-                        uptime = f"{uptime // (60 * 60):.0f} hours"
-                    elif uptime > 60:
-                        uptime = f"{uptime // 60:.0f} minutes"
-                    else:
-                        uptime = f"{uptime:.0f} seconds"
-                    if all or task['Status']['State'] not in ['shutdown', 'failed']:
-                        if 'NodeID' in task:
-                            node_inspect = api.node.inspect(task['NodeID'])
-                        task_info.append((
-                            task_id,
-                            inspect['name'],
-                            task['Slot'],
-                            node_inspect['hostname'] if 'NodeID' in task else '-',
-                            task['DesiredState'].title(), 
-                            f"{task['Status']['State'].title()}", 
-                            uptime,
-                            ', '.join([_ for _ in inspect['ports']]),
-                            task['Status']['Err'] if 'Err' in task['Status'] else '-'
-                        ))
-            except ServiceNotFound as e:
-                pass
-        
-        columns = [('ID', 'SERVICE', 'SLOT', 'NODE', 'DESIRED STATE', 'CURRENT STATE', 'UPTIME', 'PORTS', 'ERROR')]
+    for inspect in res['inspects']:
+        try:
+            for pod_name, pod in api.service.get_tasks(project_key, inspect['id']).items():
+                ready_cnt = 0
+                restart_cnt = 0
+                if pod['container_status']:
+                    container_cnt = len(pod['container_status'])
+                    for _ in pod['container_status']:
+                        restart_cnt += _['restart']
+                        if _['ready']==True:
+                            ready_cnt+=1
+                    ready = f'{ready_cnt}/{container_cnt}'
+
+                uptime = (datetime.utcnow() - parser.parse(pod['created']).
+                          replace(tzinfo=None)).total_seconds()
+                if uptime > 24 * 60 * 60:
+                    uptime = f"{uptime // (24 * 60 * 60):.0f} days"
+                elif uptime > 60 * 60:
+                    uptime = f"{uptime // (60 * 60):.0f} hours"
+                elif uptime > 60:
+                    uptime = f"{uptime // 60:.0f} minutes"
+                else:
+                    uptime = f"{uptime:.0f} seconds"
+
+                res = resources[inspect['name']]
+                if res['mem'] == None:
+                    res['mem'], res['cpu'] = 'NotReady', 'NotReady'
+                    res['gpu'] = round(res['gpu'], 1) \
+                        if not no_trunc else res['gpu']
+                else:
+                    if not no_trunc:
+                        res['mem'] = round(res['mem'], 1)
+                        res['cpu'] = round(res['cpu'], 1)
+                        res['gpu'] = round(res['gpu'], 1)
+
+                if all or pod['phase'] not in ['Failed']:
+                    task_info.append((
+                        pod_name,
+                        inspect['name'],
+                        #ready,
+                        pod['node'] if pod['node'] else '-',
+                        pod['phase'],
+                        'Running' if pod['status']['state'] == 'Running' else
+                        pod['status']['detail']['reason'],
+                        restart_cnt,
+                        uptime,
+                        res['mem'],
+                        res['cpu'],
+                        res['gpu']
+                    ))
+        except NotFound as e:
+            pass
+        columns = [('NAME', 'SERVICE', 'NODE','PHASE', 'STATUS','RESTART', 'AGE', 'MEM(Mi)', 'CPU', 'GPU')]
         columns_data = []
-        for id, service, slot, node, desired_state, current_state, uptime, ports, error in task_info:
-            columns_data.append((id, service, slot, node, desired_state, current_state, uptime, ports, error))
-        columns_data = sorted(columns_data, key=lambda x: f"{x[1]}-{x[2]:08}")
-        columns += columns_data
-    else:
-        for inspect in res['inspects']:
-            try:
-                for pod_name, pod in api.service.get_tasks(project_key, inspect['id']).items():
-                    ready_cnt = 0
-                    restart_cnt = 0
-                    if pod['container_status']:
-                        container_cnt = len(pod['container_status'])
-                        for _ in pod['container_status']:
-                            restart_cnt += _['restart']
-                            if _['ready']==True:
-                                ready_cnt+=1
-                        ready = f'{ready_cnt}/{container_cnt}'
-            
-                    uptime = (datetime.utcnow() - parser.parse(pod['created']).replace(tzinfo=None)).total_seconds()
-                    if uptime > 24 * 60 * 60:
-                        uptime = f"{uptime // (24 * 60 * 60):.0f} days"
-                    elif uptime > 60 * 60:
-                        uptime = f"{uptime // (60 * 60):.0f} hours"
-                    elif uptime > 60:
-                        uptime = f"{uptime // 60:.0f} minutes"
-                    else:
-                        uptime = f"{uptime:.0f} seconds"
-                    if all or pod['phase'] not in ['Failed']:
-                        task_info.append((
-                            pod_name,
-                            inspect['name'],
-                            #ready,
-                            pod['node'] if pod['node'] else '-',
-                            pod['phase'],
-                            'Running' if pod['status']['state'] == 'Running' else pod['status']['detail']['reason'],
-                            restart_cnt,
-                            uptime
-                        ))
-            except NotFound as e:
-                pass
-        columns = [('NAME', 'SERVICE', 'NODE','PHASE', 'STATUS','RESTART', 'AGE')]
-        columns_data = []
-        for name, service, node, phase, status, restart_cnt, uptime in task_info:
-            columns_data.append((name, service, node, phase, status, restart_cnt, uptime))
+
+        for name, service, node, phase, status, restart_cnt, uptime, mem, cpu, gpu in task_info:
+            columns_data.append((name, service, node, phase, status, restart_cnt, uptime, mem, cpu, gpu))
         columns_data = sorted(columns_data, key=lambda x: x[1])
-        columns += columns_data     
-    print(f"USERNAME: [{get_username(config)}] / PROJECT: [{inspect['project']}]")
-    utils.print_table(*([columns, 'Cannot find running services.'] + ([0] if no_trunc else [])))
+        columns += columns_data
+    username = utils.get_username(config.mlad.session)
+    print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
+    utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
+
 
 def run(with_build):
     project = utils.get_project(default_project)
@@ -234,7 +232,7 @@ def run(with_build):
     cli = ctlr.get_api_client()
     base_labels = core_utils.base_labels(
             utils.get_workspace(), 
-            get_username(config), 
+            config.mlad.session,
             project['project'])
     project_key = base_labels['MLAD.PROJECT']
     
@@ -290,9 +288,10 @@ def up(services):
     cli = ctlr.get_api_client()
     api = API(config.mlad.address, config.mlad.token.user)
     project = utils.get_project(default_project)
+
     base_labels = core_utils.base_labels(
             utils.get_workspace(), 
-            utils.get_username(config), 
+            config.mlad.session,
             project['project'])
     project_key = base_labels['MLAD.PROJECT']
 
@@ -326,7 +325,7 @@ def up(services):
     base_labels['MLAD.PROJECT.IMAGE']=full_repository
     
     # Upload Image
-    print('Update plugin image to registry...')
+    print('Update project image to registry...')
     try:
         for _ in ctlr.push_image(cli, full_repository, stream=True):
             if 'error' in _:
@@ -418,7 +417,7 @@ def down(services, no_dump):
     project_key = utils.project_key(utils.get_workspace())
     workdir = utils.get_project(default_project)['project']['workdir']
 
-    api = API(config.mlad.address, config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.session)
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
@@ -501,6 +500,110 @@ def down(services, no_dump):
             except APIError as e:
                 print(e)
                 sys.exit(1)
+    print('Done.')
+
+
+def down_force(services, no_dump):
+    '''down project using local k8s for admin'''
+    config = utils.read_config()
+    cli = k8s_ctlr.get_api_client(get_k8s_config_path())
+    project_key = utils.project_key(utils.get_workspace())
+    workdir = utils.get_project(default_project)['project']['workdir']
+    network = k8s_ctlr.get_project_network(cli, project_key=project_key)
+
+    if not network:
+        print('Already stopped project.', file=sys.stderr)
+        sys.exit(1)
+    network_inspect = k8s_ctlr.inspect_project_network(cli, network)
+
+    def _get_running_services():
+        inspects = []
+        _services = k8s_ctlr.get_services(cli, project_key)
+        for svc in _services.values():
+            inspect = k8s_ctlr.inspect_service(cli, svc)
+            inspects.append(inspect)
+        return inspects
+
+    if services:
+        running_services = _get_running_services()
+        running_svc_names = [_['name'] for _ in running_services]
+        for service_name in services:
+            if not service_name in running_svc_names:
+                print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
+                sys.exit(1)
+
+    def _get_log_path():
+        timestamp = str(network_inspect['created'])
+        time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
+        log_dir = f'{workdir}/.logs/{time}'
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        return log_dir
+
+    def dump_logs(service, log_dir):
+        path = f'{log_dir}/{service}.log'
+        with open(path, 'w') as f:
+            targets = k8s_ctlr.get_service_with_names_or_ids(
+                cli, project_key, names_or_ids=[service])
+            logs = k8s_ctlr.get_project_logs(
+                cli, project_key, timestamps=True, targets=targets)
+            for _ in logs:
+                log = _get_default_logs(_)
+                f.write(log)
+        print(f'service {service} log saved')
+
+    with interrupt_handler(message='Wait.', blocked=False):
+        running_services = _get_running_services()
+
+        def filtering(inspect):
+            return not services or inspect['name'] in services
+
+        targets = [(_['id'], _['name']) for _ in running_services if filtering(_)]
+
+        # Save desc & log
+        if not no_dump:
+            log_dir = _get_log_path()
+            path = f'{log_dir}/description.yml'
+            print(f'{utils.INFO_COLOR}Project Log Storage: '
+                  f'{log_dir}{utils.CLEAR_COLOR}')
+            if not os.path.isfile(path):
+                network_inspect['created'] = \
+                    datetime.fromtimestamp(network_inspect['created'])
+                with open(path, 'w') as f:
+                    yaml.dump(network_inspect, f)
+
+        # remove services
+        for target in targets:
+            if not no_dump:
+                dump_logs(target[1], log_dir)
+
+        if targets:
+            _services = [k8s_ctlr.get_service(cli, service_id=target[0])
+                        for target in targets]
+            res = k8s_ctlr.remove_services(cli, _services, stream=True)
+            try:
+                for _ in res:
+                    if not 'result' in _:
+                        sys.stdout.write(_['stream'])
+                    if 'result' in _:
+                        if _['result'] == 'stopped':
+                            break
+                        else:
+                            print(_['stream'])
+            except APIError as e:
+                print(e)
+                sys.exit(1)
+
+        # Remove Network
+        if not services or not _get_running_services():
+            res = k8s_ctlr.remove_project_network(cli, network, stream=True)
+            for _ in res:
+                if 'stream' in _:
+                    sys.stdout.write(_['stream'])
+                if 'result' in _:
+                    if _['result'] == 'succeed':
+                        print('Network removed.')
+                    break
     print('Done.')
 
 

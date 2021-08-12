@@ -3,8 +3,12 @@ import requests
 from pathlib import Path
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
+from mlad.cli.libs.auth import get_k8s_config_path
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
+from mlad.core import exception as CoreException
+from mlad.core.kubernetes import controller as ctlr
+
 
 def list(no_trunc):
     config = utils.read_config()
@@ -27,42 +31,98 @@ def list(no_trunc):
         columns.append((ID, hostname, address, role.title(), state.title(), activate, engine, labels))
     utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)
 
+
 def enable(ID):
     config = utils.read_config()
+    cli = ctlr.get_api_client(get_k8s_config_path())
     try:
-        with API(config.mlad.address, config.mlad.token.admin) as api:
-            api.node.enable(ID)
-    except Exception as e:
+        ctlr.enable_node(cli, ID)
+    except CoreException.NotFound as e:
         print(e)
         sys.exit(1)
+    except CoreException.APIError as e:
+        print(f'Cannot enable node {ID} : {e}')
+        sys.exit(1)
     print('Updated.')
+
 
 def disable(ID):
     config = utils.read_config()
+    cli = ctlr.get_api_client(get_k8s_config_path())
     try:
-        with API(config.mlad.address, config.mlad.token.admin) as api:
-            api.node.disable(ID)
-    except Exception as e:
+        ctlr.disable_node(cli, ID)
+    except CoreException.NotFound as e:
         print(e)
+        sys.exit(1)
+    except CoreException.APIError as e:
+        print(f'Cannot disable node {ID} : {e}')
         sys.exit(1)
     print('Updated.')
 
+
 def label_add(node, **kvs):
     config = utils.read_config()
+    cli = ctlr.get_api_client(get_k8s_config_path())
     try:
-        with API(config.mlad.address, config.mlad.token.admin) as api:
-            api.node.add_label(node, **kvs)
-    except Exception as e:
+        ctlr.add_node_labels(cli, node, **kvs)
+    except CoreException.NotFound as e:
         print(e)
+        sys.exit(1)
+    except CoreException.APIError as e:
+        print(f'Cannot add label : {e}')
         sys.exit(1)
     print('Added.')
 
+
 def label_rm(node, *keys):
+    config = utils.read_config()
+    cli = ctlr.get_api_client(get_k8s_config_path())
+    try:
+        ctlr.remove_node_labels(cli, node, *keys)
+    except CoreException.NotFound as e:
+        print(e)
+        sys.exit(1)
+    except CoreException.APIError as e:
+        print(f'Cannot remove label : {e}')
+        sys.exit(1)
+    print('Removed.')
+
+
+def resource(nodes, no_trunc):
     config = utils.read_config()
     try:
         with API(config.mlad.address, config.mlad.token.admin) as api:
-            api.node.delete_label(node, *keys)
-    except Exception as e:
+            res = api.node.resource(nodes)
+    except APIError as e:
         print(e)
         sys.exit(1)
-    print('Removed.')
+    columns = [('HOSTNAME', 'TYPE', 'CAPACITY', 'USED', 'FREE(%)')]
+
+    def get_unit(type):
+        res = ''
+        if type == 'mem':
+            res = f'{type}(Mi)'
+        elif type == 'cpu':
+            res = f'{type}(cores)'
+        elif type == 'gpu':
+            res = f'{type}(#)'
+        return res
+
+    for node, resources in res.items():
+        for i, type in enumerate(resources):
+            status = resources[type]
+            capacity = status['capacity']
+            used = status['used']
+            free = status['allocatable']
+            if not no_trunc:
+                capacity = round(capacity, 1)
+                used = round(used, 1) if not used == None else 'NotReady'
+                free = round(free, 1)
+            else:
+                used = status['used'] if not used == None else 'NotReady'
+            percentage = int(free / capacity * 100) if capacity else 0
+            type = get_unit(type)
+            columns.append((node if not i else '', type, capacity, used,
+                            f'{free}({percentage}%)'))
+    utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)
+
