@@ -1,0 +1,254 @@
+# Default values for gpu-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+platform:
+  openshift: false
+
+nfd:
+  enabled: true
+
+psp:
+  enabled: false
+
+validator:
+  repository: nvcr.io/nvidia/cloud-native
+  image: gpu-operator-validator
+  version: v1.7.1
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  args: []
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  nodeSelector:
+    nvidia.com/gpu.deploy.operator-validator: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext:
+    privileged: true
+    seLinuxOptions:
+      level: "s0"
+  resources: {}
+  priorityClassName: system-node-critical
+  plugin:
+    env:
+      - name: WITH_WORKLOAD
+        value: "true"
+
+operator:
+  repository: nvcr.io/nvidia
+  image: gpu-operator
+  # If version is not specified, then default is to use chart.AppVersion
+  #version: v1.7.1
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  priorityClassName: system-node-critical
+  defaultRuntime: docker
+  initContainer:
+    image: cuda
+    repository: nvcr.io/nvidia
+    version: 11.2.1-base-ubi8
+    imagePullPolicy: IfNotPresent
+  tolerations:
+  - key: "node-role.kubernetes.io/master"
+    operator: "Equal"
+    value: ""
+    effect: "NoSchedule"
+  annotations:
+    openshift.io/scc: restricted-readonly
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: "node-role.kubernetes.io/master"
+                operator: In
+                values: [""]
+  logging:
+    timeEncoding: epoch
+
+mig:
+  strategy: single
+
+driver:
+  enabled: true
+  repository: nvcr.io/nvidia
+  image: driver
+  version: "460.73.01"
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  nodeSelector:
+    nvidia.com/gpu.deploy.driver: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext:
+    privileged: true
+    seLinuxOptions:
+      level: "s0"
+  resources: {}
+  # private mirror repository configuration
+  repoConfig:
+    configMapName: ""
+    destinationDir: ""
+  # vGPU licensing configuration
+  licensingConfig:
+    configMapName: ""
+  priorityClassName: system-node-critical
+
+toolkit:
+  enabled: true
+  repository: nvcr.io/nvidia/k8s
+  image: container-toolkit
+  version: 1.5.0-ubuntu18.04
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: []
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  nodeSelector:
+    nvidia.com/gpu.deploy.container-toolkit: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext:
+    privileged: true
+    seLinuxOptions:
+      level: "s0"
+  resources: {}
+  priorityClassName: system-node-critical
+
+devicePlugin:
+  repository: nvcr.io/nvidia
+  image: k8s-device-plugin
+  version: v0.9.0-ubi8
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  args: []
+  env:
+    - name: PASS_DEVICE_SPECS
+      value: "true"
+    - name: FAIL_ON_INIT_ERROR
+      value: "true"
+    - name: DEVICE_LIST_STRATEGY
+      value: envvar
+    - name: DEVICE_ID_STRATEGY
+      value: uuid
+    - name: NVIDIA_VISIBLE_DEVICES
+      value: all
+    - name: NVIDIA_DRIVER_CAPABILITIES
+      value: all
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  nodeSelector:
+    nvidia.com/gpu.deploy.device-plugin: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext:
+    privileged: true
+  resources: {}
+  priorityClassName: system-node-critical
+
+dcgmExporter:
+  repository: nvcr.io/nvidia/k8s
+  image: dcgm-exporter
+  version: 2.1.8-2.4.0-rc.2-ubuntu20.04
+  imagePullPolicy: IfNotPresent
+  args:
+    - "-f"
+    - "/etc/dcgm-exporter/dcp-metrics-included.csv"
+  env: []
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  nodeSelector:
+    nvidia.com/gpu.deploy.dcgm-exporter: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext: {}
+  resources: {}
+  priorityClassName: system-node-critical
+
+gfd:
+  repository: nvcr.io/nvidia
+  image: gpu-feature-discovery
+  version: v0.4.1
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  env:
+    - name: GFD_SLEEP_INTERVAL
+      value: 60s
+    - name: GFD_FAIL_ON_INIT_ERROR
+      value: "true"
+  nodeSelector:
+    nvidia.com/gpu.deploy.gpu-feature-discovery: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext: {}
+  resources: {}
+  priorityClassName: system-node-critical
+
+
+migManager:
+  enabled: true
+  repository: nvcr.io/nvidia/cloud-native
+  image: k8s-mig-manager
+  version: v0.1.1-ubuntu20.04
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  env:
+    - name: WITH_REBOOT
+      value: "false"
+  nodeSelector:
+    nvidia.com/gpu.deploy.mig-manager: "true"
+  affinity: {}
+  podSecurityContext: {}
+  securityContext:
+    privileged: true
+  resources: {}
+  priorityClassName: system-node-critical
+
+node-feature-discovery:
+  worker:
+    tolerations:
+    - key: "node-role.kubernetes.io/master"
+      operator: "Equal"
+      value: ""
+      effect: "NoSchedule"
+    - key: "nvidia.com/gpu"
+      operator: "Equal"
+      value: "present"
+      effect: "NoSchedule"
+
+    config: |
+      sources:
+        pci:
+          deviceLabelFields:
+          - vendor
+
+  master:
+    extraLabelNs:
+      - nvidia.com
+
+  serviceAccount:
+    name: node-feature-discovery

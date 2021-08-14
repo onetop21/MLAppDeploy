@@ -2,41 +2,33 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-# Dependencies
+global:
+  fromDockerhub: false
+
+# Dependencies and subcharts
 ingress-nginx:
   enabled: true
+  namespaceOverride: ingress-nginx
 kube-prometheus-stack:
   enabled: true
   namespaceOverride: kube-prometheus-stack
 gpu-operator:
   enabled: true
   namespaceOverride: gpu-operator
-  validator:
-    repository: docker.io/nvidia
   operator:
-    repository: docker.io/nvidia
     defaultRuntime: containerd
-    initContainer:
-      repository: docker.io/nvidia
-  devicePlugin:
-    repository: docker.io/nvidia
   driver:
     enabled: false
-    repository: docker.io/nvidia
   toolkit:
     enabled: true
-    repository: docker.io/nvidia
   dcgm:
     enabled: true
-  dcgmExporter:
-    repository: docker.io/nvidia
   nfd:
-    enabled: true
-  gfd:
-    repository: docker.io/nvidia
+    enabled: false
   migManager:
     enabled: false
-    repository: docker.io/nvidia
+  node-feature-discovery:
+    namespaceOverride: node-feature-discovery
 ###################
 
 serviceMonitor:
@@ -46,7 +38,6 @@ serviceMonitor:
 replicaCount: 1
 
 image:
-  fromDockerhub: false
   repository: ghcr.io/onetop21/mlappdeploy/api-server
   pullPolicy: IfNotPresent
 

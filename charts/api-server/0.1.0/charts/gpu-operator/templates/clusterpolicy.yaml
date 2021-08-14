@@ -1,0 +1,403 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: cluster-policy
+  namespace: {{ .Values.namespaceOverride | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: "gpu-operator"
+    {{ .Release.labels }}
+spec:
+  operator:
+    {{- if .Values.operator.defaultRuntime }}
+    defaultRuntime: {{ .Values.operator.defaultRuntime }}
+    {{- end }}
+    {{- if .Values.operator.defaultGPUMode }}
+    defaultGPUMode: {{ .Values.operator.defaultGPUMode }}
+    {{- end }}
+    {{- if .Values.operator.migStrategy }}
+    migStrategy: {{ .Values.operator.migStrategy }}
+    {{- end }}
+    {{- if .Values.operator.initContainer }}
+    initContainer:
+      {{- if .Values.operator.initContainer.repository }}
+      {{- if .Values.global.fromGithub }}
+      repository: docker.io/nvidia
+      {{- else }}
+      repository: {{ .Values.operator.initContainer.repository }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.image }}
+      image: {{ .Values.operator.initContainer.image }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.version }}
+      version: {{ .Values.operator.initContainer.version }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.imagePullPolicy }}
+      imagePullPolicy: {{ .Values.operator.initContainer.imagePullPolicy }}
+      {{- end }}
+      {{- if .Values.operator.initContainer.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml .Values.operator.initContainer.imagePullSecrets | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  validator:
+    {{- if .Values.validator.repository }}
+    {{- if .Values.global.fromGithub }}
+    repository: docker.io/nvidia
+    {{- else }}
+    repository: {{ .Values.validator.repository }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.validator.image }}
+    image: {{ .Values.validator.image }}
+    {{- end }}
+    {{- if .Values.validator.version }}
+    version: {{ .Values.validator.version }}
+    {{- end }}
+    {{- if .Values.validator.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.validator.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.validator.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.validator.imagePullSecrets | nindent 8 }}
+    {{- end }}
+    {{- if .Values.validator.tolerations }}
+    tolerations: {{ toYaml .Values.validator.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.validator.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.affinity }}
+    affinity: {{ toYaml .Values.validator.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.validator.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.securityContext }}
+    securityContext: {{ toYaml .Values.validator.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.resources }}
+    resources: {{ toYaml .Values.validator.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.env }}
+    env: {{ toYaml .Values.validator.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.args }}
+    args: {{ toYaml .Values.validator.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.validator.priorityClassName }}
+    priorityClassName: {{ .Values.validator.priorityClassName }}
+    {{- end }}
+    {{- if .Values.validator.plugin }}
+    plugin:
+      {{- if .Values.validator.plugin.env }}
+      env: {{ toYaml .Values.validator.plugin.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.validator.driver }}
+    driver:
+      {{- if .Values.validator.driver.env }}
+      env: {{ toYaml .Values.validator.driver.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.validator.toolkit }}
+    toolkit:
+      {{- if .Values.validator.toolkit.env }}
+      env: {{ toYaml .Values.validator.toolkit.env | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  mig:
+    {{- if .Values.mig.strategy }}
+    strategy: {{ .Values.mig.strategy }}
+    {{- end }}
+  psp:
+    enabled: {{ .Values.psp.enabled }}
+  driver:
+    enabled: {{ .Values.driver.enabled }}
+    {{- if .Values.driver.repository }}
+    {{- if .Values.global.fromGithub }}
+    repository: docker.io/nvidia
+    {{- else }}
+    repository: {{ .Values.driver.repository }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.driver.image }}
+    image: {{ .Values.driver.image }}
+    {{- end }}
+    {{- if .Values.driver.version }}
+    version: {{ .Values.driver.version }}
+    {{- end }}
+    {{- if .Values.driver.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.driver.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.driver.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.driver.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.repoConfig }}
+    repoConfig: {{ toYaml .Values.driver.repoConfig | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.licensingConfig }}
+    licensingConfig: {{ toYaml .Values.driver.licensingConfig | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.tolerations }}
+    tolerations: {{ toYaml .Values.driver.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.driver.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.affinity }}
+    affinity: {{ toYaml .Values.driver.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.driver.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.securityContext }}
+    securityContext: {{ toYaml .Values.driver.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.resources }}
+    resources: {{ toYaml .Values.driver.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.env }}
+    env: {{ toYaml .Values.driver.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.args }}
+    args: {{ toYaml .Values.driver.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.driver.priorityClassName }}
+    priorityClassName: {{ .Values.driver.priorityClassName }}
+    {{- end }}
+  toolkit:
+    enabled: {{ .Values.toolkit.enabled }}
+    {{- if .Values.toolkit.repository }}
+    {{- if .Values.global.fromGithub }}
+    repository: docker.io/nvidia
+    {{- else }}
+    repository: {{ .Values.toolkit.repository }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.toolkit.image }}
+    image: {{ .Values.toolkit.image }}
+    {{- end }}
+    {{- if .Values.toolkit.version }}
+    version: {{ .Values.toolkit.version }}
+    {{- end }}
+    {{- if .Values.toolkit.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.toolkit.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.toolkit.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.toolkit.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.tolerations }}
+    tolerations: {{ toYaml .Values.toolkit.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.toolkit.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.affinity }}
+    affinity: {{ toYaml .Values.toolkit.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.toolkit.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.securityContext }}
+    securityContext: {{ toYaml .Values.toolkit.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.resources }}
+    resources: {{ toYaml .Values.toolkit.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.env }}
+    env: {{ toYaml .Values.toolkit.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.args }}
+    args: {{ toYaml .Values.toolkit.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.toolkit.priorityClassName }}
+    priorityClassName: {{ .Values.toolkit.priorityClassName }}
+    {{- end }}
+  devicePlugin:
+    {{- if .Values.devicePlugin.repository }}
+    {{- if .Values.global.fromGithub }}
+    repository: docker.io/nvidia
+    {{- else }}
+    repository: {{ .Values.devicePlugin.repository }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.devicePlugin.image }}
+    image: {{ .Values.devicePlugin.image }}
+    {{- end }}
+    {{- if .Values.devicePlugin.version }}
+    version: {{ .Values.devicePlugin.version }}
+    {{- end }}
+    {{- if .Values.devicePlugin.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.devicePlugin.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.devicePlugin.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.devicePlugin.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.tolerations }}
+    tolerations: {{ toYaml .Values.devicePlugin.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.devicePlugin.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.affinity }}
+    affinity: {{ toYaml .Values.devicePlugin.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.devicePlugin.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.securityContext }}
+    securityContext: {{ toYaml .Values.devicePlugin.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.resources }}
+    resources: {{ toYaml .Values.devicePlugin.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.env }}
+    env: {{ toYaml .Values.devicePlugin.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.args }}
+    args: {{ toYaml .Values.devicePlugin.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.devicePlugin.priorityClassName }}
+    priorityClassName: {{ .Values.devicePlugin.priorityClassName }}
+    {{- end }}
+  dcgmExporter:
+    {{- if .Values.dcgmExporter.repository }}
+    {{- if .Values.global.fromGithub }}
+    repository: docker.io/nvidia
+    {{- else }}
+    repository: {{ .Values.dcgmExporter.repository }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.image }}
+    image: {{ .Values.dcgmExporter.image }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.version }}
+    version: {{ .Values.dcgmExporter.version }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.dcgmExporter.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.dcgmExporter.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.tolerations }}
+    tolerations: {{ toYaml .Values.dcgmExporter.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.dcgmExporter.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.affinity }}
+    affinity: {{ toYaml .Values.dcgmExporter.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.dcgmExporter.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.securityContext }}
+    securityContext: {{ toYaml .Values.dcgmExporter.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.resources }}
+    resources: {{ toYaml .Values.dcgmExporter.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.env }}
+    env: {{ toYaml .Values.dcgmExporter.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.args }}
+    args: {{ toYaml .Values.dcgmExporter.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.dcgmExporter.priorityClassName }}
+    priorityClassName: {{ .Values.dcgmExporter.priorityClassName }}
+    {{- end }}
+  gfd:
+    {{- if .Values.gfd.repository }}
+    {{- if .Values.global.fromGithub }}
+    repository: docker.io/nvidia
+    {{- else }}
+    repository: {{ .Values.gfd.repository }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.gfd.image }}
+    image: {{ .Values.gfd.image }}
+    {{- end }}
+    {{- if .Values.gfd.version }}
+    version: {{ .Values.gfd.version }}
+    {{- end }}
+    {{- if .Values.gfd.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.gfd.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.gfd.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.gfd.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.tolerations }}
+    tolerations: {{ toYaml .Values.gfd.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.gfd.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.affinity }}
+    affinity: {{ toYaml .Values.gfd.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.gfd.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.securityContext }}
+    securityContext: {{ toYaml .Values.gfd.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.resources }}
+    resources: {{ toYaml .Values.gfd.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.env }}
+    env: {{ toYaml .Values.gfd.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.args }}
+    args: {{ toYaml .Values.gfd.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gfd.priorityClassName }}
+    priorityClassName: {{ .Values.gfd.priorityClassName }}
+    {{- end }}
+  migManager:
+    enabled: {{ .Values.migManager.enabled }}
+    {{- if .Values.migManager.repository }}
+    {{- if .Values.global.fromGithub }}
+    repository: docker.io/nvidia
+    {{- else }}
+    repository: {{ .Values.migManager.repository }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.migManager.image }}
+    image: {{ .Values.migManager.image }}
+    {{- end }}
+    {{- if .Values.migManager.version }}
+    version: {{ .Values.migManager.version }}
+    {{- end }}
+    {{- if .Values.migManager.imagePullPolicy }}
+    imagePullPolicy: {{ .Values.migManager.imagePullPolicy }}
+    {{- end }}
+    {{- if .Values.migManager.imagePullSecrets }}
+    imagePullSecrets: {{ toYaml .Values.migManager.imagePullSecrets | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.tolerations }}
+    tolerations: {{ toYaml .Values.migManager.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.nodeSelector }}
+    nodeSelector: {{ toYaml .Values.migManager.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.affinity }}
+    affinity: {{ toYaml .Values.migManager.affinity | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.podSecurityContext }}
+    podSecurityContext: {{ toYaml .Values.migManager.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.securityContext }}
+    securityContext: {{ toYaml .Values.migManager.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.resources }}
+    resources: {{ toYaml .Values.migManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.env }}
+    env: {{ toYaml .Values.migManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.args }}
+    args: {{ toYaml .Values.migManager.args | nindent 6 }}
+    {{- end }}
+    {{- if .Values.migManager.priorityClassName }}
+    priorityClassName: {{ .Values.migManager.priorityClassName }}
+    {{- end }}
