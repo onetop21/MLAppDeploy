@@ -1,12 +1,6 @@
 dependencies:
 - name: gpu-operator
-  repository: ""
+  repository: https://nvidia.github.io/gpu-operator
   version: v1.7.1
-- name: ingress-nginx
-  repository: ""
-  version: 3.35.0
-- name: kube-prometheus-stack
-  repository: ""
-  version: 17.1.1
-digest: sha256:bd0264d19a78901dc7118fcee0ac473b3848ee9618bc496affef0b4bab3a08e1
-generated: "2021-08-14T14:11:17.47514064Z"
+digest: sha256:652d3e1bdf54d2f1adc14f7101372725e92a6ca2d2ed977ec91cfb4319e6eb0f
+generated: "2021-08-14T15:44:43.310295906Z"

@@ -6,15 +6,8 @@ global:
   fromDockerhub: false
 
 # Dependencies and subcharts
-ingress-nginx:
-  enabled: true
-  namespaceOverride: ingress-nginx
-kube-prometheus-stack:
-  enabled: true
-  namespaceOverride: kube-prometheus-stack
 gpu-operator:
   enabled: true
-  namespaceOverride: gpu-operator
   operator:
     defaultRuntime: containerd
   driver:
@@ -27,8 +20,6 @@ gpu-operator:
     enabled: false
   migManager:
     enabled: false
-  node-feature-discovery:
-    namespaceOverride: node-feature-discovery
 ###################
 
 serviceMonitor:

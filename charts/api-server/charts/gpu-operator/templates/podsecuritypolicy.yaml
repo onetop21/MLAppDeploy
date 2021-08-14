@@ -3,7 +3,6 @@ apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: gpu-operator-restricted
-  namespace: {{ .Values.namespaceOverride | default .Release.Namespace }}
   labels:
     app.kubernetes.io/component: "gpu-operator"
     {{ $.Release.labels }}

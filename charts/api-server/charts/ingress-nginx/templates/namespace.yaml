@@ -1,7 +1,0 @@
-kind: Namespace
-apiVersion: v1
-metadata:
-  name: {{ .Values.namespaceOverride | default .Values.namespace }}
-  labels:
-    name: {{ .Values.namespaceOverride | default .Values.namespace }}
-    app: {{ .Release.Name }}

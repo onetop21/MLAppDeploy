@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name:  {{ include "node-feature-discovery.fullname" . }}-worker
-  namespace: {{ .Values.namespaceOverride | default .Releaes.Namespace }}
   labels:
     {{- include "node-feature-discovery.labels" . | nindent 4 }}
     role: worker

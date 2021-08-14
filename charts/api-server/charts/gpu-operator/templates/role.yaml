@@ -3,7 +3,6 @@ kind: ClusterRole
 metadata:
   creationTimestamp: null
   name: gpu-operator
-  namespace: {{ .Values.namespaceOverride | default .Release.Namespace }}
   labels:
     app.kubernetes.io/component: "gpu-operator"
     {{ $.Release.labels }}

@@ -6,20 +6,6 @@ questions:
   required: true
   label: Docker Image from DockerHub
   group: "Settings"
-- variable: ingress-nginx.enabled
-  default: false
-  description:  "Enable Ingress-NGINX."
-  type: boolean
-  required: true
-  label: Enable Ingress-NGINX
-  group: "Ingress-NGINX Settings"
-- variable: kube-prometheus-stack.enabled
-  default: false
-  description:  "Enable Prometheus Stack for Kubernetes."
-  type: boolean
-  required: true
-  label: Enable Prometheus Stack
-  group: "Prometheus Stack Settings"
 - variable: gpu-operator.enabled
   default: true
   description:  "Enable NVIDIA GPU Operator."
@@ -62,7 +48,7 @@ questions:
     label: MIG Manager
   - variable: serviceMonitor.namespace
     default: cattle-prometheus
-    label: Service Monitor Namespace (If enabled DCGM Exporter)
+    label: Service Monitor Namespace (If enabled DCGM Exporter and installed Prometheus-stack)
     description:  "Namespace to deploy service monitor (recommend: a namespace deployed prometheus operator)."
     default: {{ .Release.Namespace }}
     type: string

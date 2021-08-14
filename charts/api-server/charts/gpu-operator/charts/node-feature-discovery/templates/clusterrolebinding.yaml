@@ -12,5 +12,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "node-feature-discovery.serviceAccountName" . }}
-  namespace: {{ .Values.namespaceOverride | default $.Releaes.Namespace }}
+  namespace: {{ $.Release.Namespace }}
 {{- end }}
