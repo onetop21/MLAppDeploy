@@ -1,5 +1,5 @@
 questions:
-- variable: image.fromDockerhub
+- variable: global.fromDockerhub
   default: false
   description:  "Docker image location to pull."
   type: boolean
@@ -55,23 +55,17 @@ questions:
     description:  "Deploy DCGM Exporter as a container on the system for monitoring GPU status."
     type: boolean
     label: NVIDIA DCGM Exporter
-    show_subquestion_if: true
-    subquestions:
-    - variable: serviceMonitor.enabled
-      label: Service Monitor
-      description:  "Deploy Service Monitor for DCGM Exporter."
-      default: false
-      type: boolean
-    - variable: serviceMonitor.namespace
-      label: Service Monitor Namespace
-      description:  "Namespace to deploy service monitor (recommend: a namespace deployed prometheus operator)."
-      default: {{ .Release.Namespace }}
-      type: string
   - variable: gpu-operator.migManager.enabled
     default: false
     description:  "The MIG manager watches for changes to the MIG geometry and applies reconfiguration as needed."
     type: boolean
     label: MIG Manager
+  - variable: serviceMonitor.namespace
+    default: cattle-prometheus
+    label: Service Monitor Namespace (If enabled DCGM Exporter)
+    description:  "Namespace to deploy service monitor (recommend: a namespace deployed prometheus operator)."
+    default: {{ .Release.Namespace }}
+    type: string
 
 # - variable: gpu-operator.enabled
 #   default: false
