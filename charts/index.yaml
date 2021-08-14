@@ -3,22 +3,14 @@ entries:
   api-server:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-08-14T14:48:56.717906603Z"
+    created: "2021-08-14T16:03:33.492795241Z"
     dependencies:
     - condition: gpu-operator.enabled
       name: gpu-operator
       repository: ""
       version: v1.7.1
-    - condition: ingress-nginx.enabled
-      name: ingress-nginx
-      repository: ""
-      version: 3.35.0
-    - condition: kube-prometheus-stack.enabled
-      name: kube-prometheus-stack
-      repository: ""
-      version: 17.1.1
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: a5931aa7a8d4a0351dc146c0babf0524f2e21fb2d164d46f361aaa36a48d7d1f
+    digest: 83c4215e5787102336df701d60c163b3f31a1119fb7f6d757f989bb1cf99e4bc
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -28,4 +20,4 @@ entries:
     urls:
     - api-server-0.1.0.tgz
     version: 0.1.0
-generated: "2021-08-14T14:48:56.687274967Z"
+generated: "2021-08-14T16:03:33.488873882Z"

@@ -33,4 +33,4 @@ dependencies:
   - name: gpu-operator
     condition: gpu-operator.enabled
     version: v1.7.1
-    repository: https://nvidia.github.io/gpu-operator
+#    repository: https://nvidia.github.io/gpu-operator
