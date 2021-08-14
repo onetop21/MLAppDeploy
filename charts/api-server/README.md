@@ -17,7 +17,13 @@ Run below commands.
 
 `helm repo add prometheus-community https://prometheus-community.github.io/helm-charts`
 `helm repo update`
-`helm install prometheus-stack prometheus-community/kube-prometheus-stack --create-namespace -n prometheus`
+```bash
+helm install prometheus-stack prometheus-community/kube-prometheus-stack --create-namespace -n monitoring \
+    --set prometheus.ingress.enabled=true \
+    --set prometheus.ingress.path=/prometheus \
+    --set grafana.ingress.enabled=true \
+    --set grafana.ingress.path=/grafana
+```
 
 ## Installation
 

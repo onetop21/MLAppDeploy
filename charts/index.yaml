@@ -3,14 +3,14 @@ entries:
   api-server:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-08-14T16:03:33.492795241Z"
+    created: "2021-08-14T16:18:53.363919843Z"
     dependencies:
     - condition: gpu-operator.enabled
       name: gpu-operator
       repository: ""
       version: v1.7.1
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: 83c4215e5787102336df701d60c163b3f31a1119fb7f6d757f989bb1cf99e4bc
+    digest: 1cbb2e406201627c10d1a66a39bf4c0f4b30d9ae34f91e446317a3791936d983
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -20,4 +20,4 @@ entries:
     urls:
     - api-server-0.1.0.tgz
     version: 0.1.0
-generated: "2021-08-14T16:03:33.488873882Z"
+generated: "2021-08-14T16:18:53.357595573Z"
