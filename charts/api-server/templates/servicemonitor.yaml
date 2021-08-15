@@ -10,6 +10,7 @@ metadata:
   {{- end}}
   labels:
     app: nvidia-dcgm-exporter
+    release: prometheus-stack
 spec:
   endpoints:
   - port: gpu-metrics

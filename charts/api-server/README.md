@@ -19,14 +19,25 @@ Run below commands.
 `helm repo update`
 ```bash
 helm install prometheus-stack prometheus-community/kube-prometheus-stack --create-namespace -n monitoring \
-    --set prometheus.ingress.enabled=true \
-    --set prometheus.ingress.path=/prometheus \
     --set grafana.ingress.enabled=true \
-    --set grafana.ingress.path=/grafana
+    --set grafana.ingress.path=/grafana \
+    --set grafana.'grafana\.ini'.server.root_url='%(protocol)s://%(domain)s:%(http_port)s/grafana' \
+    --set grafana.'grafana\.ini'.server.serve_from_sub_path=true \
+    --set prometheus.ingress.enabled=true \
+    --set prometheus.ingress.paths={/prometheus} \
+    --set prometheus.ingress.pathType=Prefix \
+    --set prometheus.prometheusSpec.routePrefix=/prometheus \
+    --set prometheus.prometheusSpec.externalUrl=/prometheus \
+    --set alertmanager.ingress.enabled=true \
+    --set alertmanager.ingress.annotations.'nginx\.ingress\.kubernetes\.io/rewrite-target'='/$2' \
+    --set alertmanager.ingress.paths='{/alertmanager(/|$)(.*)}'
 ```
 
 ## Installation
 
 `helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts`
 `helm repo update`
-`helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad`
+```bash
+helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad \
+    --set serviceMonitor.namespace=monitoring
+```
