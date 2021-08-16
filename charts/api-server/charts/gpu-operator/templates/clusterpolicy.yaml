@@ -20,7 +20,7 @@ spec:
     {{- if .Values.operator.initContainer }}
     initContainer:
       {{- if .Values.operator.initContainer.repository }}
-      {{- if .Values.global.fromGithub }}
+      {{- if .Values.global.fromDockerhub }}
       repository: docker.io/nvidia
       {{- else }}
       repository: {{ .Values.operator.initContainer.repository }}
@@ -41,7 +41,7 @@ spec:
     {{- end }}
   validator:
     {{- if .Values.validator.repository }}
-    {{- if .Values.global.fromGithub }}
+    {{- if .Values.global.fromDockerhub }}
     repository: docker.io/nvidia
     {{- else }}
     repository: {{ .Values.validator.repository }}
@@ -113,7 +113,7 @@ spec:
   driver:
     enabled: {{ .Values.driver.enabled }}
     {{- if .Values.driver.repository }}
-    {{- if .Values.global.fromGithub }}
+    {{- if .Values.global.fromDockerhub }}
     repository: docker.io/nvidia
     {{- else }}
     repository: {{ .Values.driver.repository }}
@@ -167,7 +167,7 @@ spec:
   toolkit:
     enabled: {{ .Values.toolkit.enabled }}
     {{- if .Values.toolkit.repository }}
-    {{- if .Values.global.fromGithub }}
+    {{- if .Values.global.fromDockerhub }}
     repository: docker.io/nvidia
     {{- else }}
     repository: {{ .Values.toolkit.repository }}
@@ -218,7 +218,7 @@ spec:
     {{- end }}
   devicePlugin:
     {{- if .Values.devicePlugin.repository }}
-    {{- if .Values.global.fromGithub }}
+    {{- if .Values.global.fromDockerhub }}
     repository: docker.io/nvidia
     {{- else }}
     repository: {{ .Values.devicePlugin.repository }}
@@ -265,7 +265,7 @@ spec:
     {{- end }}
   dcgmExporter:
     {{- if .Values.dcgmExporter.repository }}
-    {{- if .Values.global.fromGithub }}
+    {{- if .Values.global.fromDockerhub }}
     repository: docker.io/nvidia
     {{- else }}
     repository: {{ .Values.dcgmExporter.repository }}
@@ -312,7 +312,7 @@ spec:
     {{- end }}
   gfd:
     {{- if .Values.gfd.repository }}
-    {{- if .Values.global.fromGithub }}
+    {{- if .Values.global.fromDockerhub }}
     repository: docker.io/nvidia
     {{- else }}
     repository: {{ .Values.gfd.repository }}
@@ -360,7 +360,7 @@ spec:
   migManager:
     enabled: {{ .Values.migManager.enabled }}
     {{- if .Values.migManager.repository }}
-    {{- if .Values.global.fromGithub }}
+    {{- if .Values.global.fromDockerhub }}
     repository: docker.io/nvidia
     {{- else }}
     repository: {{ .Values.migManager.repository }}

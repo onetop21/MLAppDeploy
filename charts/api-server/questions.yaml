@@ -8,72 +8,54 @@ questions:
   group: "Settings"
 - variable: gpu-operator.enabled
   default: true
-  description:  "Enable NVIDIA GPU Operator."
+  description:  "Skip install plugins for GPU if already installed NVIDIA GPU operator."
   type: boolean
   required: true
-  label: Enable NVIDIA GPU Operator
+  label: Installed NVIDIA GPU Operator
   group: "NVIDIA GPU Settings"
-  show_subquestion_if: true
+  show_subquestion_if: false
   subquestions:
-  - variable: gpu-operator.nfd.enabled
-    label: Node Feature Discovery
-    description:  "Deploy Node Feature Discovery plugin for attaching label to nodes."
+  - variable: nvidia-device-plugin.enabled
+    label: NVIDIA Device Plugin
+    description: "Deploy NVIDIA device plugin for discovery GPU devices on nodes."
     default: true
     type: boolean
-  - variable: gpu-operator.operator.defaultRuntime
-    default: docker
-    description:  "Select Default Container Runtime."
-    type: enum
-    options: ["docker", 'containerd', "crio"]
-    label: Container Runtime
-  - variable: gpu-operator.driver.enabled
-    default: false
-    description:  "Install NVIDIA driver as a container on the system."
-    type: boolean
-    label: NVIDIA Driver
-  - variable: gpu-operator.toolkit.enabled
+  - variable: gpu-feature-discovery.enabled
+    label: GPU Feature Discovery
+    description:  "Deploy GPU Feature Discovery for attaching label about GPU-stats to nodes."
     default: true
-    description:  "Deploy the NVIDIA Container Toolkit(nvidia-docker2) as a container on the system."
     type: boolean
-    label: NVIDIA Container Toolkit
-  - variable: gpu-operator.dcgm.enabled
+  - variable: gpu-feature-discovery.nfd.deploy
+    label: Node Feature Discoveryfor GPU Feature Discovery
+    description:  "Deploy Node Feature Discovery plugin for attaching label to nodes (Set FALSE if already installed)."
+    default: true
+    type: boolean
+  - variable: dcgm-exporter.enabled
     default: true
     description:  "Deploy DCGM Exporter as a container on the system for monitoring GPU status."
     type: boolean
-    label: NVIDIA DCGM Exporter
-  - variable: gpu-operator.migManager.enabled
+    label: DCGM Exporter
+  - variable: dcgm-exorter.serviceMonitor.enabled
+    show_if: dcgm-exporter.enabled=true
     default: false
-    description:  "The MIG manager watches for changes to the MIG geometry and applies reconfiguration as needed."
+    label: Service Monitor
+    description:  "Enabled to deploy service monitor for DCGM exporter."
     type: boolean
-    label: MIG Manager
-  - variable: serviceMonitor.namespace
+  - variable: dcgm-exorter.serviceMonitor.test_labels
+    show_if: dcgm-exporter.serviceMonitor.enabled=true
+    default: "release: prometheus-stack"
+    label: Labels for Service Monitor
+    description:  "Labels to deploy service monitor."
+    type: multiline
+  - variable: dcgm-exorter.serviceMonitorOnNamespace.enabled
+    show_if: "dcgm-exporter.enabled=true&&dcgm-exporter.serviceMonitor.enabled=false"
+    default: true
+    label: Enabled Namespaced Service Monitor.
+    description:  "Enabled to deploy namespaced service monitor for DCGM exporter."
+    type: boolean
+  - variable: dcgm-exorter.serviceMonitorOnNamespace.namespace
+    show_if: dcgm-exporter.serviceMonitorOnNamespace.enabled=true
     default: cattle-prometheus
-    label: Service Monitor Namespace (If enabled DCGM Exporter and installed Prometheus-stack)
+    label: Namespace for Service Monitor
     description:  "Namespace to deploy service monitor (recommend: a namespace deployed prometheus operator)."
-    default: {{ .Release.Namespace }}
     type: string
-
-# - variable: gpu-operator.enabled
-#   default: false
-#   description:  "Enable NVIDIA GPU Operator."
-#   type: boolean
-#   required: true
-#   label: Enable NVIDIA GPU Operator
-#   group: "NVIDIA GPU Settings"
-#   show_subquestion_if: false
-#   subquestions:
-#   - variable: dcgm-exporter.enabled
-#     default: false
-#     description:  "Enable NVIDIA DCGM Exporter for K8S Prometheus Stack."
-#     type: boolean
-#     label: Enable NVIDIA DCGM Exporter
-#   - variable: nvidia-device-plugin.enabled
-#     default: false
-#     description:  "Enable NVIDIA Device Plugin."
-#     type: boolean
-#     label: Enable NVIDIA Device Plugin
-#   - variable: gpu-feature-discovery.enabled
-#     default: false
-#     description:  "Enable NVIDIA GPU Feature Discovery."
-#     type: boolean
-#     label: Enable NVIDIA GPU Feature Discovery

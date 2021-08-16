@@ -4,37 +4,34 @@
 
 global:
   fromDockerhub: false
-  k3s: false
 
 # Dependencies and subcharts
 gpu-operator:
-  enabled: true
-  operator:
-    defaultRuntime: containerd
-  driver:
-    enabled: false
-  toolkit:
-    enabled: true
-    env:
-    - name: CONTAINERD_CONFIG
-      value: /etc/containerd/config.toml
-    - name: CONTAINERD_SOCKET
-      value: /run/containerd/containerd.sock
-    - name: CONTAINERD_RUNTIME_CLASS
-      value: nvidia
-    - name: CONTAINERD_SET_AS_DEFAULT
-      value: true
-  dcgm:
-    enabled: true
-  nfd:
-    enabled: false
-  migManager:
-    enabled: false
-###################
-
-serviceMonitor:
   enabled: false
-  namespace: 
+
+nvidia-device-plugin:
+  enabled: true
+  image:
+    repository: docker.io/nvidia/k8s-device-plugin
+gpu-feature-discovery:
+  enabled: true
+  image:
+    repository: docker.io/nvidia/gpu-feature-discovery
+  nfd:
+    deploy: true
+dcgm-exporter:
+  enabled: true
+  image:
+    repository: docker.io/nvidia/dcgm-exporter
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus-stack
+    # if enabled is FALSE
+  serviceMonitorOnNamespace:
+    enabled: false
+    namespace: cattle-prometheus
+###################
 
 replicaCount: 1
 

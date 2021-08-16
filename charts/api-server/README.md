@@ -33,6 +33,9 @@ helm install prometheus-stack prometheus-community/kube-prometheus-stack --creat
     --set alertmanager.ingress.paths='{/alertmanager(/|$)(.*)}'
 ```
 
+#### GPU Metrics Dashboard
+We provide an official dashboard on Grafana: https://grafana.com/grafana/dashboards/12239
+
 ## Installation
 
 `helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts`

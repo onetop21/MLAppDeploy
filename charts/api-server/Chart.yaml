@@ -30,7 +30,15 @@ appVersion: "0.1.0"
 
 # Dependencies
 dependencies: 
-  - name: gpu-operator
-    condition: gpu-operator.enabled
-    version: v1.7.1
-#    repository: https://nvidia.github.io/gpu-operator
+  - name: nvidia-device-plugin
+    version: 0.9.0
+    repository: https://nvidia.github.io/k8s-device-plugin
+    condition: nvidia-device-plugin.enabled
+  - name: gpu-feature-discovery
+    version: 0.4.1
+    repository: https://nvidia.github.io/gpu-feature-discovery
+    condition: gpu-feature-discovery.enabled
+  - name: dcgm-exporter
+    version: 2.4.0
+    repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
+    condition: dcgm-exporter.enabled

@@ -1,6 +1,12 @@
 dependencies:
-- name: gpu-operator
-  repository: ""
-  version: v1.7.1
-digest: sha256:a3945a48ed4295faa162b92170f97a16f0630d67a71900646a59a85f3d1dd177
-generated: "2021-08-14T16:00:52.950791472Z"
+- name: nvidia-device-plugin
+  repository: https://nvidia.github.io/k8s-device-plugin
+  version: 0.9.0
+- name: gpu-feature-discovery
+  repository: https://nvidia.github.io/gpu-feature-discovery
+  version: 0.4.1
+- name: dcgm-exporter
+  repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
+  version: 2.4.0
+digest: sha256:243364f8a6c8a065eca5ea163d35f733260120d98c6952d6572da8ba61383dad
+generated: "2021-08-16T17:03:28.706416826Z"
