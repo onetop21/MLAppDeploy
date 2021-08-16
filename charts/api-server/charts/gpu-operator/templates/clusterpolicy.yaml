@@ -205,6 +205,10 @@ spec:
     {{- end }}
     {{- if .Values.toolkit.env }}
     env: {{ toYaml .Values.toolkit.env | nindent 6 }}
+    {{- else }}
+    {{- if .Values.global.k3s }}
+    env: {{ toYaml .Values.toolkit.k3senv | nindent 6 }}
+    {{- end }}
     {{- end }}
     {{- if .Values.toolkit.args }}
     args: {{ toYaml .Values.toolkit.args | nindent 6 }}

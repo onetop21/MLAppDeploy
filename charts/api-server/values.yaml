@@ -4,6 +4,7 @@
 
 global:
   fromDockerhub: false
+  k3s: false
 
 # Dependencies and subcharts
 gpu-operator:
@@ -14,6 +15,15 @@ gpu-operator:
     enabled: false
   toolkit:
     enabled: true
+    env:
+    - name: CONTAINERD_CONFIG
+      value: /etc/containerd/config.toml
+    - name: CONTAINERD_SOCKET
+      value: /run/containerd/containerd.sock
+    - name: CONTAINERD_RUNTIME_CLASS
+      value: nvidia
+    - name: CONTAINERD_SET_AS_DEFAULT
+      value: true
   dcgm:
     enabled: true
   nfd:
