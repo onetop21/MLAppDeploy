@@ -1,10 +1,10 @@
-{{- if ".Values.gpu-operator.dcgm.enabled" }}
+{{- if ".Values.dcgm-exporter.serviceMonitorOnNamespace.enabled" }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: nvidia-dcgm-exporter
-  {{- if .Values.serviceMonitor.namespace }}
-  namespace: {{ .Values.serviceMonitor.namespace }}
+  {{- if .Values.serviceMonitorOnNamespace.namespace }}
+  namespace: {{ .Values.serviceMonitorOnNamespace.namespace }}
   {{- else }}
   namespace: {{ .Release.Namespace }}
   {{- end}}
