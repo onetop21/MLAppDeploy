@@ -3,8 +3,8 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: nvidia-dcgm-exporter
-  {{- if .Values.serviceMonitorOnNamespace.namespace }}
-  namespace: {{ .Values.serviceMonitorOnNamespace.namespace }}
+  {{- if .Values.dcgm-exporter.serviceMonitorOnNamespace.namespace }}
+  namespace: {{ .Values.dcgm-exporter.serviceMonitorOnNamespace.namespace }}
   {{- else }}
   namespace: {{ .Release.Namespace }}
   {{- end}}
