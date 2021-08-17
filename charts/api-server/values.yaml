@@ -15,7 +15,7 @@ dcgm-exporter:
   enabled: true
   serviceMonitor:
     enabled: true
-    additionalLabels: |
+    additionalLabels: 
       release: prometheus-stack
     namespace:
   affinity:
