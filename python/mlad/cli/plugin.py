@@ -183,7 +183,7 @@ def install(name_version, arguments):
             [f"MLAD_USER_TOKEN={config.mlad.token.user}"]
 
     res = api.project.create({'name': inspect['project_name'], 'version': inspect['version'], 'maintainer': inspect['maintainer']},
-            base_labels, extra_envs, credential=credential, swarm=True, allow_reuse=False)
+            base_labels, extra_envs, credential=credential, allow_reuse=False)
     try:
         for _ in res:
             if 'stream' in _:

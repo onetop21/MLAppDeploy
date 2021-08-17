@@ -42,10 +42,8 @@ def create_session_key():
     user = getuser()
     hostname = socket.gethostname()
     admin = auth_admin()
-    payload = {"user":user, "hostname": hostname,
-               "uuid": str(uuid.uuid4())}
-    encode = jwt.encode(payload, "mlad", algorithm="HS256")\
-        .decode('utf-8')
+    payload = {"user":user, "hostname": hostname, "uuid": str(uuid.uuid4())}
+    encode = jwt.encode(payload, "mlad", algorithm="HS256").decode('utf-8')
     return encode
 
 
@@ -69,7 +67,8 @@ def read_config():
     try:
         return OmegaConf.load(CONFIG_FILE)
     except FileNotFoundError as e:
-        print('Need to initialize configuration before.\nTry to run "mlad config init"', file=sys.stderr)
+        print('Need to initialize configuration before.\nTry to run "mlad config init"',
+              file=sys.stderr)
         sys.exit(1)
 
 
@@ -138,8 +137,10 @@ def get_project(default_project):
                 path
             )
         )
-    if not check_podname_syntax(project['project']['name']) or not check_podname_syntax(project['services']):
-        print('Syntax Error: Project(Plugin) and service require a name to follow standard as defined in RFC1123.', file=sys.stderr)
+    if not check_podname_syntax(project['project']['name']) or \
+            not check_podname_syntax(project['services']):
+        print('Syntax Error: Project(Plugin) and service require a name to '
+              'follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
     return project
 
@@ -182,20 +183,23 @@ def get_manifest(ty, default=lambda x: x):
             )
         )
     if not check_podname_syntax(manifest[ty]['name']):
-        print('Syntax Error: Project(Plugin) and service require a name to follow standard as defined in RFC1123.', file=sys.stderr)
+        print('Syntax Error: Project(Plugin) and service require a name '
+              'to follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
     return manifest
 
 
 def print_table(data, no_data_msg=None, max_width=32, upper=True):
     if max_width > 0:
-        widths = [max(_) for _ in zip(*[[min(len(str(value)), max_width) for value in datum] for datum in data])]
+        widths = [max(_) for _ in zip(*[[min(len(str(value)), max_width) for value in datum]
+                                        for datum in data])]
     else:
         widths = [max(_) for _ in zip(*[[len(str(value)) for value in datum] for datum in data])]
     format = '  '.join([('{:%d}' % _) for _ in widths])
     firstline = True
     for datum in data:
-        datum = [_ if not isinstance(_, str) or len(_) <= w else f"{_[:w-3]}..." for _, w in zip(datum, widths)]
+        datum = [_ if not isinstance(_, str) or len(_) <= w else f"{_[:w-3]}..."
+                 for _, w in zip(datum, widths)]
         if firstline:
             if upper:
                 print(format.format(*datum).upper())
@@ -230,7 +234,8 @@ def get_default_service_port(container_name, internal_port):
     import docker
     cli = docker.from_env()
     external_port = None
-    for _ in [_.ports[f'{internal_port}/tcp'] for _ in cli.containers.list() if _.name in [f'{container_name}']]: 
+    for _ in [_.ports[f'{internal_port}/tcp'] for _ in cli.containers.list()
+              if _.name in [f'{container_name}']]:
         external_port = _[0]['HostPort']
     return external_port
 
@@ -297,8 +302,10 @@ def match(filepath, ignores):
     result = False
     normpath = os.path.normpath(filepath)
     def matcher(path, pattern):
-        patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")] if '**/' in pattern else [])
-        result = map(lambda _: fnmatch.fnmatch(normpath, _) or fnmatch.fnmatch(normpath, os.path.normpath(f"{_}/*")), patterns)
+        patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")]
+                                if '**/' in pattern else [])
+        result = map(lambda _: fnmatch.fnmatch(normpath, _) or
+                               fnmatch.fnmatch(normpath, os.path.normpath(f"{_}/*")), patterns)
         return sum(result) > 0
     for ignore in ignores:
         if ignore.startswith('#'):
@@ -316,7 +323,8 @@ def arcfiles(workspace='.', ignores=[]):
         for name in files:
             filepath = os.path.join(root, name)
             if not match(filepath, ignores):
-                yield filepath, os.path.relpath(os.path.abspath(filepath), os.path.abspath(workspace))
+                yield filepath, os.path.relpath(os.path.abspath(filepath),
+                                                os.path.abspath(workspace))
         prune_dirs = []
         for name in dirs:
             dirpath = os.path.join(root, name)

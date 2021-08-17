@@ -3,7 +3,6 @@ import requests
 from pathlib import Path
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
-from mlad.cli.libs.auth import get_k8s_config_path
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
 from mlad.core import exception as CoreException
@@ -12,9 +11,9 @@ from mlad.core.kubernetes import controller as ctlr
 
 def list(no_trunc):
     config = utils.read_config()
+    api = API(config.mlad.address, config.mlad.token.admin)
     try:
-        with API(config.mlad.address, config.mlad.token.admin) as api:
-            nodes = [api.node.inspect(_) for _ in api.node.get()]
+        nodes = [api.node.inspect(_) for _ in api.node.get()]
     except APIError as e:
         print(e)
         sys.exit(1)
@@ -34,7 +33,7 @@ def list(no_trunc):
 
 def enable(ID):
     config = utils.read_config()
-    cli = ctlr.get_api_client(get_k8s_config_path())
+    cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.enable_node(cli, ID)
     except CoreException.NotFound as e:
@@ -48,7 +47,7 @@ def enable(ID):
 
 def disable(ID):
     config = utils.read_config()
-    cli = ctlr.get_api_client(get_k8s_config_path())
+    cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.disable_node(cli, ID)
     except CoreException.NotFound as e:
@@ -62,7 +61,7 @@ def disable(ID):
 
 def label_add(node, **kvs):
     config = utils.read_config()
-    cli = ctlr.get_api_client(get_k8s_config_path())
+    cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.add_node_labels(cli, node, **kvs)
     except CoreException.NotFound as e:
@@ -76,7 +75,7 @@ def label_add(node, **kvs):
 
 def label_rm(node, *keys):
     config = utils.read_config()
-    cli = ctlr.get_api_client(get_k8s_config_path())
+    cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.remove_node_labels(cli, node, *keys)
     except CoreException.NotFound as e:
@@ -90,9 +89,9 @@ def label_rm(node, *keys):
 
 def resource(nodes, no_trunc):
     config = utils.read_config()
+    api = API(config.mlad.address, config.mlad.token.admin)
     try:
-        with API(config.mlad.address, config.mlad.token.admin) as api:
-            res = api.node.resource(nodes)
+        res = api.node.resource(nodes)
     except APIError as e:
         print(e)
         sys.exit(1)

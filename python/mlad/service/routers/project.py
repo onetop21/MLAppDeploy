@@ -26,9 +26,7 @@ def _check_session_key(project, session, cli):
 
 
 @router.post("/project")
-def project_create(req: project.CreateRequest, 
-                   allow_reuse: bool = Query(False), 
-                   swarm: bool = Query(True),
+def project_create(req: project.CreateRequest, allow_reuse: bool = Query(False),
                    session: str = Header(None)):
     cli = ctlr.get_api_client()
 
@@ -38,8 +36,7 @@ def project_create(req: project.CreateRequest,
 
     try:
         res = ctlr.create_project_network(
-            cli, base_labels, extra_envs, credential, swarm=swarm, 
-            allow_reuse=allow_reuse, stream=True)          
+            cli, base_labels, extra_envs, credential, allow_reuse=allow_reuse, stream=True)
 
         def create_project(gen):
             for _ in gen:

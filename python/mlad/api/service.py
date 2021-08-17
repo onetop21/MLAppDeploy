@@ -48,22 +48,23 @@ class Service:
         url = f'{self.url}/{project_key}/service/{service_id}'
         header = {'session': self.session}
         if stream:
-            with requests.delete(url=url, headers=header, stream=True,
-                                 params={'stream': stream}) as resp:
-                if resp.status_code == 200:
-                    for _ in resp.iter_content(1024):
-                        res = _.decode()
-                        dict_res = json.loads(res)
-                        yield dict_res
-                elif resp.status_code == 404:
-                    raise ServiceNotFound(f'Failed to delete service : '
-                                          f'{resp.json()["detail"]["msg"]}', resp)
-                elif resp.status_code == 401:
-                    raise ServiceNotFound(f'Failed to delete service : '
-                                          f'{resp.json()["detail"]["msg"]}', resp)
-                else:
-                    raise APIError(f'Failed to delete service : '
-                                   f'{resp.json()["detail"]["msg"]}', resp)
+            resp = requests.delete(url=url, headers=header, stream=True,
+                                 params={'stream': stream})
+            status = resp.status_code
+            if status == 200:
+                for _ in resp.iter_content(1024):
+                    res = _.decode()
+                    dict_res = json.loads(res)
+                    yield dict_res
+            elif status == 404:
+                raise ServiceNotFound(f'Failed to delete service : '
+                                      f'{resp.json()["detail"]["msg"]}', resp)
+            elif status == 401:
+                raise ServiceNotFound(f'Failed to delete service : '
+                                      f'{resp.json()["detail"]["msg"]}', resp)
+            else:
+                raise APIError(f'Failed to delete service : '
+                               f'{resp.json()["detail"]["msg"]}', resp)
         else:
             res = requests.delete(url=url, params={'stream': stream})
             raise_error(res)
@@ -74,23 +75,24 @@ class Service:
         url = f'{self.url}/{project_key}/service'
         header = {'session': self.session}
         if stream:
-            with requests.delete(url=url, headers=header,
+            resp = requests.delete(url=url, headers=header,
                                  stream=True, json={'services': services},
-                                 params={'stream': stream}) as resp:
-                if resp.status_code == 200:
-                    for _ in resp.iter_content(1024):
-                        res = _.decode()
-                        dict_res = json.loads(res)
-                        yield dict_res
-                elif resp.status_code == 404:
-                    raise ServiceNotFound(f'Failed to delete service : '
-                                          f'{resp.json()["detail"]["msg"]}', resp)
-                elif resp.status_code == 401:
-                    raise ServiceNotFound(f'Failed to delete service : '
-                                          f'{resp.json()["detail"]["msg"]}', resp)
-                else:
-                    raise APIError(f'Failed to delete service : '
-                                   f'{resp.json()["detail"]["msg"]}', resp)
+                                 params={'stream': stream})
+            status = resp.status_code
+            if status == 200:
+                for _ in resp.iter_content(1024):
+                    res = _.decode()
+                    dict_res = json.loads(res)
+                    yield dict_res
+            elif status == 404:
+                raise ServiceNotFound(f'Failed to delete service : '
+                                      f'{resp.json()["detail"]["msg"]}', resp)
+            elif status == 401:
+                raise ServiceNotFound(f'Failed to delete service : '
+                                      f'{resp.json()["detail"]["msg"]}', resp)
+            else:
+                raise APIError(f'Failed to delete service : '
+                               f'{resp.json()["detail"]["msg"]}', resp)
         else:
             res = requests.delete(url=url, headers=header,
                                   json={'services': services},

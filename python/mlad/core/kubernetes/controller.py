@@ -24,15 +24,15 @@ from mlad.core.docker import controller as docker_controller
 SHORT_LEN = 10
 
 # Docker CLI from HOST
-def get_api_client(config_file='~/.kube/config'):#config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION):
+def get_api_client(config_file='~/.kube/config', context=None):
     try:
-        #from kubernetes.client.api_client import ApiClient
-        #config.load_kube_config(config_file=config_file) # configuration to Configuration(global)
-        #return ApiClient() # If Need, set configuration parameter from client.Configuration
-        return config.new_client_from_config(config_file=config_file)
+        if context:
+            return config.new_client_from_config(context=context)
+        else:
+            return config.new_client_from_config(config_file=config_file)
     except config.config_exception.ConfigException:
         from kubernetes.client.api_client import ApiClient
-        config.load_incluster_config() # configuration to Configuration(global)
+        config.load_incluster_config()
         return ApiClient() # If Need, set configuration parameter from client.Configuration
 
 def get_current_context():
@@ -40,7 +40,7 @@ def get_current_context():
         current_context = config.list_kube_config_contexts()[1]
     except config.config_exception.ConfigException as e:
         raise exception.APIError(str(e), 404)
-    return current_context
+    return current_context['name']
 
 def get_auth_headers(cli, image_name=None, auth_configs=None):
     return docker_controller.get_auth_headers(docker.from_env(), image_name, auth_configs)
@@ -136,7 +136,7 @@ def get_project_session(cli, network):
     return config_labels['MLAD.PROJECT.SESSION']
 
 
-def create_project_network(cli, base_labels, extra_envs, credential, swarm=True, allow_reuse=False, stream=False):
+def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse=False, stream=False):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     project_key = base_labels['MLAD.PROJECT']

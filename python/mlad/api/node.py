@@ -20,34 +20,6 @@ class Node:
         raise_error(res)
         return res.json()
 
-    # def enable(self, node_id):
-    #     url = f'{self.url}/node/{node_id}/enable'
-    #     header = {'token': self.token}
-    #     res = requests.post(url=url, headers=header)
-    #     raise_error(res)
-    #     return res.json()
-    #
-    # def disable(self, node_id):
-    #     url = f'{self.url}/node/{node_id}/disable'
-    #     header = {'token': self.token}
-    #     res = requests.post(url=url, headers=header)
-    #     raise_error(res)
-    #     return res.json()
-    #
-    # def add_label(self, node_id, **labels):
-    #     url = f'{self.url}/node/{node_id}/labels'
-    #     header = {'token': self.token}
-    #     res = requests.post(url=url, headers=header, json={'labels':labels})
-    #     raise_error(res)
-    #     return res.json()
-    #
-    # def delete_label(self, node_id, *keys):
-    #     url = f'{self.url}/node/{node_id}/labels'
-    #     header = {'token': self.token}
-    #     res = requests.delete(url=url, headers=header, json={'keys':keys})
-    #     raise_error(res)
-    #     return res.json()
-
     def resource(self, nodes=[]):
         url = f'{self.url}/nodes/resource'
         header = {'session': self.session}

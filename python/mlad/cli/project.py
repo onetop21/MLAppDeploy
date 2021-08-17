@@ -22,7 +22,6 @@ from mlad.core import exception
 from mlad.cli.libs import utils
 from mlad.cli.libs import datastore as ds
 from mlad.cli.libs import interrupt_handler
-from mlad.cli.libs.auth import get_k8s_config_path
 from mlad.cli.Format import PROJECT
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 from mlad.api import API
@@ -239,7 +238,7 @@ def run(with_build):
     with interrupt_handler(message='Wait.', blocked=True) as h:
         try:
             extra_envs = ds.get_env(config)
-            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, swarm=False, stream=True):
+            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
                 if 'result' in _:
@@ -363,10 +362,10 @@ def up(services):
 
     if not services:
         res = api.project.create(project['project'], base_labels,
-            extra_envs, credential=credential, swarm=True, allow_reuse=False)
+            extra_envs, credential=credential, allow_reuse=False)
     else:
         res = api.project.create(project['project'], base_labels,
-            extra_envs, credential=credential, swarm=True, allow_reuse=True)
+            extra_envs, credential=credential, allow_reuse=True)
     try:
         for _ in res:
             if 'stream' in _:
@@ -506,7 +505,7 @@ def down(services, no_dump):
 def down_force(services, no_dump):
     '''down project using local k8s for admin'''
     config = utils.read_config()
-    cli = k8s_ctlr.get_api_client(get_k8s_config_path())
+    cli = k8s_ctlr.get_api_client(context=k8s_ctlr.get_current_context())
     project_key = utils.project_key(utils.get_workspace())
     workdir = utils.get_project(default_project)['project']['workdir']
     network = k8s_ctlr.get_project_network(cli, project_key=project_key)
