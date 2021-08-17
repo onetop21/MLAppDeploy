@@ -24,6 +24,12 @@ metadata:
     {{- if .Values.serviceMonitor.additionalLabels }}
     {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
     {{- end }}
+    {{- if .Values.serviceMonitor.additionalMultilineLabels }}
+    {{- range $line := (regexSplit "\n" .Values.serviceMonitor.additionalMultilineLabels -1) }}
+    {{- $item := regexSplit ":[ \t]*" $line -1 }}
+    {{ dict (index $item 0) (index $item 1) | toYaml }}
+    {{- end }}
+  {{- end }}
 spec:
   selector:
     matchLabels:
