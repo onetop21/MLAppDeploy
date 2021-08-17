@@ -67,7 +67,7 @@ questions:
     label: Service Monitor
     description:  "Enabled to deploy service monitor for DCGM exporter."
     type: boolean
-  - variable: dcgm-exporter.serviceMonitor.additionalMultilineLabels
+  - variable: dcgm-exporter.serviceMonitor.additionalLabels
     show_if: dcgm-exporter.serviceMonitor.enabled=true
     default: "release: prometheus-stack"
     label: Labels for Service Monitor

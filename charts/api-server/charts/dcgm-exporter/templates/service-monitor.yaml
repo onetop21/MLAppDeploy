@@ -17,15 +17,15 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "dcgm-exporter.fullname" . }}
-  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  namespace: {{ .Values.serviceMonitor.namespace | default .Release.Namespace }}
   labels:
     {{- include "dcgm-exporter.labels" . | nindent 4 }}
     app.kubernetes.io/component: "dcgm-exporter"
+    # {{- if .Values.serviceMonitor.additionalLabels }}
+    # {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
+    # {{- end }}
     {{- if .Values.serviceMonitor.additionalLabels }}
-    {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
-    {{- end }}
-    {{- if .Values.serviceMonitor.additionalMultilineLabels }}
-    {{- range $line := (regexSplit "\n" .Values.serviceMonitor.additionalMultilineLabels -1) }}
+    {{- range $line := (regexSplit "\n" .Values.serviceMonitor.additionalLabels -1) }}
     {{- $item := regexSplit ":[ \t]*" $line -1 }}
     {{ dict (index $item 0) (index $item 1) | toYaml }}
     {{- end }}
