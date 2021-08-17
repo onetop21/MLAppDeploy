@@ -24,7 +24,7 @@ $ bash scripts/cluster-install.sh build --registry <Registry>
 $ bash scripts/cluster-install.sh deploy --registry <Registry>
 ```
 
-### ⚠ Deploy Released API-Server by Helm Charts [[View Page]](/charts/api-server/)
+### ⚠ Deploy Released API-Server by Helm Charts [[View Page]](/MLAppDeploy/charts/api-server/)
 
 ## Frontend Installation
 ### 1. Install Virtual Environment
