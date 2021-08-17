@@ -29,9 +29,9 @@ questions:
   label: GPU Feature Discovery
   description:  "Deploy GPU Feature Discovery for attaching label about GPU-stats to nodes."
   default: true
+  type: boolean
   show_subquestion_if: true
   subquestions:
-  type: boolean
   - variable: gpu-feature-discovery.image.repository
     label: NVIDIA GPU Feature Discovery Image Repository
     description: Select GPU feature discovery image repository
