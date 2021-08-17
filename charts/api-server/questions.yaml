@@ -6,15 +6,6 @@ questions:
   required: true
   label: API Server Image from DockerHub
   group: "API Server Settings"
-- variable: gpu-operator.enabled
-  default: true
-  description:  "Skip install plugins for GPU if already installed NVIDIA GPU operator."
-  type: boolean
-  required: true
-  label: Installed NVIDIA GPU Operator
-  group: "NVIDIA GPU Settings"
-  show_subquestion_if: false
-  subquestions:
 
 - variable: nvidia-device-plugin.enabled
   group: "NVIDIA GPU Settings: NVIDIA Device Plguin"
@@ -32,6 +23,7 @@ questions:
     options:
     - nvcr.io/nvidia/k8s-device-plugin
     - docker.io/nvidia/k8s-device-plugin
+
 - variable: gpu-feature-discovery.enabled
   group: "NVIDIA GPU Settings: GPU Feature Discovery"
   label: GPU Feature Discovery
@@ -53,8 +45,9 @@ questions:
     description:  "Deploy Node Feature Discovery plugin for attaching label to nodes (Set FALSE if already installed)."
     default: true
     type: boolean
+
 - variable: dcgm-exporter.enabled
-  group: NVIDIA GPU Settiongs: DCGM Exporter
+  group: "NVIDIA GPU Settiongs: DCGM Exporter"
   default: true
   description:  "Deploy DCGM Exporter as a container on the system for monitoring GPU status."
   type: boolean

@@ -3,7 +3,7 @@ entries:
   api-server:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-08-17T06:49:43.223428034Z"
+    created: "2021-08-17T06:58:15.615301537Z"
     dependencies:
     - condition: nvidia-device-plugin.enabled
       name: nvidia-device-plugin
@@ -18,7 +18,7 @@ entries:
       repository: ""
       version: 2.4.0
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: 0fc12682dec2cd7431a1e8b63bddc092cc3ccc3bb75f2ba4ef265fdee4f08016
+    digest: 2cedab067a3a3bd35cfd3f990d0e6cec8ab529d00670266832d262e3a1e8a73d
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -28,4 +28,4 @@ entries:
     urls:
     - api-server-0.1.0.tgz
     version: 0.1.0
-generated: "2021-08-17T06:49:43.21981349Z"
+generated: "2021-08-17T06:58:15.611245785Z"
