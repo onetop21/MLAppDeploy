@@ -74,14 +74,8 @@ questions:
     label: Labels for Service Monitor
     description:  "Labels to deploy service monitor."
     type: multiline
-  - variable: dcgm-exorter.namespacedServiceMonitor.enabled
-    show_if: "dcgm-exporter.enabled=true&&dcgm-exporter.serviceMonitor.enabled=false"
-    default: true
-    label: Enabled Namespaced Service Monitor.
-    description:  "Enabled to deploy namespaced service monitor for DCGM exporter."
-    type: boolean
-  - variable: dcgm-exorter.namespacedServiceMonitor.namespace
-    show_if: dcgm-exporter.namespacedServiceMonitor.enabled=true
+  - variable: dcgm-exorter.serviceMonitor.namespace
+    show_if: dcgm-exporter.serviceMonitor.enabled=true
     default: cattle-prometheus
     label: Namespace for Service Monitor
     description:  "Namespace to deploy service monitor (recommend: a namespace deployed prometheus operator)."

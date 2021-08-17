@@ -6,7 +6,7 @@ dependencies:
   repository: https://nvidia.github.io/gpu-feature-discovery
   version: 0.4.1
 - name: dcgm-exporter
-  repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
+  repository: ""
   version: 2.4.0
-digest: sha256:243364f8a6c8a065eca5ea163d35f733260120d98c6952d6572da8ba61383dad
-generated: "2021-08-16T17:03:28.706416826Z"
+digest: sha256:9635979e02c19351d56f525bd11f2bdcacd6ef73a2263e6dfcdc17ef3a1b1947
+generated: "2021-08-17T05:54:00.320873085Z"

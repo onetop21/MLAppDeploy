@@ -51,6 +51,5 @@ helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
 helm repo update
 ```
 ```bash
-helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad \
-    --set serviceMonitor.namespace=monitoring
+helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad
 ```

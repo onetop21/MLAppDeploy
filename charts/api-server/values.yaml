@@ -18,9 +18,7 @@ dcgm-exporter:
     enabled: true
     additionalLabels:
       release: prometheus-stack
-  namespacedServiceMonitor:
-    enabled: false
-    namespace: cattle-prometheus
+    namespace:
 ###################
 
 replicaCount: 1

@@ -40,5 +40,5 @@ dependencies:
     condition: gpu-feature-discovery.enabled
   - name: dcgm-exporter
     version: 2.4.0
-    repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
+    #repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
     condition: dcgm-exporter.enabled
