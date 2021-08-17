@@ -1,6 +1,5 @@
 import sys
 import io
-import os
 import pytest
 
 from omegaconf import OmegaConf
@@ -34,6 +33,7 @@ def test_valid_input():
     ]
     sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
     expected = {
+        'name': 'test-valid',
         'apiserver': {'address': inputs[0]},
         'docker': {'registry': {'address': inputs[1], 'namespace': 'gameai'}},
         'datastore': {
@@ -52,7 +52,7 @@ def test_valid_input():
         }
     }
     assert expected == OmegaConf.to_object(context.add('test-valid', inputs[0]))
-    assert os.path.isfile(context.ctx_path('test-valid'))
+    assert expected == context._find_context('test-valid')
 
 
 def test_valid_input2():
@@ -70,6 +70,7 @@ def test_valid_input2():
     ]
     sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
     expected = {
+        'name': 'test-valid2',
         'apiserver': {'address': inputs[0]},
         'docker': {'registry': {'address': inputs[1], 'namespace': None}},
         'datastore': {
@@ -88,7 +89,7 @@ def test_valid_input2():
         }
     }
     assert expected == OmegaConf.to_object(context.add('test-valid2', inputs[0]))
-    assert os.path.isfile(context.ctx_path('test-valid2'))
+    assert expected == context._find_context('test-valid2')
 
 
 def test_invalid_input():

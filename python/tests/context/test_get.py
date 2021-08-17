@@ -2,9 +2,7 @@ import os
 import pytest
 
 from mlad.cli import context
-from mlad.cli.exceptions import (
-    NotExistDefaultContextError, NotExistContextError
-)
+from mlad.cli.exceptions import NotExistContextError
 
 from . import mock
 
@@ -37,12 +35,3 @@ def test_get():
     context.get('test1')
     with pytest.raises(NotExistContextError):
         context.get('test2')
-
-
-def test_default():
-    mock.add('test1')
-    with pytest.raises(NotExistDefaultContextError):
-        context.get()
-
-    context.use('test1')
-    context.get()

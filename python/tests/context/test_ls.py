@@ -6,11 +6,11 @@ from mlad.cli import context
 from . import mock
 
 
-def setup_module():
+def setup_function():
     mock.setup()
 
 
-def teardown_module():
+def teardown_function():
     mock.teardown()
 
 
@@ -20,10 +20,8 @@ def test_ls():
     mock.add('test2')
     sys.stdout = buffer = io.StringIO()
     context.ls(False)
-    assert buffer.getvalue() == 'NAME \ntest2\ntest1\n'
     sys.stdout = origin_stdout
-    context.delete('test1')
-    context.delete('test2')
+    assert buffer.getvalue() == 'NAME   \n* test1\ntest2  \n'
 
 
 def test_blank_ls():

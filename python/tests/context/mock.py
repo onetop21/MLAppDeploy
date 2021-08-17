@@ -4,23 +4,21 @@ import shutil
 
 from mlad.cli import context
 from pathlib import Path
+from omegaconf import OmegaConf
 
 origin_stdin = None
 
 
 def setup():
-    context.DIR_PATH = './tests/contexts'
-    context.REF_PATH = './tests/context_ref.yml'
-    context.ctx_path = lambda name: f'{context.DIR_PATH}/{name}.yml'
-    Path('./tests/contexts').mkdir(exist_ok=True, parents=True)
+    context.CTX_PATH = './tests/context.yml'
+    Path('./tests').mkdir(exist_ok=True, parents=True)
+    OmegaConf.save(config=context.boilerplate, f=context.CTX_PATH)
     global origin_stdin
     origin_stdin = sys.stdin
 
 
 def teardown():
-    context.DIR_PATH = f'{context.MLAD_HOME_PATH}/contexts'
-    context.REF_PATH = f'{context.MLAD_HOME_PATH}/context_ref.yml'
-    context.ctx_path = lambda name: f'{context.DIR_PATH}/{name}.yml'
+    context.CTX_PATH = f'{context.MLAD_HOME_PATH}/context.yml'
     shutil.rmtree('./tests')
     global origin_stdin
     sys.stdin = origin_stdin

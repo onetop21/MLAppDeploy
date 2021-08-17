@@ -2,9 +2,7 @@ import pytest
 
 from omegaconf import OmegaConf
 from mlad.cli import context
-from mlad.cli.exceptions import (
-    InvalidPropertyError, NotExistDefaultContextError
-)
+from mlad.cli.exceptions import InvalidPropertyError
 
 from . import mock
 
@@ -25,6 +23,7 @@ def test_set():
                 'datastore.s3.verify=False')
 
     expected = {
+        'name': 'test1',
         'apiserver': {'address': 'https://ncml-dev.cloud.ncsoft.com'},
         'docker': {'registry': {
             'address': 'https://harbor.sailio.ncsoft.com',
@@ -50,9 +49,6 @@ def test_set():
 
 
 def test_invalid_set():
-    with pytest.raises(NotExistDefaultContextError):
-        context.set(None, 'docker.registry.namespace=null')
-
     mock.add('test2')
     context.use('test2')
     context.set(None, 'datastore.db.address=mongodb://8.8.8.8:27017')
