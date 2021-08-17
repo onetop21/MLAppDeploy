@@ -39,6 +39,8 @@ helm install prometheus-stack prometheus-community/kube-prometheus-stack --creat
     --set alertmanager.ingress.paths='{/alertmanager(/|$)(.*)}'
 ```
 
+#### Default Admin Acount
+ID `admin` / Password `prom-operator`
 #### GPU Metrics Dashboard
 We provide an official dashboard on Grafana: https://grafana.com/grafana/dashboards/12239
 
