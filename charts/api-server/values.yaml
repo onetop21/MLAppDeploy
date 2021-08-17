@@ -6,23 +6,14 @@ global:
   fromDockerhub: false
 
 # Dependencies and subcharts
-gpu-operator:
-  enabled: false
-
 nvidia-device-plugin:
   enabled: true
-  image:
-    repository: docker.io/nvidia/k8s-device-plugin
 gpu-feature-discovery:
   enabled: true
-  image:
-    repository: docker.io/nvidia/gpu-feature-discovery
   nfd:
     deploy: true
 dcgm-exporter:
   enabled: true
-  image:
-    repository: docker.io/nvidia/dcgm-exporter
   serviceMonitor:
     enabled: true
     additionalLabels:
