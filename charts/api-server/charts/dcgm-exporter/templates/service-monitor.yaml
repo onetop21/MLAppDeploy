@@ -42,9 +42,9 @@ spec:
   - port: "metrics"
     path: "/metrics"
     interval: "{{ .Values.serviceMonitor.interval }}"
-    relabeling:
+    relabelings:
     - sourceLabels: 
       - __meta_kubernetes_pod_node_name
       action: replace
-      target_label: kubernetes_node
+      targetLabel: kubernetes_node
 {{- end -}}
