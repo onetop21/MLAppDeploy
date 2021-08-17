@@ -3,7 +3,7 @@ entries:
   api-server:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-08-16T17:21:25.265601123Z"
+    created: "2021-08-17T02:40:24.320294196Z"
     dependencies:
     - condition: nvidia-device-plugin.enabled
       name: nvidia-device-plugin
@@ -18,7 +18,7 @@ entries:
       repository: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
       version: 2.4.0
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: 74694f277182192f5d062d7a1ea3d83e3c964488d2d22a2214cde7d39a34ce5d
+    digest: 5a615d05c48259d25dc4a8e2c5bc71b4a557b7d24109c6468809963843c8a14d
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -28,4 +28,4 @@ entries:
     urls:
     - api-server-0.1.0.tgz
     version: 0.1.0
-generated: "2021-08-16T17:21:25.258281774Z"
+generated: "2021-08-17T02:40:24.317376358Z"
