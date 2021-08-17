@@ -1,10 +1,10 @@
-{{- if (index .Values "dcgm-exporter" "serviceMonitorOnNamespace" "enabled") }}
+{{- if (index .Values "dcgm-exporter" "namespacedServiceMonitor" "enabled") }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: nvidia-dcgm-exporter
-  {{- if (index .Values "dcgm-exporter" "serviceMonitorOnNamespace" "namespace") }}
-  namespace: {{ index .Values "dcgm-exporter" "serviceMonitorOnNamespace" "namespace" }}
+  {{- if (index .Values "dcgm-exporter" "namespacedServiceMonitor" "namespace") }}
+  namespace: {{ index .Values "dcgm-exporter" "namespacedServiceMonitor" "namespace" }}
   {{- else }}
   namespace: {{ .Release.Namespace }}
   {{- end}}
