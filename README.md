@@ -17,11 +17,15 @@ You can install MLAD environments as worker node with master IP.
 ``` bash
 $ bash scripts/cluster-install.sh worker -i <Master node IP>
 ```
+### 2. Build and deploy API-Server
 Build and deploy MLAD service with specified registry.
 ``` bash
 $ bash scripts/cluster-install.sh build --registry <Registry>
 $ bash scripts/cluster-install.sh deploy --registry <Registry>
 ```
+
+### ⚠ Deploy Released API-Server by Helm Charts [[View Page]](/charts/api-server/)
+
 ## Frontend Installation
 ### 1. Install Virtual Environment
 ``` bash
