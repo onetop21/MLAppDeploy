@@ -37,7 +37,11 @@ def init(address):
     # address
     address = utils.parse_url(address)['url']
 
-    session = utils.create_session_key()
+    if utils.has_config():
+        input = utils.prompt("Change the existing session key (Y/N)", "N").upper()
+        session = utils.create_session_key() if input == 'Y' else utils.read_config().mlad.session
+    else:
+        session = utils.create_session_key()
 
     # registry
     registry_address = 'https://docker.io'
