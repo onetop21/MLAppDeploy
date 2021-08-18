@@ -769,24 +769,18 @@ def prune_images(cli, project_key=None):
 def push_images(cli, project_key, stream=False):
     return docker_controller.push_images(docker.from_env(), project_key, stream)
  
-def get_nodes(cli = None):
-    if cli is None :
-        cli = DEFAULT_CLI
-    else:
-        if not isinstance(cli, client.api_client.ApiClient): raise \
-            TypeError('Parameter is not valid type.')
+def get_nodes(cli = DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient): raise \
+        TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     return dict(
         [(_.metadata.name, _.metadata) for _ in api.list_node().items]
     )
 
-def get_node(node_key, cli = None):
-    if cli is None:
-        cli = DEFAULT_CLI
-    else:
-        if not isinstance(cli, client.api_client.ApiClient): raise \
-            TypeError('Parameter is not valid type.')
+def get_node(node_key, cli = DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient): raise \
+        TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     nodes = api.list_node(field_selector=f"metadata.name={node_key}")
@@ -822,12 +816,9 @@ def inspect_node(node):
         'status': {'State': state, 'Addr':addr},
     }
 
-def enable_node(node_key, cli = None):
-    if cli is None:
-        cli = DEFAULT_CLI
-    else:
-        if not isinstance(cli, client.api_client.ApiClient): raise \
-            TypeError('Parameter is not valid type.')
+def enable_node(node_key, cli = DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient): raise \
+        TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
@@ -842,12 +833,9 @@ def enable_node(node_key, cli = None):
             raise exception.APIError(msg, status)
 
     
-def disable_node(node_key, cli = None):
-    if cli is None:
-        cli = DEFAULT_CLI
-    else:
-        if not isinstance(cli, client.api_client.ApiClient): raise \
-            TypeError('Parameter is not valid type.')
+def disable_node(node_key, cli = DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient): raise \
+        TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     body = {
@@ -864,12 +852,9 @@ def disable_node(node_key, cli = None):
             raise exception.APIError(msg, status)
 
 
-def add_node_labels(node_key, cli = None, **kv):
-    if cli is None:
-        cli = DEFAULT_CLI
-    else:
-        if not isinstance(cli, client.api_client.ApiClient): raise \
-            TypeError('Parameter is not valid type.')
+def add_node_labels(node_key, cli = DEFAULT_CLI, **kv):
+    if not isinstance(cli, client.api_client.ApiClient): raise \
+        TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     body = {
@@ -889,12 +874,9 @@ def add_node_labels(node_key, cli = None, **kv):
             raise exception.APIError(msg, status)
 
 
-def remove_node_labels(node_key, cli = None, *keys):
-    if cli is None:
-        cli = DEFAULT_CLI
-    else:
-        if not isinstance(cli, client.api_client.ApiClient): raise \
-            TypeError('Parameter is not valid type.')
+def remove_node_labels(node_key, cli = DEFAULT_CLI, *keys):
+    if not isinstance(cli, client.api_client.ApiClient): raise \
+        TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     body = {
