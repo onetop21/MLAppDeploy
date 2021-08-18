@@ -112,7 +112,6 @@ def use(name: str) -> Context:
         raise NotExistContextError(name)
 
     config.current = name
-    OmegaConf.save(config=config, f=CTX_PATH)
     _save(config)
     click.echo(f'Current context name is : {name}')
     return context
@@ -154,6 +153,8 @@ def get(name: Optional[str] = None) -> Context:
         name = config.current
 
     context = _find_context(name, config=config)
+    if context is None:
+        raise NotExistContextError(name)
     click.echo(OmegaConf.to_yaml(context))
     return context
 
