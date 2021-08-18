@@ -15,12 +15,6 @@ class ContextAlreadyExistError(Exception):
         return f'The context [{self._name}] already exists.'
 
 
-class NotExistDefaultContextError(Exception):
-
-    def __str__(self):
-        return 'There is no default context, please set any context to default.'
-
-
 class NotExistContextError(Exception):
 
     def __init__(self, name: str):

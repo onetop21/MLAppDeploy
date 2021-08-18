@@ -1,4 +1,3 @@
-import os
 import pytest
 
 from mlad.cli import context
@@ -18,12 +17,15 @@ def teardown_module():
 def test_delete():
     mock.add('test1')
     mock.add('test2')
+    mock.add('test3')
     context.use('test1')
     context.delete('test2')
 
-    assert not os.path.isfile(context.ctx_path('test2'))
+    assert context._find_context('test2') is None
+    config = context._load()
+    assert ['test1', 'test3'] == [context.name for context in config.contexts]
     with pytest.raises(CannotDeleteContextError):
         context.delete('test1')
 
     with pytest.raises(NotExistContextError):
-        context.delete('test3')
+        context.delete('test4')

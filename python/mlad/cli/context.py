@@ -1,38 +1,58 @@
 import sys
 import os
 import omegaconf
+import click
 
 from typing import Optional, Dict, Callable
 from pathlib import Path
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
-    NotExistContextError, CannotDeleteContextError, NotExistDefaultContextError,
-    InvalidPropertyError, ContextAlreadyExistError
+    NotExistContextError, CannotDeleteContextError, InvalidPropertyError,
+    ContextAlreadyExistError
 )
 
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 DIR_PATH = f'{MLAD_HOME_PATH}/contexts'
 REF_PATH = f'{MLAD_HOME_PATH}/context_ref.yml'
+CTX_PATH = f'{MLAD_HOME_PATH}/context.yml'
 Path(DIR_PATH).mkdir(exist_ok=True, parents=True)
+Config = omegaconf.Container
 Context = omegaconf.Container
 StrDict = Dict[str, str]
 
 isfile = os.path.isfile
 
+boilerplate = {
+    'current': None,
+    'contexts': []
+}
+OmegaConf.save(config=boilerplate, f=CTX_PATH)
 
-def ctx_path(name: str) -> str:
-    return f'{DIR_PATH}/{name}.yml'
+
+def _load():
+    return OmegaConf.load(CTX_PATH)
 
 
-def path_to_name(path: str) -> str:
-    return os.path.splitext(path.split('/')[-1])[0]
+def _save(config: Config):
+    OmegaConf.save(config=config, f=CTX_PATH)
+
+
+def _find_context(name: str, config: Optional[Config] = None, index: bool = False) -> Optional[Context]:
+    if config is None:
+        config = OmegaConf.load(CTX_PATH)
+
+    for i, context in enumerate(config.contexts):
+        if context.name == name:
+            return context if not index else i
+
+    return None
 
 
 def add(name: str, address: str) -> Context:
 
-    if isfile(ctx_path(name)):
+    if _find_context(name) is not None:
         raise ContextAlreadyExistError(name)
     address = utils.parse_url(address)['url']
     registry_address = 'https://docker.io'
@@ -49,6 +69,7 @@ def add(name: str, address: str) -> Context:
     registry_namespace = utils.prompt('Docker Registry Namespace')
 
     base_config = OmegaConf.from_dotlist([
+        f'name={name}',
         f'apiserver.address={address}',
         f'docker.registry.address={registry_address}',
         f'docker.registry.namespace={registry_namespace}'
@@ -70,7 +91,11 @@ def add(name: str, address: str) -> Context:
     db_config = _parse_datastore('db', _db_initializer, _db_finalizer, db_prompts)
 
     context = OmegaConf.merge(base_config, s3_config, db_config)
-    OmegaConf.save(config=context, f=ctx_path(name))
+    config = _load()
+    config.contexts.append(context)
+    if config.current is None:
+        config.current = name
+    _save(config)
 
     if warn_insecure:
         print('Need to add insecure-registry to docker.json on your all nodes.', file=sys.stderr)
@@ -81,52 +106,65 @@ def add(name: str, address: str) -> Context:
 
 
 def use(name: str) -> Context:
-    target_path = ctx_path(name)
-
-    if not isfile(target_path):
+    config = _load()
+    context = _find_context(name, config=config)
+    if context is None:
         raise NotExistContextError(name)
-    context = OmegaConf.create({'target': target_path})
-    OmegaConf.save(config=context, f=REF_PATH)
+
+    config.current = name
+    _save(config)
+    click.echo(f'Current context name is : {name}')
     return context
 
 
+def _switch(direction: int = 1) -> Context:
+    config = _load()
+    if config.current is None:
+        raise NotExistContextError('Any Contexts')
+    n_contexts = len(config.contexts)
+    index = _find_context(config.current, config=config, index=True)
+    next_index = (index + direction) % n_contexts
+    return use(config.contexts[next_index].name)
+
+
+def next() -> Context:
+    return _switch(direction=1)
+
+
+def prev() -> Context:
+    return _switch(direction=-1)
+
+
 def delete(name: str) -> None:
-    target_path = ctx_path(name)
-    if isfile(REF_PATH):
-        curr_path = OmegaConf.load(REF_PATH).target
-        if target_path == curr_path:
-            raise CannotDeleteContextError
-    try:
-        os.remove(target_path)
-    except FileNotFoundError:
+    config = _load()
+    index = _find_context(name, config=config, index=True)
+    if index is None:
         raise NotExistContextError(name)
+    elif config.current == config.contexts[index].name:
+        raise CannotDeleteContextError
+    else:
+        del config.contexts[index]
+    _save(config)
 
 
 def get(name: Optional[str] = None) -> Context:
-
+    config = _load()
     if name is None:
-        if not isfile(REF_PATH):
-            raise NotExistDefaultContextError
-        target_path = OmegaConf.load(REF_PATH).target
-        return get(path_to_name(target_path))
+        name = config.current
 
-    target_path = ctx_path(name)
-    if not isfile(target_path):
+    context = _find_context(name, config=config)
+    if context is None:
         raise NotExistContextError(name)
-
-    context = OmegaConf.load(ctx_path(name))
-    print(OmegaConf.to_yaml(context))
+    click.echo(OmegaConf.to_yaml(context))
     return context
 
 
 def set(name: Optional[str] = None, *args) -> None:
+    config = _load()
     if name is None:
-        if not isfile(REF_PATH):
-            raise NotExistDefaultContextError
-        target_path = OmegaConf.load(REF_PATH).target
-        return set(path_to_name(target_path), *args)
-
-    context = OmegaConf.load(ctx_path(name))
+        name = config.current
+    index = _find_context(name, config=config, index=True)
+    context = config.contexts[index]
     try:
         for arg in args:
             keys = arg.split('=')[0].split('.')
@@ -135,15 +173,18 @@ def set(name: Optional[str] = None, *args) -> None:
                 value = value[key]
     except Exception:
         raise InvalidPropertyError(arg)
+
     context = OmegaConf.merge(context, OmegaConf.from_dotlist(args))
-    OmegaConf.save(config=context, f=ctx_path(name))
+    OmegaConf.update(config, f'contexts.{index}', context)
+    _save(config)
 
 
 def ls(no_trunc):
-    names = [os.path.splitext(filename)[0] for filename in os.listdir(DIR_PATH)]
+    config = _load()
+    names = [context.name for context in config.contexts]
     table = [('NAME',)]
     for name in names:
-        table.append([name])
+        table.append([name if config.current != name else f'* {name}'])
     utils.print_table(table, 'There are no contexts.', 0 if no_trunc else 32)
 
 
