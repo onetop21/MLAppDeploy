@@ -84,7 +84,7 @@ def init(name, version, maintainer):
 def list(no_trunc):
     config = utils.read_config()
     projects = {}
-    api = API(config.mlad.address, config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.session)
     try:
         networks = api.project.get()
     except APIError as e:
@@ -144,7 +144,7 @@ def list(no_trunc):
 
 def status(all, no_trunc):
     config = utils.read_config()
-    api = API(config.mlad.address, config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.session)
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
@@ -285,7 +285,7 @@ def run(with_build):
 def up(services):
     config = utils.read_config()
     cli = ctlr.get_api_client()
-    api = API(config.mlad.address, config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.session)
     project = utils.get_project(default_project)
 
     base_labels = core_utils.base_labels(
@@ -609,7 +609,7 @@ def down_force(services, no_dump):
 def logs(tail, follow, timestamps, names_or_ids):
     config = utils.read_config()
     project_key = utils.project_key(utils.get_workspace())
-    api = API(config.mlad.address, config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.session)
     # Block not running.
     try:
         project = api.project.inspect(project_key)
@@ -633,7 +633,7 @@ def logs(tail, follow, timestamps, names_or_ids):
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
     config = utils.read_config()
-    api = API(config.mlad.address, config.mlad.token.user)
+    api = API(config.mlad.address, config.mlad.session)
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = api.project.inspect(project_key)
