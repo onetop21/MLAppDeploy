@@ -36,6 +36,8 @@ services:
                 condition: always
     test:
         command: python client.py
+        env:
+            test: 123 
 #        deploy:
 #            replicas: 1
             # constraints:

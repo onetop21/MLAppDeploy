@@ -5,6 +5,7 @@ class InvalidProjectError(Exception):
     def __str__(self):
         return f'Cannot find project {self.project_id}'
 
+
 class InvalidServiceError(Exception):
     def __init__(self, project_id, service_id):
         self.project_id = project_id
@@ -13,6 +14,16 @@ class InvalidServiceError(Exception):
     def __str__(self):
         return (f'Cannot find service {self.service_id} '
                f'in project {self.project_id}')
+
+
+class InvalidSessionError(Exception):
+    def __init__(self, service=False):
+        self.target = 'Service' if service else 'Project'
+
+    def __str__(self):
+        return f'{self.target} can only be removed by ' \
+               f'the project creator'
+
 
 class InvalidLogRequest(Exception):
     pass

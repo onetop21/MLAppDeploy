@@ -1,31 +1,38 @@
 import json
 from typing import List
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from mlad.core.exception import APIError
 from mlad.service.models import service
-from mlad.service.exception import InvalidProjectError,InvalidServiceError, exception_detail
+from mlad.service.exception import InvalidProjectError,InvalidServiceError, \
+    InvalidSessionError, exception_detail
 from mlad.service.libs import utils
-if not utils.is_kube_mode():
-    from mlad.core.docker import controller as ctlr
-    MODE = 'swarm'
-else:
-    from mlad.core.kubernetes import controller as ctlr
-    MODE = 'kube'
+from mlad.core.kubernetes import controller as ctlr
+
+
 router = APIRouter()
 
+
 def _check_project_key(project_key, service, cli=None):
-    if MODE=='kube':
-        inspect_key = str(ctlr.inspect_service(cli, service)['key']).replace('-','')
-    else:
-        inspect_key = str(ctlr.inspect_service(service)['key']).replace('-','')
+    inspect_key = str(ctlr.inspect_service(cli, service)['key']).replace('-','')
     if project_key == inspect_key:
         return True
     else:
         raise InvalidServiceError(project_key, service.short_id)
 
+
+def _check_session_key(project_key, session, cli):
+    project = ctlr.get_project_network(cli, project_key=project_key)
+    project_session = ctlr.get_project_session(cli, project)
+    if project_session == session:
+        return True
+    else:
+        raise InvalidSessionError(service=True)
+
+
 @router.get("/project/service")
-def services_list(labels: List[str] = Query(None)):
+def services_list(labels: List[str] = Query(None),
+                  session: str = Header(None)):
     cli = ctlr.get_api_client()
     labels_dict=dict()
    
@@ -36,20 +43,19 @@ def services_list(labels: List[str] = Query(None)):
     try:
         services = ctlr.get_services(cli, extra_filters=labels_dict)
         for service in services.values():
-            if MODE=='kube':
-                inspect = ctlr.inspect_service(cli, service)
-            else:
-                inspect = ctlr.inspect_service(service)
+            inspect = ctlr.inspect_service(cli, service)
             inspects.append(inspect)    
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return {'mode':MODE, 'inspects':inspects}
+    return {'inspects':inspects}
+
 
 @router.get("/project/{project_key}/service")
 def service_list(project_key:str, 
-                 labels: List[str] = Query(None)):
+                 labels: List[str] = Query(None),
+                 session: str = Header(None)):
     cli = ctlr.get_api_client()
     #TODO check labels validation
     #labels = ["MLAD.PROJECT", "MLAD.PROJECT.NAME=lmai"]
@@ -64,22 +70,21 @@ def service_list(project_key:str,
         if not network:
             raise InvalidProjectError(project_key)
 
-        services = ctlr.get_services(cli, key, extra_filters=labels_dict)   
+        services = ctlr.get_services(cli, key, extra_filters=labels_dict)
         for service in services.values():
-            if MODE=='kube':
-                inspect = ctlr.inspect_service(cli, service)
-            else:
-                inspect = ctlr.inspect_service(service)
+            inspect = ctlr.inspect_service(cli, service)
             inspects.append(inspect)      
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return {'mode':MODE, 'inspects':inspects}
+    return {'inspects':inspects}
     #return [_.short_id for _ in services.values()]
 
+
 @router.post("/project/{project_key}/service")
-def service_create(project_key:str, req:service.CreateRequest):
+def service_create(project_key:str, req:service.CreateRequest,
+                   session: str = Header(None)):
     targets = req.json
     cli = ctlr.get_api_client()
     try:
@@ -94,41 +99,35 @@ def service_create(project_key:str, req:service.CreateRequest):
         raise HTTPException(status_code=e.status_code, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    if utils.is_kube_mode():
-        return [_.metadata.uid for _ in services]
-    else :
-        return [_.short_id for _ in services]
+    return [_.metadata.uid for _ in services]
+
+
 
 @router.get("/project/{project_key}/service/{service_id}")
-def service_inspect(project_key:str, service_id:str):
+def service_inspect(project_key:str, service_id:str,
+                    session: str = Header(None)):
     cli = ctlr.get_api_client()
     try:
         service = ctlr.get_service(cli, service_id=service_id)
         key = str(project_key).replace('-','')
         if _check_project_key(key, service, cli):
-            if MODE=='kube':
-                inspects = ctlr.inspect_service(cli, service)
-            else:
-                inspects = ctlr.inspect_service(service)
+            inspects = ctlr.inspect_service(cli, service)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return inspects
-    #return {'mode':MODE, 'inspects':inspects}
 
 
 @router.get("/project/{project_key}/service/{service_id}/tasks")
-def service_tasks(project_key:str, service_id:str):
+def service_tasks(project_key:str, service_id:str,
+                  session: str = Header(None)):
     cli = ctlr.get_api_client()
     try:
         service = ctlr.get_service(cli, service_id=service_id)
         key = str(project_key).replace('-','')
         if _check_project_key(key, service, cli):
-            if MODE=='kube':
-                tasks= ctlr.inspect_service(cli,service)['tasks']
-            else:
-                tasks= ctlr.inspect_service(service)['tasks']
+            tasks= ctlr.inspect_service(cli,service)['tasks']
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
@@ -138,18 +137,13 @@ def service_tasks(project_key:str, service_id:str):
 
 @router.put("/project/{project_key}/service/{service_id}/scale")
 def service_scale(project_key:str, service_id:str, 
-                  req: service.ScaleRequest):
+                  req: service.ScaleRequest, session: str = Header(None)):
     cli = ctlr.get_api_client()
     key = str(project_key).replace('-','')
     try:
         service = ctlr.get_service(cli, service_id=service_id)
         if _check_project_key(key, service, cli):
-            if MODE=='kube':
-                ctlr.scale_service(cli, service, req.scale_spec)
-            else:
-                service.scale(req.scale_spec)
-        # if _check_project_key(project_key, service):
-        #     service.scale(req.scale_spec)
+            ctlr.scale_service(cli, service, req.scale_spec)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
@@ -158,9 +152,12 @@ def service_scale(project_key:str, service_id:str,
 
 
 @router.delete("/project/{project_key}/service/{service_id}")
-def service_remove(project_key: str, service_id: str, stream: bool = Query(False)):
+def service_remove(project_key: str, service_id: str,
+                   stream: bool = Query(False),
+                   session: str = Header(None)):
     cli = ctlr.get_api_client()
     try:
+        _check_session_key(project_key, session, cli)
         service = ctlr.get_service(cli, service_id=service_id)
         if _check_project_key(project_key, service, cli):
             res = ctlr.remove_services(cli, [service], stream=stream)
@@ -171,6 +168,8 @@ def service_remove(project_key: str, service_id: str, stream: bool = Query(False
 
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
+    except InvalidSessionError as e:
+        raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
@@ -181,10 +180,14 @@ def service_remove(project_key: str, service_id: str, stream: bool = Query(False
 
 
 @router.delete("/project/{project_key}/service")
-def services_remove(project_key: str, req: service.RemoveRequest, stream: bool = Query(False)):
+def services_remove(project_key: str, req: service.RemoveRequest,
+                    stream: bool = Query(False),
+                    session: str = Header(None)):
     cli = ctlr.get_api_client()
     try:
-        services = [ctlr.get_service(cli, service_id=service_id) for service_id in req.services]
+        _check_session_key(project_key, session, cli)
+        services = [ctlr.get_service(cli, service_id=service_id)
+                    for service_id in req.services]
         for service in services:
             _check_project_key(project_key, service, cli)
 
@@ -206,6 +209,8 @@ def services_remove(project_key: str, req: service.RemoveRequest, stream: bool =
 
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
+    except InvalidSessionError as e:
+        raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:

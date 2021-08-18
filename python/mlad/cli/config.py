@@ -1,9 +1,13 @@
 import sys
 import os
+import uuid
 from omegaconf import OmegaConf
+from getpass import getuser
+
 from mlad.cli.libs import utils
 from mlad.cli.libs import datastore as ds
 from mlad.core.default import config as default_config
+
 
 def get_value(config, keys, stack=[]):
     if not keys:
@@ -28,12 +32,16 @@ def get_value(config, keys, stack=[]):
             print('Cannot find config key.', file=sys.stderr)
         sys.exit(1)
 
-def init(address, token):
+
+def init(address):
     # address
     address = utils.parse_url(address)['url']
 
-    # token
-    user_token = input(f"MLAppDeploy User Token :")
+    if utils.has_config():
+        input = utils.prompt("Change the existing session key (Y/N)", "N").upper()
+        session = utils.create_session_key() if input == 'Y' else utils.read_config().mlad.session
+    else:
+        session = utils.create_session_key()
 
     # registry
     registry_address = 'https://docker.io'
@@ -52,8 +60,7 @@ def init(address, token):
     utils.generate_empty_config()
     set(*(
         f"mlad.address={address}",
-        f"mlad.token.admin={token}",
-        f"mlad.token.user={user_token}",
+        f"mlad.session={session}",
         f'docker.registry.address={registry_address}',
         f'docker.registry.namespace={registry_namespace}'
     ))
@@ -68,10 +75,12 @@ def init(address, token):
         print(f"/etc/docker/daemon.json:", file=sys.stderr)
         print(f"  \"insecure-registries\": [\"{registry_address}\"]", file=sys.stderr)
 
+
 def set(*args):
     config = default_config['client'](utils.read_config())
     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
     utils.write_config(config)
+
 
 def get(keys, no_trunc=False):
     config = default_config['client'](utils.read_config())
@@ -84,6 +93,7 @@ def get(keys, no_trunc=False):
     else:
         print(data)
 
+
 def env(unset):
     config = default_config['client'](utils.read_config())
     envs = ds.get_env(config)
@@ -94,6 +104,7 @@ def env(unset):
         else:
             print(f'export {line}')
     print(f'# To set environment variables, run "eval $(mlad config env)"')
+
 
 # Extension for DataStore
 def datastore(kind=None):
@@ -113,6 +124,7 @@ def datastore(kind=None):
     config = store['finalizer'](config)    
     set(*[f"datastore.{kind}.{k}={v}" for k, v in config.items()])
 
+
 # S3 DataStore
 def _datastore_s3_initializer():
     # specific controlling docker
@@ -130,11 +142,13 @@ def _datastore_s3_initializer():
         secret_key = None
     return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
 
+
 def _datastore_s3_finalizer(datastore):
     parsed = utils.parse_url(datastore['endpoint'])
     datastore['endpoint'] = parsed['url']
     datastore['verify'] = parsed['scheme'] == 'https'
     return datastore
+
 
 def _datastore_s3_translator(kind, key, value):
     if key == 'endpoint':
@@ -158,6 +172,7 @@ ds.add_datastore('s3',
         region='Region',
         accesskey='Access Key ID',
         secretkey='Secret Access Key')
+
 
 # MongoDB DataStore
 def _datastore_mongodb_initializer():

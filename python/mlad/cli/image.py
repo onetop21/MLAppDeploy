@@ -60,11 +60,11 @@ def build(quiet, plugin, no_cache, pull):
     manifest_type = 'plugin' if plugin else 'project'
     default = default_plugin if plugin else default_project
     manifest = utils.get_manifest(manifest_type, default)
-    
+
     # Generate Base Labels
     base_labels = core_utils.base_labels(
         utils.get_workspace(), 
-        utils.get_username(config), 
+        config.mlad.session,
         manifest[manifest_type], 
         manifest_type
     )

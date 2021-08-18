@@ -1,15 +1,15 @@
 import os
 import sys
-from .auth import Auth
 from .node import Node
 from .service import Service
 from .project import Project
 
 API_PREFIX = '/api/v1'
 
+
 class API:
-    def __init__(self, url=None, token=None):
-        self.token = token
+    def __init__(self, url=None, session=None):
+        self.session = session
         if not url:
             host = 'mlad-service.mlad'
             port = '8440'
@@ -24,17 +24,13 @@ class API:
         return False
 
     @property
-    def auth(self):
-        return Auth(self.url, self.token)
-
-    @property
     def node(self):
-        return Node(self.url, self.token)
+        return Node(self.url, self.session)
 
     @property
     def project(self):
-        return Project(self.url, self.token)
+        return Project(self.url, self.session)
 
     @property
     def service(self):
-        return Service(self.url)
+        return Service(self.url, self.session)

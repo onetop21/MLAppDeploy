@@ -16,6 +16,7 @@ class DelMonitor(Thread):
 
     def __init__(self,cli, collector, services, namespace, timeout=0xFFFF):
         Thread.__init__(self)
+        self.daemon=True
         self.__stopped = False
         self.api = client.CoreV1Api(cli)
         self.collector = collector
@@ -61,7 +62,6 @@ class DelMonitor(Thread):
             pass
         if service_removed:
             msg = f"All Service removed."
-            print(msg)
             self.collector.queue.put({'result': 'completed', 'stream': msg})
         else:
             for svc, target in services.items():
