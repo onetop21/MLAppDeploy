@@ -770,8 +770,8 @@ def push_images(cli, project_key, stream=False):
     return docker_controller.push_images(docker.from_env(), project_key, stream)
  
 def get_nodes(cli = DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient): raise \
-        TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     return dict(
@@ -779,8 +779,8 @@ def get_nodes(cli = DEFAULT_CLI):
     )
 
 def get_node(node_key, cli = DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient): raise \
-        TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     nodes = api.list_node(field_selector=f"metadata.name={node_key}")
@@ -791,7 +791,8 @@ def get_node(node_key, cli = DEFAULT_CLI):
         raise exception.NotFound(f'Cannot find node "{node_key}"')
 
 def inspect_node(node):
-    if not isinstance(node, client.models.v1_node.V1Node): raise TypeError('Parameter is not valid type.')
+    if not isinstance(node, client.models.v1_node.V1Node):
+        raise TypeError('Parameter is not valid type.')
     hostname = node.metadata.labels['kubernetes.io/hostname']
     availability = 'active' if node.spec.taints == None else 'pause'
     platform = node.metadata.labels['kubernetes.io/os']    
@@ -817,8 +818,8 @@ def inspect_node(node):
     }
 
 def enable_node(node_key, cli = DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient): raise \
-        TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
@@ -834,8 +835,8 @@ def enable_node(node_key, cli = DEFAULT_CLI):
 
     
 def disable_node(node_key, cli = DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient): raise \
-        TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     body = {
@@ -853,8 +854,8 @@ def disable_node(node_key, cli = DEFAULT_CLI):
 
 
 def add_node_labels(node_key, cli = DEFAULT_CLI, **kv):
-    if not isinstance(cli, client.api_client.ApiClient): raise \
-        TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     body = {
@@ -875,8 +876,8 @@ def add_node_labels(node_key, cli = DEFAULT_CLI, **kv):
 
 
 def remove_node_labels(node_key, cli = DEFAULT_CLI, *keys):
-    if not isinstance(cli, client.api_client.ApiClient): raise \
-        TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     body = {
@@ -897,7 +898,8 @@ def remove_node_labels(node_key, cli = DEFAULT_CLI, *keys):
 
 
 def scale_service(cli, service, scale_spec):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     name = service.metadata.name
     namespace = service.metadata.namespace
     config_labels = get_config_labels(cli, service, f'service-{name}-labels')
