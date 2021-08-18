@@ -18,9 +18,8 @@ logger = init_logger(__name__)
 
 @router.get("/node")
 def node_list(session: str = Header(None)):
-    cli = ctlr.get_api_client()
     try:
-        nodes = ctlr.get_nodes(cli)
+        nodes = ctlr.get_nodes()
     except Exception as e:
         logger.error(e)
         raise HTTPException(status_code=500, detail=exception_detail(e))
@@ -29,9 +28,8 @@ def node_list(session: str = Header(None)):
 
 @router.get("/node/{node_id}")
 def node_inspect(node_id:str, session: str = Header(None)):
-    cli = ctlr.get_api_client()
     try:
-        node = ctlr.get_node(cli, node_id)
+        node = ctlr.get_node(node_id)
         inspects = ctlr.inspect_node(node)
     except exception.NotFound as e:
         logger.error(e)
@@ -44,15 +42,14 @@ def node_inspect(node_id:str, session: str = Header(None)):
 
 @router.get("/nodes/resource")
 def node_resource(nodes: List[str] = Query(None)):
-    cli = ctlr.get_api_client()
     res={}
     try:
         if not nodes:
-            nodes = ctlr.get_nodes(cli)
+            nodes = ctlr.get_nodes()
         for node in nodes:
-            node = ctlr.get_node(cli, node)
+            node = ctlr.get_node(node)
             name = node.metadata.name
-            resource = ctlr.get_node_resources(cli, node)
+            resource = ctlr.get_node_resources(node)
             res[name] = resource
     except exception.NotFound as e:
         logger.error(e)

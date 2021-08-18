@@ -23,7 +23,7 @@ from mlad.core.docker import controller as docker_controller
 
 SHORT_LEN = 10
 
-# Docker CLI from HOST
+
 def get_api_client(config_file='~/.kube/config', context=None):
     try:
         if context:
@@ -34,6 +34,10 @@ def get_api_client(config_file='~/.kube/config', context=None):
         from kubernetes.client.api_client import ApiClient
         config.load_incluster_config()
         return ApiClient() # If Need, set configuration parameter from client.Configuration
+
+
+DEFAULT_CLI = get_api_client()
+
 
 def get_current_context():
     try:
@@ -765,15 +769,25 @@ def prune_images(cli, project_key=None):
 def push_images(cli, project_key, stream=False):
     return docker_controller.push_images(docker.from_env(), project_key, stream)
  
-def get_nodes(cli):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+def get_nodes(cli = None):
+    if cli is None :
+        cli = DEFAULT_CLI
+    else:
+        if not isinstance(cli, client.api_client.ApiClient): raise \
+            TypeError('Parameter is not valid type.')
+
     api = client.CoreV1Api(cli)
     return dict(
         [(_.metadata.name, _.metadata) for _ in api.list_node().items]
     )
 
-def get_node(cli, node_key):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+def get_node(node_key, cli = None):
+    if cli is None:
+        cli = DEFAULT_CLI
+    else:
+        if not isinstance(cli, client.api_client.ApiClient): raise \
+            TypeError('Parameter is not valid type.')
+
     api = client.CoreV1Api(cli)
     nodes = api.list_node(field_selector=f"metadata.name={node_key}")
     if nodes.items: 
@@ -808,9 +822,12 @@ def inspect_node(node):
         'status': {'State': state, 'Addr':addr},
     }
 
-def enable_node(cli, node_key):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
+def enable_node(node_key, cli = None):
+    if cli is None:
+        cli = DEFAULT_CLI
+    else:
+        if not isinstance(cli, client.api_client.ApiClient): raise \
+            TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
@@ -825,9 +842,13 @@ def enable_node(cli, node_key):
             raise exception.APIError(msg, status)
 
     
-def disable_node(cli, node_key):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
+def disable_node(node_key, cli = None):
+    if cli is None:
+        cli = DEFAULT_CLI
+    else:
+        if not isinstance(cli, client.api_client.ApiClient): raise \
+            TypeError('Parameter is not valid type.')
+
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints":[{"effect":"NoSchedule",
@@ -843,9 +864,13 @@ def disable_node(cli, node_key):
             raise exception.APIError(msg, status)
 
 
-def add_node_labels(cli, node_key, **kv):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
+def add_node_labels(node_key, cli = None, **kv):
+    if cli is None:
+        cli = DEFAULT_CLI
+    else:
+        if not isinstance(cli, client.api_client.ApiClient): raise \
+            TypeError('Parameter is not valid type.')
+
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -864,9 +889,13 @@ def add_node_labels(cli, node_key, **kv):
             raise exception.APIError(msg, status)
 
 
-def remove_node_labels(cli, node_key, *keys):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
+def remove_node_labels(node_key, cli = None, *keys):
+    if cli is None:
+        cli = DEFAULT_CLI
+    else:
+        if not isinstance(cli, client.api_client.ApiClient): raise \
+            TypeError('Parameter is not valid type.')
+
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1051,8 +1080,15 @@ def parse_cpu(str_cpu):
         cpu = float(str_cpu)
     return cpu
 
-def get_node_resources(cli, node):
+def get_node_resources(node, cli = None):
+    if cli is None :
+        cli = DEFAULT_CLI
+    else:
+        if not isinstance(cli, client.api_client.ApiClient): raise \
+            TypeError('Parameter is not valid type.')
+
     if not isinstance(node, client.models.v1_node.V1Node): raise TypeError('Parameter is not valid type.')
+
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
     nodes = api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")

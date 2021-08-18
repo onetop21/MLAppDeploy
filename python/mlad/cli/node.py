@@ -11,7 +11,7 @@ from mlad.core.kubernetes import controller as ctlr
 
 def list(no_trunc):
     config = utils.read_config()
-    api = API(config.mlad.address, config.mlad.token.admin)
+    api = API(config.mlad.address, config.mlad.session)
     try:
         nodes = [api.node.inspect(_) for _ in api.node.get()]
     except APIError as e:
@@ -35,7 +35,7 @@ def enable(ID):
     config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
-        ctlr.enable_node(cli, ID)
+        ctlr.enable_node(ID, cli)
     except CoreException.NotFound as e:
         print(e)
         sys.exit(1)
@@ -49,7 +49,7 @@ def disable(ID):
     config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
-        ctlr.disable_node(cli, ID)
+        ctlr.disable_node(ID, cli)
     except CoreException.NotFound as e:
         print(e)
         sys.exit(1)
@@ -63,7 +63,7 @@ def label_add(node, **kvs):
     config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
-        ctlr.add_node_labels(cli, node, **kvs)
+        ctlr.add_node_labels(node, cli, **kvs)
     except CoreException.NotFound as e:
         print(e)
         sys.exit(1)
@@ -77,7 +77,7 @@ def label_rm(node, *keys):
     config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
-        ctlr.remove_node_labels(cli, node, *keys)
+        ctlr.remove_node_labels(node, cli, *keys)
     except CoreException.NotFound as e:
         print(e)
         sys.exit(1)
@@ -89,7 +89,7 @@ def label_rm(node, *keys):
 
 def resource(nodes, no_trunc):
     config = utils.read_config()
-    api = API(config.mlad.address, config.mlad.token.admin)
+    api = API(config.mlad.address, config.mlad.session)
     try:
         res = api.node.resource(nodes)
     except APIError as e:
