@@ -43,7 +43,7 @@ def create_session_key():
     hostname = socket.gethostname()
     admin = auth_admin()
     payload = {"user":user, "hostname": hostname, "uuid": str(uuid.uuid4())}
-    encode = jwt.encode(payload, "mlad", algorithm="HS256").decode('utf-8')
+    encode = jwt.encode(payload, "mlad", algorithm="HS256")
     return encode
 
 
