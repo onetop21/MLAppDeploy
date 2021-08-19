@@ -31,9 +31,13 @@ def get_api_client(config_file='~/.kube/config', context=None):
         else:
             return config.new_client_from_config(config_file=config_file)
     except config.config_exception.ConfigException:
+        pass
+    try:
         from kubernetes.client.api_client import ApiClient
         config.load_incluster_config()
         return ApiClient() # If Need, set configuration parameter from client.Configuration
+    except config.config_exception.ConfigException:
+        return None
 
 
 DEFAULT_CLI = get_api_client()
