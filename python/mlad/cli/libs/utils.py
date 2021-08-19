@@ -339,7 +339,7 @@ def prompt(msg, default='', ty=str):
 
 @lru_cache(maxsize=None)
 def get_username(session):
-    decoded = jwt.decode(session, "mlad", algorithm="HS256")
+    decoded = jwt.decode(session, "mlad", algorithms="HS256")
     if decoded["user"]:
         return decoded["user"]
     else:
