@@ -51,7 +51,7 @@ def test_set():
 def test_invalid_set():
     mock.add('test2')
     context.use('test2')
-    context.set(None, 'datastore.db.address=mongodb://8.8.8.8:27017')
+    context.set('test2', 'datastore.db.address=mongodb://8.8.8.8:27017')
     with pytest.raises(InvalidPropertyError):
         context.set('test2', '')
     with pytest.raises(InvalidPropertyError):

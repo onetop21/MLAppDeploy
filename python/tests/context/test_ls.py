@@ -19,9 +19,9 @@ def test_ls():
     mock.add('test1')
     mock.add('test2')
     sys.stdout = buffer = io.StringIO()
-    context.ls(False)
+    context.ls()
     sys.stdout = origin_stdout
-    assert buffer.getvalue() == 'NAME   \n* test1\ntest2  \n'
+    assert buffer.getvalue() == '  NAME \n* test1\n  test2\n'
 
 
 def test_blank_ls():
@@ -29,8 +29,8 @@ def test_blank_ls():
     origin_stderr = sys.stderr
     sys.stdout = buffer = io.StringIO()
     sys.stderr = buffer2 = io.StringIO()
-    context.ls(False)
-    assert buffer.getvalue() == 'NAME\n'
+    context.ls()
+    assert buffer.getvalue() == '  NAME\n'
     assert buffer2.getvalue() == 'There are no contexts.\n'
 
     sys.stdout = origin_stdout

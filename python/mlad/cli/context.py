@@ -22,13 +22,13 @@ Config = omegaconf.Container
 Context = omegaconf.Container
 StrDict = Dict[str, str]
 
-isfile = os.path.isfile
-
 boilerplate = {
     'current': None,
     'contexts': []
 }
-OmegaConf.save(config=boilerplate, f=CTX_PATH)
+
+if not os.path.isfile(CTX_PATH):
+    OmegaConf.save(config=boilerplate, f=CTX_PATH)
 
 
 def _load():
@@ -113,25 +113,26 @@ def use(name: str) -> Context:
 
     config.current = name
     _save(config)
-    click.echo(f'Current context name is : {name}')
     return context
 
 
-def _switch(direction: int = 1) -> Context:
+def _switch(direction: int = 1) -> str:
     config = _load()
     if config.current is None:
         raise NotExistContextError('Any Contexts')
     n_contexts = len(config.contexts)
     index = _find_context(config.current, config=config, index=True)
     next_index = (index + direction) % n_contexts
-    return use(config.contexts[next_index].name)
+    name = config.contexts[next_index].name
+    use(name)
+    return name
 
 
-def next() -> Context:
+def next() -> str:
     return _switch(direction=1)
 
 
-def prev() -> Context:
+def prev() -> str:
     return _switch(direction=-1)
 
 
@@ -159,10 +160,8 @@ def get(name: Optional[str] = None) -> Context:
     return context
 
 
-def set(name: Optional[str] = None, *args) -> None:
+def set(name: str, *args) -> None:
     config = _load()
-    if name is None:
-        name = config.current
     index = _find_context(name, config=config, index=True)
     context = config.contexts[index]
     try:
@@ -179,13 +178,13 @@ def set(name: Optional[str] = None, *args) -> None:
     _save(config)
 
 
-def ls(no_trunc):
+def ls():
     config = _load()
     names = [context.name for context in config.contexts]
-    table = [('NAME',)]
+    table = [('  NAME',)]
     for name in names:
-        table.append([name if config.current != name else f'* {name}'])
-    utils.print_table(table, 'There are no contexts.', 0 if no_trunc else 32)
+        table.append([f'  {name}' if config.current != name else f'* {name}'])
+    utils.print_table(table, 'There are no contexts.', 0)
 
 
 def _parse_datastore(kind: str, initializer: Callable[[], StrDict],

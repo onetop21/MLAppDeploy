@@ -3,13 +3,8 @@ import copy
 import time
 import json
 import uuid
-import base64
-from pathlib import Path
-from typing import Dict, List
 from collections import defaultdict
 import docker
-from kubernetes.client import models
-import requests
 from mlad.core import exception
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
@@ -35,7 +30,8 @@ def get_api_client(config_file='~/.kube/config', context=None):
     try:
         from kubernetes.client.api_client import ApiClient
         config.load_incluster_config()
-        return ApiClient() # If Need, set configuration parameter from client.Configuration
+        # If Need, set configuration parameter from client.Configuration
+        return ApiClient()
     except config.config_exception.ConfigException:
         return None
 
@@ -50,18 +46,23 @@ def get_current_context():
         raise exception.APIError(str(e), 404)
     return current_context['name']
 
+
 def get_auth_headers(cli, image_name=None, auth_configs=None):
     return docker_controller.get_auth_headers(docker.from_env(), image_name, auth_configs)
 
+
 def get_project_networks(cli, extra_labels=[]):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     selector = ['MLAD.PROJECT.TYPE'] + (extra_labels or ['MLAD.PROJECT.TYPE=project'])
     namespaces = api.list_namespace(label_selector=','.join(selector))
     return dict([(_.metadata.name, _) for _ in namespaces.items])
 
+
 def get_project_network(cli, **kwargs):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     if kwargs.get('project_key'):
         namespaces = api.list_namespace(label_selector=f"MLAD.PROJECT={kwargs.get('project_key')}")
@@ -69,18 +70,19 @@ def get_project_network(cli, **kwargs):
         namespaces = api.list_namespace(label_selector=f"MLAD.PROJECT.ID={kwargs.get('project_id')}")
     elif kwargs.get('network_id'):
         all_namespaces = api.list_namespace(label_selector="MLAD.PROJECT")
-        namespaces = list(filter(lambda _: _.metadata.uid==kwargs.get('network_id'), all_namespaces))
+        namespaces = list(filter(lambda _: _.metadata.uid == kwargs.get('network_id'), all_namespaces))
     else:
         raise TypeError('At least one parameter is required.')
     if not namespaces.items:
         return None
-    elif len(namespaces.items)==1:
+    elif len(namespaces.items) == 1:
         return namespaces.items[0]
     else:
-        raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
+        raise exception.Duplicated('Need to remove networks or down project, because exists duplicated networks.')
+
 
 def get_labels(obj):
-    #TODO to be modified
+    # TODO to be modified
     if isinstance(obj, client.models.v1_namespace.V1Namespace):
         return obj.metadata.labels
     elif isinstance(obj, client.models.v1_replication_controller.V1ReplicationController):
@@ -90,22 +92,26 @@ def get_labels(obj):
     else:
         raise TypeError('Parameter is not valid type.')
 
+
 def get_config_labels(cli, obj, key):
-    #key='project-labels', 'service-{name}-labels'
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    # key='project-labels', 'service-{name}-labels'
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    if isinstance(obj,client.models.v1_namespace.V1Namespace):
+    if isinstance(obj, client.models.v1_namespace.V1Namespace):
         namespace = obj.metadata.name
     elif isinstance(obj, client.models.v1_service.V1Service):
         namespace = obj.metadata.namespace
     ret = api.read_namespaced_config_map(key, namespace)
     return ret.data
 
+
 def create_config_labels(cli, key, namespace, labels):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     ret = api.create_namespaced_config_map(
-        namespace, 
+        namespace,
         client.V1ConfigMap(
             data=labels,
             metadata=client.V1ObjectMeta(name=key)
@@ -113,10 +119,12 @@ def create_config_labels(cli, key, namespace, labels):
     )
     return ret.data
 
+
 def inspect_project_network(cli, network):
-    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
-    labels = get_labels(network) #labels from namespace
-    if network.metadata.deletion_timestamp: 
+    if not isinstance(network, client.models.v1_namespace.V1Namespace):
+        raise TypeError('Parameter is not valid type.')
+    labels = get_labels(network)
+    if network.metadata.deletion_timestamp:
         return {'deleted': True, 'key': uuid.UUID(labels['MLAD.PROJECT'])}
     created = network.metadata.creation_timestamp
     config_labels = get_config_labels(cli, network, 'project-labels')
@@ -137,6 +145,7 @@ def inspect_project_network(cli, network):
         'created': int(time.mktime(created.timetuple()))
     }
 
+
 def get_project_session(cli, network):
     if not isinstance(network, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
@@ -145,7 +154,8 @@ def get_project_session(cli, network):
 
 
 def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse=False, stream=False):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     project_key = base_labels['MLAD.PROJECT']
     network = get_project_network(cli, project_key=project_key)
@@ -160,8 +170,8 @@ def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse
                 return (network, stream_out)
         raise exception.AlreadyExist('Already exist project network.')
     basename = base_labels['MLAD.PROJECT.BASE']
-    project_version = base_labels['MLAD.PROJECT.VERSION']
-    default_image = base_labels['MLAD.PROJECT.IMAGE']
+    # project_version = base_labels['MLAD.PROJECT.VERSION']
+    # default_image = base_labels['MLAD.PROJECT.IMAGE']
 
     def resp_stream():
         network_name = f"{basename}-cluster"
@@ -170,31 +180,29 @@ def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse
             yield {'stream': message}
             labels = copy.deepcopy(base_labels)
             labels.update({
-                'MLAD.PROJECT.NETWORK': network_name, 
+                'MLAD.PROJECT.NETWORK': network_name,
                 'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
                 'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
             })
             keys = {
-                'MLAD.PROJECT':labels['MLAD.PROJECT'],
-                'MLAD.PROJECT.NAME':labels['MLAD.PROJECT.NAME'],
-                'MLAD.PROJECT.TYPE':labels['MLAD.PROJECT.TYPE'],
+                'MLAD.PROJECT': labels['MLAD.PROJECT'],
+                'MLAD.PROJECT.NAME': labels['MLAD.PROJECT.NAME'],
+                'MLAD.PROJECT.TYPE': labels['MLAD.PROJECT.TYPE'],
             }
-            ret = api.create_namespace(
+            api.create_namespace(
                 client.V1Namespace(
                     metadata=client.V1ObjectMeta(
-                        name=network_name, 
+                        name=network_name,
                         labels=keys
                     )
                 )
             )
-            config_map_ret=create_config_labels(cli, 'project-labels', 
-                network_name, labels)
-            #AuthConfig
-            api.create_namespaced_secret(network_name,
+            create_config_labels(cli, 'project-labels', network_name, labels)
+            # AuthConfig
+            api.create_namespaced_secret(
+                network_name,
                 client.V1Secret(
-                    metadata=client.V1ObjectMeta(
-                       name=f"{basename}-auth"
-                    ),
+                    metadata=client.V1ObjectMeta(name=f"{basename}-auth"),
                     type='kubernetes.io/dockerconfigjson',
                     data={'.dockerconfigjson': credential}
                 )
@@ -208,12 +216,16 @@ def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse
         stream_out = (_ for _ in resp_stream())
         return (get_project_network(cli, project_key=project_key), stream_out)
 
+
 def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
-    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     network_info = inspect_project_network(cli, network)
-    ret = api.delete_namespace(network.metadata.name)
+    api.delete_namespace(network.metadata.name)
+
     def resp_stream():
         removed = False
         for tick in range(timeout):
@@ -226,8 +238,7 @@ def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
                 yield {'stream': message}
                 time.sleep(1)
         if not removed:
-            message = f"Failed to remove network.\n"
-            #print(message, file=sys.stderr)
+            message = 'Failed to remove network.\n'
             yield {'result': 'failed', 'stream': message}
         else:
             yield {'result': 'succeed'}
@@ -237,12 +248,15 @@ def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
     else:
         return (not get_project_network(cli, project_key=network_info['key'].hex), (_ for _ in resp_stream()))
 
+
 # Manage services and tasks
 def get_containers(cli, project_key=None, extra_filters={}):
     return docker_controller.get_containers(docker.from_env(), project_key, extra_filters)
 
+
 def get_services(cli, project_key=None, extra_filters={}):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
     filters += [f'{key}={value}' for key, value in extra_filters.items()]
@@ -252,9 +266,10 @@ def get_services(cli, project_key=None, extra_filters={}):
     else:
         return dict([(_.metadata.name, _) for _ in services.items])
 
+
 def get_service(cli, **kwargs):
-    #service_id = k8s service uid
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     if kwargs.get('service_id'):
         service = api.list_service_for_all_namespaces(label_selector=f"uid={kwargs.get('service_id')}")
@@ -266,16 +281,19 @@ def get_service(cli, **kwargs):
     elif len(service.items) == 1:
         return service.items[0]
 
+
 def get_service_from_kind(cli, service_name, namespace, kind):
     # get job or rc of service
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     core_api = client.CoreV1Api(cli)
     batch_api = client.BatchV1Api(cli)
     if kind == 'job':
-        service = batch_api.list_namespaced_job(namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
+        service = batch_api.list_namespaced_job(
+            namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
     elif kind == 'rc':
-        service = core_api.list_namespaced_replication_controller(namespace,
-                                                                  label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
+        service = core_api.list_namespaced_replication_controller(
+            namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
     if not service.items:
         return None
     elif len(service.items) == 1:
@@ -283,11 +301,14 @@ def get_service_from_kind(cli, service_name, namespace, kind):
     else:
         raise exception.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
 
+
 def inspect_container(container):
     return docker_controller.inspect_container(container)
 
+
 def get_pod_info(pod):
-    if not isinstance(pod, client.models.v1_pod.V1Pod): raise TypeError('Parameter is not valid type.')
+    if not isinstance(pod, client.models.v1_pod.V1Pod):
+        raise TypeError('Parameter is not valid type.')
          
     pod_info = {
         'name': pod.metadata.name, #pod name
@@ -298,6 +319,7 @@ def get_pod_info(pod):
         'node': pod.spec.node_name,
         'phase': pod.status.phase
     }
+
     def get_status(container_state):
         if container_state.running:
             return {'state':'Running', 'detail':None}
@@ -332,6 +354,7 @@ def get_pod_info(pod):
                 else:
                     return _['status']
         return status
+
     if pod.status.container_statuses:
         for container in pod.status.container_statuses:
             container_info = {
@@ -352,13 +375,16 @@ def get_pod_info(pod):
         }
     return pod_info
 
+
 def _get_job(cli, name, namespace):
     api = client.BatchV1Api(cli)
     return api.read_namespaced_job(name, namespace)
 
+
 def _get_replication_controller(cli, name, namespace):
     api = client.CoreV1Api(cli)
     return api.read_namespaced_replication_controller(name, namespace)
+
 
 def inspect_service(cli, service):
     if not isinstance(service, client.models.v1_service.V1Service): raise TypeError('Parameter is not valid type.')
@@ -411,8 +437,10 @@ def inspect_service(cli, service):
             }
     return inspect
 
+
 def create_containers(cli, network, services, extra_labels={}):
     return docker_controller.create_containers(docker.from_env(), network, services, extra_labels)
+
 
 def _create_job(cli, name, image, command, namespace='default', envs=None, 
                 restart_policy='Never', replicas=1, cpu=None, gpu=None, mem=None, 
@@ -463,15 +491,20 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
     api_response = api.create_namespaced_job(namespace, body)
     return api_response
 
+
 def _create_replication_controller(cli, name, image, command, namespace='default',
                                    envs=None, restart_policy='Always', 
                                    replicas=1, cpu=None, gpu=None, mem=None,
                                    labels=None, constraints={}, secrets=None):
     resources = {}
-    if cpu: resources['cpu'] = str(cpu)
-    if gpu: resources['nvidia.com/gpu'] = str(gpu)
-    if mem: resources['memory'] = str(mem)
-    constraints = dict([(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_]) for _ in constraints])
+    if cpu:
+        resources['cpu'] = str(cpu)
+    if gpu:
+        resources['nvidia.com/gpu'] = str(gpu)
+    if mem:
+        resources['memory'] = str(mem)
+    constraints = dict([(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_])
+                        for _ in constraints])
 
     api = client.CoreV1Api(cli)
     body=client.V1ReplicationController(
@@ -512,6 +545,7 @@ def _create_replication_controller(cli, name, image, command, namespace='default
     )
     api_response = api.create_namespaced_replication_controller(namespace, body)
     return api_response
+
 
 def create_services(cli, network, services, extra_labels={}):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
@@ -570,6 +604,7 @@ def create_services(cli, network, services, extra_labels={}):
         #         size *= (2**10)
         #     res_spec['mem_limit'] = size
         #     res_spec['mem_reservation'] = size
+
         RESTART_POLICY_STORE = {
             'never': 'Never',           # JOB Controller
             'no': 'Never',              # JOB Controller
@@ -672,20 +707,25 @@ def create_services(cli, network, services, extra_labels={}):
             raise exception.APIError(err_msg, status)
     return instances
 
+
 def remove_containers(cli, containers):
     return docker_controller.remove_containers(docker.from_env(), containers)
+
 
 def _delete_job(cli, name, namespace):
     api = client.BatchV1Api(cli)
     return api.delete_namespaced_job(name, namespace, propagation_policy='Foreground')
+
 
 def _delete_replication_controller(cli, name, namespace):
     api = client.CoreV1Api(cli)
     return api.delete_namespaced_replication_controller(name, 
         namespace, propagation_policy='Foreground')
 
+
 def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=False):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     network_api = client.NetworkingV1beta1Api(cli)
 
@@ -700,7 +740,7 @@ def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=F
         kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
         return service_name, namespace, kind, targets
 
-    service_to_check=[]
+    service_to_check = []
     for service in services:
         service_name, namespace, kind, _ = _get_service_info(service)
         service_to_check.append((service_name, namespace, kind, _))
@@ -755,24 +795,31 @@ def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=F
 def get_images(cli, project_key=None):
     return docker_controller.get_images(docker.from_env(), project_key)
 
+
 def get_image(cli, image_id):
     return docker_controller.get_image(docker.from_env(), image_id)
+
 
 def inspect_image(image):
     return docker_controller.inspect_image(image)
 
+
 def build_image(cli, base_labels, tar, dockerfile, stream=False):
     return docker_controller.build_image(docker.from_env(), base_labels, tar, dockerfile, stream)
+
 
 def remove_image(cli, ids, force=False):
     return docker_controller.remove_image(docker.from_env(), ids, force)
 
+
 def prune_images(cli, project_key=None):
     return docker_controller.prune_images(docker.from_env(), project_key)
+
 
 def push_images(cli, project_key, stream=False):
     return docker_controller.push_images(docker.from_env(), project_key, stream)
  
+
 def get_nodes(cli = DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
@@ -781,6 +828,7 @@ def get_nodes(cli = DEFAULT_CLI):
     return dict(
         [(_.metadata.name, _.metadata) for _ in api.list_node().items]
     )
+
 
 def get_node(node_key, cli = DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
