@@ -12,47 +12,65 @@ from mlad.cli import context
               prompt='MLAD Service Address', help='MLAD API Server Address.')
 def add(name, address):
     """Add a new context."""
-    ret = context.add(name, address)
-    click.echo('Context created successfully.')
-    click.echo(OmegaConf.to_yaml(ret))
+    try:
+        ret = context.add(name, address)
+        click.echo('Context created successfully.')
+        click.echo(OmegaConf.to_yaml(ret))
+    except Exception as e:
+        click.echo(e)
 
 
 @click.command()
 @click.argument('NAME', required=True)
 def use(name: str):
     """Change to the context."""
-    context.use(name)
-    click.echo(f'Current context name is: [{name}].')
+    try:
+        context.use(name)
+        click.echo(f'Current context name is: [{name}].')
+    except Exception as e:
+        click.echo(e)
 
 
 @click.command()
 def next():
     """Change to the next context."""
-    name = context.next()
-    click.echo(f'Current context name is [{name}].')
+    try:
+        name = context.next()
+        click.echo(f'Current context name is [{name}].')
+    except Exception as e:
+        click.echo(e)
 
 
 @click.command()
 def prev():
     """Change to the previous context."""
-    name = context.prev()
-    click.echo(f'Current context name is [{name}].')
+    try:
+        name = context.prev()
+        click.echo(f'Current context name is [{name}].')
+    except Exception as e:
+        click.echo(e)
 
 
 @click.command()
 @click.argument('NAME', required=True)
 def delete(name: str):
     """Delete the context."""
-    context.delete(name)
-    click.echo(f'Delete the context of [{name}].')
+    try:
+        context.delete(name)
+        click.echo(f'Delete the context of [{name}].')
+    except Exception as e:
+        click.echo(e)
 
 
 @click.command()
 @click.argument('NAME', required=False)
 def get(name: Optional[str]):
     """Display lower-level information on the context."""
-    ret = context.get(name)
-    click.echo(OmegaConf.to_yaml(ret))
+    try:
+        ret = context.get(name)
+        click.echo(OmegaConf.to_yaml(ret))
+    except Exception as e:
+        click.echo(e)
 
 
 @click.command()
@@ -60,14 +78,20 @@ def get(name: Optional[str]):
 @click.argument('ARGS', required=True, nargs=-1)
 def set(name, args):
     """Set a context entry in config."""
-    context.set(name, *args)
-    click.echo(f'The context [{name}] is successfully configured.')
+    try:
+        context.set(name, *args)
+        click.echo(f'The context [{name}] is successfully configured.')
+    except Exception as e:
+        click.echo(e)
 
 
 @click.command()
 def ls():
     """List contexts."""
-    context.ls()
+    try:
+        context.ls()
+    except Exception as e:
+        click.echo(e)
 
 
 @click.group('context')

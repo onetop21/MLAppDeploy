@@ -156,7 +156,6 @@ def get(name: Optional[str] = None) -> Context:
     context = _find_context(name, config=config)
     if context is None:
         raise NotExistContextError(name)
-    click.echo(OmegaConf.to_yaml(context))
     return context
 
 
