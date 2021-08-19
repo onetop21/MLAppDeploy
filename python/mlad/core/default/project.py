@@ -2,25 +2,25 @@ import sys
 from mlad.core.libs import utils
 
 obj = {
-    'project': {
-        'name': 'Unknown',
-        'version': '0.0',
-        'maintainer': 'Unknown',
-        'workdir': './', 
-    },
+    'apiVersion': 'v1',
+    'name': 'Unknown',
+    'version': '0.0.1',
+    'maintainer': 'Unknown',
+    'workdir': './',
     'workspace': {
+        'kind': 'Workspace',
         'base': 'python:latest',
-        'prescripts': [],
-        'postscripts': [],
-        'requires': {},
+        'preps': [],
+        'script': '',
         'env': {
             'PYTHONUNBUFFERED': 1
         },
-        'ignore': [ '**/.*' ],
+        'ignores': ['**/.*'],
         'command': '',
         'arguments': '',
     },
-    'services': {}
+    'ingress': {},
+    'app': {}
 }
 
-sys.modules[__name__] = lambda x: utils.update_obj(obj, x) 
+sys.modules[__name__] = lambda x: utils.update_obj(obj, x)

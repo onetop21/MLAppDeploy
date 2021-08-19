@@ -1,6 +1,6 @@
 import sys
 
-FORMAT='''# MLAppDeploy Dockerfile
+FORMAT = '''# MLAppDeploy Dockerfile
 FROM {BASE}
 MAINTAINER {MAINTAINER}
 
@@ -11,16 +11,13 @@ MAINTAINER {MAINTAINER}
 WORKDIR /workspace
 
 # Pre Scripts
-RUN {PRESCRIPTS}
-
-# Requires
-{REQUIRES}
+{PREPS}
 
 # Copy projects
 COPY . .
 
 #Post Scripts
-RUN {POSTSCRIPTS}
+RUN {SCRIPT}
 
 # Entrypoint
 CMD {COMMAND}

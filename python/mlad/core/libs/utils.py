@@ -1,14 +1,16 @@
-import sys
-import os
 import copy
 import uuid
 import json
 import base64
 import jwt
+from typing import Dict
 from mlad.core.libs import constants as const
+from mlad.core import exception
+
 
 def project_key(workspace):
     return hash(workspace).hex
+
 
 def get_username(session):
     decoded = jwt.decode(session, "mlad", algorithms="HS256")
@@ -17,12 +19,14 @@ def get_username(session):
     else:
         raise RuntimeError("Session key is invalid.")
 
+
 def get_repository(base_name, registry=None):
     if registry:
         repository = f"{registry}/{base_name.replace('-', '/', 1)}"
     else:
         repository = f"{base_name.replace('-', '/', 1)}"
     return repository
+
 
 def merge(source, destination):
     if source:
@@ -33,11 +37,12 @@ def merge(source, destination):
                 merge(value, node)
             else:
                 destination[key] = value
-    return destination 
+    return destination
+
 
 def update_obj(base, obj):
     # Remove no child branch
-    que=[obj]
+    que = [obj]
     while len(que):
         item = que.pop(0)
         if isinstance(item, dict):
@@ -52,6 +57,7 @@ def update_obj(base, obj):
                 del item[key]
     return merge(obj, copy.deepcopy(base))
 
+
 def generate_unique_id(length=None):
     UUID = uuid.uuid4()
     if length:
@@ -59,15 +65,19 @@ def generate_unique_id(length=None):
     else:
         return UUID
 
+
 def hash(body: str):
     import hashlib
     return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
 
+
 def encode_dict(body):
     return base64.urlsafe_b64encode(json.dumps(body or {}).encode()).decode()
 
+
 def decode_dict(body):
     return json.loads(base64.urlsafe_b64decode(body.encode()).decode() or "{}")
+
 
 # Get URL or Socket from CLI
 def get_requests_host(cli):
@@ -81,37 +91,30 @@ def get_requests_host(cli):
         return cli.api.base_url
     raise exception.NotSupportURL
 
+
 # Change Key Style (ex. task_template -> TaskTemplate)
 def change_key_style(dct):
-    return dict((k.title().replace('_',''), v) for k, v in dct.items())
+    return dict((k.title().replace('_', ''), v) for k, v in dct.items())
+
 
 # Manage Project and Network
-def base_labels(workspace, session, manifest, ty='project'):
+def base_labels(workspace: str, session: str, manifest: Dict):
     # workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
     username = get_username(session)
-
-    if ty == 'plugin':
-        basename = f"{username}-{manifest['name']}-plugin".lower()
-        key = project_key(basename)
-        default_image = f"{username}/{manifest['name']}-plugin:{manifest['version']}".lower()
-        #default_image = f"{basename}:{manifest['version']}"
-    else:
-        key = project_key(workspace)
-        basename = f"{username}-{manifest['name']}-{key[:const.SHORT_LEN]}".lower()
-        default_image = f"{username}/{manifest['name']}-{key[:const.SHORT_LEN]}:latest".lower()
-        #default_image = f"{basename}:latest"
+    key = project_key(workspace)
+    basename = f"{username}-{manifest['name']}-{key[:const.SHORT_LEN]}".lower()
+    default_image = f"{username}/{manifest['name']}-{key[:const.SHORT_LEN]}:latest".lower()
     labels = {
-        f'MLAD.VERSION': '1',
-        f'MLAD.PROJECT': key,
-        f'MLAD.PROJECT.TYPE': ty,
-        f'MLAD.PROJECT.WORKSPACE': workspace,
-        f'MLAD.PROJECT.USERNAME': username,
-        f'MLAD.PROJECT.NAME': manifest['name'].lower(),
-        f'MLAD.PROJECT.MAINTAINER': manifest['maintainer'],
-        f'MLAD.PROJECT.VERSION': str(manifest['version']).lower(),
-        f'MLAD.PROJECT.BASE': basename,
-        f'MLAD.PROJECT.IMAGE': default_image,
-        f'MLAD.PROJECT.SESSION': session,
+        'MLAD.VERSION': '1',
+        'MLAD.PROJECT': key,
+        'MLAD.PROJECT.WORKSPACE': workspace,
+        'MLAD.PROJECT.USERNAME': username,
+        'MLAD.PROJECT.NAME': manifest['name'].lower(),
+        'MLAD.PROJECT.MAINTAINER': manifest['maintainer'],
+        'MLAD.PROJECT.VERSION': str(manifest['version']).lower(),
+        'MLAD.PROJECT.BASE': basename,
+        'MLAD.PROJECT.IMAGE': default_image,
+        'MLAD.PROJECT.SESSION': session,
     }
     return labels

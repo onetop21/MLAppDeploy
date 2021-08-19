@@ -1,27 +1,33 @@
 import sys
-import os
 import io
 import tarfile
 import json
-import base64
 import urllib3
 import requests
 import docker
-from pathlib import Path
 from mlad.core.default import project as default_project
-from mlad.core.default import plugin as default_plugin
 from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
 from mlad.cli.libs import utils
-from mlad.cli.libs import interrupt_handler
-from mlad.cli.Format import PROJECT
-from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
+from mlad.cli.Format import (
+    DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT,
+    DOCKERFILE_REQ_ADD, DOCKERFILE_REQ_RUN, DOCKERFILE_REQ_APK, DOCKERFILE_REQ_YUM
+)
+
+PREP_KEY_TO_TEMPLATE = {
+    'run': DOCKERFILE_REQ_RUN,
+    'add': DOCKERFILE_REQ_ADD,
+    'apt': DOCKERFILE_REQ_APT,
+    'pip': DOCKERFILE_REQ_PIP,
+    'apk': DOCKERFILE_REQ_APK,
+    'yum': DOCKERFILE_REQ_YUM
+}
+
 
 def list(all, plugin, tail, no_trunc):
     cli = ctlr.get_api_client()
     if all:
-        images = ctlr.get_images(cli, extra_labels=['MLAD.PROJECT.TYPE=project'])# + \
-        #         ctlr.get_images(cli, extra_labels=['MLAD.PROJECT.TYPE=plugin'])
+        images = ctlr.get_images(cli, extra_labels=['MLAD.PROJECT.TYPE=project'])
     elif plugin:
         images = ctlr.get_images(cli, extra_labels=['MLAD.PROJECT.TYPE=plugin'])
     else:
@@ -51,40 +57,71 @@ def list(all, plugin, tail, no_trunc):
             data.append(row)
     utils.print_table(*([data, 'No have built image.'] + ([0] if no_trunc else [])))
     if untagged:
-        print(f'This project has {untagged} untagged images. To free disk spaces up by cleaning gabage images.') 
+        print(f'This project has {untagged} untagged images.'
+              'To free disk spaces up by cleaning gabage images.')
 
-def build(quiet, plugin, no_cache, pull):
+
+def build(quiet: bool, no_cache: bool, pull: bool):
     config = utils.read_config()
     cli = ctlr.get_api_client()
-    
-    manifest_type = 'plugin' if plugin else 'project'
-    default = default_plugin if plugin else default_project
-    manifest = utils.get_manifest(manifest_type, default)
+    manifest = utils.get_manifest(default_project)
 
     # Generate Base Labels
     base_labels = core_utils.base_labels(
-        utils.get_workspace(), 
+        utils.get_workspace(),
         config.mlad.session,
-        manifest[manifest_type], 
-        manifest_type
+        manifest
     )
-    project_key = base_labels['MLAD.PROJECT']
-
-    # Append service manfest using label.
-    if plugin:
-        base_labels['MLAD.PROJECT.PLUGIN_MANIFEST']=base64.urlsafe_b64encode(json.dumps(manifest['service']).encode()).decode()
-
     # Prepare Latest Image
     latest_image = None
-    images = ctlr.get_images(cli, extra_labels=[f'MLAD.PROJECT.TYPE={manifest_type}'])
-    if len(images):
-        latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
-        if latest_image and len(latest_image): latest_image = latest_image[0]
-    image_version = f"{base_labels['MLAD.PROJECT.VERSION']}"
+    images = ctlr.get_images(cli)
+    if len(images) > 0:
+        latest_image = sorted(filter(None, [
+            image if tag.endswith('latest') else None
+            for image in images for tag in image.tags
+        ]), key=lambda x: str(x))
+        if latest_image is not None and len(latest_image) > 0:
+            latest_image = latest_image[0]
 
-    print(f'Generating {manifest_type} image...')
+    workspace = manifest['workspace']
+    # For the workspace kind
+    if workspace['kind'] == 'Workspace':
+        envs = [DOCKERFILE_ENV.format(KEY=k, VALUE=v) for k, v in workspace['env'].items()]
+        preps = workspace['preps']
+        prep_docker_formats = []
+        for prep in preps:
+            key = prep.keys()[0]
+            template = PREP_KEY_TO_TEMPLATE[key]
+            prep_docker_formats.append(template.format(SRC=prep[key]))
 
-    if manifest['workspace'] != default({})['workspace']:
+        commands = [f'"{item}"' for item in workspace['command'].split()] + \
+            [f'"{item}"' for item in workspace['arguments'].split()]
+
+        dockerfile = DOCKERFILE.format(
+            BASE=workspace['base'],
+            MAINTAINER=manifest['maintainer'],
+            ENVS='\n'.join(envs),
+            PREPS='\n'.join(prep_docker_formats),
+            SCRIPT=';'.join(workspace['script']) if len(workspace['script']) else "echo .",
+            COMMAND='[{}]'.format(', '.join(commands)),
+        )
+        tarbytes = io.BytesIO()
+        dockerfile_info = tarfile.TarInfo('.dockerfile')
+        dockerfile_info.size = len(dockerfile)
+        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+            for name, arcname in utils.arcfiles(manifest['workdir'], workspace['ignore']):
+                tar.add(name, arcname)
+            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
+        tarbytes.seek(0)
+
+        # Build Image
+        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
+
+    # For the dockerfile kind
+    else:
+        pass
+
+    if manifest['workspace'] != default_project({})['workspace']:
         # Prepare workspace data from manifest file
         envs = []
         for key in manifest['workspace']['env'].keys():
@@ -101,12 +138,12 @@ def build(quiet, plugin, no_cache, pull):
             elif key == 'pip':
                 requires.append(DOCKERFILE_REQ_PIP.format(
                     SRC=manifest['workspace']['requires'][key]
-                )) 
+                ))
 
         # Dockerfile to memory
         dockerfile = DOCKERFILE.format(
             BASE=manifest['workspace']['base'],
-            MAINTAINER=manifest[manifest_type]['maintainer'],
+            MAINTAINER=manifest['maintainer'],
             ENVS='\n'.join(envs),
             PRESCRIPTS=';'.join(manifest['workspace']['prescripts']) if len(manifest['workspace']['prescripts']) else "echo .",
             REQUIRES='\n'.join(requires),
@@ -153,8 +190,8 @@ def build(quiet, plugin, no_cache, pull):
 
     image = ctlr.get_image(cli, base_labels['MLAD.PROJECT.IMAGE'])
 
-    #print(docker.auth.resolve_repository_name(base_labels['MLAD.PROJECT.IMAGE']))
     repository = base_labels['MLAD.PROJECT.IMAGE']
+
     # Check updated
     if latest_image != image:
         if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
@@ -164,25 +201,8 @@ def build(quiet, plugin, no_cache, pull):
     else:
         print(f'Already built {manifest_type} to image.', file=sys.stderr)
 
-    #updated = False
-    #if latest_image != image:
-    #    image.tag(repository)
-    #    updated = True
-    #    if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
-    #        latest_image.tag('remove')
-    #        cli.images.remove('remove')
-    #else:
-    #    if len(latest_image.tags) < 2:
-    #        image.tag(repository, tag=image_version)
-    #        updated = True
-    #    else:
-    #        print(f'Already built {manifest_type} to image.', file=sys.stderr)
-
-    #if updated:
-    #    #print(f"Built Image: {'/'.join(repository.split('/')[1:])}:{image_version}")
-    #    print(f"Built Image: {repository}")
-
     print('Done.')
+
 
 def search(keyword):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

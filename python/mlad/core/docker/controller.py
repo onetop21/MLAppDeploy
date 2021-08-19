@@ -517,13 +517,17 @@ def remove_services(cli, services, timeout=0xFFFF):
         removed &= service_removed
     return removed
 
+
 # Image Control
 def get_images(cli, project_key=None, extra_labels=[]):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, docker.client.DockerClient):
+        raise TypeError('Parameter is not valid type.')
 
-    filters = f'MLAD.PROJECT'
-    if project_key: filters+= f"={project_key}"
-    return cli.images.list(filters={ 'label': [filters] + extra_labels } )
+    filters = 'MLAD.PROJECT'
+    if project_key:
+        filters += f"={project_key}"
+    return cli.images.list(filters={'label': [filters] + extra_labels})
+
 
 def get_image(cli, image_id):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')

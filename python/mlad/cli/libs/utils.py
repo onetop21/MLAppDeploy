@@ -1,14 +1,14 @@
 import sys
 import os
 import re
-import copy
 import fnmatch
 import uuid
 import socket
 import hashlib
 import itertools
 import jwt
-from pathlib import Path
+from typing import Callable, Dict
+from pathlib import Pat
 from functools import lru_cache
 from urllib.parse import urlparse
 from omegaconf import OmegaConf
@@ -66,7 +66,7 @@ def has_config():
 def read_config():
     try:
         return OmegaConf.load(CONFIG_FILE)
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         print('Need to initialize configuration before.\nTry to run "mlad config init"',
               file=sys.stderr)
         sys.exit(1)
@@ -164,26 +164,23 @@ def read_manifest(path):
 
 
 @lru_cache(maxsize=None)
-def get_manifest(ty, default=lambda x: x):
-    manifest_path = manifest_file(ty)
+def get_manifest(default: Callable[[Dict], Dict]) -> Dict:
+    manifest_path = os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
     manifest = read_manifest(manifest_path)
-    if not manifest:
-        print(f'Need to generate {ty} manifest file before.', file=sys.stderr)
+    if manifest is None:
+        print('Need to generate manifest file before.', file=sys.stderr)
         print(f'$ {sys.argv[0]} --help', file=sys.stderr)
         sys.exit(1)
 
     # replace workdir to abspath
     manifest = default(manifest)
-    path = manifest[ty].get('workdir', './')
+    path = manifest.get('workdir', './')
     if not os.path.isabs(path):
-        manifest[ty]['workdir'] = os.path.normpath(
-            os.path.join(
-                os.path.dirname(manifest_path),
-                path
-            )
+        manifest['workdir'] = os.path.normpath(
+            os.path.join(os.path.dirname(manifest_path), path)
         )
-    if not check_podname_syntax(manifest[ty]['name']):
-        print('Syntax Error: Project(Plugin) and service require a name '
+    if not check_podname_syntax(manifest['name']):
+        print('Syntax Error: Project(Component) and service require a name '
               'to follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
     return manifest

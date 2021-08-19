@@ -1,5 +1,5 @@
 import sys
 
-FORMAT = '''ENV {KEY} {VALUE}'''
+FORMAT = '''RUN {SRC}'''
 
 sys.modules[__name__] = FORMAT
