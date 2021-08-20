@@ -620,6 +620,7 @@ then
                     MASTER_IP=$(HostIP)
                     if [ $RUNNING_CONTAINER ]; then
                         ColorEcho "Register insecure registry."
+                        sudo mkdir -p /etc/rancher/k3s/
                         echo -e "mirror:\n  $MASTER_IP:5000:\n    endpoint:\n      - http://$MASTER_IP:5000" | sudo tee /etc/rancher/k3s/registries.yaml
                     fi
 
@@ -637,6 +638,7 @@ then
                     # Create registries.yaml for insecure private registry
                     if [ $(curl -s -o /dev/null -w "%{http_code}" http://$MASTER_IP:5000/v2/_catalog) -eq "200" ]; then
                         ColorEcho "Register insecure registry."
+                        sudo mkdir -p /etc/rancher/k3s/
                         echo -e "mirror:\n  $MASTER_IP:5000:\n    endpoint:\n      - http://$MASTER_IP:5000" | sudo tee /etc/rancher/k3s/registries.yaml
                     fi
                     # Install k3s agent
