@@ -9,7 +9,7 @@ from typing import Dict, List
 import docker
 import requests
 import requests_unixsocket
-from mlad.core import exception
+from mlad.core import exceptions
 from mlad.core.libs import utils
 from mlad.core.docker.logs import LogHandler, LogCollector
 from mlad.core.default import project_service as service_default

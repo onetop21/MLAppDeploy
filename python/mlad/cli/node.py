@@ -5,7 +5,7 @@ from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
-from mlad.core import exception as CoreException
+from mlad.core import exceptions as CoreException
 from mlad.core.kubernetes import controller as ctlr
 
 

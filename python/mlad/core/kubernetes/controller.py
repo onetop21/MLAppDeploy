@@ -10,7 +10,8 @@ from collections import defaultdict
 import docker
 from kubernetes.client import models
 import requests
-from mlad.core import exception
+from mlad.core import exceptions
+from mlad.core.exceptions import NetworkAlreadyExistError
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
@@ -47,7 +48,7 @@ def get_current_context():
     try:
         current_context = config.list_kube_config_contexts()[1]
     except config.config_exception.ConfigException as e:
-        raise exception.APIError(str(e), 404)
+        raise exceptions.APIError(str(e), 404)
     return current_context['name']
 
 def get_auth_headers(cli, image_name=None, auth_configs=None):
@@ -77,7 +78,7 @@ def get_project_network(cli, **kwargs):
     elif len(namespaces.items)==1:
         return namespaces.items[0]
     else:
-        raise exception.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
+        raise exceptions.Duplicated(f"Need to remove networks or down project, because exists duplicated networks.")
 
 def get_labels(obj):
     #TODO to be modified
@@ -158,7 +159,7 @@ def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse
             else:
                 stream_out = (_ for _ in resp_stream())
                 return (network, stream_out)
-        raise exception.AlreadyExist('Already exist project network.')
+        raise NetworkAlreadyExistError(project_key)
     basename = base_labels['MLAD.PROJECT.BASE']
     project_version = base_labels['MLAD.PROJECT.VERSION']
     default_image = base_labels['MLAD.PROJECT.IMAGE']
@@ -281,7 +282,7 @@ def get_service_from_kind(cli, service_name, namespace, kind):
     elif len(service.items) == 1:
         return service.items[0]
     else:
-        raise exception.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
+        raise exceptions.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
 
 def inspect_container(container):
     return docker_controller.inspect_container(container)
@@ -532,7 +533,7 @@ def create_services(cli, network, services, extra_labels={}):
 
         # Check running already
         if get_services(cli, project_info['key'], extra_filters={'MLAD.PROJECT.SERVICE': name}):
-            raise exception.Duplicated('Already running service.')
+            raise exceptions.Duplicated('Already running service.')
     
         image = service['image'] or image_name
         env = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
@@ -669,7 +670,7 @@ def create_services(cli, network, services, extra_labels={}):
                     msg = str(e)
                     status = 500
             err_msg = f'Failed to create services: {msg}'
-            raise exception.APIError(err_msg, status)
+            raise exceptions.APIError(err_msg, status)
     return instances
 
 def remove_containers(cli, containers):
@@ -792,7 +793,7 @@ def get_node(node_key, cli = DEFAULT_CLI):
         return nodes.items[0]
     else:
         #print(f'Cannot find node "{node_key}"', file=sys.stderr)
-        raise exception.NotFound(f'Cannot find node "{node_key}"')
+        raise exceptions.NotFound(f'Cannot find node "{node_key}"')
 
 def inspect_node(node):
     if not isinstance(node, client.models.v1_node.V1Node):
@@ -831,11 +832,11 @@ def enable_node(node_key, cli = DEFAULT_CLI):
     try:
         api_response = api.patch_node(node_key, body)
     except ApiException as e:
-        msg, status = exception.handle_k8s_api_error(e)
+        msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exception.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_key}.')
         else:
-            raise exception.APIError(msg, status)
+            raise exceptions.APIError(msg, status)
 
     
 def disable_node(node_key, cli = DEFAULT_CLI):
@@ -850,11 +851,11 @@ def disable_node(node_key, cli = DEFAULT_CLI):
     try:
         api_response = api.patch_node(node_key, body)
     except ApiException as e:
-        msg, status = exception.handle_k8s_api_error(e)
+        msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exception.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_key}.')
         else:
-            raise exception.APIError(msg, status)
+            raise exceptions.APIError(msg, status)
 
 
 def add_node_labels(node_key, cli = DEFAULT_CLI, **kv):
@@ -872,11 +873,11 @@ def add_node_labels(node_key, cli = DEFAULT_CLI, **kv):
     try:
         api_response = api.patch_node(node_key, body)
     except ApiException as e:
-        msg, status = exception.handle_k8s_api_error(e)
+        msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exception.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_key}.')
         else:
-            raise exception.APIError(msg, status)
+            raise exceptions.APIError(msg, status)
 
 
 def remove_node_labels(node_key, cli = DEFAULT_CLI, *keys):
@@ -894,11 +895,11 @@ def remove_node_labels(node_key, cli = DEFAULT_CLI, *keys):
     try:
         api_response = api.patch_node(node_key, body)
     except ApiException as e:
-        msg, status = exception.handle_k8s_api_error(e)
+        msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exception.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_key}.')
         else:
-            raise exception.APIError(msg, status)
+            raise exceptions.APIError(msg, status)
 
 
 def scale_service(cli, service, scale_spec):
@@ -961,7 +962,7 @@ def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
                         selected += [(_[0], __)]
                         names_or_ids.remove(__)
         if names_or_ids:
-            raise exception.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
+            raise exceptions.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
 
     else:
         for _ in sources:
@@ -978,7 +979,7 @@ def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
             print(f'Cannot get logs of pending service: {target[1]}')
 
     if not targets:
-        raise exception.NotFound("Cannot find running services")
+        raise exceptions.NotFound("Cannot find running services")
 
     return targets
 
