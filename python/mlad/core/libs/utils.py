@@ -5,7 +5,7 @@ import base64
 import jwt
 from typing import Dict
 from mlad.core.libs import constants as const
-from mlad.core import exception
+from mlad.core import exceptions
 
 
 def project_key(workspace):
@@ -89,7 +89,7 @@ def get_requests_host(cli):
         return cli.api.base_url
     elif cli.api.base_url.startswith('http://'):
         return cli.api.base_url
-    raise exception.NotSupportURL
+    raise exceptions.NotSupportURL
 
 
 # Change Key Style (ex. task_template -> TaskTemplate)
@@ -110,6 +110,7 @@ def base_labels(workspace: str, session: str, manifest: Dict):
         'MLAD.PROJECT': key,
         'MLAD.PROJECT.WORKSPACE': workspace,
         'MLAD.PROJECT.USERNAME': username,
+        'MLAD.PROJECT.API_VERSION': manifest['apiVersion'],
         'MLAD.PROJECT.NAME': manifest['name'].lower(),
         'MLAD.PROJECT.MAINTAINER': manifest['maintainer'],
         'MLAD.PROJECT.VERSION': str(manifest['version']).lower(),

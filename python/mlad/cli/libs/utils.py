@@ -7,16 +7,15 @@ import socket
 import hashlib
 import itertools
 import jwt
-from typing import Callable, Dict
-from pathlib import Pat
+from typing import Dict
+from pathlib import Path
 from functools import lru_cache
 from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from getpass import getuser
 
-from mlad.api import API
-from mlad.api.exception import APIError
 from mlad.cli.libs.exceptions import InvalidURLError
+from mlad.core.default import project as project_default
 from mlad.cli.libs.auth import auth_admin
 
 
@@ -163,8 +162,8 @@ def read_manifest(path):
         return None
 
 
-@lru_cache(maxsize=None)
-def get_manifest(default: Callable[[Dict], Dict]) -> Dict:
+def get_manifest() -> Dict:
+    default = project_default
     manifest_path = os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
     manifest = read_manifest(manifest_path)
     if manifest is None:
@@ -298,6 +297,7 @@ def color_index():
 def match(filepath, ignores):
     result = False
     normpath = os.path.normpath(filepath)
+    
     def matcher(path, pattern):
         patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")]
                                 if '**/' in pattern else [])
@@ -327,7 +327,8 @@ def arcfiles(workspace='.', ignores=[]):
             dirpath = os.path.join(root, name)
             if match(dirpath, ignores):
                 prune_dirs.append(name)
-        for _ in prune_dirs: dirs.remove(_)
+        for _ in prune_dirs:
+            dirs.remove(_)
 
 
 def prompt(msg, default='', ty=str):
@@ -341,5 +342,3 @@ def get_username(session):
         return decoded["user"]
     else:
         raise RuntimeError("Session key is invalid.")
-
-

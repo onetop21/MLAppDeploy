@@ -530,11 +530,14 @@ def get_images(cli, project_key=None, extra_labels=[]):
 
 
 def get_image(cli, image_id):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, docker.client.DockerClient):
+        raise TypeError('Parameter is not valid type.')
     return cli.images.get(image_id)    
 
+
 def inspect_image(image):
-    if not isinstance(image, docker.models.images.Image): raise TypeError('Parameter is not valid type.')
+    if not isinstance(image, docker.models.images.Image):
+        raise TypeError('Parameter is not valid type.')
     headed = len([_ for _ in image.tags if _.endswith('latest')]) > 0
     labels = {
         # for Manifest
@@ -560,9 +563,6 @@ def build_image(cli, base_labels, tar, dockerfile, no_cache=False, pull=False, s
     # Setting path and docker file
     #os.getcwd() + "/.mlad/"
     #temporary
-    project_base = base_labels['MLAD.PROJECT.BASE']
-    project_name = base_labels['MLAD.PROJECT.NAME']
-    username = base_labels['MLAD.PROJECT.USERNAME']
     latest_name = base_labels['MLAD.PROJECT.IMAGE']
 
     headers = get_auth_headers(cli)
@@ -756,4 +756,3 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         print('Cannot find running containers.', file=sys.stderr)
     handler.release()
-

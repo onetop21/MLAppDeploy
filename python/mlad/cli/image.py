@@ -5,7 +5,6 @@ import json
 import urllib3
 import requests
 import docker
-from mlad.core.default import project as default_project
 from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
 from mlad.cli.libs import utils
@@ -64,120 +63,48 @@ def list(all, plugin, tail, no_trunc):
 def build(quiet: bool, no_cache: bool, pull: bool):
     config = utils.read_config()
     cli = ctlr.get_api_client()
-    manifest = utils.get_manifest(default_project)
+    manifest = utils.get_manifest()
 
     # Generate Base Labels
-    base_labels = core_utils.base_labels(
-        utils.get_workspace(),
-        config.mlad.session,
-        manifest
-    )
+    workspace_key = utils.get_workspace()
+    base_labels = core_utils.base_labels(workspace_key, config.mlad.session, manifest)
+
     # Prepare Latest Image
     latest_image = None
     images = ctlr.get_images(cli)
     if len(images) > 0:
-        latest_image = sorted(filter(None, [
-            image if tag.endswith('latest') else None
+        latest_images = sorted([
+            image
             for image in images for tag in image.tags
-        ]), key=lambda x: str(x))
-        if latest_image is not None and len(latest_image) > 0:
-            latest_image = latest_image[0]
+            if tag.endswith('latest')
+        ], key=lambda x: str(x))
+        if len(latest_images) > 0:
+            latest_image = latest_images[0]
 
     workspace = manifest['workspace']
     # For the workspace kind
     if workspace['kind'] == 'Workspace':
-        envs = [DOCKERFILE_ENV.format(KEY=k, VALUE=v) for k, v in workspace['env'].items()]
-        preps = workspace['preps']
-        prep_docker_formats = []
-        for prep in preps:
-            key = prep.keys()[0]
-            template = PREP_KEY_TO_TEMPLATE[key]
-            prep_docker_formats.append(template.format(SRC=prep[key]))
-
-        commands = [f'"{item}"' for item in workspace['command'].split()] + \
-            [f'"{item}"' for item in workspace['arguments'].split()]
-
-        dockerfile = DOCKERFILE.format(
-            BASE=workspace['base'],
-            MAINTAINER=manifest['maintainer'],
-            ENVS='\n'.join(envs),
-            PREPS='\n'.join(prep_docker_formats),
-            SCRIPT=';'.join(workspace['script']) if len(workspace['script']) else "echo .",
-            COMMAND='[{}]'.format(', '.join(commands)),
-        )
-        tarbytes = io.BytesIO()
-        dockerfile_info = tarfile.TarInfo('.dockerfile')
-        dockerfile_info.size = len(dockerfile)
-        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-            for name, arcname in utils.arcfiles(manifest['workdir'], workspace['ignore']):
-                tar.add(name, arcname)
-            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-        tarbytes.seek(0)
-
-        # Build Image
-        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
-
+        payload = _obtain_workspace_payload(workspace, manifest['maintainer'])
     # For the dockerfile kind
     else:
-        pass
+        if 'dockerfile' in workspace:
+            with open(workspace['dockerfile'], 'r') as dockerfile:
+                payload = dockerfile.read()
+        else:
+            payload = workspace['script']
 
-    if manifest['workspace'] != default_project({})['workspace']:
-        # Prepare workspace data from manifest file
-        envs = []
-        for key in manifest['workspace']['env'].keys():
-            envs.append(DOCKERFILE_ENV.format(
-                KEY=key,
-                VALUE=manifest['workspace']['env'][key]
-            ))
-        requires = []
-        for key in manifest['workspace']['requires'].keys():
-            if key == 'apt':
-                requires.append(DOCKERFILE_REQ_APT.format(
-                    SRC=manifest['workspace']['requires'][key]
-                ))
-            elif key == 'pip':
-                requires.append(DOCKERFILE_REQ_PIP.format(
-                    SRC=manifest['workspace']['requires'][key]
-                ))
+    tarbytes = io.BytesIO()
+    dockerfile_info = tarfile.TarInfo('.dockerfile')
+    dockerfile_info.size = len(payload)
+    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+        for name, arcname in utils.arcfiles(manifest['workdir'], workspace['ignores']):
+            tar.add(name, arcname)
+        tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
+    tarbytes.seek(0)
 
-        # Dockerfile to memory
-        dockerfile = DOCKERFILE.format(
-            BASE=manifest['workspace']['base'],
-            MAINTAINER=manifest['maintainer'],
-            ENVS='\n'.join(envs),
-            PRESCRIPTS=';'.join(manifest['workspace']['prescripts']) if len(manifest['workspace']['prescripts']) else "echo .",
-            REQUIRES='\n'.join(requires),
-            POSTSCRIPTS=';'.join(manifest['workspace']['postscripts']) if len(manifest['workspace']['postscripts']) else "echo .",
-            COMMAND='[{}]'.format(', '.join(
-                [f'"{item}"' for item in manifest['workspace']['command'].split()] + 
-                [f'"{item}"' for item in manifest['workspace']['arguments'].split()]
-            )),
-        )
-
-        tarbytes = io.BytesIO()
-        dockerfile_info = tarfile.TarInfo('.dockerfile')
-        dockerfile_info.size = len(dockerfile)
-        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-            for name, arcname in utils.arcfiles(manifest[manifest_type]['workdir'], manifest['workspace']['ignore']):
-                tar.add(name, arcname)
-            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-        tarbytes.seek(0)
-
-        # Build Image
-        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
-
-    else:
-        dockerfile = f"FROM {manifest['service']['image']}\nMAINTAINER {manifest[manifest_type]['maintainer']}"
-
-        tarbytes = io.BytesIO()
-        dockerfile_info = tarfile.TarInfo('.dockerfile')
-        dockerfile_info.size = len(dockerfile)
-        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-        tarbytes.seek(0)
-
-        # Build Image
-        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
+    # Build Image
+    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name,
+                                    no_cache, pull, stream=True)
 
     # Print build output
     for _ in build_output:
@@ -194,14 +121,38 @@ def build(quiet: bool, no_cache: bool, pull: bool):
 
     # Check updated
     if latest_image != image:
-        if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
+        if latest_image is not None and len(latest_image.tags) < 2 \
+                and latest_image.tags[-1].endswith(':latest'):
             latest_image.tag('remove')
             cli.images.remove('remove')
         print(f"Built Image: {repository}")
     else:
-        print(f'Already built {manifest_type} to image.', file=sys.stderr)
+        print('The same image has been build before', file=sys.stderr)
 
     print('Done.')
+    return image
+
+
+def _obtain_workspace_payload(workspace, maintainer):
+    envs = [DOCKERFILE_ENV.format(KEY=k, VALUE=v) for k, v in workspace['env'].items()]
+    preps = workspace['preps']
+    prep_docker_formats = []
+    for prep in preps:
+        key = tuple(prep.keys())[0]
+        template = PREP_KEY_TO_TEMPLATE[key]
+        prep_docker_formats.append(template.format(SRC=prep[key]))
+
+    commands = [f'"{item}"' for item in workspace['command'].split()] + \
+        [f'"{item}"' for item in workspace['arguments'].split()]
+
+    return DOCKERFILE.format(
+        BASE=workspace['base'],
+        MAINTAINER=maintainer,
+        ENVS='\n'.join(envs),
+        PREPS='\n'.join(prep_docker_formats),
+        SCRIPT=';'.join(workspace['script']) if len(workspace['script']) else "echo .",
+        COMMAND=f'[{", ".join(commands)}]',
+    )
 
 
 def search(keyword):
@@ -214,48 +165,48 @@ def search(keyword):
             repositories = catalog['repositories']
             for repository in repositories:
                 tags = json.loads(requests.get(f'http://{config["docker"]["registry"]}/v2/{repository}/tags/list', verify=False).text)
-                images += [ f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags'] ] 
-            found = [ item for item in filter(None, [image if keyword in image else None for image in images]) ]
+                images += [f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags']]
+            found = [item for item in filter(None, [image if keyword in image else None for image in images])]
 
             columns = [('REPOSITORY', 'TAG')]
             for item in found:
                 repo, tag = item.rsplit(':', 1)
-                columns.append((repo, tag))                 
+                columns.append((repo, tag))
             utils.print_table(columns, 'Cannot find image.', 48)
         else:
             print('No images.', file=sys.stderr)
-    except requests.exceptions.ConnectionError as e:
+    except requests.exceptions.ConnectionError:
         print(f"Cannot connect to docker registry [{config['docker']['registry']}]", file=sys.stderr)
+
 
 def remove(ids, force):
     print('Remove project image...')
     cli = ctlr.get_api_client()
     try:
-        result = ctlr.remove_image(cli, ids, force)
+        ctlr.remove_image(cli, ids, force)
     except docker.errors.ImageNotFound as e:
         print(e, file=sys.stderr)
-        result = []
     print('Done.')
+
 
 def prune(all):
     cli = ctlr.get_api_client()
     if all:
-        result = ctlr.prune_images(cli) 
+        result = ctlr.prune_images(cli)
     else:
         project_key = utils.project_key(utils.get_workspace())
-        result = ctlr.prune_images(cli, project_key) 
+        result = ctlr.prune_images(cli, project_key)
 
     if result['ImagesDeleted'] and len(result['ImagesDeleted']):
         for deleted in result['ImagesDeleted']:
-            status, value = [ (key, deleted[key]) for key in deleted ][-1]
+            status, value = [(key, deleted[key]) for key in deleted][-1]
             print(f'{status:12} {value:32}')
         reclaimed = result['SpaceReclaimed']
         unit = 0
-        unit_list = ['B', 'KB', 'MB', 'GB', 'TB' ]
+        unit_list = ['B', 'KB', 'MB', 'GB', 'TB']
         while reclaimed / 1000. > 1:
             reclaimed /= 1000.
             unit += 1
         print(f'{reclaimed:.2f}{unit_list[unit]} Space Reclaimed.')
     else:
         print('Already cleared.', file=sys.stderr)
-
