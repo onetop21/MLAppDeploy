@@ -39,7 +39,7 @@ dockerfile_default = {
 
 
 def update(x):
-    kind = x['workspace']['kind']
+    kind = x['workspace'].get('kind', 'Workspace')
     return utils.update_obj(workspace_default if kind == 'Workspace' else dockerfile_default, x)
 
 
