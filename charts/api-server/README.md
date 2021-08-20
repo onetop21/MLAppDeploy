@@ -12,7 +12,11 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 ```
 ```bash
+# Local or Cloud (LoadBalancer)
 helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx
+# Baremetal
+helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx \
+    controller.service.type=NodePort
 ```
 
 ### Prometheus Stack (Optional)
