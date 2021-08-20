@@ -231,6 +231,14 @@ function IsDeployed {
     return 0
 }
 
+function HasHelmRepo {
+    VALUE=$1
+    COUNT=(($(helm repo list -o json | jq .[].name -r | grep -e ^${VALUE}$ | wc -l)+\
+        $(helm repo list -o json | jq .[].url -r | grep -e ^${VALUE}$ | wc -l)))
+    >&2 echo COUNT=$VALUE:$COUNT
+    return [ $COUNT -ne 0]
+}
+
 # Usage/Help
 function UsageHeader {
     ColorEcho INFO "MLAppDeploy Environment Installer (based k3s)"
@@ -458,7 +466,7 @@ elif [ $DEPLOY ]; then
                 unset LOADBALANCER
                 ;;
             *)
-                [ ${1:0:2} == "--" ] && unshift \
+                [ ${1:0:2} == "--" ] && continue \
                     || ColorEcho WARN "Not support ingress type [$1]."
                 ;;
             esac
@@ -764,7 +772,7 @@ then
     if [ $INGRESS ]
     then
         PrintStep "Install Ingress-NGINX."
-        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        ! HasHelmRepo ingress-nginx && helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
         helm repo update
         [ $LOADBALANCER ] && ( \
             helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx || \
@@ -775,7 +783,7 @@ then
     # Install Prometheus Stack
     [ $MONITORING ] && (
         PrintStep "Install Prometheus Stack."
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        ! HasHelmRepo prometheus-community && helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo update
         helm install prometheus-stack prometheus-community/kube-prometheus-stack --create-namespace -n monitoring \
             --set grafana.ingress.enabled=true \
@@ -810,7 +818,7 @@ then
     }
 
     PrintStep "Deploy MLAppDeploy Service."
-    helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
+    ! HasHelmRepo mlappdeploy && helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
     helm repo update
     if [ $RESET ]
     then
@@ -831,10 +839,10 @@ then
     do
         HELM_OPTIONS+="--set $KEY=${HELM_ARGS[$KEY]} "
     done
-    kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
+    kubectl apply secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
 
     ColorEcho "Deploy MLAppDeploy service."
-    helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad $HELM_OPTIONS $ADDITIONAL_LABELS $SERVICEMONITOR_NAMESPACE
+    echo helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad $HELM_OPTIONS $ADDITIONAL_LABELS $SERVICEMONITOR_NAMESPACE
 
 
 
