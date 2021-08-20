@@ -236,7 +236,7 @@ function HasHelmRepo {
     COUNT_NAME=$(helm repo list -o json | jq .[].name -r | grep -e ^${VALUE}$ | wc -l)
     COUNT_REPO=$(helm repo list -o json | jq .[].url -r | grep -e ^${VALUE}$ | wc -l)
     COUNT=$((COUNT_NAME+COUNT_REPO))
-    return [ $COUNT -ne 0 ]
+    [ $COUNT -ne 0 ] && return 0 || return 1
 }
 
 # Usage/Help
@@ -807,14 +807,14 @@ then
         KEYS=$(echo $JSON | jq keys[] -r)
         for KEY in $KEYS
         do
-            ADDITIONAL_LABELS+="--set dcgm-exporter.serviceMonitor.additionalLabels.$KEY=$(echo $JSON | jq .$KEY -r) "
+            HELM_ARGS[dcgm-exporter.serviceMonitor.additionalLabels.$KEY]=$(echo $JSON | jq .$KEY -r)
         done
 
         # dcgm-exporter.serviceMonitor.namespace
         JSON_NAMES=$(kubectl get prometheus -A -l app=kube-prometheus-stack-prometheus -o jsonpath="{.items[*].spec.serviceMonitorNamespaceSelector.matchNames}")
         NAMES_COUNT=$(echo $JSON_NAMES | jq length)
         [ ${NAMES_COUNT:-0} -gt 0 ] && {
-            SERVICEMONITOR_NAMESPACE="--set dcgm-exporter.serviceMonitor.namespace=$(echo $JSON_NAMES | jq .[0] -r)"
+            HELM_ARGS[dcgm-exporter.serviceMonitor.namespace]=$(echo $JSON_NAMES | jq .[0] -r)
         }
     }
 
@@ -827,7 +827,7 @@ then
         INSTANCE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-name}")
         NAMESPACE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-namespace}")
         helm uninstall -n $NAMESPACE $INSTANCE
-        #kubectl delete secret regcred
+        kubectl delete secret regcred
     fi
 
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/api-server
@@ -843,7 +843,7 @@ then
     kubectl apply secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
 
     ColorEcho "Deploy MLAppDeploy service."
-    echo helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad $HELM_OPTIONS $ADDITIONAL_LABELS $SERVICEMONITOR_NAMESPACE
+    echo helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad --set imagePullSecrets={regcred} $HELM_OPTIONS
 
 
 
