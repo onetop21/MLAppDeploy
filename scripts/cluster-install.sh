@@ -437,6 +437,7 @@ elif [ $BUILD ]; then
     fi
 
 elif [ $DEPLOY ]; then
+    LOADBALANCER=1  # Default
     declare -A HELM_ARGS_OVERRIDE
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
     OPTIONS=$(getopt -o brh --long registry:,ingress:,monitoring,set:,beta,config:,reset,help -- "$@")
@@ -454,10 +455,11 @@ elif [ $DEPLOY ]; then
                 LOADBALANCER=1
                 ;;
             np|nodeport)
-                NODEPORT=1
+                unset LOADBALANCER
                 ;;
             *)
-                ColorEcho WARN "Not support ingress type [$1]."
+                [ ${1:0:2} == "--" ] && unshift \
+                    || ColorEcho WARN "Not support ingress type [$1]."
                 ;;
             esac
             ;;
