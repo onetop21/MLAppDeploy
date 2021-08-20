@@ -649,6 +649,7 @@ then
                 fi
             fi
             export KUBECONFIG=$HOME/.kube/config
+            chmod 600 $HOME/.kube/config
             kubectl config set-context default
         else
             ColorEcho "Already installed kubernetes."
