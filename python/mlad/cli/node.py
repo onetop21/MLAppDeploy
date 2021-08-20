@@ -1,16 +1,14 @@
-import sys, os
-import requests
-from pathlib import Path
+import sys
 from mlad.cli.libs import utils
-from mlad.cli.libs import interrupt_handler
+from mlad.cli import config as config_core
 from mlad.api import API
-from mlad.api.exception import APIError, NotFound
+from mlad.api.exception import APIError
 from mlad.core import exception as CoreException
 from mlad.core.kubernetes import controller as ctlr
 
 
 def list(no_trunc):
-    config = utils.read_config()
+    config = config_core.get()
     api = API(config.mlad.address, config.mlad.session)
     try:
         nodes = [api.node.inspect(_) for _ in api.node.get()]
@@ -32,7 +30,6 @@ def list(no_trunc):
 
 
 def enable(ID):
-    config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.enable_node(ID, cli)
@@ -46,7 +43,6 @@ def enable(ID):
 
 
 def disable(ID):
-    config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.disable_node(ID, cli)
@@ -60,7 +56,6 @@ def disable(ID):
 
 
 def label_add(node, **kvs):
-    config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.add_node_labels(node, cli, **kvs)
@@ -74,7 +69,6 @@ def label_add(node, **kvs):
 
 
 def label_rm(node, *keys):
-    config = utils.read_config()
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
         ctlr.remove_node_labels(node, cli, *keys)
@@ -88,7 +82,7 @@ def label_rm(node, *keys):
 
 
 def resource(nodes, no_trunc):
-    config = utils.read_config()
+    config = config_core.get()
     api = API(config.mlad.address, config.mlad.session)
     try:
         res = api.node.resource(nodes)
@@ -115,13 +109,12 @@ def resource(nodes, no_trunc):
             free = status['allocatable']
             if not no_trunc:
                 capacity = round(capacity, 1)
-                used = round(used, 1) if not used == None else 'NotReady'
+                used = round(used, 1) if used is not None else 'NotReady'
                 free = round(free, 1)
             else:
-                used = status['used'] if not used == None else 'NotReady'
+                used = status['used'] if used is not None else 'NotReady'
             percentage = int(free / capacity * 100) if capacity else 0
             type = get_unit(type)
             columns.append((node if not i else '', type, capacity, used,
                             f'{free}({percentage}%)'))
     utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)
-

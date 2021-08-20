@@ -25,24 +25,15 @@ HOME = str(Path.home())
 CONFIG_PATH = f'{Path.home()}/.mlad'
 CONFIG_FILE = f'{CONFIG_PATH}/config.yml'
 COMPLETION_FILE = f'{CONFIG_PATH}/completion.sh'
-PROJECT_FILE_ENV_KEY='MLAD_PRJFILE'
+PROJECT_FILE_ENV_KEY = 'MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
 DEFAULT_PLUGIN_FILE = 'mlad-plugin.yml'
-
-
-def generate_empty_config():
-    if not os.path.exists(CONFIG_PATH):
-        os.makedirs(CONFIG_PATH, exist_ok=True)
-    if not os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'w') as f:
-            f.write('')
 
 
 def create_session_key():
     user = getuser()
     hostname = socket.gethostname()
-    admin = auth_admin()
-    payload = {"user":user, "hostname": hostname, "uuid": str(uuid.uuid4())}
+    payload = {"user": user, "hostname": hostname, "uuid": str(uuid.uuid4())}
     encode = jwt.encode(payload, "mlad", algorithm="HS256")
     return encode
 
@@ -59,10 +50,6 @@ def project_key(workspace):
     return hash(workspace).hex
 
 
-def has_config():
-    return os.path.exists(CONFIG_FILE)
-
-
 def read_config():
     try:
         return OmegaConf.load(CONFIG_FILE)
@@ -71,9 +58,6 @@ def read_config():
               file=sys.stderr)
         sys.exit(1)
 
-
-def write_config(config):
-    OmegaConf.save(config=config, f=CONFIG_FILE)
 
 
 def get_completion(shell='bash'):
@@ -344,5 +328,3 @@ def get_username(session):
         return decoded["user"]
     else:
         raise RuntimeError("Session key is invalid.")
-
-

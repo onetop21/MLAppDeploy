@@ -1,9 +1,8 @@
 import sys
 import os
 import omegaconf
-import click
 
-from typing import Optional, Dict, Callable
+from typing import Optional, Dict, Callable, List
 from pathlib import Path
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
@@ -50,10 +49,19 @@ def _find_context(name: str, config: Optional[Config] = None, index: bool = Fals
     return None
 
 
-def add(name: str, address: str) -> Context:
+def add(name: str, address: str, allow_duplicate=False) -> Context:
 
-    if _find_context(name) is not None:
-        raise ContextAlreadyExistError(name)
+    config = _load()
+    duplicated_index = _find_context(name, config=config, index=True)
+    if duplicated_index is not None:
+        if not allow_duplicate:
+            raise ContextAlreadyExistError(name)
+        elif utils.prompt('Change the existing session key (Y/N)?', 'N') == 'Y':
+            session = utils.create_session_key()
+        else:
+            session = config.contexts[duplicated_index].session
+    else:
+        session = utils.create_session_key()
     address = utils.parse_url(address)['url']
     registry_address = 'https://docker.io'
     warn_insecure = False
@@ -70,6 +78,7 @@ def add(name: str, address: str) -> Context:
 
     base_config = OmegaConf.from_dotlist([
         f'name={name}',
+        f'session={session}',
         f'apiserver.address={address}',
         f'docker.registry.address={registry_address}',
         f'docker.registry.namespace={registry_namespace}'
@@ -91,10 +100,13 @@ def add(name: str, address: str) -> Context:
     db_config = _parse_datastore('db', _db_initializer, _db_finalizer, db_prompts)
 
     context = OmegaConf.merge(base_config, s3_config, db_config)
-    config = _load()
-    config.contexts.append(context)
+    if duplicated_index is not None:
+        config.contexts[duplicated_index] = context
+    else:
+        config.contexts.append(context)
     if config.current is None:
         config.current = name
+
     _save(config)
 
     if warn_insecure:
@@ -220,19 +232,27 @@ def _s3_finalizer(datastore: StrDict) -> StrDict:
     return datastore
 
 
-def _datastore_s3_translator(kind, key, value):
-    if key == 'endpoint':
-        return f'S3_ENDPOINT={value}'
-    elif key == 'verify':
-        return [f'S3_USE_HTTPS={1 if value else 0}', 'S3_VERIFY_SSL=0']
-    elif key == 'accesskey':
-        return f'AWS_ACCESS_KEY_ID={value}'
-    elif key == 'secretkey':
-        return f'AWS_SECRET_ACCESS_KEY={value}'
-    elif key == 'region':
-        return f'AWS_REGION={value}'
-    else:
-        return f'{kind.upper()}_{key.upper()}={value}'
+def get_env(context: Context) -> List[str]:
+    envs = []
+    for k, v in context['datastore']['s3'].items():
+        if k == 'endpoint':
+            envs.append(f'S3_ENDPOINT={v}')
+        elif k == 'verify':
+            envs.append(f'S3_USE_HTTPS={1 if v else 0}')
+            envs.append('S3_VERIFY_SSL=0')
+        elif k == 'accesskey':
+            envs.append(f'AWS_ACCESS_KEY_ID={v}')
+        elif k == 'secretkey':
+            envs.append(f'AWS_SECRET_ACCESS_KEY={v}')
+        elif k == 'region':
+            envs.append(f'AWS_REGION={v}')
+        else:
+            envs.append(f'S3_{k.upper()}={v}')
+
+    for k, v in context['datastore']['db'].items():
+        envs.append(f'DB_{k.upper()}={v}')
+    envs = sorted(envs)
+    return envs
 
 
 def _db_initializer() -> StrDict:

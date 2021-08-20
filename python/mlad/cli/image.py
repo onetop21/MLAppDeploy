@@ -12,6 +12,7 @@ from mlad.core.default import project as default_project
 from mlad.core.default import plugin as default_plugin
 from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
+from mlad.cli import config as config_core
 from mlad.cli.libs import utils
 from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
@@ -54,7 +55,7 @@ def list(all, plugin, tail, no_trunc):
         print(f'This project has {untagged} untagged images. To free disk spaces up by cleaning gabage images.') 
 
 def build(quiet, plugin, no_cache, pull):
-    config = utils.read_config()
+    config = config_core.get()
     cli = ctlr.get_api_client()
     
     manifest_type = 'plugin' if plugin else 'project'
@@ -186,7 +187,7 @@ def build(quiet, plugin, no_cache, pull):
 
 def search(keyword):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    config = utils.read_config()
+    config = config_core.get()
     try:
         images = []
         catalog = json.loads(requests.get(f"http://{config['docker']['registry']}/v2/_catalog", verify=False).text)
@@ -238,4 +239,3 @@ def prune(all):
         print(f'{reclaimed:.2f}{unit_list[unit]} Space Reclaimed.')
     else:
         print('Already cleared.', file=sys.stderr)
-

@@ -3,12 +3,11 @@ import uvicorn
 from mlad import __version__
 from mlad.service.libs import utils
 
-from fastapi import FastAPI, Depends, Header
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.logger import logger
-from mlad.service.routers import image, service, project, node, auth
-from mlad.service.auth import Authorization
+from mlad.service.routers import service, project, node
 from mlad.service.libs.auth import generate_admin_token
+from mlad.core.default.config import service_config
 
 '''
 # 인증 (Admin 전용)
@@ -80,16 +79,16 @@ def create_app():
     app.include_router(project.router, prefix=APIV1)
 
     print(f"Admin Token  : {generate_admin_token().decode()}")
-    print(f"Orchestrator : 'Kubernetes'")
-    print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}") 
+    print("Orchestrator : 'Kubernetes'")
+    print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}")
     print(f'Prefix       : {root_path}')
     return app
 
+
 app = create_app()
 
-#Run by 'python -m mlad.service'
+
 if __name__ == '__main__':
-    config = utils.read_config()
-    uvicorn.run(app, host=config['server']['host'],
-                port=config['server']['port'],
-                debug=config['server']['debug'])
+    uvicorn.run(app, host=service_config['host'],
+                port=service_config['port'],
+                debug=service_config['debug'])
