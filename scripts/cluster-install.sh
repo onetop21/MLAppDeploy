@@ -233,10 +233,10 @@ function IsDeployed {
 
 function HasHelmRepo {
     VALUE=$1
-    COUNT=(($(helm repo list -o json | jq .[].name -r | grep -e ^${VALUE}$ | wc -l)+\
-        $(helm repo list -o json | jq .[].url -r | grep -e ^${VALUE}$ | wc -l)))
-    >&2 echo COUNT=$VALUE:$COUNT
-    return [ $COUNT -ne 0]
+    COUNT_NAME=$(helm repo list -o json | jq .[].name -r | grep -e ^${VALUE}$ | wc -l)
+    COUNT_REPO=$(helm repo list -o json | jq .[].url -r | grep -e ^${VALUE}$ | wc -l)
+    COUNT=$((COUNT_NAME+COUNT_REPO))
+    return [ $COUNT -ne 0 ]
 }
 
 # Usage/Help
@@ -803,7 +803,7 @@ then
     # Find dcgm-exporter.serviceMonitor.additionalLabels and dcgm-exporter.serviceMonitor.namespace values
     [ $DCGM ] && IsDeployed deploy app=kube-prometheus-stack-operator && {
         # dcgm-exporter.serviceMonitor.additionalLabels
-        JSON=$(kubectl get prometheus -n monitoring -l app=kube-prometheus-stack-prometheus -o jsonpath="{.items[*].spec.serviceMonitorSelector.matchLabels}")
+        JSON=$(kubectl get prometheus -A -l app=kube-prometheus-stack-prometheus -o jsonpath="{.items[*].spec.serviceMonitorSelector.matchLabels}")
         KEYS=$(echo $JSON | jq keys[] -r)
         for KEY in $KEYS
         do
@@ -811,8 +811,9 @@ then
         done
 
         # dcgm-exporter.serviceMonitor.namespace
-        JSON_NAMES=$(kubectl get prometheus -n monitoring -l app=kube-prometheus-stack-prometheus -o jsonpath="{.items[*].spec.serviceMonitorNamespaceSelector.matchNames}")
-        [ $(jq length) -gt 0 ] && {
+        JSON_NAMES=$(kubectl get prometheus -A -l app=kube-prometheus-stack-prometheus -o jsonpath="{.items[*].spec.serviceMonitorNamespaceSelector.matchNames}")
+        NAMES_COUNT=$(echo $JSON_NAMES | jq length)
+        [ ${NAMES_COUNT:-0} -gt 0 ] && {
             SERVICEMONITOR_NAMESPACE="--set dcgm-exporter.serviceMonitor.namespace=$(echo $JSON_NAMES | jq .[0] -r)"
         }
     }
