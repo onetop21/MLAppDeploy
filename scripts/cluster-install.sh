@@ -827,7 +827,7 @@ then
         INSTANCE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-name}")
         NAMESPACE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-namespace}")
         helm uninstall -n $NAMESPACE $INSTANCE
-        kubectl delete secret regcred
+        kubectl delete secret regcred -n mlad
     fi
 
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/api-server
@@ -840,10 +840,10 @@ then
     do
         HELM_OPTIONS+="--set $KEY=${HELM_ARGS[$KEY]} "
     done
-    kubectl apply secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
 
     ColorEcho "Deploy MLAppDeploy service."
-    echo helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad --set imagePullSecrets={regcred} $HELM_OPTIONS
+    helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+    kubectl create secret -n mlad generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
 
 
 
