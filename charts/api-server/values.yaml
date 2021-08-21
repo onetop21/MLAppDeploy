@@ -88,9 +88,6 @@ ingress:
   hosts:
     - paths:
       - path: /
-        backend:
-          serviceName: mlad-service
-          servicePort: 8440
           
 tls: []
 #  - secretName: chart-example-tls

@@ -774,10 +774,12 @@ then
         PrintStep "Install Ingress-NGINX."
         ! HasHelmRepo ingress-nginx && helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
         helm repo update
-        [ $LOADBALANCER ] && ( \
+        [ $LOADBALANCER ] && \
             helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx || \
             helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx --set controller.service.type=NodePort
-        )
+        ColorEcho INFO "Wait few minutes for available ingress controller."
+        kubectl wait --for=condition=available --timeout=600s -n ingress-nginx deployment.apps/ingress-nginx-controller || \
+            ColorEcho ERROR "Timeout waiting for ingress controller."
     fi
 
     # Install Prometheus Stack
@@ -821,17 +823,16 @@ then
     PrintStep "Deploy MLAppDeploy Service."
     ! HasHelmRepo mlappdeploy && helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
     helm repo update
-    if [ $RESET ]
+
+    if [ $BETA ]
     then
-        ColorEcho "Remove installed previous service."
-        INSTANCE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-name}")
-        NAMESPACE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-namespace}")
-        helm uninstall -n $NAMESPACE $INSTANCE
-        kubectl delete secret regcred -n mlad
+        HELM_ARGS[ingress.annotations.nginx\.ingress\.kubernetes\.io/rewrite-target]='/$2'
+        HELM_ARGS[ingress.host[0].path[0].path]='/beta(/|$)(.*)'
+        HELM_ARGS[env.ROOT_PATH]='/beta'
     fi
 
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/api-server
-    VERSION=$(docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
+    VERSION=$(sudo docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
     TAGGED_IMAGE=$IMAGE_NAME:$VERSION
     HELM_ARGS[image.repository]=$TAGGED_IMAGE
 
@@ -840,6 +841,15 @@ then
     do
         HELM_OPTIONS+="--set $KEY=${HELM_ARGS[$KEY]} "
     done
+
+    if [ $RESET ]
+    then
+        ColorEcho "Remove installed previous service."
+        INSTANCE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-name}")
+        NAMESPACE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-namespace}")
+        helm uninstall -n $NAMESPACE $INSTANCE
+        kubectl delete secret regcred -n mlad
+    fi
 
     ColorEcho "Deploy MLAppDeploy service."
     helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
