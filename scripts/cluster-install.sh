@@ -1,5 +1,6 @@
 #!/bin/bash
 
+PROJECT_NAME=MLAppDeploy
 K3S_VERSION=v1.20.9+k3s1
 
 if [ -f $0 ]; then
@@ -715,6 +716,9 @@ then
 elif [ $DEPLOY ]
 then
     GetPrivileged
+    
+    INSTANCE=${PROJECT_NAME,,}
+    NAMESPACE=${PROJECT_NAME,,}
 
     if ! IsInstalledCluster
     then
@@ -824,17 +828,23 @@ then
     ! HasHelmRepo mlappdeploy && helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
     helm repo update
 
+    SELECTOR=app.kubernetes.io/instance=$INSTANCE,app.kubernetes.io/name=api-server
+    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/api-server
+    VERSION=$(sudo docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
+    HELM_ARGS[image.repository]=$IMAGE_NAME
+    HELM_ARGS[image.tag]=$VERSION
+
     if [ $BETA ]
     then
+        SELECTOR+=',app.kubernetes.io/beta'
+        INSTANCE+='-beta'
+        HELM_ARGS[additionalLabels.app\.kubernetes\.io/beta]=true
         HELM_ARGS[ingress.annotations.nginx\.ingress\.kubernetes\.io/rewrite-target]='/$2'
         HELM_ARGS[ingress.host[0].path[0].path]='/beta(/|$)(.*)'
         HELM_ARGS[env.ROOT_PATH]='/beta'
+        HELM_ARGS[image.tag]=latest
     fi
-
-    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/api-server
-    VERSION=$(sudo docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
-    TAGGED_IMAGE=$IMAGE_NAME:$VERSION
-    HELM_ARGS[image.repository]=$TAGGED_IMAGE
+    (IsDeployed deploy $SELECTOR) && ROLLOUT=1
 
     # Generate Options
     for KEY in ${!HELM_ARGS[@]}
@@ -845,19 +855,21 @@ then
     if [ $RESET ]
     then
         ColorEcho "Remove installed previous service."
-        INSTANCE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-name}")
-        NAMESPACE=$(kubectl get -A deploy -l app.kubernetes.io/name=api-server -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-namespace}")
-        helm uninstall -n $NAMESPACE $INSTANCE
-        kubectl delete secret regcred -n mlad
+        (   # Scope
+            NAMESPACE=$(kubectl get -A deploy -l $SELECTOR -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-namespace}")
+            [ $NAMESPACE ] && helm uninstall -n $NAMESPACE $INSTANCE
+        )
     fi
 
     ColorEcho "Deploy MLAppDeploy service."
-    helm install mlappdeploy mlappdeploy/api-server --create-namespace -n mlad --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
-    kubectl create secret -n mlad generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
-
-
-
-
+    if [ $ROLLOUT ]
+    then
+        helm update $INSTANCE mlappdeploy/api-server -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+    else
+        helm install $INSTANCE mlappdeploy/api-server --create-namespace -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+    fi
+    kubectl create secret -n $NAMESPACE generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson \
+        --save-config --dry-run=client -o yaml | kubectl apply -f -
 
     exit 1
 

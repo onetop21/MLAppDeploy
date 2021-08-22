@@ -48,6 +48,9 @@ Selector labels
 {{- define "mlappdeploy.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "mlappdeploy.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- if .Values.labels }}
+{{ toYaml . }}
+{{- end }}
 {{- end }}
 
 {{/*

@@ -39,6 +39,8 @@ imagePullSecrets: []
 nameOverride: "api-server"
 fullnameOverride: ""
 
+additionLabels:
+
 env:
   MLAD_DEBUG: 1
   MLAD_KUBE: 1
