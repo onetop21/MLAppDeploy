@@ -20,22 +20,22 @@ def test_next():
     for index in range(5):
         mock.add(f'next-{index}')
     config = context._load()
-    assert config.current == 'next-0'
+    assert config['current-context'] == 'next-0'
     for index in range(5):
         context.next()
         config = context._load()
-        config.current == f'next-{(index + 1) % 5}'
+        config['current-context'] == f'next-{(index + 1) % 5}'
 
 
 def test_prev():
     for index in range(5):
         mock.add(f'prev-{index}')
     config = context._load()
-    assert config.current == 'prev-0'
+    assert config['current-context'] == 'prev-0'
     for index in range(5):
         context.next()
         config = context._load()
-        config.current == f'prev-{(5 - index) % 5}'
+        config['current-context'] == f'prev-{(5 - index) % 5}'
 
 
 def test_invalid_use():

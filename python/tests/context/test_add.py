@@ -171,6 +171,8 @@ def test_allow_duplicate():
             }
         }
     }
-    context_dict = OmegaConf.to_object(context.add('test-allow-duplicate', inputs[0], allow_duplicate=True))
+    context_dict = OmegaConf.to_object(
+        context.add('test-allow-duplicate', inputs[0], allow_duplicate=True)
+    )
     del context_dict['session']
     assert expected == context_dict

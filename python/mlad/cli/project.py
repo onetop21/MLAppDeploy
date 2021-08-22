@@ -85,7 +85,7 @@ def init(name, version, maintainer):
 def list(no_trunc):
     config = config_core.get()
     projects = {}
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     try:
         networks = api.project.get()
     except APIError as e:
@@ -145,7 +145,7 @@ def list(no_trunc):
 
 def status(all, no_trunc):
     config = config_core.get()
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
@@ -224,7 +224,8 @@ def status(all, no_trunc):
 def run(with_build):
     project = utils.get_project(default_project)
 
-    if with_build: build(False, True)
+    if with_build:
+        build(False, True)
 
     print('Deploying test container image to local...')
     config = config_core.get()
@@ -232,7 +233,7 @@ def run(with_build):
     cli = ctlr.get_api_client()
     base_labels = core_utils.base_labels(
             utils.get_workspace(), 
-            config.mlad.session,
+            config.session,
             project['project'])
     project_key = base_labels['MLAD.PROJECT']
     
@@ -286,7 +287,7 @@ def run(with_build):
 def up(services):
     config = config_core.get()
     cli = ctlr.get_api_client()
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     project = utils.get_project(default_project)
 
     base_labels = core_utils.base_labels(
@@ -417,7 +418,7 @@ def down(services, no_dump):
     project_key = utils.project_key(utils.get_workspace())
     workdir = utils.get_project(default_project)['project']['workdir']
 
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
@@ -609,7 +610,7 @@ def down_force(services, no_dump):
 def logs(tail, follow, timestamps, names_or_ids):
     config = config_core.get()
     project_key = utils.project_key(utils.get_workspace())
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     # Block not running.
     try:
         project = api.project.inspect(project_key)
@@ -633,7 +634,7 @@ def logs(tail, follow, timestamps, names_or_ids):
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
     config = config_core.get()
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = api.project.inspect(project_key)

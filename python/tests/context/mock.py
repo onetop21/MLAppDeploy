@@ -10,7 +10,7 @@ origin_stdin = None
 
 
 def setup():
-    context.CTX_PATH = './tests/context.yml'
+    context.CTX_PATH = './tests/config.yml'
     Path('./tests').mkdir(exist_ok=True, parents=True)
     OmegaConf.save(config=context.boilerplate, f=context.CTX_PATH)
     global origin_stdin
@@ -18,7 +18,7 @@ def setup():
 
 
 def teardown():
-    context.CTX_PATH = f'{context.MLAD_HOME_PATH}/context.yml'
+    context.CTX_PATH = f'{context.MLAD_HOME_PATH}/config.yml'
     shutil.rmtree('./tests')
     global origin_stdin
     sys.stdin = origin_stdin

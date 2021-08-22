@@ -20,7 +20,7 @@ def test_use():
     mock.add('use')
     context.use('use')
     config = context._load()
-    assert config.current == 'use'
+    assert config['current-context'] == 'use'
 
 
 def test_invalid_use():

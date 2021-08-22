@@ -13,16 +13,13 @@ from mlad.cli.exceptions import (
 
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
-DIR_PATH = f'{MLAD_HOME_PATH}/contexts'
-REF_PATH = f'{MLAD_HOME_PATH}/context_ref.yml'
-CTX_PATH = f'{MLAD_HOME_PATH}/context.yml'
-Path(DIR_PATH).mkdir(exist_ok=True, parents=True)
+CTX_PATH = f'{MLAD_HOME_PATH}/config.yml'
 Config = omegaconf.Container
 Context = omegaconf.Container
 StrDict = Dict[str, str]
 
 boilerplate = {
-    'current': None,
+    'current-context': None,
     'contexts': []
 }
 
@@ -104,8 +101,8 @@ def add(name: str, address: str, allow_duplicate=False) -> Context:
         config.contexts[duplicated_index] = context
     else:
         config.contexts.append(context)
-    if config.current is None:
-        config.current = name
+    if config['current-context'] is None:
+        config['current-context'] = name
 
     _save(config)
 
@@ -123,17 +120,17 @@ def use(name: str) -> Context:
     if context is None:
         raise NotExistContextError(name)
 
-    config.current = name
+    config['current-context'] = name
     _save(config)
     return context
 
 
 def _switch(direction: int = 1) -> str:
     config = _load()
-    if config.current is None:
+    if config['current-context'] is None:
         raise NotExistContextError('Any Contexts')
     n_contexts = len(config.contexts)
-    index = _find_context(config.current, config=config, index=True)
+    index = _find_context(config['current-context'], config=config, index=True)
     next_index = (index + direction) % n_contexts
     name = config.contexts[next_index].name
     use(name)
@@ -153,7 +150,7 @@ def delete(name: str) -> None:
     index = _find_context(name, config=config, index=True)
     if index is None:
         raise NotExistContextError(name)
-    elif config.current == config.contexts[index].name:
+    elif config['current-context'] == config.contexts[index].name:
         raise CannotDeleteContextError
     else:
         del config.contexts[index]
@@ -163,7 +160,7 @@ def delete(name: str) -> None:
 def get(name: Optional[str] = None) -> Context:
     config = _load()
     if name is None:
-        name = config.current
+        name = config['current-context']
 
     context = _find_context(name, config=config)
     if context is None:
@@ -194,7 +191,7 @@ def ls():
     names = [context.name for context in config.contexts]
     table = [('  NAME',)]
     for name in names:
-        table.append([f'  {name}' if config.current != name else f'* {name}'])
+        table.append([f'  {name}' if config['current-context'] != name else f'* {name}'])
     utils.print_table(table, 'There are no contexts.', 0)
 
 

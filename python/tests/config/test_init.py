@@ -14,4 +14,4 @@ def teardown_function():
 def test_init():
     mock.init()
     config = context._load()
-    assert config.current == 'default'
+    assert config['current-context'] == 'default'

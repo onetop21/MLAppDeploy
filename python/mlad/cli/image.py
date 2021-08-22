@@ -65,7 +65,7 @@ def build(quiet, plugin, no_cache, pull):
     # Generate Base Labels
     base_labels = core_utils.base_labels(
         utils.get_workspace(), 
-        config.mlad.session,
+        config.session,
         manifest[manifest_type], 
         manifest_type
     )
@@ -190,11 +190,12 @@ def search(keyword):
     config = config_core.get()
     try:
         images = []
-        catalog = json.loads(requests.get(f"http://{config['docker']['registry']}/v2/_catalog", verify=False).text)
+        registry_address = config.docker.registry.address
+        catalog = json.loads(requests.get(f"http://{registry_address}/v2/_catalog", verify=False).text)
         if 'repositories' in catalog:
             repositories = catalog['repositories']
             for repository in repositories:
-                tags = json.loads(requests.get(f'http://{config["docker"]["registry"]}/v2/{repository}/tags/list', verify=False).text)
+                tags = json.loads(requests.get(f'http://{registry_address}/v2/{repository}/tags/list', verify=False).text)
                 images += [ f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags'] ] 
             found = [ item for item in filter(None, [image if keyword in image else None for image in images]) ]
 

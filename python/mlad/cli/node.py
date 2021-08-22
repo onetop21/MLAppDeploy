@@ -9,7 +9,7 @@ from mlad.core.kubernetes import controller as ctlr
 
 def list(no_trunc):
     config = config_core.get()
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     try:
         nodes = [api.node.inspect(_) for _ in api.node.get()]
     except APIError as e:
@@ -83,7 +83,7 @@ def label_rm(node, *keys):
 
 def resource(nodes, no_trunc):
     config = config_core.get()
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     try:
         res = api.node.resource(nodes)
     except APIError as e:
