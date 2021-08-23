@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
 from mlad.service.models import node
-from mlad.core import exception
+from mlad.core import exceptions
 from requests.exceptions import HTTPError
 from mlad.service.exception import exception_detail
 from mlad.service.libs.log import init_logger

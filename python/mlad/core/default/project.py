@@ -1,26 +1,46 @@
 import sys
 from mlad.core.libs import utils
 
-obj = {
-    'project': {
-        'name': 'Unknown',
-        'version': '0.0',
-        'maintainer': 'Unknown',
-        'workdir': './', 
-    },
+workspace_default = {
+    'apiVersion': 'v1',
+    'name': 'Unknown',
+    'version': '0.0.1',
+    'maintainer': 'Unknown',
+    'workdir': './',
     'workspace': {
+        'kind': 'Workspace',
         'base': 'python:latest',
-        'prescripts': [],
-        'postscripts': [],
-        'requires': {},
+        'preps': [],
+        'script': '',
         'env': {
             'PYTHONUNBUFFERED': 1
         },
-        'ignore': [ '**/.*' ],
+        'ignores': ['**/.*'],
         'command': '',
         'arguments': '',
     },
-    'services': {}
+    'ingress': {},
+    'app': {}
 }
 
-sys.modules[__name__] = lambda x: utils.update_obj(obj, x) 
+dockerfile_default = {
+    'apiVersion': 'v1',
+    'name': 'Unknown',
+    'version': '0.0.1',
+    'maintainer': 'Unknown',
+    'workdir': './',
+    'workspace': {
+        'kind': 'Dockerfile',
+        'ignores': ['**/.*'],
+    },
+    'ingress': {},
+    'app': {}
+}
+
+
+def update(x):
+    kind = x['workspace'].get('kind', 'Workspace')
+    return utils.update_obj(workspace_default if kind == 'Workspace' else dockerfile_default, x)
+
+
+sys.modules[__name__] = lambda x: update(x)

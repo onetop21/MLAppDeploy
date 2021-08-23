@@ -1,30 +1,20 @@
 import sys
 
-FORMAT='''# MLAppDeploy Dockerfile
+FORMAT = '''
 FROM {BASE}
 MAINTAINER {MAINTAINER}
 
-# Environments
 {ENVS}
 
-# Working directory
 WORKDIR /workspace
 
-# Pre Scripts
-RUN {PRESCRIPTS}
+{PREPS}
 
-# Requires
-{REQUIRES}
-
-# Copy projects
 COPY . .
 
-#Post Scripts
-RUN {POSTSCRIPTS}
+RUN {SCRIPT}
 
-# Entrypoint
 CMD {COMMAND}
-
 '''
 
 sys.modules[__name__] = FORMAT

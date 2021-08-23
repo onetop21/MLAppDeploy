@@ -10,7 +10,7 @@ from mlad.service.exception import InvalidProjectError, InvalidServiceError, \
     InvalidLogRequest, InvalidSessionError, exception_detail
 from mlad.service.libs import utils
 from mlad.core.kubernetes import controller as ctlr
-from mlad.core import exception
+from mlad.core import exceptions
 
 
 router = APIRouter()
