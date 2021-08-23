@@ -1,6 +1,6 @@
 questions:
 - variable: fromDockerhub
-  default: true
+  default: false
   description:  "API Server image location to pull."
   type: boolean
   required: true
@@ -11,7 +11,7 @@ questions:
   group: "NVIDIA GPU Settings: NVIDIA Device Plguin"
   label: NVIDIA Device Plugin
   description: "Deploy NVIDIA device plugin for discovery GPU devices on nodes."
-  default: false
+  default: true
   type: boolean
   show_subquestion_if: true
   subquestions:

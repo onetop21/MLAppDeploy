@@ -730,7 +730,8 @@ then
     (! IsInstalled helm) && HELM=1
     [ $INGRESS ] && (IsDeployed deploy app.kubernetes.io/name=ingress-nginx app=ingress-nginx) && unset INGRESS
     [ $MONITORING ] && (IsDeployed deploy app=kube-prometheus-stack-operator) && unset MONITORING
-    (! IsDeployed ds app.kubernetes.io/name=nvidia-device-plugin name=nvidia-device-plugin-ds app=nvidia-device-plugin-daemonset) && NVDP=1
+    (! IsDeployed ds app.kubernetes.io/name=nvidia-device-plugin name=nvidia-device-plugin-ds app=nvidia-device-plugin-daemonset ||
+     ! IsDeployed pod app.kubernetes.io/name=nvidia-device-plugin name=nvidia-device-plugin-ds app=nvidia-device-plugin-daemonset) && NVDP=1
     (! IsDeployed ds app.kubernetes.io/name=node-feature-discovery app=nfd) && NFD=1
     (! IsDeployed ds app.kubernetes.io/name=gpu-feature-discovery app=gpu-feature-discovery) && GFD=1
     (! IsDeployed ds app.kubernetes.io/component=dcgm-exporter app=nvidia-dcgm-exporter) && DCGM=1
@@ -738,23 +739,31 @@ then
     # Process Helm options
     declare -A HELM_ARGS
     [ $NVDP ] && {
-        [ "${HELM_ARGS_OVERRIDE[nvidia-device-plugine.enabled]}" == "false" ] && unset NVDP || HELM_ARGS[nvidia-device-plugin.enabled]=true
+        [ "${HELM_ARGS_OVERRIDE[nvidia-device-plugine.enabled]}" == "false" ] && \
+            HELM_ARGS[nvidia-device-plugin.enabled]=false || HELM_ARGS[nvidia-device-plugin.enabled]=true
     } || {
+        HELM_ARGS[nvidia-device-plugin.enabled]=false
         ColorEcho WARN 'Already installed NVIDIA device plugin.'
     }
     [ $NFD ] && {
-        [ "${HELM_ARGS_OVERRIDE[gpu-feature-discovery.nfd.deploy]}" == "false" ] && unset NVDP || HELM_ARGS[gpu-feature-discovery.nfd.deploy]=true
+        [ "${HELM_ARGS_OVERRIDE[gpu-feature-discovery.nfd.deploy]}" == "false" ] && \
+            HELM_ARGS[gpu-feature-discovery.nfd.deploy]=false || HELM_ARGS[gpu-feature-discovery.nfd.deploy]=true
     } || {
+        HELM_ARGS[gpu-feature-discovery.nfd.deploy]=false
         ColorEcho WARN 'Already installed node feature discovery.'
     }
     [ $GFD ] && {
-        [ "${HELM_ARGS_OVERRIDE[gpu-feature-discovery.enabled]}" == "false" ] && unset NVDP || HELM_ARGS[gpu-feature-discovery.enabled]=true
+        [ "${HELM_ARGS_OVERRIDE[gpu-feature-discovery.enabled]}" == "false" ] && \
+            HELM_ARGS[gpu-feature-discovery.enabled]=false || HELM_ARGS[gpu-feature-discovery.enabled]=true
     } || {
+        HELM_ARGS[gpu-feature-discovery.enabled]=false
         ColorEcho WARN 'Already installed gpu feature discovery.'
     }
     [ $DCGM ] && {
-        [ "${HELM_ARGS_OVERRIDE[dcgm-exporter.enabled]}" == "false" ] && unset NVDP || HELM_ARGS[dcgm-exporter.enabled]=true
+        [ "${HELM_ARGS_OVERRIDE[dcgm-exporter.enabled]}" == "false" ] && \
+            HELM_ARGS[dcgm-exporter.enabled]=false || HELM_ARGS[dcgm-exporter.enabled]=true
     } || {
+        HELM_ARGS[dcgm-exporter.enabled]=false
         ColorEcho WARN 'Already installed data center gpu monitor.'
     }
 
@@ -764,7 +773,7 @@ then
         HELM_ARGS[$KEY]=${HELM_ARGS_OVERRIDE[$KEY]}
     done
 
-    MAX_STEP=$((3+HELM+INGRESS+MONITORING+NVDP+NFD+GFD+DCGM))
+    MAX_STEP=$((3+HELM+INGRESS+MONITORING))
 
     # Install Helm
     [ $HELM ] && (
@@ -870,124 +879,4 @@ then
     fi
     kubectl create secret -n $NAMESPACE generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson \
         --save-config --dry-run=client -o yaml | kubectl apply -f -
-
-    exit 1
-
-    [ $(kubectl get ns mlad >> /dev/null 2>&1; echo $?) -eq 0 ] && IS_EXIST_NS=1
-    [ $(kubectl get deploy/mlad-service -n mlad >> /dev/null 2>&1; echo $?) -eq 0 ] && IS_RUNNING_SERVICE=1
-    [ $(kubectl get deploy/mlad-service-beta -n mlad >> /dev/null 2>&1; echo $?) -eq 0 ] && IS_RUNNING_SERVICE_BETA=1
-    if [ ! $BETA ]; then
-        if [ ! $IS_RUNNING_SERVICE ]; then
-            if [ -f mlad-service.yaml ]; then
-                ColorEcho "Deploy MLAppDeploy service."
-                kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
-                mkdir -p .temp
-                cp mlad-service.yaml .temp/
-                pushd .temp
-                rm kustomization.yaml >> /dev/null 2>&1
-                kustomize create --resources mlad-service.yaml
-                kustomize edit set image ghcr.io/onetop21/mlappdeploy/service=$TAGGED_IMAGE
-                popd
-                kubectl apply -k .temp
-            else
-                # Deploy script from stream. (No have script on local.)
-                mkdir -p /tmp/mlad-service
-                pushd /tmp/mlad-service
-                rm kustomization.yaml >> /dev/null 2>&1
-                kustomize create --resources https://raw.githubusercontent.com/onetop21/MLAppDeploy/master/scripts/mlad-service.yaml
-                kustomize edit set image ghcr.io/onetop21/mlappdeploy/service=$TAGGED_IMAGE
-                popd
-                kubectl apply -k /tmp/mlad-service
-            fi
-        else
-            ColorEcho INFO "Rolling Update..."
-            kubectl -n mlad set image deployment/mlad-service mlad-service=$TAGGED_IMAGE --record
-            kubectl -n mlad rollout restart deployment/mlad-service
-            kubectl -n mlad rollout status deployment/mlad-service
-        fi
-        if [[ "$?" == "0" ]]; then
-            ColorEcho INFO "Wait to activate MLAppDeploy service...(up to 2mins)"
-            kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service
-            if [[ "$?" != "0" ]]; then
-                ColorEcho ERROR "Cannot verify to deploy MLAppDeploy Service."
-                exit 1
-            fi
-            while [[ -z "$TOKEN_LOG" ]]; do
-                sleep 1
-                TOKEN_LOG=$(kubectl logs -n mlad deploy/mlad-service 2>&1 | head -n1)
-            done
-            ColorEcho INFO $TOKEN_LOG
-        else
-            ColorEcho ERROR "Failed to deploy MLApploy Service."
-        fi
-    else
-        if [ -f mlad-service-beta.yaml ]; then
-            if [ ! $IS_RUNNING_SERVICE_BETA ]; then
-                ColorEcho "Deploy MLAppDeploy service."
-                kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
-                mkdir -p .temp
-                cp mlad-service-beta.yaml .temp/
-                pushd .temp
-                rm kustomization.yaml >> /dev/null 2>&1
-                kustomize create --resources mlad-service-beta.yaml
-                kustomize edit set image ghcr.io/onetop21/mlappdeploy/service=$IMAGE_NAME
-                popd
-                kubectl apply -k .temp
-            else
-                ColorEcho INFO "Rolling Update..."
-                kubectl -n mlad set image deployment/mlad-service-beta mlad-service-beta=$IMAGE_NAME --record
-                kubectl -n mlad rollout restart deployment/mlad-service-beta
-                kubectl -n mlad rollout status deployment/mlad-service-beta
-            fi
-        else
-            ColorEcho WARN "Beta service deployment only supports git clone status."
-        fi
-        if [[ "$?" == "0" ]]; then
-            ColorEcho INFO "Wait to activate MLAppDeploy beta service...(up to 2mins)"
-            kubectl wait --for=condition=available --timeout=120s -n mlad deploy/mlad-service-beta
-            if [[ "$?" != "0" ]]; then
-                ColorEcho ERROR "Cannot verify to deploy MLAppDeploy Beta Service."
-                exit 1
-            fi
-            while [[ -z "$TOKEN_LOG" ]]; do
-                sleep 1
-                TOKEN_LOG=$(kubectl logs -n mlad deploy/mlad-service-beta 2>&1 | head -n1)
-            done
-            ColorEcho INFO $TOKEN_LOG
-        else
-            ColorEcho ERROR "Failed to deploy MLApploy Beta Service."
-        fi
-    fi
-    if [ $(kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?) -eq 0 ]; then
-        TYPE=$(kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath={.spec.type})
-        NODEPORT=$(kubectl -n ingress-nginx get -o jsonpath="{.spec.ports[0].nodePort}" services ingress-nginx-controller)
-        NODES=$(kubectl get nodes -o jsonpath='{ $.items[*].status.addresses[?(@.type=="InternalIP")].address }')
-        if [[ "$TYPE" == "LoadBalancer" ]]; then
-            LB_ADDRS=$(kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[*]['hostname','ip']}")
-            for LB_ADDR in $LB_ADDRS; do
-                if [[ "$LB_ADDR" == "localhost" ]]; then
-                    LB_ADDR=$(HostIP)
-                fi
-                if [ ! $BETA ]; then
-                    ColorEcho INFO "Service Address : http://$LB_ADDR"
-                else
-                    ColorEcho INFO "Service Address : http://$LB_ADDR/beta"
-                fi
-            done
-        elif [[ "$TYPE" == "NodePort" ]]; then
-            for NODE in $NODES; do 
-                if [[ $(curl --connect-timeout 1 -s $NODE:$NODEPORT >> /dev/null 2>&1; echo $?) == "0" ]]; then
-                    if [ ! $BETA ]; then
-                        ColorEcho INFO "Service Address : http://$NODE:$NODEPORT"
-                    else
-                        ColorEcho INFO "Service Address : http://$NODE:$NODEPORT/beta"
-                    fi
-                fi
-            done
-        else
-            ColorEcho WARN "Not supported ingress service type."
-        fi
-    else
-        ColorEcho ERROR "Failed to get LoadBalancer IP."
-    fi
 fi
