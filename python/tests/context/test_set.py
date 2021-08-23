@@ -44,8 +44,9 @@ def test_set():
             }
         }
     }
-    ctx = context.get('test1')
-    assert expected == OmegaConf.to_object(ctx)
+    context_dict = OmegaConf.to_object(context.get('test1'))
+    del context_dict['session']
+    assert expected == context_dict
 
 
 def test_invalid_set():

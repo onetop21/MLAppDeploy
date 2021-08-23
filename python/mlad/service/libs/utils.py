@@ -1,24 +1,25 @@
 import sys
 import os
-from omegaconf import OmegaConf
-from functools import lru_cache
 from mlad.core.default import config as default_config
+from mlad.cli import config as config_core
 
 CONFIG_FILE = os.environ.get('MLAD_CONFIG_PATH', '/config.yaml')
 
-@lru_cache(maxsize=None)
+
 def read_config():
     try:
-        config = OmegaConf.load(CONFIG_FILE)
-    except FileNotFoundError as e:
+        config = config_core.get()
+    except Exception:
         config = {}
     return default_config['service'](config)
+
 
 def is_debug_mode():
     config = read_config()
     if '-d' in sys.argv or '--debug' in sys.argv or os.environ.get('MLAD_DEBUG', config['mlad']['debug']):
         return True
     return False
+
 
 def is_kube_mode():
     config = read_config()

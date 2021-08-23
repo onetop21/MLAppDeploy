@@ -7,6 +7,7 @@ import requests
 import docker
 from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
+from mlad.cli import config as config_core
 from mlad.cli.libs import utils
 from mlad.cli.Format import (
     DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT,
@@ -157,16 +158,17 @@ def _obtain_workspace_payload(workspace, maintainer):
 
 def search(keyword):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    config = utils.read_config()
+    config = config_core.get()
     try:
         images = []
-        catalog = json.loads(requests.get(f"http://{config['docker']['registry']}/v2/_catalog", verify=False).text)
+        registry_address = config.docker.registry.address
+        catalog = json.loads(requests.get(f"http://{registry_address}/v2/_catalog", verify=False).text)
         if 'repositories' in catalog:
             repositories = catalog['repositories']
             for repository in repositories:
-                tags = json.loads(requests.get(f'http://{config["docker"]["registry"]}/v2/{repository}/tags/list', verify=False).text)
-                images += [f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags']]
-            found = [item for item in filter(None, [image if keyword in image else None for image in images])]
+                tags = json.loads(requests.get(f'http://{registry_address}/v2/{repository}/tags/list', verify=False).text)
+                images += [ f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags'] ] 
+            found = [ item for item in filter(None, [image if keyword in image else None for image in images]) ]
 
             columns = [('REPOSITORY', 'TAG')]
             for item in found:

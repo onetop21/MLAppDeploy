@@ -51,8 +51,9 @@ def test_valid_input():
             }
         }
     }
-    assert expected == OmegaConf.to_object(context.add('test-valid', inputs[0]))
-    assert expected == context._find_context('test-valid')
+    context_dict = OmegaConf.to_object(context.add('test-valid', inputs[0]))
+    del context_dict['session']
+    assert context_dict == expected
 
 
 def test_valid_input2():
@@ -88,8 +89,9 @@ def test_valid_input2():
             }
         }
     }
-    assert expected == OmegaConf.to_object(context.add('test-valid2', inputs[0]))
-    assert expected == context._find_context('test-valid2')
+    context_dict = OmegaConf.to_object(context.add('test-valid2', inputs[0]))
+    del context_dict['session']
+    expected == context_dict
 
 
 def test_invalid_input():
@@ -132,3 +134,45 @@ def test_dupilicate():
     mock.add('test')
     with pytest.raises(ContextAlreadyExistError):
         mock.add('test')
+
+
+def test_allow_duplicate():
+    mock.add('test-allow-duplicate')
+    inputs = [
+        'https://ncml-dev.cloud.ncsoft.com',
+        'Y',
+        'https://harbor.sailio.ncsoft.com',
+        '',
+        'http://localhost:9000',
+        'us-west-1',
+        'minioadmin',
+        'minioadmin',
+        'mongodb://localhost:27017',
+        '',
+        ''
+    ]
+    sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
+    expected = {
+        'name': 'test-allow-duplicate',
+        'apiserver': {'address': inputs[0]},
+        'docker': {'registry': {'address': inputs[2], 'namespace': None}},
+        'datastore': {
+            's3': {
+                'endpoint': inputs[4],
+                'region': inputs[5],
+                'accesskey': inputs[6],
+                'secretkey': inputs[7],
+                'verify': False
+            },
+            'db': {
+                'address': inputs[8],
+                'username': None,
+                'password': None
+            }
+        }
+    }
+    context_dict = OmegaConf.to_object(
+        context.add('test-allow-duplicate', inputs[0], allow_duplicate=True)
+    )
+    del context_dict['session']
+    assert expected == context_dict

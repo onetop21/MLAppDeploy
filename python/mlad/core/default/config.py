@@ -4,20 +4,6 @@ import uuid
 from distutils.util import strtobool
 from omegaconf import OmegaConf
 
-client_config = {
-    'mlad': {
-        'address': 'http://localhost:8440',
-        'session': ''
-    },
-    'docker': {
-        'registry': {
-            'address': 'https://docker.io',
-            'namespace': ''
-        }
-    },
-    'datastore': {
-    }
-}
 
 service_config = {
     'docker': {
@@ -42,6 +28,5 @@ service_config = {
 }
 
 sys.modules[__name__] = {
-    'client': lambda x: OmegaConf.merge(OmegaConf.create(client_config), x),
     'service': lambda x: OmegaConf.merge(OmegaConf.create(service_config), x),
 }

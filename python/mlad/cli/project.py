@@ -24,6 +24,7 @@ from mlad.cli.libs import datastore as ds
 from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
 from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
+from mlad.cli import config as config_core
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
 
@@ -82,9 +83,9 @@ def init(name, version, maintainer):
 
 
 def list(no_trunc):
-    config = utils.read_config()
+    config = config_core.get()
     projects = {}
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     try:
         networks = api.project.get()
     except APIError as e:
@@ -143,8 +144,8 @@ def list(no_trunc):
 
 
 def status(all, no_trunc):
-    config = utils.read_config()
-    api = API(config.mlad.address, config.mlad.session)
+    config = config_core.get()
+    api = API(config.apiserver.address, config.session)
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
@@ -223,21 +224,22 @@ def status(all, no_trunc):
 def run(with_build):
     project = utils.get_project(default_project)
 
-    if with_build: build(False, True)
+    if with_build:
+        build(False, True)
 
     print('Deploying test container image to local...')
-    config = utils.read_config()
+    config = config_core.get()
 
     cli = ctlr.get_api_client()
     base_labels = core_utils.base_labels(
             utils.get_workspace(), 
-            config.mlad.session,
+            config.session,
             project['project'])
     project_key = base_labels['MLAD.PROJECT']
     
     with interrupt_handler(message='Wait.', blocked=True) as h:
         try:
-            extra_envs = ds.get_env(config)
+            extra_envs = config_core.get_env()
             for _ in ctlr.create_project_network(cli, base_labels, extra_envs, stream=True):
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
@@ -283,9 +285,9 @@ def run(with_build):
 
 
 def up(services):
-    config = utils.read_config()
+    config = config_core.get()
     cli = ctlr.get_api_client()
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     project = utils.get_project(default_project)
 
     base_labels = core_utils.base_labels(
@@ -358,7 +360,7 @@ def up(services):
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
     credential = encoded.decode()
 
-    extra_envs = ds.get_env(default_config['client'](config))
+    extra_envs = config_core.get_env()
 
     if not services:
         res = api.project.create(project['project'], base_labels,
@@ -412,11 +414,11 @@ def up(services):
 
 
 def down(services, no_dump):
-    config = utils.read_config()
+    config = config_core.get()
     project_key = utils.project_key(utils.get_workspace())
     workdir = utils.get_project(default_project)['project']['workdir']
 
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     # Block duplicated running.
     try:
         inspect = api.project.inspect(project_key=project_key)
@@ -504,7 +506,6 @@ def down(services, no_dump):
 
 def down_force(services, no_dump):
     '''down project using local k8s for admin'''
-    config = utils.read_config()
     cli = k8s_ctlr.get_api_client(context=k8s_ctlr.get_current_context())
     project_key = utils.project_key(utils.get_workspace())
     workdir = utils.get_project(default_project)['project']['workdir']
@@ -607,9 +608,9 @@ def down_force(services, no_dump):
 
 
 def logs(tail, follow, timestamps, names_or_ids):
-    config = utils.read_config()
+    config = config_core.get()
     project_key = utils.project_key(utils.get_workspace())
-    api = API(config.mlad.address, config.mlad.session)
+    api = API(config.apiserver.address, config.session)
     # Block not running.
     try:
         project = api.project.inspect(project_key)
@@ -632,8 +633,8 @@ def logs(tail, follow, timestamps, names_or_ids):
 
 def scale(scales):
     scale_spec = dict([ scale.split('=') for scale in scales ])
-    config = utils.read_config()
-    api = API(config.mlad.address, config.mlad.session)
+    config = config_core.get()
+    api = API(config.apiserver.address, config.session)
     project_key = utils.project_key(utils.get_workspace())
     try:    
         project = api.project.inspect(project_key)
@@ -651,7 +652,3 @@ def scale(scales):
             print(f'Service scale updated: {service}')
         else:
             print(f'Invalid service name: {service}')
-
-    
-    
-

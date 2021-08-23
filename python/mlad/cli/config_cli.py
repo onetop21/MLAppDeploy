@@ -1,39 +1,58 @@
-import sys
 import os
-import getpass
 import click
+from omegaconf import OmegaConf
 from mlad.cli import config
 from mlad.cli.libs import utils
-from mlad.cli.autocompletion import *
+from mlad.cli.autocompletion import get_config_key_completion
 
-# mlad config init
-# mlad config set [key=value]
-# mlad config get [key]
 
 @click.command()
-@click.option('--address', '-a', default='http://localhost:8440', prompt='MLAppDeploy Service Address', help='Set service address')
+@click.option('--address', '-a', default='http://localhost:8440',
+              prompt='MLAppDeploy Service Address', help='Set service address')
 def init(address):
     '''Initialize configurations'''
-    config.init(address)
+    try:
+        ret = config.init(address)
+        click.echo('Config created successfully.')
+        click.echo(OmegaConf.to_yaml(ret))
+    except Exception as e:
+        click.echo(e)
+
 
 @click.command()
-@click.argument('VAR', required=True, nargs=-1, autocompletion=get_config_key_completion)
-def set(var):
+@click.argument('ARGS', required=True, nargs=-1, autocompletion=get_config_key_completion)
+def set(args):
     '''Set configurations. [KEY=VALUE]...'''
-    config.set(*var) 
+    try:
+        config.set(*args)
+        click.echo('The config is successfully configured.')
+    except Exception as e:
+        click.echo(e)
+
 
 @click.command()
-@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
-@click.argument('KEY', required=False, autocompletion=get_config_key_completion)
-def get(no_trunc, key):
+def get():
     '''Get configurations'''
-    config.get(key, no_trunc)
+    try:
+        ret = config.get()
+        click.echo(OmegaConf.to_yaml(ret))
+    except Exception as e:
+        click.echo(e)
+
 
 @click.command()
 @click.option('--unset', '-u', is_flag=True)
 def env(unset):
     '''To set environment variables, run "eval $(mlad config env)"'''
-    config.env(unset)
+    try:
+        lines, msg = config.env(unset=unset)
+        for line in lines:
+            click.echo(line)
+        click.echo('')
+        click.echo(msg)
+    except Exception as e:
+        click.echo(e)
+
 
 @click.command()
 @click.option('--install', is_flag=True, help='Install shell-completion to shell(Linux Only)')
@@ -51,21 +70,14 @@ def completion(install):
     else:
         click.echo(f'Cannot support shell [{shell}].\nSupported Shell: bash, zsh')
 
-@click.command()
-@click.argument('KIND', required=False)
-def datastore(kind):
-    '''Set configurations for data storage'''
-    config.datastore(kind)
 
 @click.group('config')
 def cli():
     '''Manage configuration'''
 
+
 cli.add_command(init)
-cli.add_command(datastore)
 cli.add_command(set)
 cli.add_command(get)
 cli.add_command(env)
 cli.add_command(completion)
-
-#sys.modules[__name__] = config
