@@ -68,12 +68,22 @@ x-definitions:
         required: true
       script:
         type: string
-        excludes: dockerfile
+        excludes: [filePath, ignorePath]
         required: true
-      dockerfile:
+      ignores:                    # Describe exclude files from project.
+        type: list
+        default:
+          - "**/.*"
+        schema:                   # Describe script run after copy files.
+          type: string
+        excludes: [filePath, ignorePath]
+      filePath:
         type: string
-        excludes: script
+        excludes: [script, ignores]
         required: true
+      ignorePath:
+        type: string
+        excludes: [script, ignores]
   - definition: &ingress
       target:
         type: string
