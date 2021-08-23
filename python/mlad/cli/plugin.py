@@ -15,7 +15,7 @@ from mlad.core.docker import controller as ctlr
 from mlad.core.default import config as default_config
 from mlad.core.default import project as default_project
 from mlad.core.default import plugin as default_plugin
-from mlad.core import exception
+from mlad.core import exceptions
 from mlad.core.libs import utils as core_utils
 from mlad.cli.libs import utils
 from mlad.cli.libs import datastore as ds

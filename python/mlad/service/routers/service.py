@@ -2,7 +2,7 @@ import json
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
 from fastapi.responses import StreamingResponse
-from mlad.core.exception import APIError
+from mlad.core.exceptions import APIError
 from mlad.service.models import service
 from mlad.service.exception import InvalidProjectError,InvalidServiceError, \
     InvalidSessionError, exception_detail

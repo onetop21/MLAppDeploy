@@ -43,3 +43,19 @@ def handle_k8s_api_error(e):
             msg = str(e)
             status = 500
     return msg, status
+
+
+
+class NetworkAlreadyExistError(Exception):
+    
+    def __init__(self, key: str):
+        self.key = key
+
+    def __str__(self):
+        return f'Already exist the project network, key: [{self.key}]'
+
+
+class DockerError(Exception):
+
+    def __str__(self):
+        return 'Invalid docker environment, please install a docker daemon.'

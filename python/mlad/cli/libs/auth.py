@@ -1,7 +1,7 @@
 import os
 from functools import lru_cache
 from mlad.core.kubernetes.controller import get_current_context
-from mlad.core.exception import APIError
+from mlad.core.exceptions import APIError
 
 
 @lru_cache(maxsize=None)

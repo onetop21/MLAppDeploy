@@ -3,7 +3,7 @@ from mlad.cli.libs import utils
 from mlad.cli import config as config_core
 from mlad.api import API
 from mlad.api.exception import APIError
-from mlad.core import exception as CoreException
+from mlad.core import exceptions as CoreException
 from mlad.core.kubernetes import controller as ctlr
 
 

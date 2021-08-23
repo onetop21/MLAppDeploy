@@ -9,7 +9,7 @@ from typing import Dict, List
 import docker
 import requests
 import requests_unixsocket
-from mlad.core import exception
+from mlad.core import exceptions
 from mlad.core.libs import utils
 from mlad.core.docker.logs import LogHandler, LogCollector
 from mlad.core.default import project_service as service_default
@@ -517,20 +517,27 @@ def remove_services(cli, services, timeout=0xFFFF):
         removed &= service_removed
     return removed
 
+
 # Image Control
 def get_images(cli, project_key=None, extra_labels=[]):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, docker.client.DockerClient):
+        raise TypeError('Parameter is not valid type.')
 
-    filters = f'MLAD.PROJECT'
-    if project_key: filters+= f"={project_key}"
-    return cli.images.list(filters={ 'label': [filters] + extra_labels } )
+    filters = 'MLAD.PROJECT'
+    if project_key:
+        filters += f"={project_key}"
+    return cli.images.list(filters={'label': [filters] + extra_labels})
+
 
 def get_image(cli, image_id):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, docker.client.DockerClient):
+        raise TypeError('Parameter is not valid type.')
     return cli.images.get(image_id)    
 
+
 def inspect_image(image):
-    if not isinstance(image, docker.models.images.Image): raise TypeError('Parameter is not valid type.')
+    if not isinstance(image, docker.models.images.Image):
+        raise TypeError('Parameter is not valid type.')
     headed = len([_ for _ in image.tags if _.endswith('latest')]) > 0
     labels = {
         # for Manifest
@@ -556,9 +563,6 @@ def build_image(cli, base_labels, tar, dockerfile, no_cache=False, pull=False, s
     # Setting path and docker file
     #os.getcwd() + "/.mlad/"
     #temporary
-    project_base = base_labels['MLAD.PROJECT.BASE']
-    project_name = base_labels['MLAD.PROJECT.NAME']
-    username = base_labels['MLAD.PROJECT.USERNAME']
     latest_name = base_labels['MLAD.PROJECT.IMAGE']
 
     headers = get_auth_headers(cli)
@@ -752,4 +756,3 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         print('Cannot find running containers.', file=sys.stderr)
     handler.release()
-
