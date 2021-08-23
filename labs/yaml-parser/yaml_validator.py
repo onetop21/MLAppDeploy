@@ -5,10 +5,16 @@ import cerberus
 warnings.simplefilter("ignore", UserWarning)
 
 class Validator(cerberus.Validator):
+    def _validate_description(self, constraint, field, value):
+        pass
+    
     def _validate_selector(self, constraint, field, value):
         del self.schema[field]['selector']
-        document = copy.deepcopy(self.document)
+        recent_error = None
         for _ in reversed(constraint):
-            self.schema[field]['schema'] = _
-            if self.validate(document): return
-            if cerberus.Validator({'kind': _['kind']}).validate({'kind': value.get('kind')}): return
+            validator = cerberus.Validator(_)
+            if validator.validate(value): 
+                self.schema[field]['schema'] = _
+                return 
+            recent_error = validator._errors
+        self._error(recent_error)

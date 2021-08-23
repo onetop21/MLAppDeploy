@@ -13,14 +13,14 @@ with open(sys.argv[1]) as f:
 with open(sys.argv[2]) as f:
     document = load(f)
 
-print('Document.')
+print("Document.")
 pprint(document, sort_dicts=False)
 v = Validator(schema)
 if v.validate(document):
-    print('Verified.')
-    pprint(v.document, sort_dicts=False)
-    with open('output.yaml', 'w') as f:
-        f.write(dump(v.document))
+    print("Verified.")
+    pprint(v.normalized(document), sort_dicts=False)
+    with open("output.yaml", "w") as f:
+        f.write(dump(v.normalized(document)))
 else:
     print("Errors:", v.errors)
     sys.exit(1)
