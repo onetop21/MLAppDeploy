@@ -26,7 +26,3 @@ service_config = {
         'user': str(uuid.uuid4()),
     },
 }
-
-sys.modules[__name__] = {
-    'service': lambda x: OmegaConf.merge(OmegaConf.create(service_config), x),
-}
