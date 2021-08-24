@@ -821,29 +821,15 @@ def prune_images(cli, project_key=None):
 
 def push_images(cli, project_key, stream=False):
     return docker_controller.push_images(docker.from_env(), project_key, stream)
- 
 
-def get_nodes(cli = DEFAULT_CLI):
+
+def get_nodes(cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
-    return dict(
-        [(_.metadata.name, _.metadata) for _ in api.list_node().items]
-    )
+    return {node.metadata.name: node for node in api.list_node().items}
 
-
-def get_node(node_key, cli = DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-
-    api = client.CoreV1Api(cli)
-    nodes = api.list_node(field_selector=f"metadata.name={node_key}")
-    if nodes.items: 
-        return nodes.items[0]
-    else:
-        #print(f'Cannot find node "{node_key}"', file=sys.stderr)
-        raise exceptions.NotFound(f'Cannot find node "{node_key}"')
 
 def inspect_node(node):
     if not isinstance(node, client.models.v1_node.V1Node):
@@ -1123,10 +1109,11 @@ def get_node_resources(node, cli = None):
     if cli is None :
         cli = DEFAULT_CLI
     else:
-        if not isinstance(cli, client.api_client.ApiClient): raise \
-            TypeError('Parameter is not valid type.')
-
-    if not isinstance(node, client.models.v1_node.V1Node): raise TypeError('Parameter is not valid type.')
+        if not isinstance(cli, client.api_client.ApiClient):
+            raise TypeError('Parameter is not valid type.')
+    print(node)
+    if not isinstance(node, client.models.v1_node.V1Node):
+        raise TypeError('Parameter is not valid type.')
 
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
