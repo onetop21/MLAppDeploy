@@ -2,10 +2,7 @@ from typing import List
 from fastapi import APIRouter, Query, HTTPException
 from mlad.service.models import image
 from mlad.service.libs import utils
-if not utils.is_kube_mode():
-    from mlad.core.docker import controller as ctlr
-else:
-    from mlad.core.kubernetes import controller as ctlr
+from mlad.core.kubernetes import controller as ctlr
 
 router = APIRouter()
 

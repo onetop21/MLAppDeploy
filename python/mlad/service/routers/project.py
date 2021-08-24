@@ -5,7 +5,6 @@ from fastapi import APIRouter, Query, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
 from starlette.types import Receive
 from mlad.service.models import project
-from mlad.service.auth import Authorization
 from mlad.service.exception import InvalidProjectError, InvalidServiceError, \
     InvalidLogRequest, InvalidSessionError, exception_detail
 from mlad.service.libs import utils
@@ -14,7 +13,6 @@ from mlad.core import exceptions
 
 
 router = APIRouter()
-user = Authorization('user')
 
 
 def _check_session_key(project, session, cli):
