@@ -13,16 +13,11 @@ service_config = {
         'config': '~/.kube/config'
     },
     'mlad': {
-        'orchestrator': 'swarm',
         'debug': False
     },
     'server': {
         'host': os.environ.get('HOST', '0.0.0.0'),
         'port': int(os.environ.get('PORT', 8440)),
         'debug': bool(strtobool(os.environ.get('DEBUG', 'True'))),
-    },
-    'auth_keys': {
-        'admin': str(uuid.uuid4()),
-        'user': str(uuid.uuid4()),
-    },
+    }
 }
