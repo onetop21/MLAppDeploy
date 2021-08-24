@@ -6,10 +6,7 @@ from requests.exceptions import HTTPError
 from mlad.service.exception import exception_detail
 from mlad.service.libs.log import init_logger
 from mlad.service.libs import utils
-if not utils.is_kube_mode():
-    from mlad.core.docker import controller as ctlr
-else:
-    from mlad.core.kubernetes import controller as ctlr
+from mlad.core.kubernetes import controller as ctlr
 
 
 router = APIRouter()

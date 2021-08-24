@@ -20,10 +20,3 @@ def is_debug_mode():
             'MLAD_DEBUG', service_config['mlad']['debug']):
         return True
     return False
-
-
-def is_kube_mode():
-    if '-k' in sys.argv or '--kube' in sys.argv or os.environ.get(
-            'MLAD_KUBE', service_config['mlad']['orchestrator'].lower()=='kube'):
-        return True
-    return False
