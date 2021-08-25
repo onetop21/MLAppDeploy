@@ -10,7 +10,7 @@ def activate() -> None:
     cli.containers.run(
         '172.19.153.144:5000/mlad/board:latest',
         environment=[
-            f'MLAD_ACCESS={config.apiserver.address}'
+            f'MLAD_ACCESS={config.apiserver.address}',
             f'MLAD_SESSION={config.session}'
         ],
         name='mlad-board',
