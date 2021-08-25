@@ -11,7 +11,7 @@ def list(no_trunc):
     config = config_core.get()
     api = API(config.apiserver.address, config.session)
     try:
-        nodes = [api.node.inspect(_) for _ in api.node.get()]
+        nodes = api.node.list()
     except APIError as e:
         print(e)
         sys.exit(1)
@@ -81,11 +81,11 @@ def label_rm(node, *keys):
     print('Removed.')
 
 
-def resource(nodes, no_trunc):
+def resource(names=None, no_trunc=False):
     config = config_core.get()
     api = API(config.apiserver.address, config.session)
     try:
-        res = api.node.resource(nodes)
+        res = api.node.resource(names)
     except APIError as e:
         print(e)
         sys.exit(1)
@@ -101,7 +101,7 @@ def resource(nodes, no_trunc):
             res = f'{type}(#)'
         return res
 
-    for node, resources in res.items():
+    for name, resources in res.items():
         for i, type in enumerate(resources):
             status = resources[type]
             capacity = status['capacity']
@@ -115,6 +115,11 @@ def resource(nodes, no_trunc):
                 used = status['used'] if used is not None else 'NotReady'
             percentage = int(free / capacity * 100) if capacity else 0
             type = get_unit(type)
-            columns.append((node if not i else '', type, capacity, used,
-                            f'{free}({percentage}%)'))
+            columns.append([name if not i else '', type, capacity, used,
+                            f'{free} ({percentage}%)'])
+        max_print_length = max([len(column[-1]) for column in columns])
+        for column in columns[1:]:
+            free_text, percentage_text = column[-1].split(' ')
+            space_size = max_print_length - len(free_text) - len(percentage_text)
+            column[-1] = f'{free_text}{" " * space_size}{percentage_text}'
     utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)

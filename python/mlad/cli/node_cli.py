@@ -42,11 +42,11 @@ def rm(id, key):
 
 
 @click.command()
-@click.argument('nodes', nargs=-1, required=False)
+@click.argument('NAMES', nargs=-1, required=False)
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
-def resource(nodes, no_trunc):
+def resource(names, no_trunc):
     '''Show resource status of nodes'''
-    node.resource(nodes, no_trunc)
+    node.resource(names=names, no_trunc=no_trunc)
 
 
 @click.group()
