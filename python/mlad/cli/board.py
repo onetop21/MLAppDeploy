@@ -16,9 +16,13 @@ def activate() -> None:
         name='mlad-board',
         auto_remove=True,
         ports={'2021/tcp': '2021'},
+        labels=['mlad-board'],
         detach=True)
 
 
 def deactivate() -> None:
-    container = cli.containers.get('mlad-board')
-    container.stop()
+    containers = cli.containers.list(filters={
+        'label': 'mlad-board'
+    })
+    for container in containers:
+        container.stop()
