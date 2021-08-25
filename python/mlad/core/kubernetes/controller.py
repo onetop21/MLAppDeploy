@@ -5,8 +5,6 @@ import json
 import uuid
 from collections import defaultdict
 import docker
-from kubernetes.client import models
-import requests
 from mlad.core import exceptions
 from mlad.core.exceptions import NetworkAlreadyExistError
 from mlad.core.libs import utils
@@ -1108,10 +1106,9 @@ def parse_cpu(str_cpu):
 def get_node_resources(node, cli = None):
     if cli is None :
         cli = DEFAULT_CLI
-    else:
-        if not isinstance(cli, client.api_client.ApiClient):
-            raise TypeError('Parameter is not valid type.')
-    print(node)
+    elif not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    
     if not isinstance(node, client.models.v1_node.V1Node):
         raise TypeError('Parameter is not valid type.')
 
