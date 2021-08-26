@@ -37,3 +37,9 @@ class InvalidPropertyError(Exception):
 
     def __str__(self):
         return f'There is no matched key in "{self._arg}".'
+
+
+class MLADBoardNotActivatedError(Exception):
+
+    def __str__(self):
+        return 'The MLAD dashboard is not activated'

@@ -1,6 +1,7 @@
 import docker
 
 from mlad.cli import config as config_core
+from mlad.cli.exceptions import MLADBoardNotActivatedError
 
 cli = docker.from_env()
 
@@ -26,3 +27,17 @@ def deactivate() -> None:
     })
     for container in containers:
         container.stop()
+
+
+def install(file_path: str, no_build: bool) -> None:
+    try:
+        cli.containers.get('mlad-board')
+    except docker.errors.NotFound:
+        raise MLADBoardNotActivatedError
+
+
+def uninstall(name: str) -> None:
+    try:
+        cli.containers.get('mlad-board')
+    except docker.errors.NotFound:
+        raise MLADBoardNotActivatedError
