@@ -7,6 +7,7 @@ from mlad.cli import project_cli as project
 from mlad.cli import plugin_cli as plugin
 from mlad.cli import node_cli as node
 from mlad.cli import context_cli as context
+from mlad.cli import board_cli as board
 from mlad.cli.autocompletion import get_project_file_completion
 from mlad.cli.libs.auth import auth_admin
 
@@ -55,6 +56,7 @@ else:
 main.add_command(image.cli, 'image')
 main.add_command(project.cli, 'project')
 main.add_command(plugin.cli, 'plugin')
+main.add_command(board.cli, 'board')
 
 main.add_dummy_command()
 main.add_dummy_command('\b\bPrefer:')
