@@ -50,5 +50,5 @@ def load(file):
         return _data
     return drop_recursive(yaml.load(sub_load(file), Loader=Loader))
 
-def dump(content):
-    return yaml.dump(content, Dumper=Dumper, default_flow_style=False)
+def dump(doc):
+    return yaml.dump(doc, Dumper=Dumper, default_flow_style=False)

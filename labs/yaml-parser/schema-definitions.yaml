@@ -5,20 +5,26 @@ x-definitions:
         type: string
         regex: "v[0-9]+"
         default: v1
+        description: Schema version for MLAppDeploy project.
+        order: 0
       name: 
         type: string
         required: true
         empty: false
+        order: 1
       version: 
         type: string
         regex: "[0-9]+\\.[0-9]+\\.[0-9]+"
         default: 0.0.1
+        order: 2
       maintainer:
         type: string
         default: ${USER}
+        order: 3
       workdir:                    # Describe workspace directory.
         type: string
         default: .
+        order: 4
   - definition: &workspace
       kind: 
         type: string
@@ -58,7 +64,7 @@ x-definitions:
         default:
           PYTHONUNBUFFERED: 1       
       command:                    # Describe application to execute
-        type: string
+        type: [string, list]
       args:                       # Describe arguments for execute application
         type: [string, list]
   - definition: &dockerfile
@@ -107,13 +113,9 @@ x-definitions:
         schema:
           type: integer
       command:                    # Describe command to need overwrite.
-        anyof: 
-          - type: string
-          - type: list
+        type: [string, list]
       args:                       # Describe arguments to need overwrite.
-        anyof: 
-          - type: string
-          - type: list
+        type: [string, list]
       mounts:
         type: list
         schema:
@@ -172,7 +174,6 @@ x-definitions:
                 regex: "[0-9]+[GMK]?[i]?"
           requests:
             type: dict
-            required: true
             schema:
               cpu:
                 type: number

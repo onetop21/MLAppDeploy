@@ -18,9 +18,9 @@ pprint(document, sort_dicts=False)
 v = Validator(schema)
 if v.validate(document):
     print("Verified.")
-    pprint(v.normalized(document), sort_dicts=False)
-    with open("output.yaml", "w") as f:
-        f.write(dump(v.normalized(document)))
+    pprint(v.ordered(v.normalized(document)), sort_dicts=False)
+    # with open("output.yaml", "w") as f:
+    #     f.write(dump(v.ordered(v.normalized(document))))
 else:
     print("Errors:", v.errors)
     sys.exit(1)
