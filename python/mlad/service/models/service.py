@@ -21,8 +21,8 @@ class Component(BaseModel):
     image: Optional[str] = None
     env: Optional[dict] = None
     ports: Optional[list] = None
-    command: Optional[str] = None
-    args: Optional[str] = None
+    command: Optional[Union[list, str]] = None
+    args: Optional[Union[list, str]] = None
     ports: Optional[list] = None
     mounts: Optional[list] = None
     ingress: Optional[Ingress] = None

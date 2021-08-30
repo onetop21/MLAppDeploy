@@ -750,8 +750,10 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
         # Check running already
         if get_services(project_info['key'], extra_filters={'MLAD.PROJECT.SERVICE': name}, cli=cli):
             raise exceptions.Duplicated('Already running service.')
-    
+
+        kind = service['kind']
         image = service['image'] or image_name
+
         env = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         env += [f"{key}={service['env'][key]}" for key in service['env'].keys()] \
             if service['env'] else []
@@ -761,39 +763,28 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
         env += [f"PROJECT_KEY={project_info['key']}"]
         env += [f"PROJECT_ID={project_info['id']}"]
         env += [f"SERVICE={name}"]
-        #env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
-        command = f"{service['command']} {service['args']}".strip()
-        labels = copy.copy(network_labels)
+        env += ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}',
+                'NODE_HOSTNAME={{.Node.Hostname}}']
+        envs = [client.V1EnvVar(name=_.split('=', 1)[0], value=_.split('=', 1)[1])
+               for _ in env]
+
+        command = []
+        if service['command']:
+            command += service['command'] if isinstance(service['command'], list) \
+                else service['command'].split()
+        if service['args']:
+            command += service['args'] if isinstance(service['args'], list) \
+                else service['args'].split()
+
+        labels = copy.copy(network_labels) or {}
         labels.update(extra_labels)
         labels['MLAD.PROJECT.SERVICE'] = name
 
         constraints = service['constraints']
         ingress = service['ingress'] if 'ingress' in service else None
         mounts = service['mounts'] or []
-        kind = service['kind']
-        
-        # Try to run
-        inst_name = f"{project_base}-{name}"
-        kwargs = {
-            'name': inst_name,
-            #hostname=f'{name}.{{{{.Task.Slot}}}}',
-            'image': image, 
-            'env': env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}',
-                          'NODE_HOSTNAME={{.Node.Hostname}}'],
-            'mounts': ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
-                      + mounts,
-            'command': command.split(),
-            'container_labels': labels,
-            'labels': labels,
-            'networks': [{'Target': namespace, 'Aliases': [name]}],
-            'constraints': constraints,
-        }
-
-        envs = [client.V1EnvVar(name=_.split('=', 1)[0], value=_.split('=', 1)[1])
-               for _ in env]
-        command = kwargs.get('command', [])
-        labels = kwargs.get('labels', {})
-        mounts = kwargs.get('mounts', [])
+        mounts += ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
+        inst_name = f"{project_base}-{name}" # TBD
 
         config_labels['MLAD.PROJECT.SERVICE'] = name
         config_labels['MLAD.PROJECT.SERVICE.KIND'] = kind
