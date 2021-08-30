@@ -2,6 +2,7 @@ import os
 import socket
 import docker
 import requests
+import click
 
 from typing import List
 from omegaconf import OmegaConf
@@ -75,6 +76,7 @@ def install(file_path: str, no_build: bool) -> None:
         if isinstance(args, str):
             args = args.split(' ')
         mounts = component.get('mounts', [])
+        click.echo(f'Run the container [{app_name}]')
         cli.containers.run(
             image.tags[-1],
             environment=env,
@@ -125,7 +127,7 @@ def list():
     columns = [('ID', 'NAME', 'PORT')]
     for container, port in zip(containers, ports):
         columns.append((
-            container.shot_id,
+            container.short_id,
             container.name,
             port
         ))
