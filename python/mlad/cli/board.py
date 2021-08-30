@@ -102,7 +102,8 @@ def install(file_path: str, no_build: bool) -> None:
             detach=True)
 
         component_specs.append({
-            'name': app_name,
+            'name': spec.name,
+            'app_name': app_name,
             'hosts': [f'{host_ip}:{p}' for p in ports]
         })
 
