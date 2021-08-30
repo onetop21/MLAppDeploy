@@ -70,10 +70,10 @@ def install(file_path: str, no_build: bool) -> None:
         ports = component.get('ports', [])
         command = component.get('command', [])
         if isinstance(command, str):
-            command = [command]
+            command = command.split(' ')
         args = component.get('args', [])
         if isinstance(args, str):
-            args = [args]
+            args = args.split(' ')
         mounts = component.get('mounts', [])
         cli.containers.run(
             image.tags[-1],
