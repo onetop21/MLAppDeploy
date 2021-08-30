@@ -13,17 +13,17 @@ from mlad.core.kubernetes import controller as ctlr
 router = APIRouter()
 
 
-def _check_project_key(project_key, service, cli=None):
-    inspect_key = str(ctlr.inspect_service(cli, service)['key']).replace('-','')
+def _check_project_key(project_key, service):
+    inspect_key = str(ctlr.inspect_service(service)['key']).replace('-','')
     if project_key == inspect_key:
         return True
     else:
         raise InvalidServiceError(project_key, service.short_id)
 
 
-def _check_session_key(project_key, session, cli):
-    project = ctlr.get_project_network(cli, project_key=project_key)
-    project_session = ctlr.get_project_session(cli, project)
+def _check_session_key(project_key, session):
+    project = ctlr.get_project_network(project_key=project_key)
+    project_session = ctlr.get_project_session(project)
     if project_session == session:
         return True
     else:
@@ -33,7 +33,6 @@ def _check_session_key(project_key, session, cli):
 @router.get("/project/service")
 def services_list(labels: List[str] = Query(None),
                   session: str = Header(None)):
-    cli = ctlr.get_api_client()
     labels_dict=dict()
    
     if labels:
@@ -41,22 +40,21 @@ def services_list(labels: List[str] = Query(None),
                        for label in labels}
     inspects=[]
     try:
-        services = ctlr.get_services(cli, extra_filters=labels_dict)
+        services = ctlr.get_services(extra_filters=labels_dict)
         for service in services.values():
-            inspect = ctlr.inspect_service(cli, service)
+            inspect = ctlr.inspect_service(service)
             inspects.append(inspect)    
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return {'inspects':inspects}
+    return {'inspects': inspects}
 
 
 @router.get("/project/{project_key}/service")
 def service_list(project_key:str, 
                  labels: List[str] = Query(None),
                  session: str = Header(None)):
-    cli = ctlr.get_api_client()
     #TODO check labels validation
     #labels = ["MLAD.PROJECT", "MLAD.PROJECT.NAME=lmai"]
     labels_dict=dict()
@@ -66,14 +64,14 @@ def service_list(project_key:str,
     inspects=[] 
     try:
         key = str(project_key).replace('-','')
-        network = ctlr.get_project_network(cli, project_key=key)
+        network = ctlr.get_project_network(project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
 
-        services = ctlr.get_services(cli, key, extra_filters=labels_dict)
+        services = ctlr.get_services(key, extra_filters=labels_dict)
         for service in services.values():
-            inspect = ctlr.inspect_service(cli, service)
-            inspects.append(inspect)      
+            inspect = ctlr.inspect_service(service)
+            inspects.append(inspect)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
@@ -86,48 +84,47 @@ def service_list(project_key:str,
 def service_create(project_key:str, req:service.CreateRequest,
                    session: str = Header(None)):
     targets = req.json
-    cli = ctlr.get_api_client()
+    key = str(project_key).replace('-', '')
     try:
-        key = str(project_key).replace('-','')
-        network = ctlr.get_project_network(cli, project_key=key)
+        network = ctlr.get_project_network(project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
-        services = ctlr.create_services(cli, network, targets)
+        services = ctlr.create_services(network, targets)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except APIError as e:
         raise HTTPException(status_code=e.status_code, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return [_.metadata.uid for _ in services]
+    #return [_.metadata.uid for _ in services]
+    return [ctlr.inspect_service(_) for _ in services]
 
 
-
-@router.get("/project/{project_key}/service/{service_id}")
-def service_inspect(project_key:str, service_id:str,
+@router.get("/project/{project_key}/service/{service_name}")
+def service_inspect(project_key:str, service_name:str,
                     session: str = Header(None)):
-    cli = ctlr.get_api_client()
+    key = str(project_key).replace('-', '')
     try:
-        service = ctlr.get_service(cli, service_id=service_id)
-        key = str(project_key).replace('-','')
-        if _check_project_key(key, service, cli):
-            inspects = ctlr.inspect_service(cli, service)
+        namespace = ctlr.get_project_network(project_key=project_key).metadata.name
+        service = ctlr.get_service(service_name, namespace)
+        if _check_project_key(key, service):
+            inspect = ctlr.inspect_service(service)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return inspects
+    return inspect
 
 
-@router.get("/project/{project_key}/service/{service_id}/tasks")
-def service_tasks(project_key:str, service_id:str,
+@router.get("/project/{project_key}/service/{service_name}/tasks")
+def service_tasks(project_key:str, service_name:str,
                   session: str = Header(None)):
-    cli = ctlr.get_api_client()
+    key = str(project_key).replace('-', '')
     try:
-        service = ctlr.get_service(cli, service_id=service_id)
-        key = str(project_key).replace('-','')
-        if _check_project_key(key, service, cli):
-            tasks= ctlr.inspect_service(cli,service)['tasks']
+        namespace = ctlr.get_project_network(project_key=project_key).metadata.name
+        service = ctlr.get_service(service_name, namespace)
+        if _check_project_key(key, service):
+            tasks = ctlr.inspect_service(service)['tasks']
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
@@ -135,32 +132,31 @@ def service_tasks(project_key:str, service_id:str,
     return tasks
 
 
-@router.put("/project/{project_key}/service/{service_id}/scale")
-def service_scale(project_key:str, service_id:str, 
+@router.put("/project/{project_key}/service/{service_name}/scale")
+def service_scale(project_key:str, service_name:str,
                   req: service.ScaleRequest, session: str = Header(None)):
-    cli = ctlr.get_api_client()
     key = str(project_key).replace('-','')
     try:
-        service = ctlr.get_service(cli, service_id=service_id)
-        if _check_project_key(key, service, cli):
-            ctlr.scale_service(cli, service, req.scale_spec)
+        namespace = ctlr.get_project_network(project_key=project_key).metadata.name
+        service = ctlr.get_service(service_name, namespace)
+        if _check_project_key(key, service):
+            ctlr.scale_service(service, req.scale_spec)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return {'message':f'service {service_id} scale updated'}
+    return {'message':f'service {service_name} scale updated'}
 
 
-@router.delete("/project/{project_key}/service/{service_id}")
-def service_remove(project_key: str, service_id: str,
+@router.delete("/project/{project_key}/service/{service_name}")
+def service_remove(project_key: str, service_name: str,
                    stream: bool = Query(False),
                    session: str = Header(None)):
-    cli = ctlr.get_api_client()
     try:
-        _check_session_key(project_key, session, cli)
-        service = ctlr.get_service(cli, service_id=service_id)
-        if _check_project_key(project_key, service, cli):
-            res = ctlr.remove_services(cli, [service], stream=stream)
+        _check_session_key(project_key, session)
+        service = ctlr.get_service(name, namespace)
+        if _check_project_key(project_key, service):
+            res = ctlr.remove_services([service], stream=stream)
 
         def remove_service(gen):
             for _ in gen:
@@ -175,21 +171,22 @@ def service_remove(project_key: str, service_id: str,
     if stream:
         return StreamingResponse(remove_service(res))
     else:
-        inspect = ctlr.inspect_service(cli, service)
-        return {'message': f"service {inspect['name']} removed"}
+        inspect = ctlr.inspect_service(service)
+        return {'message': f"service {service_name} removed"}
 
 
 @router.delete("/project/{project_key}/service")
 def services_remove(project_key: str, req: service.RemoveRequest,
                     stream: bool = Query(False),
                     session: str = Header(None)):
-    cli = ctlr.get_api_client()
+    key = str(project_key).replace('-', '')
     try:
-        _check_session_key(project_key, session, cli)
-        services = [ctlr.get_service(cli, service_id=service_id)
-                    for service_id in req.services]
+        _check_session_key(project_key, session)
+        namespace = ctlr.get_project_network(project_key=project_key).metadata.name
+        services = [ctlr.get_service(name, namespace)
+                    for name in req.services]
         for service in services:
-            _check_project_key(project_key, service, cli)
+            _check_project_key(project_key, service)
 
         class disconnectHandler:
             def __init__(self):
@@ -201,7 +198,7 @@ def services_remove(project_key: str, req: service.RemoveRequest,
                     cb()
         handler = disconnectHandler() if stream else None
 
-        res = ctlr.remove_services(cli, services, handler, stream=stream)
+        res = ctlr.remove_services(services, handler, stream=stream)
 
         def remove_service(gen):
             for _ in gen:

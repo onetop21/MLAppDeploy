@@ -111,17 +111,21 @@ def get_project(default_project):
 
     # replace workdir to abspath
     project_file = get_project_file()
-    project = default_project(project)
-    path = project['project'].get('workdir', './')
+    #project = default_project(project)
+    path = project.get('workdir', './')
     if not os.path.isabs(path):
-        project['project']['workdir'] = os.path.normpath(
+        project['workdir'] = os.path.normpath(
             os.path.join(
                 os.path.dirname(project_file),
                 path
             )
         )
-    if not check_podname_syntax(project['project']['name']) or \
-            not check_podname_syntax(project['services']):
+    # if not check_podname_syntax(project['name']) or \
+    #         not check_podname_syntax(project['services']):
+    #     print('Syntax Error: Project(Plugin) and service require a name to '
+    #           'follow standard as defined in RFC1123.', file=sys.stderr)
+    #     sys.exit(1)
+    if not check_podname_syntax(project['name']):
         print('Syntax Error: Project(Plugin) and service require a name to '
               'follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)

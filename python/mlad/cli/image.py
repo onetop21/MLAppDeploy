@@ -62,13 +62,13 @@ def list(all, plugin, tail, no_trunc):
 
 
 def build(quiet: bool, no_cache: bool, pull: bool):
-    config = utils.read_config()
+    config = config_core.get()
     cli = ctlr.get_api_client()
     manifest = utils.get_manifest()
 
     # Generate Base Labels
     workspace_key = utils.get_workspace()
-    base_labels = core_utils.base_labels(workspace_key, config.mlad.session, manifest)
+    base_labels = core_utils.base_labels(workspace_key, config.session, manifest)
 
     # Prepare Latest Image
     latest_image = None
