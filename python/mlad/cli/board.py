@@ -135,7 +135,7 @@ def _obtain_host():
     s.connect(('8.8.8.8', 80))
     host = s.getsockname()[0]
     s.close()
-    return host
+    return f'http://{host}'
 
 
 def _obtain_port(container) -> List[str]:
