@@ -42,6 +42,12 @@ def deactivate() -> None:
     for container in containers:
         container.stop()
 
+    host_ip = _obtain_host()
+    res = requests.delete(f'{host_ip}:2021/mlad/component', json={
+        'name': 'mlad-board'
+    })
+    res.raise_for_status()
+
 
 def install(file_path: str, no_build: bool) -> None:
     try:
