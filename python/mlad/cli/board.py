@@ -91,7 +91,7 @@ def install(file_path: str, no_build: bool) -> None:
             'hosts': [f'{host_ip}:{p}' for p in ports]
         })
 
-        res = requests.post(f'{host_ip}:2021/component', json=body)
+        res = requests.post(f'{host_ip}:2021/mlad/component', json=body)
         res.raise_for_status()
 
 
@@ -102,7 +102,7 @@ def uninstall(name: str) -> None:
         raise MLADBoardNotActivatedError
 
     host_ip = _obtain_host()
-    res = requests.delete(f'{host_ip}:2021/component', json={
+    res = requests.delete(f'{host_ip}:2021/mlad/component', json={
         'name': name
     })
     res.raise_for_status()
