@@ -81,7 +81,7 @@ def install(file_path: str, no_build: bool) -> None:
             image.tags[-1],
             environment=env,
             name=app_name,
-            auto_remove=False,
+            auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
             mounts=mounts,
