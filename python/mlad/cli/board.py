@@ -31,7 +31,7 @@ def activate() -> None:
         name='mlad-board',
         auto_remove=True,
         ports={'2021/tcp': '2021'},
-        labels=['mlad-board'],
+        labels=['MLAD_BOARD'],
         detach=True)
 
 
