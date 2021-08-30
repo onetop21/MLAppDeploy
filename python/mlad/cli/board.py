@@ -60,7 +60,7 @@ def install(file_path: str, no_build: bool) -> None:
         image = image_core.build(False, True, False)
 
     host_ip = _obtain_host()
-    body = []
+    component_specs = []
     for app_name, component in spec.app.items():
         if 'image' in component:
             image_name = component['image']
@@ -86,12 +86,14 @@ def install(file_path: str, no_build: bool) -> None:
             labels=labels,
             detach=True)
 
-        body.append({
+        component_specs.append({
             'name': app_name,
             'hosts': [f'{host_ip}:{p}' for p in ports]
         })
 
-        res = requests.post(f'{host_ip}:2021/mlad/component', json=body)
+        res = requests.post(f'{host_ip}:2021/mlad/component', json={
+            'components': component_specs
+        })
         res.raise_for_status()
 
 
