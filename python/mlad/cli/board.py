@@ -42,7 +42,7 @@ def deactivate() -> None:
     })
 
     containers = cli.containers.list(filters={
-        'label': 'mlad-board'
+        'label': 'MLAD_BOARD'
     })
     for container in containers:
         container.stop()
@@ -55,6 +55,7 @@ def install(file_path: str, no_build: bool) -> None:
         raise MLADBoardNotActivatedError
 
     spec = OmegaConf.load(file_path)
+    labels = ['MLAD_BOARD', f'COMPONENT_NAME={spec.name}']
     if no_build:
         built_images = cli.images.list(filter={'label': labels})
         if len(built_images) == 0:
@@ -80,7 +81,7 @@ def install(file_path: str, no_build: bool) -> None:
         if isinstance(args, str):
             args = args.split(' ')
         mounts = component.get('mounts', [])
-        labels = ['mlad-board', spec.name, app_name]
+        labels = ['MLAD_BOARD', f'COMPONENT_NAME={spec.name}', f'APP_NAME={app_name}']
         click.echo(f'Run the container [{app_name}]')
         cli.containers.run(
             image.tags[-1],
@@ -117,7 +118,7 @@ def uninstall(name: str) -> None:
     res.raise_for_status()
 
     containers = cli.containers.list(filters={
-        'label': name
+        'label': f'COMPONENT_NAME={name}'
     })
     for container in containers:
         container.stop()
@@ -125,17 +126,19 @@ def uninstall(name: str) -> None:
 
 def list():
     containers = cli.containers.list(filters={
-        'label': 'mlad-board'
+        'label': 'MLAD_BOARD'
     })
     containers = [c for c in containers if c.name != 'mlad-board']
-    ports = [_obtain_port(c) for c in containers]
-    columns = [('ID', 'NAME', 'PORT')]
-    for container, port in zip(containers, ports):
-        columns.append((
-            container.short_id,
-            container.name,
-            port
-        ))
+    ports_list = [_obtain_ports(c) for c in containers]
+    columns = [('ID', 'NAME', 'APP_NAME', 'PORT')]
+    for container, ports in zip(containers, ports_list):
+        for port in ports:
+            columns.append((
+                container.short_id,
+                container.labels['COMPONENT_NAME'],
+                container.labels['APP_NAME'],
+                port
+            ))
     utils.print_table(columns, 'No components installed', 0)
 
 
@@ -147,13 +150,13 @@ def _obtain_host():
     return f'http://{host}'
 
 
-def _obtain_port(container) -> List[str]:
+def _obtain_ports(container) -> List[str]:
     port_data = lo_cli.inspect_container(container.id)['NetworkSettings']['Ports']
     return [k.replace('/tcp', '') for k in port_data.keys()]
 
 
 def _obtain_board_image_tag():
-    images = cli.images.list(filters={'label': 'mlad-board'})
+    images = cli.images.list(filters={'label': 'MLAD_BOARD'})
     latest_images = [image for image in images
                      if any([tag.endswith('latest') for tag in image.tags])]
     return latest_images[0].tags[0] if len(latest_images) > 0 else None
