@@ -1,19 +1,32 @@
+import os
+import socket
 import docker
+import requests
 
+from typing import List
+from omegaconf import OmegaConf
 from mlad.cli import config as config_core
-from mlad.cli.exceptions import MLADBoardNotActivatedError
+from mlad.cli.exceptions import (
+    MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError
+)
+from mlad.cli import image as image_core
+from mlad.cli.libs import utils
 
 cli = docker.from_env()
+lo_cli = docker.APIClient()
 
 
 def activate() -> None:
     config = config_core.get()
+    image_tag = _obtain_board_image_tag()
+    if image_tag is None:
+        raise BoardImageNotExistError
     cli.containers.run(
-        '172.19.153.144:5000/mlad/board:latest',
+        image_tag,
         environment=[
             f'MLAD_ADDRESS={config.apiserver.address}',
-            f'MLAD_SESSION={config.session}'
-        ],
+            f'MLAD_SESSION={config.session}',
+        ] + config_core.get_env(),
         name='mlad-board',
         auto_remove=True,
         ports={'2021/tcp': '2021'},
@@ -35,9 +48,99 @@ def install(file_path: str, no_build: bool) -> None:
     except docker.errors.NotFound:
         raise MLADBoardNotActivatedError
 
+    spec = OmegaConf.load(file_path)
+    labels = ['mlad-board', spec.name]
+    if no_build:
+        built_images = cli.images.list(filter={'label': labels})
+        if len(built_images) == 0:
+            raise ComponentImageNotExistError
+        image = built_images[0]
+    else:
+        os.environ['MLAD_PRJFILE'] = file_path
+        image = image_core.build(False, True, False)
+
+    host_ip = _obtain_host()
+    body = []
+    for app_name, component in spec.app.items():
+        if 'image' in component:
+            image_name = component['image']
+            cli.images.pull(image_name)
+            image = cli.images.get(image_name)
+        env = component.get('env', dict())
+        ports = component.get('ports', [])
+        command = component.get('command', [])
+        args = component.get('args', [])
+        mounts = component.get('mounts', [])
+        cli.containers.run(
+            image.tags[-1],
+            environment=env,
+            name=app_name,
+            auto_remove=True,
+            ports={f'{p}/tcp': p for p in ports},
+            command=command + args,
+            mounts=mounts,
+            labels=labels,
+            detach=True)
+
+        body.append({
+            'name': app_name,
+            'hosts': [f'{host_ip}:{p}' for p in ports]
+        })
+
+        res = requests.post(f'{host_ip}:2021/component', json=body)
+        res.raise_for_status()
+
 
 def uninstall(name: str) -> None:
     try:
         cli.containers.get('mlad-board')
     except docker.errors.NotFound:
         raise MLADBoardNotActivatedError
+
+    host_ip = _obtain_host()
+    res = requests.delete(f'{host_ip}:2021/component', json={
+        'name': name
+    })
+    res.raise_for_status()
+
+    containers = cli.containers.list(filters={
+        'label': name
+    })
+    for container in containers:
+        container.stop()
+
+
+def list():
+    containers = cli.containers.list(filters={
+        'label': 'mlad-board'
+    })
+    containers = [c for c in containers if c.name != 'mlad-board']
+    ports = [_obtain_port(c) for c in containers]
+    columns = [('ID', 'NAME', 'PORT')]
+    for container, port in zip(containers, ports):
+        columns.append((
+            container.shot_id,
+            container.name,
+            port
+        ))
+    utils.print_table(columns, 'No components installed', 0)
+
+
+def _obtain_host():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    host = s.getsockname()[0]
+    s.close()
+    return host
+
+
+def _obtain_port(container) -> List[str]:
+    port_data = lo_cli.inspect_container(container.id)['NetworkSettings']['Ports']
+    return [k.replace('/tcp', '') for k in port_data.keys()]
+
+
+def _obtain_board_image_tag():
+    images = cli.images.list(filters={'label': 'mlad-board'})
+    latest_images = [image for image in images
+                     if any([tag.endswith('latest') for tag in image.tags])]
+    return latest_images[0].tags[0] if len(latest_images) > 0 else None
