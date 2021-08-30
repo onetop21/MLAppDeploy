@@ -66,7 +66,7 @@ def install(file_path: str, no_build: bool) -> None:
             image_name = component['image']
             cli.images.pull(image_name)
             image = cli.images.get(image_name)
-        env = component.get('env', dict())
+        env = {**component.get('env', dict()), **config_core.get_env(dict=True)}
         ports = component.get('ports', [])
         command = component.get('command', [])
         if isinstance(command, str):
@@ -79,7 +79,7 @@ def install(file_path: str, no_build: bool) -> None:
             image.tags[-1],
             environment=env,
             name=app_name,
-            auto_remove=True,
+            auto_remove=False,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
             mounts=mounts,
