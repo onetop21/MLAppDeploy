@@ -10,6 +10,5 @@ workspace:
 app:
   board:
     kind: Component
-    image: 172.19.153.144:5000/piper/dashboard:0.1
+    image: 172.19.153.144:5000/piper/board:0.2
     ports: [4000]
-    command: /backend/piper-dashboard --mongo-address $(DB_ADDRESS) --mongo-username $(DB_USERNAME) --mongo-password $(DB_PASSWORD) --s3-endpoint $(S3_ENDPOINT) --s3-access-key $(AWS_ACCESS_KEY_ID) --s3-secret-key $(AWS_SECRET_ACCESS_KEY) --mlad-token $(MLAD_USER_TOKEN)
