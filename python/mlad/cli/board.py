@@ -55,7 +55,10 @@ def install(file_path: str, no_build: bool) -> None:
         raise MLADBoardNotActivatedError
 
     spec = OmegaConf.load(file_path)
-    labels = ['MLAD_BOARD', f'COMPONENT_NAME={spec.name}']
+    labels = {
+        'MLAD_BOARD': '',
+        'COMPONENT_NAME': spec.name
+    }
     if no_build:
         built_images = cli.images.list(filter={'label': labels})
         if len(built_images) == 0:
@@ -81,7 +84,11 @@ def install(file_path: str, no_build: bool) -> None:
         if isinstance(args, str):
             args = args.split(' ')
         mounts = component.get('mounts', [])
-        labels = ['MLAD_BOARD', f'COMPONENT_NAME={spec.name}', f'APP_NAME={app_name}']
+        labels = {
+            'MLAD_BOARD': '',
+            'COMPONENT_NAME': spec.name,
+            'APP_NAME': app_name
+        }
         click.echo(f'Run the container [{app_name}]')
         cli.containers.run(
             image.tags[-1],
