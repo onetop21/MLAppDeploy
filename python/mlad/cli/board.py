@@ -36,17 +36,17 @@ def activate() -> None:
 
 
 def deactivate() -> None:
-    containers = cli.containers.list(filters={
-        'label': 'mlad-board'
-    })
-    for container in containers:
-        container.stop()
-
     host_ip = _obtain_host()
     res = requests.delete(f'{host_ip}:2021/mlad/component', json={
         'name': 'mlad-board'
     })
     res.raise_for_status()
+
+    containers = cli.containers.list(filters={
+        'label': 'mlad-board'
+    })
+    for container in containers:
+        container.stop()
 
 
 def install(file_path: str, no_build: bool) -> None:
