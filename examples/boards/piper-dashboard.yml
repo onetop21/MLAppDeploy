@@ -4,7 +4,9 @@ version: 0.1.0
 maintainer: jooonhoe
 workspace:
   kind: Dockerfile
-  script: ''
+  script: |
+    FROM python:3.7-slim
+    RUN echo "hello world"
 app:
   board:
     kind: Component
