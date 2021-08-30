@@ -68,7 +68,7 @@ def build(quiet: bool, no_cache: bool, pull: bool):
 
     # Generate Base Labels
     workspace_key = utils.get_workspace()
-    base_labels = core_utils.base_labels(workspace_key, config.mlad.session, manifest)
+    base_labels = core_utils.base_labels(workspace_key, config.session, manifest)
 
     # Prepare Latest Image
     latest_image = None
