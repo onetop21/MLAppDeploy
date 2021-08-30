@@ -62,7 +62,7 @@ def list(all, plugin, tail, no_trunc):
 
 
 def build(quiet: bool, no_cache: bool, pull: bool):
-    config = utils.read_config()
+    config = config_core.get()
     cli = ctlr.get_api_client()
     manifest = utils.get_manifest()
 
