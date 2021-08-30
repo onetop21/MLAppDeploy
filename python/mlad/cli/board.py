@@ -37,10 +37,9 @@ def activate() -> None:
 
 def deactivate() -> None:
     host_ip = _obtain_host()
-    res = requests.delete(f'{host_ip}:2021/mlad/component', json={
+    requests.delete(f'{host_ip}:2021/mlad/component', json={
         'name': 'mlad-board'
     })
-    res.raise_for_status()
 
     containers = cli.containers.list(filters={
         'label': 'mlad-board'
