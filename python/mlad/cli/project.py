@@ -19,6 +19,7 @@ from mlad.core.default import config as default_config
 from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 from mlad.core import exceptions
+from mlad.cli.image import build as project_build
 from mlad.cli.libs import utils
 from mlad.cli.libs import datastore as ds
 from mlad.cli.libs import interrupt_handler
@@ -229,72 +230,128 @@ def status(all, no_trunc):
     utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
 
 
-# def run(with_build):
-#     #TODO
-#     project = utils.get_project(default_project)
-#
-#     if with_build:
-#         build(False, True)
-#
-#     print('Deploying test container image to local...')
-#     config = config_core.get()
-#
-#     cli = ctlr.get_api_client()
-#     base_labels = core_utils.base_labels(
-#             utils.get_workspace(),
-#             config.session,
-#             project['project'])
-#     project_key = base_labels['MLAD.PROJECT']
-#
-#     with interrupt_handler(message='Wait.', blocked=True) as h:
-#         try:
-#             extra_envs = config_core.get_env()
-#             for _ in ctlr.create_project_network(cli, base_labels, extra_envs, stream=True):
-#                 if 'stream' in _:
-#                     sys.stdout.write(_['stream'])
-#                 if 'result' in _:
-#                     if _['result'] == 'succeed':
-#                         network = ctlr.get_project_network(cli, network_id=_['id'])
-#                     else:
-#                         print(f"Unknown Stream Result [{_['stream']}]")
-#                     break
-#         except exception.AlreadyExist as e:
-#             print('Already running project.', file=sys.stderr)
-#             sys.exit(1)
-#
-#         # Start Containers
-#         instances = ctlr.create_containers(cli, network, project['services'] or {})
-#         for instance in instances:
-#             inspect = ctlr.inspect_container(instance)
-#             print(f"Starting {inspect['name']}...")
-#             time.sleep(1)
-#
-#     # Show Logs
-#     with interrupt_handler(blocked=False) as h:
-#         colorkey = {}
-#         for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
-#             _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
-#
-#     # Stop Containers and Network
-#     with interrupt_handler(message='Wait.', blocked=True):
-#         containers = ctlr.get_containers(cli, project_key).values()
-#         ctlr.remove_containers(cli, containers)
-#
-#         try:
-#             for _ in ctlr.remove_project_network(cli, network, stream=True):
-#                 if 'stream' in _:
-#                     sys.stdout.write(_['stream'])
-#                 if 'result' in _:
-#                     if _['result'] == 'succeed':
-#                         print('Network removed.')
-#                     break
-#         except docker.errors.APIError as e:
-#             print('Network already removed.', file=sys.stderr)
-#     print('Done.')
+def run(no_build, env, quota, command):
+    if not no_build:
+        project_build(False, False, False)
+
+    envs = dict(os.environ) if env else {}
+
+    quota = {_.split('=')[0]: _.split('=')[1] for _ in quota} if quota else {}
+    for k,v in quota.items():
+        quota[k] = int(v) if k == 'cpu' or k == 'gpu' else v
+
+    command = [_ for _ in command] if command else []
+
+    config = config_core.get()
+    cli = ctlr.get_api_client()
+    api = API(config.apiserver.address, config.session)
+
+    project = utils.get_project(default_project)
+    try:
+        project = project_validator.validate(project)
+    except project_validator.InvalidProjectYaml as e:
+        print('Errors:', e)
+        sys.exit(1)
+
+    base_labels = core_utils.base_labels(
+            utils.get_workspace(),
+            config.session,
+            project)
+
+    project_key = base_labels['MLAD.PROJECT']
+
+    try:
+        inspect = api.project.inspect(project_key=project_key)
+        if inspect:
+            print('Failed to create project : Already exist project.')
+            sys.exit(1)
+    except NotFound as e:
+        pass
+
+    images = ctlr.get_images(cli, project_key=project_key)
+    images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
+
+    # select suitable image
+    if not images:
+        print(f"Cannot find built image of project [{project['project']['name']}].",
+              file=sys.stderr)
+        return
+    image = images[0]
+    repository = image.labels['MLAD.PROJECT.IMAGE']
+    inspect = ctlr.inspect_image(image)
+
+    # set prefix to image name
+    parsed_url = utils.parse_url(config.docker.registry.address)
+    registry = parsed_url['address']
+    if config.docker.registry.namespace:
+        registry = f"{registry}/{config.docker.registry.namespace}"
+    full_repository = f"{registry}/{repository}"
+    image.tag(full_repository)
+    base_labels['MLAD.PROJECT.IMAGE'] = full_repository
+
+    # Upload Image
+    print('Update project image to registry...')
+    try:
+        for _ in ctlr.push_image(cli, full_repository, stream=True):
+            if 'error' in _:
+                raise docker.errors.APIError(_['error'], None)
+            elif 'stream' in _:
+                sys.stdout.write(_['stream'])
+    except docker.errors.APIError as e:
+        print(e, file=sys.stderr)
+        print('Failed to Update Image to Registry.', file=sys.stderr)
+        print('Please Check Registry Server.', file=sys.stderr)
+        sys.exit(1)
+    except StopIteration:
+        pass
+
+    workspace, ingress = [project.pop(key, None) for key in ['workspace', 'ingress']]
+
+    # AuthConfig
+    cli = ctlr.get_api_client()
+    headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config'] or b'e30K'))}
+    encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
+    credential = encoded.decode()
+
+    extra_envs = config_core.get_env()
+
+    res = api.project.create(base_labels, extra_envs, credential=credential, allow_reuse=True)
+    try:
+        for _ in res:
+            if 'stream' in _:
+                sys.stdout.write(_['stream'])
+            if 'result' in _:
+                if _['result'] == 'succeed':
+                    network_id = _['id']
+                    break
+    except APIError as e:
+        print(e)
+        sys.exit(1)
+
+    service = {
+        'kind': 'App',
+        'name': 'run-app',
+        'command': command,
+        'env': envs,
+        'quota': quota
+    }
+
+    with interrupt_handler(message='Wait.', blocked=True) as h:
+        try:
+            instance = api.service.create(project_key, [service])[0]
+            name = instance['name']
+            inspect = api.service.inspect(project_key, name)
+            print(f"Starting {name}...")
+            time.sleep(1)
+        except APIError as e:
+            print(e)
+        if h.interrupted:
+            pass
+
+    print('Done.')
 
 
 def up(services):
-    from pprint import pprint
     config = config_core.get()
     cli = ctlr.get_api_client()
     api = API(config.apiserver.address, config.session)
@@ -394,7 +451,7 @@ def up(services):
     if not services:
         res = api.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
     else:
-        res = api.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
+        res = api.project.create(base_labels, extra_envs, credential=credential, allow_reuse=True)
     try:
         for _ in res:
             if 'stream' in _:
@@ -433,7 +490,7 @@ def up(services):
             for instance in instances:
                 name = instance['name']
                 inspect = api.service.inspect(project_key, name)
-                print(f"Starting {inspect['name']}...")
+                print(f"Starting {name}...")
                 time.sleep(1)
         except APIError as e:
             print(e)

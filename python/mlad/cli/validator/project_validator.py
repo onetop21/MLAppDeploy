@@ -1,7 +1,6 @@
 #!/home/onetop21/base3.7/bin/python
 import sys
 import json
-from pprint import pprint
 from mlad.cli.validator.yaml_parser import load, dump, SCHEMA_PATH
 from mlad.cli.validator.yaml_validator import Validator
 from mlad.cli.validator.exceptions import InvalidProjectYaml

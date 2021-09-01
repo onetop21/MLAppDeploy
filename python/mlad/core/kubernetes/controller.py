@@ -768,13 +768,13 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
         envs = [client.V1EnvVar(name=_.split('=', 1)[0], value=_.split('=', 1)[1])
                for _ in env]
 
-        command = []
-        if service['command']:
-            command += service['command'] if isinstance(service['command'], list) \
-                else service['command'].split()
-        if service['args']:
-            command += service['args'] if isinstance(service['args'], list) \
-                else service['args'].split()
+        command = service['command'] or []
+        args = service['args'] or []
+        if isinstance(command, str):
+            command = command.split()
+        if isinstance(args, str):
+            args = args.split()
+        command += args
 
         labels = copy.copy(network_labels) or {}
         labels.update(extra_labels)
