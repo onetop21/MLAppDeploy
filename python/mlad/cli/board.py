@@ -65,7 +65,8 @@ def install(file_path: str, no_build: bool) -> None:
             raise ComponentImageNotExistError
         image = built_images[0]
     else:
-        os.environ['MLAD_PRJFILE'] = file_path
+        if file_path is not None:
+            os.environ['MLAD_PRJFILE'] = file_path
         image = image_core.build(False, True, False)
 
     host_ip = _obtain_host()
@@ -93,7 +94,7 @@ def install(file_path: str, no_build: bool) -> None:
         cli.containers.run(
             image.tags[-1],
             environment=env,
-            name=app_name,
+            name=f'{spec.name}-{app_name}',
             auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
