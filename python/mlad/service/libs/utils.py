@@ -1,6 +1,6 @@
 import sys
 import os
-from mlad.core.default import config as service_config
+from mlad.core.default.config import service_config
 from mlad.cli import config as config_core
 
 
