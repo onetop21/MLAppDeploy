@@ -226,6 +226,9 @@ def status(all, no_trunc):
 
 
 def run(no_build, env, quota, command):
+    SERVICE_NAME = 'run-app'
+    timeout = 0xFFFF # TBD : option or static value
+
     if not no_build:
         project_build(False, False, False)
 
@@ -323,7 +326,7 @@ def run(no_build, env, quota, command):
 
     service = {
         'kind': 'App',
-        'name': 'run-app',
+        'name': SERVICE_NAME,
         'command': command,
         'env': envs,
         'quota': quota
@@ -334,14 +337,25 @@ def run(no_build, env, quota, command):
             instance = api.service.create(project_key, [service])[0]
             name = instance['name']
             inspect = api.service.inspect(project_key, name)
-            print(f"Starting {name}...")
+            print(f"Starting \'{name}\'...")
             time.sleep(1)
         except APIError as e:
             print(e)
         if h.interrupted:
             pass
 
-    print('Done.')
+    for tick in range(timeout):
+        tasks = api.service.get_tasks(project_key, name)
+        phase = [tasks[_]['phase'] for _ in tasks][0]
+        if phase == 'Running' or phase == 'Succeeded':
+            break
+        else:
+            padding = '\033[1A\033[K' if tick else ''
+            sys.stdout.write(f"{padding}Wait service to be running...[{tick}s]\n")
+            time.sleep(1)
+
+    logs('all', True, True, SERVICE_NAME)
+    down(None, True)
 
 
 def up(service_names):
@@ -482,7 +496,7 @@ def up(service_names):
             for instance in instances:
                 name = instance['name']
                 inspect = api.service.inspect(project_key, name)
-                print(f"Starting {name}...")
+                print(f"Starting \'{name}\'...")
                 time.sleep(1)
         except APIError as e:
             print(e)
@@ -568,7 +582,7 @@ def down(services, no_dump):
             except APIError as e:
                 print(e)
                 sys.exit(1)
-        
+
         #Remove Network
         if not services or not api.service.get(project_key)['inspects']:
             res = api.project.delete(project_key)
