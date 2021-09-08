@@ -41,7 +41,7 @@ def ps(all, no_trunc):
     project.status(all, no_trunc)
 
 
-@click.command()
+@click.command(context_settings={"ignore_unknown_options": True})
 @click.option('--no-build', is_flag=True, help='Run without project build.')
 @click.option('--env', is_flag=True, help='Set all os envs for run')
 @click.option('--quota', type=click.STRING, multiple=True, help='Set quota for run')
