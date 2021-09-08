@@ -219,12 +219,7 @@ def status(all, no_trunc):
                     ))
         except NotFound as e:
             pass
-
-        columns_data = []
-        for name, service, node, phase, status, restart_cnt, uptime, ports, mem, cpu, gpu in task_info:
-            columns_data.append((name, service, node, phase, status, restart_cnt, uptime, ports, mem, cpu, gpu))
-        columns_data = sorted(columns_data, key=lambda x: x[1])
-        columns += columns_data
+        columns += sorted([tuple(elem) for elem in task_info])
     username = utils.get_username(config.session)
     print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
     utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
@@ -351,7 +346,7 @@ def run(no_build, env, quota, command):
     print('Done.')
 
 
-def up(services):
+def up(service_names):
     config = config_core.get()
     cli = ctlr.get_api_client()
     api = API(config.apiserver.address, config.session)
@@ -370,7 +365,7 @@ def up(services):
 
     project_key = base_labels['MLAD.PROJECT']
 
-    if not services:
+    if not service_names:
         try:
             inspect = api.project.inspect(project_key=project_key)
             if inspect:
@@ -416,9 +411,9 @@ def up(services):
         pass
 
     print('Deploying services to cluster...')
-    if services:
+    if service_names:
         targets = {}
-        for name in services:
+        for name in service_names:
             if name in project['app']:
                 targets[name] = project['app'][name]
                 #targets[name]['service_type'] = 'project'
@@ -430,7 +425,7 @@ def up(services):
 
     workspace, ingress, app = [project.pop(key, None) for key in ['workspace', 'ingress', 'app']]
 
-    if ingress:
+    if ingress is not None:
         for name, _ in ingress.items():
             service, port = _['target'].split(':')
             if service in targets.keys():
@@ -448,7 +443,7 @@ def up(services):
 
     extra_envs = config_core.get_env()
 
-    if not services:
+    if not service_names:
         res = api.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
     else:
         res = api.project.create(base_labels, extra_envs, credential=credential, allow_reuse=True)

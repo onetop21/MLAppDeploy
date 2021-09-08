@@ -11,22 +11,36 @@ class Validator(cerberus.Validator):
     def _validate_order(self, constraint, field, value):
         '''For use YAML Editor'''
 
+    def _validate_multiline(self, constraint, field, value):
+        '''For use YAML Editor'''
+
     def _validate_selector(self, constraint, field, value):
-        recent_error = None
+        _errors = []
         for _ in reversed(constraint):
-            validator = cerberus.Validator(_)
+            validator = Validator(_)
             if validator.validate(value):
                 return
-            recent_error = validator._errors
-        self._error(recent_error)
+            if not validator.errors.get('kind'):
+                _errors = validator._errors
+        if _errors:
+            def update_document_path(errors):
+                for error in errors:
+                    error.document_path = (*self.document_path, field, *error.document_path)
+                    if error.info:
+                        for info in error.info:
+                            update_document_path(info)
+            update_document_path(_errors)
+            self._error(_errors)
+        else:
+            self._error(validator._errors)
 
     def _normalize_coerce_selector(self, document):
         for key, value in self.schema.items():
             for schema in value.get('selector', []):
-                validator = cerberus.Validator(schema)
+                validator = Validator(schema)
                 if validator.validate(document):
                     return validator.normalized(document)
-        print('Not Found suitable selector schema.')
+        return validator.normalized(document)
 
     def ordered(self, document, schema=None):
         '''For use YAML Editor'''

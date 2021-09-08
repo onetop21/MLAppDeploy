@@ -23,6 +23,15 @@ workspace:
     #ignore:                        # [OPTIONAL] Describe exclude files from project.
     #   - "**/.*"
     #script: python script.py       # [OPTIONAL] Describe script for run.
+    #-------------------------------#
+    #kind: Dockerfile               # Describe kind of workspace. (*Workspace, Dockerfile)
+    #script: |                      # Describe Dockerfile script.
+    #   FROM python:latest
+    #   RUN echo "hello world"
+    #ignores:                       # [OPTIONAL] Describe exclude files from project.
+    #   - "**/.*"
+    #filePath: .                    # Describe Dockerfile path. (Instead of defining script.)
+    #ignorePath: ./data             # [OPTIONAL] Describe exclude file path. (Instead of defining ignores)
 app:
     ### Describe 'App' to run.
     #[NAME]:
