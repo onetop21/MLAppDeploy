@@ -1,0 +1,14 @@
+apiVersion: v1
+name: piper-dashboard
+version: 0.1.0
+maintainer: jooonhoe
+workspace:
+  kind: Dockerfile
+  script: |
+    FROM python:3.7-slim
+    RUN echo "hello world"
+app:
+  board:
+    kind: Component
+    image: 172.19.153.144:5000/piper/board:0.2
+    ports: [4000]
