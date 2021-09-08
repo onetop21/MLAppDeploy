@@ -280,8 +280,6 @@ def get_service(name, namespace, cli = DEFAULT_CLI):
 def get_services(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
-    api = client.CoreV1Api(cli)
-    core_api = client.CoreV1Api(cli)
     batch_api = client.BatchV1Api(cli)
     apps_api = client.AppsV1Api(cli)
     filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
@@ -535,22 +533,22 @@ def _resources_to_V1Resource(type='Quota', resources=None):
     if type == 'Quota':
         for type in resources:
             if type == 'cpu': requests['cpu'] = str(resources['cpu']) if resources[type] else None
-            if type == 'gpu': requests['nvidia.com/gpu'] = str(resources['gpu']) \
+            elif type == 'gpu': requests['nvidia.com/gpu'] = str(resources['gpu']) \
                 if resources[type] else None
-            if type == 'mem': requests['memory'] = str(resources['mem']) \
+            elif type == 'mem': requests['memory'] = str(resources['mem']) \
                 if resources[type] else None
         limits = requests
     elif type == 'Resources':
         if 'limits' in resources:
             for type in resources['limits']:
                 if type == 'cpu': limits['cpu'] = str(resources['limits']['cpu'])
-                if type == 'gpu': limits['nvidia.com/gpu'] = str(resources['limits']['gpu'])
-                if type == 'mem': limits['mem'] = str(resources['limits']['mem'])
+                elif type == 'gpu': limits['nvidia.com/gpu'] = str(resources['limits']['gpu'])
+                elif type == 'mem': limits['mem'] = str(resources['limits']['mem'])
         if 'requests' in resources:
             for type in resources['requests']:
                 if type == 'cpu': requests['cpu'] = str(resources['requests']['cpu'])
-                if type == 'gpu': requests['nvidia.com/gpu'] = str(resources['requests']['gpu'])
-                if type == 'mem': requests['mem'] = str(resources['requests']['mem'])
+                elif type == 'gpu': requests['nvidia.com/gpu'] = str(resources['requests']['gpu'])
+                elif type == 'mem': requests['mem'] = str(resources['requests']['mem'])
     return client.V1ResourceRequirements(limits=limits, requests=requests)
 
 

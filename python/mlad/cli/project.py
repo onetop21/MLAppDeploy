@@ -219,7 +219,7 @@ def status(all, no_trunc):
                     ))
         except NotFound as e:
             pass
-        columns += sorted([tuple(elem) for elem in task_info])
+        columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
     username = utils.get_username(config.session)
     print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
     utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
@@ -299,8 +299,6 @@ def run(no_build, env, quota, command):
         sys.exit(1)
     except StopIteration:
         pass
-
-    workspace, ingress = [project.pop(key, None) for key in ['workspace', 'ingress']]
 
     # AuthConfig
     cli = ctlr.get_api_client()
@@ -423,9 +421,8 @@ def up(service_names):
     else:
         targets = project['app'] or {}
 
-    workspace, ingress, app = [project.pop(key, None) for key in ['workspace', 'ingress', 'app']]
-
-    if ingress is not None:
+    if 'ingress' in project:
+        ingress = project['ingress']
         for name, _ in ingress.items():
             service, port = _['target'].split(':')
             if service in targets.keys():
