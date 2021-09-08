@@ -1185,8 +1185,6 @@ def get_service_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI)
         phase = get_pod_info(pod)['phase']
         if not phase == 'Pending':
             targets.append(target)
-        else:
-            print(f'Cannot get logs of pending service: {target[1]}')
 
     if not targets:
         raise exceptions.NotFound("Cannot find running services")

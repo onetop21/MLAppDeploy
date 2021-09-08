@@ -524,11 +524,14 @@ def down(services, no_dump):
     def dump_logs(service, log_dir):
         path = f'{log_dir}/{service}.log'
         with open(path, 'w') as f:
-            logs = api.project.log(project_key, timestamps=True, names_or_ids=[service])
-            for _ in logs:
-                log = _get_default_logs(_)
-                f.write(log)
-        print(f'service {service} log saved')
+            try:
+                logs = api.project.log(project_key, timestamps=True, names_or_ids=[service])
+                for _ in logs:
+                    log = _get_default_logs(_)
+                    f.write(log)
+                print(f'Service \'{service}\' log saved.')
+            except NotFound:
+                print(f'Cannot get logs of pending service \'{service}\'.')
 
     with interrupt_handler(message='Wait.', blocked=False):
         running_services = api.service.get(project_key)['inspects']
@@ -623,14 +626,19 @@ def down_force(services, no_dump):
     def dump_logs(service, log_dir):
         path = f'{log_dir}/{service}.log'
         with open(path, 'w') as f:
-            targets = k8s_ctlr.get_service_with_names_or_ids(
-                cli, project_key, names_or_ids=[service])
-            logs = k8s_ctlr.get_project_logs(
-                cli, project_key, timestamps=True, targets=targets)
-            for _ in logs:
-                log = _get_default_logs(_)
-                f.write(log)
-        print(f'service {service} log saved')
+            try:
+                targets = k8s_ctlr.get_service_with_names_or_ids(
+                    project_key, names_or_ids=[service], cli=cli)
+            except exceptions.NotFound as e:
+                print(f'Cannot get logs of pending service \'{service}\'')
+            else:
+                logs = k8s_ctlr.get_project_logs(
+                    project_key, timestamps=True, targets=targets, cli=cli)
+                for _ in logs:
+                    log = _get_default_logs(_)
+                    f.write(log)
+                print(f'Service \'{service}\' log saved.')
+
 
     with interrupt_handler(message='Wait.', blocked=False):
         running_services = _get_running_services()
