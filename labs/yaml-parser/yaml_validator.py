@@ -22,11 +22,12 @@ class Validator(cerberus.Validator):
                 _errors = validator._errors
         if _errors:
             def update_document_path(errors):
-                for error in errors:
-                    error.document_path = (*self.document_path, field, *error.document_path)
-                    if error.info:
-                        for info in error.info:
-                            update_document_path(info)
+                if isinstance(errors, dict):
+                    for error in errors:
+                        error.document_path = (*self.document_path, field, *error.document_path)
+                        if error.info:
+                            for info in error.info:
+                                update_document_path(info)
             update_document_path(_errors)
             self._error(_errors)
         else:

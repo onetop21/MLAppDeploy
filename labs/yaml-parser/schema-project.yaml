@@ -6,7 +6,7 @@
 <<: *metadata
 workspace: 
   type: dict
-  selector: [*workspace, *dockerfile]
+  selector: [*workspace, *dockerfile, *dockerfile2]
   order: 10
   coerce: selector
 ingress:

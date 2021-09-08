@@ -59,10 +59,14 @@ x-definitions:
           type: string
       script:
         type: string
+        multiline: true
       env:                        # Describe environment variables.
         type: dict
+        valuesrules:
+          schema:
+            type: [string]
         default:
-          PYTHONUNBUFFERED: 1       
+          PYTHONUNBUFFERED: "1"      
       command:                    # Describe application to execute
         type: [string, list]
       args:                       # Describe arguments for execute application
@@ -72,9 +76,10 @@ x-definitions:
         type: string
         allowed: [Dockerfile]
         required: true
-      script:
+      buildscript:
         type: string
-        excludes: [filePath, ignorePath]
+        default: "FROM    python:latest"
+        multiline: true
         required: true
       ignores:                    # Describe exclude files from project.
         type: list
@@ -82,14 +87,18 @@ x-definitions:
           - "**/.*"
         schema:                   # Describe script run after copy files.
           type: string
-        excludes: [filePath, ignorePath]
+  - definition: &dockerfile2
+      kind:
+        type: string
+        allowed: [Dockerfile2]
+        required: true
       filePath:
         type: string
-        excludes: [script, ignores]
+        default: 'Dockerfile'
         required: true
       ignorePath:
         type: string
-        excludes: [script, ignores]
+        default: '.dockerignore'
   - definition: &ingress
       target:
         type: string

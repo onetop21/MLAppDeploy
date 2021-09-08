@@ -6,7 +6,7 @@
 <<: *metadata
 workspace: 
   type: dict
-  selector: [*workspace, *dockerfile]
+  selector: [*workspace, *dockerfile, *dockerfile2]
 app:
   type: dict
   valuesrules:
