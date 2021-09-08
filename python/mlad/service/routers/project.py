@@ -37,11 +37,12 @@ def project_create(req: project.CreateRequest, allow_reuse: bool = Query(False),
         def create_project(gen):
             for _ in gen:
                 yield json.dumps(_)
+
+        return StreamingResponse(create_project(res))
     except TypeError as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=exception_detail(e))
-    return StreamingResponse(create_project(res))
 
 
 @router.get("/project")
@@ -52,9 +53,9 @@ def projects(extra_labels: str = '', session: str = Header(None)):
         for k, v in networks.items():
             inspect = ctlr.inspect_project_network(v)
             projects.append(inspect)
+        return projects
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return projects
 
 
 @router.get("/project/{project_key}")
@@ -65,11 +66,11 @@ def project_inspect(project_key:str, session: str = Header(None)):
         if not network:
             raise InvalidProjectError(project_key)
         inspect = ctlr.inspect_project_network(network)
+        return inspect
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return inspect
 
 
 @router.delete("/project/{project_key}")
@@ -82,16 +83,18 @@ def project_remove(project_key:str, session: str = Header(None)):
             raise InvalidProjectError(project_key)           
 
         res = ctlr.remove_project_network(network, stream=True)
+
         def remove_project(gen):
             for _ in gen:
                 yield json.dumps(_)
+
+        return StreamingResponse(remove_project(res))
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidSessionError as e:
         raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return StreamingResponse(remove_project(res))
 
 
 @router.get("/project/{project_key}/logs")
@@ -137,7 +140,7 @@ def project_log(project_key: str, tail:str = Query('all'),
                     _['timestamp']=str(_['timestamp'])
                 yield json.dumps(_)
 
-
+        return StreamingResponse(get_logs(logs), background=handler)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidServiceError as e:
@@ -146,13 +149,12 @@ def project_log(project_key: str, tail:str = Query('all'),
         raise HTTPException(status_code=400, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return StreamingResponse(get_logs(logs), background=handler)
 
 
 @router.get("/project/{project_key}/resource")
 def project_resource(project_key: str, session: str = Header(None)):
     try:
         res = ctlr.get_project_resources(project_key)
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return res
