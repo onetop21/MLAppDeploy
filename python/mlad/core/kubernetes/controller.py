@@ -235,7 +235,7 @@ def remove_project_network(network, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
                 break
             else:
                 padding = '\033[1A\033[K' if tick else ''
-                message = f"{padding}Wait to remove network [{tick}s]\n"
+                message = f"{padding}Wait to remove network...[{tick}s]\n"
                 yield {'stream': message}
                 time.sleep(1)
         if not removed:
@@ -397,7 +397,7 @@ def get_pod_info(pod):
         pod_info['status'] = {
             'state': 'Waiting',
             'detail': {
-                'reason': pod.status.conditions[0].reason
+                'reason': pod.status.conditions[0].reason if pod.status.conditions else None
             }
         }
     return pod_info
@@ -507,7 +507,7 @@ def _mounts_to_V1Volume(name, mounts):
     _volumes = []
     if mounts:
         for i, _ in enumerate(mounts):
-            mount_path, host_path = _.split(":")[0], _.split(":")[1]
+            host_path, mount_path = _.split(":")[0], _.split(":")[1]
             volume_name = f'{name}-mnt{i}'
             _mounts.append(
                 client.V1VolumeMount(
@@ -694,7 +694,7 @@ def _create_kind_app(cli, name, image, command, namespace, restart_policy, envs,
     if controller == 'Job':
         res = _create_job(name, image, command, namespace, restart_policy, envs, mounts, scale,
                           None, quota, None, labels, constraints, secrets, cli)
-    elif kind == 'Deployment':
+    elif controller == 'Deployment':
         res = _create_deployment(cli, name, image, command, namespace, envs, mounts, scale,
                                  quota, None, labels, constraints, secrets)
     return res, controller

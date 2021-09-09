@@ -46,21 +46,22 @@ app:
     #        [KEY]: [VALUE]         # [OPTIONAL] Describe environment variables additionaly.
     #    ports: [80,...]            # [OPTIONAL] Describe expose ports to other apps.
     #    args: temp                 # [OPTIONAL] Describe arguments to need overwrite.
-    #    mounts: ['test-mnt:/data'] # [OPTIONAL] Describe mounts.
+    #    mounts:                    # [OPTIONAL] Describe mounts.
+    #       - '/host-path:/mnt-path'
     #    scale: 1                   # [OPTIONAL] Describe number of replicas or parallelism. (*1)
     #    quota:                     # [OPTIONAL] Describe required system resource quota.
     #        cpu: 1
     #        gpu: 0
     #        mem: 8G
-    #    restartPolicy: never       # [OPTIONAL] Describe restart policy. (*never, on-failure, always)
+    #    restartPolicy: never       # [OPTIONAL] Describe restart policy. (*never, onFailure, always)
     ### Describe 'Job' to run.
     #[NAME]:
     ## Available fields from app - image, env, ports, command, args, mounts, constraints 
     #    kind: Job                  # [OPTIONAL] Describe kind of app. (*App, Job, Service)
     #    runSpec:                   # [OPTIONAL] Describe spec for running Job. 
-    #        restartPolicy: never   # [OPTIONAL] Describe restart policy. (*never, on-failure)
+    #        restartPolicy: never   # [OPTIONAL] Describe restart policy. (*never, onFailure)
     #        parallelism: 1         # [OPTIONAL] (*1)
-    #        Completion: 1          # [OPTIONAL] (*1)
+    #        completion: 1          # [OPTIONAL] (*1)
     #    resources:                 # [OPTIONAL] Describe resource specifically for the Job.
     #        limits:
     #            cpu: 1

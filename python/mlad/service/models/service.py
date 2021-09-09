@@ -49,7 +49,7 @@ class App(AppBase):
 
 
 class JobRunSpec(BaseModel):
-    restart_policy: Optional[str] = 'never'
+    restartPolicy: Optional[str] = 'never'
     parallelism: Optional[int] = 1
     completion: Optional[int] = 1
 
