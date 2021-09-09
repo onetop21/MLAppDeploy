@@ -43,12 +43,12 @@ def services_list(labels: List[str] = Query(None),
         services = ctlr.get_services(extra_filters=labels_dict)
         for service in services.values():
             inspect = ctlr.inspect_service(service)
-            inspects.append(inspect)    
+            inspects.append(inspect)
+        return {'inspects': inspects}
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return {'inspects': inspects}
 
 
 @router.get("/project/{project_key}/service")
@@ -72,11 +72,11 @@ def service_list(project_key:str,
         for service in services.values():
             inspect = ctlr.inspect_service(service)
             inspects.append(inspect)
+        return {'inspects': inspects}
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return {'inspects':inspects}
     #return [_.short_id for _ in services.values()]
 
 
@@ -90,6 +90,7 @@ def service_create(project_key:str, req:service.CreateRequest,
         if not network:
             raise InvalidProjectError(project_key)
         services = ctlr.create_services(network, targets)
+        return [ctlr.inspect_service(_) for _ in services]
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except APIError as e:
@@ -97,7 +98,6 @@ def service_create(project_key:str, req:service.CreateRequest,
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     #return [_.metadata.uid for _ in services]
-    return [ctlr.inspect_service(_) for _ in services]
 
 
 @router.get("/project/{project_key}/service/{service_name}")
@@ -109,11 +109,11 @@ def service_inspect(project_key:str, service_name:str,
         service = ctlr.get_service(service_name, namespace)
         if _check_project_key(key, service):
             inspect = ctlr.inspect_service(service)
+        return inspect
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return inspect
 
 
 @router.get("/project/{project_key}/service/{service_name}/tasks")
@@ -125,11 +125,11 @@ def service_tasks(project_key:str, service_name:str,
         service = ctlr.get_service(service_name, namespace)
         if _check_project_key(key, service):
             tasks = ctlr.inspect_service(service)['tasks']
+        return tasks
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return tasks
 
 
 @router.put("/project/{project_key}/service/{service_name}/scale")

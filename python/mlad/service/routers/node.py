@@ -17,10 +17,10 @@ logger = init_logger(__name__)
 def node_list(session: str = Header(None)):
     try:
         nodes = ctlr.get_nodes()
+        return list(nodes.keys())
     except Exception as e:
         logger.error(e)
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return list(nodes.keys())
 
 
 @router.get("/node/{node_id}")
@@ -28,13 +28,13 @@ def node_inspect(node_id:str, session: str = Header(None)):
     try:
         node = ctlr.get_node(node_id)
         inspects = ctlr.inspect_node(node)
+        return inspects
     except exception.NotFound as e:
         logger.error(e)
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return inspects
 
 
 @router.get("/nodes/resource")
@@ -48,10 +48,10 @@ def node_resource(nodes: List[str] = Query(None)):
             name = node.metadata.name
             resource = ctlr.get_node_resources(node)
             res[name] = resource
+        return res
     except exception.NotFound as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return res
