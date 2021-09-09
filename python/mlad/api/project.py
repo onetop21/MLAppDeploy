@@ -17,12 +17,11 @@ class Project:
         raise_error(res)
         return res.json()    
 
-    def create(self, project, base_labels, extra_envs=[], credential=None, allow_reuse=False):
+    def create(self, base_labels, extra_envs=[], credential=None, allow_reuse=False):
         url = self.url
         header = {'session': self.session}
         resp = requests.post(url=url,headers=header,
-            json={'project':project,'base_labels':base_labels,
-                'extra_envs':extra_envs, 'credential':credential},
+            json={'base_labels':base_labels, 'extra_envs':extra_envs, 'credential':credential},
             params={'allow_reuse': allow_reuse}, stream=True)
         if resp.status_code == 200:
             res = ''

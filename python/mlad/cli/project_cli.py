@@ -42,11 +42,13 @@ def ps(all, no_trunc):
 
 
 @click.command(context_settings={"ignore_unknown_options": True})
-@click.option('--build', '-b', is_flag=True, help='Build a project image before run')
-@click.argument('arguments', nargs=-1, required=False)
-def run(build, arguments):
-    '''Deploy and run a project instantly on cluster'''
-    project.run(build)
+@click.option('--no-build', is_flag=True, help='Run without project build.')
+@click.option('--env', is_flag=True, help='Set all os envs for run')
+@click.option('--quota', type=click.STRING, multiple=True, help='Set quota for run')
+@click.argument('command', nargs=-1, required=True)
+def run(no_build, env, quota, command):
+    '''Run project with minimal options for app without definition'''
+    project.run(no_build, env, quota, command)
 
 
 @click.command()

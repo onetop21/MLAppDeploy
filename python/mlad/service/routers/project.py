@@ -15,8 +15,8 @@ from mlad.core import exceptions
 router = APIRouter()
 
 
-def _check_session_key(project, session, cli):
-    project_session = ctlr.get_project_session(cli, project)
+def _check_session_key(project, session):
+    project_session = ctlr.get_project_session(project)
     if project_session == session:
         return True
     else:
@@ -26,77 +26,75 @@ def _check_session_key(project, session, cli):
 @router.post("/project")
 def project_create(req: project.CreateRequest, allow_reuse: bool = Query(False),
                    session: str = Header(None)):
-    cli = ctlr.get_api_client()
-
     base_labels = req.base_labels
     extra_envs = req.extra_envs
     credential = req.credential
 
     try:
         res = ctlr.create_project_network(
-            cli, base_labels, extra_envs, credential, allow_reuse=allow_reuse, stream=True)
+            base_labels, extra_envs, credential, allow_reuse=allow_reuse, stream=True)
 
         def create_project(gen):
             for _ in gen:
                 yield json.dumps(_)
+
+        return StreamingResponse(create_project(res))
     except TypeError as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=exception_detail(e))
-    return StreamingResponse(create_project(res))
 
 
 @router.get("/project")
 def projects(extra_labels: str = '', session: str = Header(None)):
-    cli = ctlr.get_api_client()
     try:
-        networks = ctlr.get_project_networks(cli, extra_labels.split(',') if extra_labels else [])
+        networks = ctlr.get_project_networks(extra_labels.split(',') if extra_labels else [])
         projects = []
         for k, v in networks.items():
-            inspect = ctlr.inspect_project_network(cli, v)
+            inspect = ctlr.inspect_project_network(v)
             projects.append(inspect)
+        return projects
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return projects
 
 
 @router.get("/project/{project_key}")
 def project_inspect(project_key:str, session: str = Header(None)):
-    cli = ctlr.get_api_client()
     try:
         key = str(project_key).replace('-','')
-        network = ctlr.get_project_network(cli, project_key=key)
+        network = ctlr.get_project_network(project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
-        inspect = ctlr.inspect_project_network(cli, network)
+        inspect = ctlr.inspect_project_network(network)
+        return inspect
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return inspect
 
 
 @router.delete("/project/{project_key}")
 def project_remove(project_key:str, session: str = Header(None)):
-    cli = ctlr.get_api_client()
     try:
         key = str(project_key).replace('-','')
-        network = ctlr.get_project_network(cli, project_key=key)
-        _check_session_key(network, session, cli)
+        network = ctlr.get_project_network(project_key=key)
+        _check_session_key(network, session)
         if not network:
             raise InvalidProjectError(project_key)           
 
-        res = ctlr.remove_project_network(cli, network, stream=True)
+        res = ctlr.remove_project_network(network, stream=True)
+
         def remove_project(gen):
             for _ in gen:
                 yield json.dumps(_)
+
+        return StreamingResponse(remove_project(res))
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidSessionError as e:
         raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return StreamingResponse(remove_project(res))
 
 
 @router.get("/project/{project_key}/logs")
@@ -105,17 +103,17 @@ def project_log(project_key: str, tail:str = Query('all'),
                 timestamps: bool = Query(False),
                 names_or_ids: list = Query(None),
                 session: str = Header(None)):
-    cli = ctlr.get_api_client()
+
     selected = True if names_or_ids else False
     try:
         key = str(project_key).replace('-','')
-        network = ctlr.get_project_network(cli, project_key=key)
+        network = ctlr.get_project_network(project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
 
         try:
-            targets = ctlr.get_service_with_names_or_ids(cli, key, names_or_ids)
-        except exception.NotFound as e:
+            targets = ctlr.get_service_with_names_or_ids(key, names_or_ids)
+        except exceptions.NotFound as e:
             if 'running' in str(e):
                 raise InvalidLogRequest("Cannot find running services.")
             else:
@@ -132,8 +130,7 @@ def project_log(project_key: str, tail:str = Query('all'),
                     cb()
         handler = disconnectHandler()
 
-        logs = ctlr.get_project_logs(cli, key,
-            tail, follow, timestamps, selected, handler, targets)
+        logs = ctlr.get_project_logs(key, tail, follow, timestamps, selected, handler, targets)
 
 
         def get_logs(logs):
@@ -143,7 +140,7 @@ def project_log(project_key: str, tail:str = Query('all'),
                     _['timestamp']=str(_['timestamp'])
                 yield json.dumps(_)
 
-
+        return StreamingResponse(get_logs(logs), background=handler)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidServiceError as e:
@@ -152,14 +149,12 @@ def project_log(project_key: str, tail:str = Query('all'),
         raise HTTPException(status_code=400, detail=exception_detail(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return StreamingResponse(get_logs(logs), background=handler)
 
 
 @router.get("/project/{project_key}/resource")
 def project_resource(project_key: str, session: str = Header(None)):
-    cli = ctlr.get_api_client()
     try:
-        res = ctlr.get_project_resources(cli, project_key)
+        res = ctlr.get_project_resources(project_key)
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    return res

@@ -36,7 +36,8 @@ def main():
         'psutil>=5.8.0,<5.9.0',
         'omegaconf>=2.0.6,<3.0.0',
         'kubernetes>=12.0.0,<13.0.0',
-        'PyJWT>=2.1.0,<3.0.0'
+        'PyJWT>=2.1.0,<3.0.0',
+        'Cerberus>=1.3.0,<1.4.0'
       ],
       entry_points='''
         [console_scripts]

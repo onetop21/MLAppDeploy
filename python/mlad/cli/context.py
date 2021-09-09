@@ -24,6 +24,7 @@ boilerplate = {
 }
 
 if not os.path.isfile(CTX_PATH):
+    Path(MLAD_HOME_PATH).mkdir(exist_ok=True, parents=True)
     OmegaConf.save(config=boilerplate, f=CTX_PATH)
 
 

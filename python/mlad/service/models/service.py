@@ -1,48 +1,95 @@
-from typing import List, Optional
+import json
+from typing import List, Optional, Union
 from pydantic import BaseModel
 
-class RestartPolicy(BaseModel):
-    condition: Optional[str]=None
-    delay: Optional[int]=None
-    max_attempts: Optional[int]=None
-    window: Optional[int]=None
 
 class Quota(BaseModel):
-    cpus: Optional[int]=None
-    gpus: Optional[int]=None
-    mems: Optional[str]=None
+    cpu: Optional[int]=None
+    gpu: Optional[int]=None
+    mem: Optional[str]=None
 
-class Deploy(BaseModel):
-    quota: Optional[Quota]= None
-    constraints: Optional[dict]=None
-    restart_policy: Optional[RestartPolicy]=None
-    replicas: Optional[int]=None
 
-class Service(BaseModel):
-    name: str #service_name
-    # Deprecated: decide type by restart policy.
-    #type: Optional[str] = 'job' #job or rc
+class Ingress(BaseModel):
+    name: str = None
+    rewritePath: bool = True
+    port: str = None
+
+
+class Component(BaseModel):
+    kind = 'Component'
+    name: str
     image: Optional[str] = None
     env: Optional[dict] = None
-    depends: Optional[list] = None
-    command: Optional[str] = None
-    arguments: Optional[str] = None
-    #labels: dict
-    ports: Optional[list]=None #k8s Required
-    deploy: Optional[Deploy]=None
-    # For Plugin
-    service_type: Optional[str] = None
-    expose: Optional[int] = None
+    ports: Optional[list] = None
+    command: Optional[Union[list, str]] = None
+    args: Optional[Union[list, str]] = None
+    ports: Optional[list] = None
+    mounts: Optional[list] = None
+    ingress: Optional[Ingress] = None
+
+
+class Constraint(BaseModel):
+    hostname: Optional[str] = None
+    label: Optional[dict] = None
+
+
+class AppBase(Component):
+    kind = 'App'
+    constraints: Optional[Constraint] = None
+
+
+class AdvancedBase(AppBase):
+    resources: Optional[dict] = None
+
+
+class App(AppBase):
+    restartPolicy: Optional[str] = 'never'
+    scale: Optional[int] = 1
+    quota: Optional[Quota] = None
+
+
+class JobRunSpec(BaseModel):
+    restartPolicy: Optional[str] = 'never'
+    parallelism: Optional[int] = 1
+    completion: Optional[int] = 1
+
+
+class Job(AdvancedBase):
+    kind = 'Job'
+    runSpec: Optional[JobRunSpec] = None
+
+
+class AutoScaler(BaseModel):
+    enable: Optional[bool] = False
+    min: Optional[int] = 1
+    max: Optional[int] = 1
+    metrics: Optional[list] = None
+
+
+class SerivceRunSpec(BaseModel):
+    replicas: Optional[int] = 1
+    autoscaler: Optional[AutoScaler] = None
+
+
+class Service(AdvancedBase):
+    kind = 'Service'
+    runSpec: Optional[SerivceRunSpec] = None
 
 
 class CreateRequest(BaseModel):
-    services: List[Service]
-    
+    services: List[dict]
+
     @property
     def json(self):
-        import json
         targets = dict()
         for _ in self.services:
+            kind = _['kind']
+            if kind == 'App':
+                _ = App(**_)
+            elif kind == 'Job':
+                _ = Job(**_)
+            elif kind == 'Service':
+                _ = Service(**_)
             service = json.loads(_.json())
             targets[_.name]=service
             del targets[_.name]['name']
