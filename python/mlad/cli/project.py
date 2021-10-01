@@ -553,7 +553,7 @@ def down(services, no_dump):
                 dump_logs(target[1], log_dir)
         if targets:
             res = API.service.remove(project_key, services=[target[1] for target in targets],
-                                     stream=True, timeout=60)
+                                     stream=True)
             try:
                 for _ in res:
                     if 'result' not in _:

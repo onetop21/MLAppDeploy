@@ -43,7 +43,7 @@ class Service(APIBase):
         path = f'/{project_key}/service'
         if stream:
             resp = self._delete(path, params={'stream': stream}, body={'services': services},
-                                stream=True, raw=True)
+                                stream=True, raw=True, timeout=60)
             for _ in resp.iter_content(1024):
                 res = _.decode()
                 dict_res = json.loads(res)
