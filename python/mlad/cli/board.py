@@ -8,7 +8,8 @@ from typing import List
 from omegaconf import OmegaConf
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
-    MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError
+    MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError,
+    MLADBoardAlreadyActivatedError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
@@ -22,6 +23,14 @@ def activate() -> None:
     image_tag = _obtain_board_image_tag()
     if image_tag is None:
         raise BoardImageNotExistError
+
+    try:
+        cli.containers.get('mlad-board')
+    except docker.errors.NotFound:
+        pass
+    else:
+        raise MLADBoardAlreadyActivatedError
+
     cli.containers.run(
         image_tag,
         environment=[
@@ -36,6 +45,12 @@ def activate() -> None:
 
 
 def deactivate() -> None:
+
+    try:
+        cli.containers.get('mlad-board')
+    except docker.errors.NotFound:
+        raise MLADBoardNotActivatedError
+
     host_ip = _obtain_host()
     requests.delete(f'{host_ip}:2021/mlad/component', json={
         'name': 'mlad-board'

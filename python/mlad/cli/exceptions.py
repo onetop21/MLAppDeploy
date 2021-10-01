@@ -45,6 +45,12 @@ class MLADBoardNotActivatedError(Exception):
         return 'The MLAD dashboard is not activated.'
 
 
+class MLADBoardAlreadyActivatedError(Exception):
+
+    def __str__(self):
+        return 'The MLAD dashboard is already activated at localhost:2021'
+
+
 class BoardImageNotExistError(Exception):
 
     def __str__(self):
