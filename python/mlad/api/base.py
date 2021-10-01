@@ -16,7 +16,7 @@ class APIBase:
              raw: bool = False, stream: bool = False):
         url = f'{self.baseurl}{path}'
         res = requests.get(url=url, headers=self.headers, params=params,
-                           timeout=3, stream=stream)
+                           timeout=30, stream=stream)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -24,7 +24,7 @@ class APIBase:
               raw: bool = False, stream: bool = False):
         url = f'{self.baseurl}{path}'
         res = requests.post(url=url, headers=self.headers, params=params, json=body,
-                            timeout=3, stream=stream)
+                            timeout=30, stream=stream)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -32,7 +32,7 @@ class APIBase:
                 raw: bool = False, stream: bool = False):
         url = f'{self.baseurl}{path}'
         res = requests.delete(url=url, headers=self.headers, params=params, json=body,
-                              timeout=3, stream=stream)
+                              timeout=30, stream=stream)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -40,6 +40,6 @@ class APIBase:
              raw: bool = False, stream: bool = False):
         url = f'{self.baseurl}{path}'
         res = requests.put(url=url, headers=self.headers, params=params, json=body,
-                           timeout=3, stream=stream)
+                           timeout=30, stream=stream)
         self.raise_error(res)
         return res if raw else res.json()
