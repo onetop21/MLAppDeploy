@@ -10,7 +10,7 @@ class Project(APIBase):
 
     def get(self, extra_labels=[]):
         params = {'extra_labels': ','.join(extra_labels)}
-        return self._get('/', params=params)
+        return self._get('', params=params)
 
     def create(self, base_labels, extra_envs=[], credential=None, allow_reuse=False):
         body = {
@@ -19,7 +19,7 @@ class Project(APIBase):
             'credential': credential
         }
         params = {'allow_reuse': allow_reuse}
-        resp = self._post('/', params=params, body=body, raw=True, stream=True)
+        resp = self._post('', params=params, body=body, raw=True, stream=True)
         res = ''
         for _ in resp.iter_content(1024):
             res += _.decode()
