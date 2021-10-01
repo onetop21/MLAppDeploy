@@ -35,7 +35,7 @@ class Project(APIBase):
         return self._get(f'/{project_key}')
 
     def delete(self, project_key):
-        resp = self._delete(f'/{project_key}', stream=True)
+        resp = self._delete(f'/{project_key}', stream=True, raw=True)
         for _ in resp.iter_content(1024):
             res = _.decode()
             dict_res = json.loads(res)
