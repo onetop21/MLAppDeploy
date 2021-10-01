@@ -31,6 +31,7 @@ def env(unset=False) -> Tuple[List[str], str]:
     return ret, msg
 
 
-def get_env():
+def get_env(dict=False):
     ctx = get()
-    return context.get_env(ctx)
+    env = context.get_env(ctx)
+    return {e.split('=')[0]: e.split('=')[1] for e in env} if dict else env

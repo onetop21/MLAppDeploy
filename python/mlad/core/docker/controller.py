@@ -540,8 +540,6 @@ def inspect_image(image):
         raise TypeError('Parameter is not valid type.')
     headed = len([_ for _ in image.tags if _.endswith('latest')]) > 0
     labels = {
-        # for Manifest
-        'type': image.labels['MLAD.PROJECT.TYPE'], 
         # for Image
         'id': image.id.split(':',1)[-1],
         'short_id': image.short_id.split(':',1)[-1],
@@ -553,6 +551,7 @@ def inspect_image(image):
         'maintainer': image.attrs['Author'],
         'created': image.attrs['Created'],
         # for Project
+        'api_version': image.labels['MLAD.PROJECT.API_VERSION'],
         'workspace': image.labels['MLAD.PROJECT.WORKSPACE'] if 'MLAD.PROJECT.WORKSPACE' in image.labels else 'Not Supported',
         'project_name': image.labels['MLAD.PROJECT.NAME'],
     }

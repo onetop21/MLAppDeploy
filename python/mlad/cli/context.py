@@ -24,6 +24,7 @@ boilerplate = {
 }
 
 if not os.path.isfile(CTX_PATH):
+    Path(MLAD_HOME_PATH).mkdir(exist_ok=True, parents=True)
     OmegaConf.save(config=boilerplate, f=CTX_PATH)
 
 
@@ -232,6 +233,8 @@ def _s3_finalizer(datastore: StrDict) -> StrDict:
 def get_env(context: Context) -> List[str]:
     envs = []
     for k, v in context['datastore']['s3'].items():
+        if v is None:
+            v = ''
         if k == 'endpoint':
             envs.append(f'S3_ENDPOINT={v}')
         elif k == 'verify':
@@ -247,6 +250,8 @@ def get_env(context: Context) -> List[str]:
             envs.append(f'S3_{k.upper()}={v}')
 
     for k, v in context['datastore']['db'].items():
+        if v is None:
+            v = ''
         envs.append(f'DB_{k.upper()}={v}')
     envs = sorted(envs)
     return envs

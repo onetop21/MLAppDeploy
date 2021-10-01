@@ -52,7 +52,7 @@ class DelMonitor(Thread):
                     if pod in services[service]:
                         services[service].remove(pod)
                         if not services[service]:
-                            msg = f"Service {service} removed."
+                            msg = f'Service \'{service}\' removed.'
                             self.collector.queue.put({'result': 'succeed', 'stream': msg})
                         all_targets.remove(pod)
                         if not all_targets:

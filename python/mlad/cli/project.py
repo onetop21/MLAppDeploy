@@ -1,32 +1,27 @@
 import sys
 import os
-import io
 import time
-import tarfile
 import json
 import yaml
 import base64
 import docker
-from pathlib import Path
 from datetime import datetime
 from dateutil import parser
-from functools import lru_cache
 from collections import defaultdict
-from requests.exceptions import HTTPError
 from mlad.core.docker import controller as ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
-from mlad.core.default import config as default_config
 from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 from mlad.core import exceptions
+from mlad.cli.image import build as project_build
 from mlad.cli.libs import utils
-from mlad.cli.libs import datastore as ds
 from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
-from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
 from mlad.cli import config as config_core
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
+
+from mlad.cli.validator import project_validator
 
 
 def _parse_log(log, max_name_width=32, len_short_id=10):
@@ -37,7 +32,7 @@ def _parse_log(log, max_name_width=32, len_short_id=10):
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
     msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
     timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
-    return name, namewidth,  msg, timestamp
+    return name, namewidth, msg, timestamp
 
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
@@ -52,6 +47,7 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
             sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, timestamp, msg))
         else:
             sys.stdout.write(("{}{:%d}{} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, msg))
+
 
 def _get_default_logs(log):
     name, _, msg, timestamp = _parse_log(log, len_short_id=20)
@@ -70,9 +66,10 @@ def init(name, version, maintainer):
         print('Already generated project file.', file=sys.stderr)
         sys.exit(1)
 
-    if not name: name = input('Project Name : ')
-    #if not version: version = input('Project Version : ')
-    #if not author: author = input('Project Author : ')
+    if not name:
+        name = input('Project Name : ')
+    # if not version: version = input('Project Version : ')
+    # if not author: author = input('Project Author : ')
 
     with open(utils.DEFAULT_PROJECT_FILE, 'w') as f:
         f.write(PROJECT.format(
@@ -95,9 +92,9 @@ def list(no_trunc):
                 'MEM(Mi)', 'CPU', 'GPU')]
     for network in networks:
         project_key = network['key']
-        default = { 
-            'username': network['username'], 
-            'project': network['project'], 
+        default = {
+            'username': network['username'],
+            'project': network['project'],
             'image': network['image'],
             'services': 0, 'replicas': 0, 'tasks': 0,
             'hostname': network['workspace']['hostname'],
@@ -117,8 +114,8 @@ def list(no_trunc):
         used = defaultdict(lambda: 0)
         resources = API.project.resource(project_key)
         for service, resource in resources.items():
-            used['mem'] += resource['mem'] if not resource['mem'] == None else 0
-            used['cpu'] += resource['cpu'] if not resource['cpu'] == None else 0
+            used['mem'] += resource['mem'] if not resource['mem'] is None else 0
+            used['cpu'] += resource['cpu'] if not resource['cpu'] is None else 0
             used['gpu'] += resource['gpu']
         for k in used:
             used[k] = used[k] if no_trunc else round(used[k], 1)
@@ -152,15 +149,17 @@ def status(all, no_trunc):
         print('Cannot find running project.', file=sys.stderr)
         sys.exit(1)
 
-    task_info = []
     res = API.service.get(project_key)
+    columns = [
+        ('NAME', 'SERVICE', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
     for inspect in res['inspects']:
+        task_info = []
         try:
-            for pod_name, pod in API.service.get_tasks(project_key, inspect['id']).items():
+            ports = [*inspect['ports']][0] if inspect['ports'] else '-'
+            for pod_name, pod in API.service.get_tasks(project_key, inspect['name']).items():
                 ready_cnt = 0
                 restart_cnt = 0
                 if pod['container_status']:
-                    container_cnt = len(pod['container_status'])
                     for _ in pod['container_status']:
                         restart_cnt += _['restart']
                         if _['ready']:
@@ -177,7 +176,7 @@ def status(all, no_trunc):
                 else:
                     uptime = f"{uptime:.0f} seconds"
 
-                res = resources[inspect['name']]
+                res = resources[inspect['name']].copy()
                 if res['mem'] is None:
                     res['mem'], res['cpu'] = 'NotReady', 'NotReady'
                     res['gpu'] = round(res['gpu'], 1) \
@@ -192,120 +191,74 @@ def status(all, no_trunc):
                     task_info.append((
                         pod_name,
                         inspect['name'],
-                        #ready,
                         pod['node'] if pod['node'] else '-',
                         pod['phase'],
                         'Running' if pod['status']['state'] == 'Running' else
                         pod['status']['detail']['reason'],
                         restart_cnt,
                         uptime,
+                        ports,
                         res['mem'],
                         res['cpu'],
                         res['gpu']
                     ))
-        except NotFound as e:
+        except NotFound:
             pass
-        columns = [('NAME', 'SERVICE', 'NODE','PHASE', 'STATUS','RESTART', 'AGE', 'MEM(Mi)', 'CPU', 'GPU')]
-        columns_data = []
-
-        for name, service, node, phase, status, restart_cnt, uptime, mem, cpu, gpu in task_info:
-            columns_data.append((name, service, node, phase, status, restart_cnt, uptime, mem, cpu, gpu))
-        columns_data = sorted(columns_data, key=lambda x: x[1])
-        columns += columns_data
-    username = utils.get_username(config.mlad.session)
+        columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
+    username = utils.get_username(config.session)
     print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
     utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
 
 
-def run(with_build):
-    project = utils.get_project(default_project)
+def run(no_build, env, quota, command):
+    SERVICE_NAME = 'run-app'
+    # TBD : option or static value
+    timeout = 0xFFFF
 
-    if with_build:
-        build(False, True)
+    if not no_build:
+        project_build(False, False, False)
 
-    print('Deploying test container image to local...')
+    envs = dict(os.environ) if env else {}
+
+    quota = {_.split('=')[0]: _.split('=')[1] for _ in quota} if quota else {}
+    for k, v in quota.items():
+        quota[k] = int(v) if k == 'cpu' or k == 'gpu' else v
+
+    command = [_ for _ in command] if command else []
+
     config = config_core.get()
-
     cli = ctlr.get_api_client()
+    api = API(config.apiserver.address, config.session)
+
+    project = utils.get_project(default_project)
+    try:
+        project = project_validator.validate(project)
+    except project_validator.InvalidProjectYaml as e:
+        print('Errors:', e)
+        sys.exit(1)
+
     base_labels = core_utils.base_labels(
-            utils.get_workspace(), 
-            config.session,
-            project['project'])
+        utils.get_workspace(),
+        config.session,
+        project)
+
     project_key = base_labels['MLAD.PROJECT']
-    
-    with interrupt_handler(message='Wait.', blocked=True) as h:
-        try:
-            extra_envs = config_core.get_env()
-            for _ in ctlr.create_project_network(cli, base_labels, extra_envs, stream=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        network = ctlr.get_project_network(cli, network_id=_['id'])
-                    else:
-                        print(f"Unknown Stream Result [{_['stream']}]")
-                    break
-        except exception.AlreadyExist as e:
-            print('Already running project.', file=sys.stderr)
+
+    try:
+        inspect = api.project.inspect(project_key=project_key)
+        if inspect:
+            print('Failed to create project : Already exist project.')
             sys.exit(1)
-
-        # Start Containers
-        instances = ctlr.create_containers(cli, network, project['services'] or {})  
-        for instance in instances:
-            inspect = ctlr.inspect_container(instance)
-            print(f"Starting {inspect['name']}...")
-            time.sleep(1)
-
-    # Show Logs
-    with interrupt_handler(blocked=False) as h:
-        colorkey = {}
-        for _ in ctlr.container_logs(cli, project_key, 'all', True, False):
-            _print_log(_, colorkey, 32, ctlr.SHORT_LEN)
-
-    # Stop Containers and Network
-    with interrupt_handler(message='Wait.', blocked=True):
-        containers = ctlr.get_containers(cli, project_key).values()
-        ctlr.remove_containers(cli, containers)
-
-        try:
-            for _ in ctlr.remove_project_network(cli, network, stream=True):
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        print('Network removed.')
-                    break
-        except docker.errors.APIError as e:
-            print('Network already removed.', file=sys.stderr)
-    print('Done.')
-
-
-def up(services):
-    config = config_core.get()
-    cli = ctlr.get_api_client()
-    project = utils.get_project(default_project)
-
-    base_labels = core_utils.base_labels(
-            utils.get_workspace(), 
-            config.mlad.session,
-            project['project'])
-    project_key = base_labels['MLAD.PROJECT']
-
-    if not services:
-        try:
-            inspect = API.project.inspect(project_key=project_key)
-            if inspect:
-                print('Failed to create project : Already exist project.')
-                sys.exit(1)
-        except NotFound as e:
-            pass
+    except NotFound:
+        pass
 
     images = ctlr.get_images(cli, project_key=project_key)
     images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
-    
+
     # select suitable image
     if not images:
-        print(f"Cannot find built image of project [{project['project']['name']}].", file=sys.stderr)
+        print(f"Cannot find built image of project [{project['project']['name']}].",
+              file=sys.stderr)
         return
     image = images[0]
     repository = image.labels['MLAD.PROJECT.IMAGE']
@@ -318,8 +271,125 @@ def up(services):
         registry = f"{registry}/{config.docker.registry.namespace}"
     full_repository = f"{registry}/{repository}"
     image.tag(full_repository)
-    base_labels['MLAD.PROJECT.IMAGE']=full_repository
-    
+    base_labels['MLAD.PROJECT.IMAGE'] = full_repository
+
+    # Upload Image
+    print('Update project image to registry...')
+    try:
+        for _ in ctlr.push_image(cli, full_repository, stream=True):
+            if 'error' in _:
+                raise docker.errors.APIError(_['error'], None)
+            elif 'stream' in _:
+                sys.stdout.write(_['stream'])
+    except docker.errors.APIError as e:
+        print(e, file=sys.stderr)
+        print('Failed to Update Image to Registry.', file=sys.stderr)
+        print('Please Check Registry Server.', file=sys.stderr)
+        sys.exit(1)
+    except StopIteration:
+        pass
+
+    # AuthConfig
+    cli = ctlr.get_api_client()
+    headers = {'auths': json.loads(base64.urlsafe_b64decode(ctlr.get_auth_headers(cli)['X-Registry-Config'] or b'e30K'))}
+    encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
+    credential = encoded.decode()
+
+    extra_envs = config_core.get_env()
+
+    res = api.project.create(base_labels, extra_envs, credential=credential, allow_reuse=True)
+    try:
+        for _ in res:
+            if 'stream' in _:
+                sys.stdout.write(_['stream'])
+            if 'result' in _:
+                if _['result'] == 'succeed':
+                    break
+    except APIError as e:
+        print(e)
+        sys.exit(1)
+
+    service = {
+        'kind': 'App',
+        'name': SERVICE_NAME,
+        'command': command,
+        'env': envs,
+        'quota': quota
+    }
+
+    with interrupt_handler(message='Wait.', blocked=True) as h:
+        try:
+            instance = api.service.create(project_key, [service])[0]
+            name = instance['name']
+            inspect = api.service.inspect(project_key, name)
+            print(f"Starting \'{name}\'...")
+            time.sleep(1)
+        except APIError as e:
+            print(e)
+        if h.interrupted:
+            pass
+
+    for tick in range(timeout):
+        tasks = api.service.get_tasks(project_key, name)
+        phase = [tasks[_]['phase'] for _ in tasks][0]
+        if phase == 'Running' or phase == 'Succeeded':
+            break
+        else:
+            padding = '\033[1A\033[K' if tick else ''
+            sys.stdout.write(f"{padding}Wait service to be running...[{tick}s]\n")
+            time.sleep(1)
+
+    logs('all', True, True, SERVICE_NAME)
+    down(None, True)
+
+
+def up(service_names):
+    config = config_core.get()
+    cli = ctlr.get_api_client()
+    project = utils.get_project(default_project)
+    try:
+        project = project_validator.validate(project)
+    except project_validator.InvalidProjectYaml as e:
+        print('Errors:', e)
+        sys.exit(1)
+
+    base_labels = core_utils.base_labels(
+        utils.get_workspace(),
+        config.session,
+        project)
+
+    project_key = base_labels['MLAD.PROJECT']
+
+    if not service_names:
+        try:
+            inspect = API.project.inspect(project_key=project_key)
+            if inspect:
+                print('Failed to create project : Already exist project.')
+                sys.exit(1)
+        except NotFound:
+            pass
+
+    images = ctlr.get_images(cli, project_key=project_key)
+    images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
+
+    # select suitable image
+    if not images:
+        print(f"Cannot find built image of project [{project['project']['name']}].", file=sys.stderr)
+        return
+
+    image = images[0]
+    repository = image.labels['MLAD.PROJECT.IMAGE']
+    inspect = ctlr.inspect_image(image)
+
+    # set prefix to image name
+    parsed_url = utils.parse_url(config.docker.registry.address)
+    registry = parsed_url['address']
+    if config.docker.registry.namespace:
+        registry = f"{registry}/{config.docker.registry.namespace}"
+    full_repository = f"{registry}/{repository}"
+    image.tag(full_repository)
+    base_labels['MLAD.PROJECT.IMAGE'] = full_repository
+
     # Upload Image
     print('Update project image to registry...')
     try:
@@ -337,17 +407,27 @@ def up(services):
         pass
 
     print('Deploying services to cluster...')
-    if services:
+    if service_names:
         targets = {}
-        for name in services:
-            if name in project['services']:
-                targets[name] = project['services'][name]
-                #targets[name]['service_type'] = 'project'
+        for name in service_names:
+            if name in project['app']:
+                targets[name] = project['app'][name]
             else:
                 print(f'Cannot find service[{name}] in mlad-project.yaml.', file=sys.stderr)
                 sys.exit(1)
     else:
-        targets = project['services'] or {}
+        targets = project['app'] or {}
+
+    if 'ingress' in project:
+        ingress = project['ingress']
+        for name, _ in ingress.items():
+            service, port = _['target'].split(':')
+            if service in targets.keys():
+                targets[service]['ingress'] = {
+                    'name': name,
+                    'rewritePath': _['rewritePath'],
+                    'port': port
+                }
 
     # AuthConfig
     cli = ctlr.get_api_client()
@@ -357,19 +437,18 @@ def up(services):
 
     extra_envs = config_core.get_env()
 
-    if not services:
+    if len(service_names) == 0:
         res = API.project.create(project['project'], base_labels,
-            extra_envs, credential=credential, allow_reuse=False)
+                                 extra_envs, credential=credential, allow_reuse=False)
     else:
         res = API.project.create(project['project'], base_labels,
-            extra_envs, credential=credential, allow_reuse=True)
+                                 extra_envs, credential=credential, allow_reuse=True)
     try:
         for _ in res:
             if 'stream' in _:
                 sys.stdout.write(_['stream'])
             if 'result' in _:
                 if _['result'] == 'succeed':
-                    network_id = _['id']
                     break
     except APIError as e:
         print(e)
@@ -383,22 +462,26 @@ def up(services):
         if service_name in running_svc_names:
             print(f'Already running service[{service_name}] in project.', file=sys.stderr)
             excludes.append(service_name)
-    for _ in excludes: del targets[_]
+    for _ in excludes:
+        del targets[_]
 
     def _target_model(targets):
         services = []
         for k, v in targets.items():
-            v['name']=k
+            v['name'] = k
             services.append(v)
         return services
+
+    target_model = _target_model(targets)
 
     with interrupt_handler(message='Wait.', blocked=True) as h:
         target_model = _target_model(targets)
         try:
             instances = API.service.create(project_key, target_model)
             for instance in instances:
-                inspect = API.service.inspect(project_key, instance)
-                print(f"Starting {inspect['name']}...")
+                name = instance['name']
+                inspect = API.service.inspect(project_key, name)
+                print(f"Starting \'{name}\'...")
                 time.sleep(1)
         except APIError as e:
             print(e)
@@ -409,22 +492,21 @@ def up(services):
 
 
 def down(services, no_dump):
-    config = config_core.get()
     project_key = utils.project_key(utils.get_workspace())
-    workdir = utils.get_project(default_project)['project']['workdir']
+    workdir = utils.get_project(default_project)['workdir']
 
     # Block duplicated running.
     try:
         inspect = API.project.inspect(project_key=project_key)
-    except NotFound as e:
+    except NotFound:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
 
     if services:
         running_services = API.service.get(project_key)['inspects']
-        running_svc_names = [ _['name'] for _ in running_services ]
+        running_svc_names = [_['name'] for _ in running_services]
         for service_name in services:
-            if not service_name in running_svc_names:
+            if service_name not in running_svc_names:
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
 
@@ -439,20 +521,23 @@ def down(services, no_dump):
     def dump_logs(service, log_dir):
         path = f'{log_dir}/{service}.log'
         with open(path, 'w') as f:
-            logs = API.project.log(project_key, timestamps=True, names_or_ids=[service])
-            for _ in logs:
-                log = _get_default_logs(_)
-                f.write(log)
-        print(f'service {service} log saved')
+            try:
+                logs = API.project.log(project_key, timestamps=True, names_or_ids=[service])
+                for _ in logs:
+                    log = _get_default_logs(_)
+                    f.write(log)
+                print(f'Service \'{service}\' log saved.')
+            except NotFound:
+                print(f'Cannot get logs of pending service \'{service}\'.')
 
     with interrupt_handler(message='Wait.', blocked=False):
         running_services = API.service.get(project_key)['inspects']
-      
+
         def filtering(inspect):
             return not services or inspect['name'] in services
         targets = [(_['id'], _['name']) for _ in running_services if filtering(_)]
 
-        #Save desc & log
+        # Save desc & log
         if not no_dump:
             log_dir = _get_log_path()
             path = f'{log_dir}/description.yml'
@@ -462,15 +547,15 @@ def down(services, no_dump):
                 with open(path, 'w') as f:
                     yaml.dump(inspect, f)
 
-        #remove services
+        # remove services
         for target in targets:
             if not no_dump:
                 dump_logs(target[1], log_dir)
         if targets:
-            res = API.service.remove(project_key, services=[target[0] for target in targets], stream=True)
+            res = API.service.remove(project_key, services=[target[1] for target in targets], stream=True)
             try:
                 for _ in res:
-                    if not 'result' in _:
+                    if 'result' not in _:
                         sys.stdout.write(_['stream'])
                     if 'result' in _:
                         if _['result'] == 'stopped':
@@ -480,8 +565,8 @@ def down(services, no_dump):
             except APIError as e:
                 print(e)
                 sys.exit(1)
-        
-        #Remove Network
+
+        # Remove Network
         if not services or not API.service.get(project_key)['inspects']:
             res = API.project.delete(project_key)
             try:
@@ -502,19 +587,20 @@ def down_force(services, no_dump):
     '''down project using local k8s for admin'''
     cli = k8s_ctlr.get_api_client(context=k8s_ctlr.get_current_context())
     project_key = utils.project_key(utils.get_workspace())
-    workdir = utils.get_project(default_project)['project']['workdir']
+    workdir = utils.get_project(default_project)['workdir']
     network = k8s_ctlr.get_project_network(cli, project_key=project_key)
 
     if not network:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
-    network_inspect = k8s_ctlr.inspect_project_network(cli, network)
+    network_inspect = k8s_ctlr.inspect_project_network(network, cli)
+    namespace = network_inspect['name']
 
     def _get_running_services():
         inspects = []
-        _services = k8s_ctlr.get_services(cli, project_key)
+        _services = k8s_ctlr.get_services(project_key, cli=cli)
         for svc in _services.values():
-            inspect = k8s_ctlr.inspect_service(cli, svc)
+            inspect = k8s_ctlr.inspect_service(svc, cli)
             inspects.append(inspect)
         return inspects
 
@@ -522,7 +608,7 @@ def down_force(services, no_dump):
         running_services = _get_running_services()
         running_svc_names = [_['name'] for _ in running_services]
         for service_name in services:
-            if not service_name in running_svc_names:
+            if service_name not in running_svc_names:
                 print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
                 sys.exit(1)
 
@@ -537,14 +623,18 @@ def down_force(services, no_dump):
     def dump_logs(service, log_dir):
         path = f'{log_dir}/{service}.log'
         with open(path, 'w') as f:
-            targets = k8s_ctlr.get_service_with_names_or_ids(
-                cli, project_key, names_or_ids=[service])
-            logs = k8s_ctlr.get_project_logs(
-                cli, project_key, timestamps=True, targets=targets)
-            for _ in logs:
-                log = _get_default_logs(_)
-                f.write(log)
-        print(f'service {service} log saved')
+            try:
+                targets = k8s_ctlr.get_service_with_names_or_ids(
+                    project_key, names_or_ids=[service], cli=cli)
+            except exceptions.NotFound:
+                print(f'Cannot get logs of pending service \'{service}\'')
+            else:
+                logs = k8s_ctlr.get_project_logs(
+                    project_key, timestamps=True, targets=targets, cli=cli)
+                for _ in logs:
+                    log = _get_default_logs(_)
+                    f.write(log)
+                print(f'Service \'{service}\' log saved.')
 
     with interrupt_handler(message='Wait.', blocked=False):
         running_services = _get_running_services()
@@ -572,12 +662,12 @@ def down_force(services, no_dump):
                 dump_logs(target[1], log_dir)
 
         if targets:
-            _services = [k8s_ctlr.get_service(cli, service_id=target[0])
-                        for target in targets]
-            res = k8s_ctlr.remove_services(cli, _services, stream=True)
+            _services = [k8s_ctlr.get_service(target[1], namespace, cli)
+                         for target in targets]
+            res = k8s_ctlr.remove_services(_services, stream=True, cli=cli)
             try:
                 for _ in res:
-                    if not 'result' in _:
+                    if 'result' not in _:
                         sys.stdout.write(_['stream'])
                     if 'result' in _:
                         if _['result'] == 'stopped':
@@ -590,7 +680,7 @@ def down_force(services, no_dump):
 
         # Remove Network
         if not services or not _get_running_services():
-            res = k8s_ctlr.remove_project_network(cli, network, stream=True)
+            res = k8s_ctlr.remove_project_network(network, stream=True, cli=cli)
             for _ in res:
                 if 'stream' in _:
                     sys.stdout.write(_['stream'])
@@ -605,10 +695,9 @@ def logs(tail, follow, timestamps, names_or_ids):
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
-        project = API.project.inspect(project_key)
-        logs = API.project.log(project_key, tail, follow,
-            timestamps, names_or_ids)
-    except NotFound as e:
+        API.project.inspect(project_key)
+        logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
+    except NotFound:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
@@ -624,22 +713,20 @@ def logs(tail, follow, timestamps, names_or_ids):
 
 
 def scale(scales):
-    scale_spec = dict([ scale.split('=') for scale in scales ])
-    config = config_core.get()
+    scale_spec = dict([scale.split('=') for scale in scales])
     project_key = utils.project_key(utils.get_workspace())
-    try:    
-        project = API.project.inspect(project_key)
-    except NotFound as e:
+    try:
+        API.project.inspect(project_key)
+    except NotFound:
         print('Cannot find running service.', file=sys.stderr)
         sys.exit(1)
 
     inspects = API.service.get(project_key)['inspects']
+    services = [_['name'] for _ in inspects]
 
-    services = dict([(_['name'], _['id']) for _ in inspects])
     for service in scale_spec:
         if service in services:
-            res = API.service.scale(project_key, services[service],
-                scale_spec[service])
+            API.service.scale(project_key, service, scale_spec[service])
             print(f'Service scale updated: {service}')
         else:
             print(f'Invalid service name: {service}')

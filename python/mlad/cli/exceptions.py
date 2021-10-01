@@ -37,3 +37,24 @@ class InvalidPropertyError(Exception):
 
     def __str__(self):
         return f'There is no matched key in "{self._arg}".'
+
+
+class MLADBoardNotActivatedError(Exception):
+
+    def __str__(self):
+        return 'The MLAD dashboard is not activated.'
+
+
+class BoardImageNotExistError(Exception):
+
+    def __str__(self):
+        return 'The MLAD dashboard image does not exist.'
+
+
+class ComponentImageNotExistError(Exception):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return f'The component [{self.name}] image does not exist.'

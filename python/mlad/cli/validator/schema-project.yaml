@@ -1,0 +1,24 @@
+!include schema-definitions.yaml
+
+############################
+# MLAppDeploy Project v0.2 #
+############################
+<<: *metadata
+workspace:
+  type: dict
+  selector: [*workspace, *dockerfile]
+  order: 10
+  coerce: selector
+ingress:
+  type: dict
+  valuesrules:
+    type: dict
+    schema: *ingress
+  order: 20
+app:
+  type: dict
+  valuesrules:
+    type: dict
+    selector: [*app, *job, *service]
+    coerce: selector
+  order: 30

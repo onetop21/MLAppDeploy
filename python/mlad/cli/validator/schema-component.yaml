@@ -1,0 +1,14 @@
+!include schema-definitions.yaml
+
+############################
+# MLAppDeploy Project v0.2 #
+############################
+<<: *metadata
+workspace:
+  type: dict
+  selector: [*workspace, *dockerfile]
+app:
+  type: dict
+  valuesrules:
+    type: dict
+    selector: [*component]

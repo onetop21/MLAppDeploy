@@ -52,16 +52,17 @@ def get_auth_headers(cli, image_name=None, auth_configs=None):
     return docker_controller.get_auth_headers(docker.from_env(), image_name, auth_configs)
 
 
-def get_project_networks(cli, extra_labels=[]):
+def get_project_networks(extra_labels=[], cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    selector = ['MLAD.PROJECT.TYPE'] + (extra_labels or ['MLAD.PROJECT.TYPE=project'])
+    #selector = ['MLAD.PROJECT.TYPE'] + (extra_labels or ['MLAD.PROJECT.TYPE=project'])
+    selector = ['MLAD.PROJECT'] + extra_labels
     namespaces = api.list_namespace(label_selector=','.join(selector))
     return dict([(_.metadata.name, _) for _ in namespaces.items])
 
 
-def get_project_network(cli, **kwargs):
+def get_project_network(cli=DEFAULT_CLI, **kwargs):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -94,15 +95,13 @@ def get_labels(obj):
         raise TypeError('Parameter is not valid type.')
 
 
-def get_config_labels(cli, obj, key):
+def get_config_labels(namespace, key, cli=DEFAULT_CLI):
     # key='project-labels', 'service-{name}-labels'
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    if isinstance(obj, client.models.v1_namespace.V1Namespace):
-        namespace = obj.metadata.name
-    elif isinstance(obj, client.models.v1_service.V1Service):
-        namespace = obj.metadata.namespace
+    if isinstance(namespace, client.models.v1_namespace.V1Namespace):
+        namespace = namespace.metadata.name
     ret = api.read_namespaced_config_map(key, namespace)
     return ret.data
 
@@ -121,14 +120,14 @@ def create_config_labels(cli, key, namespace, labels):
     return ret.data
 
 
-def inspect_project_network(cli, network):
+def inspect_project_network(network, cli=DEFAULT_CLI):
     if not isinstance(network, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
     labels = get_labels(network)
     if network.metadata.deletion_timestamp:
         return {'deleted': True, 'key': uuid.UUID(labels['MLAD.PROJECT'])}
     created = network.metadata.creation_timestamp
-    config_labels = get_config_labels(cli, network, 'project-labels')
+    config_labels = get_config_labels(network, 'project-labels', cli)
     hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
     return {
         'key': uuid.UUID(labels['MLAD.PROJECT']),
@@ -147,14 +146,15 @@ def inspect_project_network(cli, network):
     }
 
 
-def get_project_session(cli, network):
+def get_project_session(network, cli=DEFAULT_CLI):
     if not isinstance(network, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
-    config_labels = get_config_labels(cli, network, 'project-labels')
+    config_labels = get_config_labels(network, 'project-labels', cli)
     return config_labels['MLAD.PROJECT.SESSION']
 
 
-def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse=False, stream=False):
+def create_project_network(base_labels, extra_envs, credential, allow_reuse=False, stream=False,
+                           cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -171,8 +171,6 @@ def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse
                 return (network, stream_out)
         raise NetworkAlreadyExistError(project_key)
     basename = base_labels['MLAD.PROJECT.BASE']
-    # project_version = base_labels['MLAD.PROJECT.VERSION']
-    # default_image = base_labels['MLAD.PROJECT.IMAGE']
 
     def resp_stream():
         network_name = f"{basename}-cluster"
@@ -188,7 +186,7 @@ def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse
             keys = {
                 'MLAD.PROJECT': labels['MLAD.PROJECT'],
                 'MLAD.PROJECT.NAME': labels['MLAD.PROJECT.NAME'],
-                'MLAD.PROJECT.TYPE': labels['MLAD.PROJECT.TYPE'],
+                #'MLAD.PROJECT.TYPE': labels['MLAD.PROJECT.TYPE'],
             }
             api.create_namespace(
                 client.V1Namespace(
@@ -218,13 +216,13 @@ def create_project_network(cli, base_labels, extra_envs, credential, allow_reuse
         return (get_project_network(cli, project_key=project_key), stream_out)
 
 
-def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
+def remove_project_network(network, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     if not isinstance(network, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    network_info = inspect_project_network(cli, network)
+    network_info = inspect_project_network(network, cli)
     api.delete_namespace(network.metadata.name)
 
     def resp_stream():
@@ -235,7 +233,7 @@ def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
                 break
             else:
                 padding = '\033[1A\033[K' if tick else ''
-                message = f"{padding}Wait to remove network [{tick}s]\n"
+                message = f"{padding}Wait to remove network...[{tick}s]\n"
                 yield {'stream': message}
                 time.sleep(1)
         if not removed:
@@ -255,46 +253,72 @@ def get_containers(cli, project_key=None, extra_filters={}):
     return docker_controller.get_containers(docker.from_env(), project_key, extra_filters)
 
 
-def get_services(cli, project_key=None, extra_filters={}):
+def _get_job(cli, name, namespace):
+    api = client.BatchV1Api(cli)
+    return api.read_namespaced_job(name, namespace)
+
+
+def _get_deployment(cli, name, namespace):
+    api = client.AppsV1Api(cli)
+    return api.read_namespaced_deployment(name, namespace)
+
+
+def get_service(name, namespace, cli = DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
+    key = f'service-{name}-labels'
+    config_labels = get_config_labels(namespace, key, cli)
+    controller = config_labels['MLAD.PROJECT.SERVICE.CONTROLLER']
+    name = config_labels['MLAD.PROJECT.SERVICE']
+    service = get_service_from_controller(cli, name, namespace, controller)
+    return service
+
+
+def get_services(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    batch_api = client.BatchV1Api(cli)
+    apps_api = client.AppsV1Api(cli)
     filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
     filters += [f'{key}={value}' for key, value in extra_filters.items()]
-    services = api.list_service_for_all_namespaces(label_selector=','.join(filters))
+
+    services = []
+    services += batch_api.list_job_for_all_namespaces(label_selector=','.join(filters)).items
+    services += apps_api.list_deployment_for_all_namespaces(label_selector=','.join(filters)).items
+
     if project_key:
-        return dict([(_.metadata.labels['MLAD.PROJECT.SERVICE'], _) for _ in services.items])
+        return dict([(_.metadata.labels['MLAD.PROJECT.SERVICE'], _) for _ in services])
     else:
-        return dict([(_.metadata.name, _) for _ in services.items])
+        return dict([(_.metadata.name, _) for _ in services])
 
 
-def get_service(cli, **kwargs):
+def get_deployed_service(cli, namespace, name):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    if kwargs.get('service_id'):
-        service = api.list_service_for_all_namespaces(label_selector=f"uid={kwargs.get('service_id')}")
-    elif kwargs.get('service_name') and kwargs.get('namespace'):
-        service = api.list_namespaced_service(kwargs.get('namespace'),
-                                              label_selector=f"MLAD.PROJECT.SERVICE={kwargs.get('service_name')}" )
+    service = api.list_namespaced_service(
+        namespace, label_selector=f"MLAD.PROJECT.SERVICE={name}")
     if not service.items:
         return None
     elif len(service.items) == 1:
         return service.items[0]
 
 
-def get_service_from_kind(cli, service_name, namespace, kind):
+def get_service_from_controller(cli, service_name, namespace, controller):
     # get job or rc of service
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     core_api = client.CoreV1Api(cli)
     batch_api = client.BatchV1Api(cli)
-    if kind == 'job':
+    apps_api = client.AppsV1Api(cli)
+    if controller == 'Job':
         service = batch_api.list_namespaced_job(
             namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
-    elif kind == 'rc':
-        service = core_api.list_namespaced_replication_controller(
+    elif controller == 'Deployment':
+        service = apps_api.list_namespaced_deployment(
             namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
+
     if not service.items:
         return None
     elif len(service.items) == 1:
@@ -371,42 +395,38 @@ def get_pod_info(pod):
         pod_info['status'] = {
             'state': 'Waiting',
             'detail': {
-                'reason': pod.status.conditions[0].reason
+                'reason': pod.status.conditions[0].reason if pod.status.conditions else None
             }
         }
     return pod_info
 
 
-def _get_job(cli, name, namespace):
-    api = client.BatchV1Api(cli)
-    return api.read_namespaced_job(name, namespace)
+def inspect_service(service, cli=DEFAULT_CLI):
+    controller = None
+    if isinstance(service, client.models.v1_deployment.V1Deployment):
+        controller = 'Deployment'
+    elif isinstance(service, client.models.v1_job.V1Job):
+        controller = 'Job'
+    else: raise TypeError('Parameter is not valid type.')
 
-
-def _get_replication_controller(cli, name, namespace):
     api = client.CoreV1Api(cli)
-    return api.read_namespaced_replication_controller(name, namespace)
 
-
-def inspect_service(cli, service):
-    if not isinstance(service, client.models.v1_service.V1Service): raise TypeError('Parameter is not valid type.')
-    api = client.CoreV1Api(cli)
-    service_name = service.metadata.name
+    name = service.metadata.name
     namespace = service.metadata.namespace
-    config_labels = get_config_labels(cli, service,
-                                      f'service-{service_name}-labels')
-    labels = service.metadata.labels
+    config_labels = get_config_labels(namespace, f'service-{name}-labels', cli)
 
-    kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
-    if kind == 'job':
-        replica_ret = _get_job(cli, service_name, namespace)
-    elif kind == 'rc':
-        replica_ret = _get_replication_controller(cli, service_name, namespace)
-    pod_ret = api.list_namespaced_pod(namespace, label_selector=f'MLAD.PROJECT.SERVICE={service_name}')
+    if controller == 'Job':
+        replica_ret = _get_job(cli, name, namespace)
+    elif controller == 'Deployment':
+        replica_ret = _get_deployment(cli, name, namespace)
+    pod_ret = api.list_namespaced_pod(namespace,
+                                      label_selector=f'MLAD.PROJECT.SERVICE={name}')
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
-   
+
     inspect = {
-        'key': uuid.UUID(config_labels['MLAD.PROJECT']) if config_labels.get('MLAD.VERSION') else '',
+        'key': uuid.UUID(config_labels['MLAD.PROJECT']) if config_labels.get(
+            'MLAD.VERSION') else '',
         'workspace': {
             'hostname': hostname,
             'path': path
@@ -414,28 +434,34 @@ def inspect_service(cli, service):
         'username': config_labels.get('MLAD.PROJECT.USERNAME'),
         'network': config_labels.get('MLAD.PROJECT.NETWORK'),
         'project': config_labels.get('MLAD.PROJECT.NAME'),
-        'project_id': uuid.UUID(config_labels['MLAD.PROJECT.ID']) if config_labels.get('MLAD.VERSION') else '',
+        'project_id': uuid.UUID(config_labels['MLAD.PROJECT.ID']) if config_labels.get(
+            'MLAD.VERSION') else '',
         'version': config_labels.get('MLAD.PROJECT.VERSION'),
         'base': config_labels.get('MLAD.PROJECT.BASE'),
-        'image': replica_ret.spec.template.spec.containers[0].image, # Replace from labels['MLAD.PROJECT.IMAGE']
+        'image': replica_ret.spec.template.spec.containers[0].image,
+        # Replace from labels['MLAD.PROJECT.IMAGE']
 
         'id': service.metadata.uid,
-        'name': config_labels.get('MLAD.PROJECT.SERVICE'), 
-        'replicas': replica_ret.spec.parallelism if kind == 'job' else replica_ret.spec.replicas,
+        'name': config_labels.get('MLAD.PROJECT.SERVICE'),
+        'replicas': replica_ret.spec.parallelism if controller == 'Job'
+            else replica_ret.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': {},
         'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
         'created': replica_ret.metadata.creation_timestamp,
+        'kind': config_labels.get('MLAD.PROJECT.SERVICE.KIND')
     }
 
-    if service.spec.ports:
-        for _ in service.spec.ports:
-            target = _.target_port
-            published = _.port
-            inspect['ports'][f"{target}->{published}"] = {
-                'target': target,
-                'published': published
-            }
+    deployed_service = get_deployed_service(cli, namespace, name)
+    if deployed_service:
+        if deployed_service.spec.ports:
+            for _ in deployed_service.spec.ports:
+                target = _.target_port
+                published = _.port
+                inspect['ports'][f"{target}->{published}"] = {
+                    'target': target,
+                    'published': published
+                }
     return inspect
 
 
@@ -443,23 +469,128 @@ def create_containers(cli, network, services, extra_labels={}):
     return docker_controller.create_containers(docker.from_env(), network, services, extra_labels)
 
 
-def _create_job(cli, name, image, command, namespace='default', envs=None, 
-                restart_policy='Never', replicas=1, cpu=None, gpu=None, mem=None, 
-                labels=None, constraints={}, secrets=None):
-    resources = {}
-    if cpu: resources['cpu'] = str(cpu)
-    if gpu: resources['nvidia.com/gpu'] = str(gpu)
-    if mem: resources['memory'] = str(mem)
-    # hostname: docker-desktop -> kubernetes.io/hostname: docker-desktop
-    # labels.hello: world      -> hello: world
-    constraints = dict([(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_]) for _ in constraints])
+def _create_autoscaler(cli, namespace, name, labels, spec):
+    api = client.AutoscalingV2beta2Api(cli)
+
+    metrics = spec['metrics']
+    _metrics = [client.V2beta2MetricSpec(
+        type='Resource',
+        resource=client.V2beta2ResourceMetricSource(
+            name=_['resources'], #ex. cpu, memory
+            target=client.V2beta2MetricTarget(
+                type='Utilization',
+                average_utilization=60
+            )
+        )) for _ in metrics]
+
+    body = client.V2beta2HorizontalPodAutoscaler(
+        metadata=client.V1ObjectMeta(name=name, labels=labels),
+        spec=client.V2beta2HorizontalPodAutoscalerSpec(
+            max_replicas=spec['max'],
+            min_replicas=spec['min'],
+            metrics=_metrics,
+            scale_target_ref=client.V2beta2CrossVersionObjectReference(
+                api_version='apps/v1',
+                kind='Deployment',
+                name=name
+            )
+        )
+    )
+    api_response = api.create_namespaced_horizontal_pod_autoscaler(namespace, body)
+    return api_response
+
+
+def _mounts_to_V1Volume(name, mounts):
+    _mounts = []
+    _volumes = []
+    if mounts:
+        for i, _ in enumerate(mounts):
+            host_path, mount_path = _.split(":")[0], _.split(":")[1]
+            volume_name = f'{name}-mnt{i}'
+            _mounts.append(
+                client.V1VolumeMount(
+                    name=volume_name,
+                    mount_path=mount_path,
+                )
+            )
+            _volumes.append(
+                client.V1Volume(
+                    name=volume_name,
+                    host_path=client.V1HostPathVolumeSource(
+                        path=host_path
+                        #type=Directory
+                    )
+                )
+            )
+    return _mounts, _volumes
+
+
+def _resources_to_V1Resource(type='Quota', resources=None):
+    limits = {}
+    requests = {}
+    if type == 'Quota':
+        for type in resources:
+            if type == 'cpu':
+                requests['cpu'] = str(resources['cpu']) if resources[type] else None
+            elif type == 'gpu':
+                requests['nvidia.com/gpu'] = str(resources['gpu']) \
+                if resources[type] else None
+            elif type == 'mem':
+                requests['memory'] = str(resources['mem']) \
+                if resources[type] else None
+        limits = requests
+    elif type == 'Resources':
+        if 'limits' in resources:
+            for type in resources['limits']:
+                if type == 'cpu':
+                    limits['cpu'] = str(resources['limits']['cpu'])
+                elif type == 'gpu':
+                    limits['nvidia.com/gpu'] = str(resources['limits']['gpu'])
+                elif type == 'mem':
+                    limits['mem'] = str(resources['limits']['mem'])
+        if 'requests' in resources:
+            for type in resources['requests']:
+                if type == 'cpu':
+                    requests['cpu'] = str(resources['requests']['cpu'])
+                elif type == 'gpu':
+                    requests['nvidia.com/gpu'] = str(resources['requests']['gpu'])
+                elif type == 'mem':
+                    requests['mem'] = str(resources['requests']['mem'])
+    return client.V1ResourceRequirements(limits=limits, requests=requests)
+
+
+def _constraints_to_labels(constraints):
+    _constraints = {}
+    if constraints:
+        for k, v in constraints.items():
+            if constraints[k]:
+                if k == 'hostname':
+                    _constraints["kubernetes.io/hostname"] = v
+                else:
+                    for _ in v:
+                        _constraints[_] = str(v[_])
+    return _constraints
+
+
+def _create_job(name, image, command, namespace='default', restart_policy='Never',
+                envs=None, mounts=None, parallelism=None, completions=None, quota=None, resources=None,
+                labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
+
+    _resources = _resources_to_V1Resource(resources=quota) if quota \
+        else _resources_to_V1Resource(type='Resources', resources=resources) if resources \
+        else None
+
+    _constraints =_constraints_to_labels(constraints)
+
+    _mounts, _volumes = _mounts_to_V1Volume(name, mounts)
 
     api = client.BatchV1Api(cli)
     body=client.V1Job(
         metadata=client.V1ObjectMeta(name=name,labels=labels),
         spec=client.V1JobSpec(
             backoff_limit=0,
-            parallelism=replicas,
+            parallelism=parallelism,
+            completions=completions,
             selector={'MLAD.PROJECT.SERVICE': name},
             template=client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(name=name, labels=labels),
@@ -473,237 +604,250 @@ def _create_job(cli, name, image, command, namespace='default', envs=None,
                             image_pull_policy='Always', #TODO modify to option
                             command=command,
                             env=envs,
-                            resources=client.V1ResourceRequirements(
-                                limits=dict(
-                                    list(resources.items())
-                                ),
-                                requests=dict(
-                                    list(resources.items())
-                                )
-                            )
+                            resources=_resources,
+                            volume_mounts=_mounts
                         )
                     ],
-                    node_selector = constraints,
-                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secrets else None
+                    volumes=_volumes,
+                    node_selector = _constraints,
+                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)]
+                    if secrets else None
                 )
             )
-        )  
+        )
     )
     api_response = api.create_namespaced_job(namespace, body)
     return api_response
 
 
-def _create_replication_controller(cli, name, image, command, namespace='default',
-                                   envs=None, restart_policy='Always', 
-                                   replicas=1, cpu=None, gpu=None, mem=None,
-                                   labels=None, constraints={}, secrets=None):
-    resources = {}
-    if cpu:
-        resources['cpu'] = str(cpu)
-    if gpu:
-        resources['nvidia.com/gpu'] = str(gpu)
-    if mem:
-        resources['memory'] = str(mem)
-    constraints = dict([(_[7:] if _.startswith('labels.') else f"kubernetes.io/{_}", constraints[_])
-                        for _ in constraints])
+def _create_deployment(cli, name, image, command, namespace='default',
+                       envs=None, mounts=None, replicas=1, quota=None, resources=None,
+                       labels=None, constraints=None, secrets=None):
 
-    api = client.CoreV1Api(cli)
-    body=client.V1ReplicationController(
+    _resources = _resources_to_V1Resource(resources=quota) if quota \
+        else _resources_to_V1Resource(type='Resources', resources=resources) if resources \
+        else None
+
+    _constraints = _constraints_to_labels(constraints)
+
+    _mounts, _volumes = _mounts_to_V1Volume(name, mounts)
+
+    api = client.AppsV1Api(cli)
+    body = client.V1Deployment(
         metadata=client.V1ObjectMeta(
             name=name,
             labels=labels
         ),
-        spec=client.V1ReplicationControllerSpec(
+        spec=client.V1DeploymentSpec(
             replicas=replicas,
-            selector={'MLAD.PROJECT.SERVICE': name},
+            selector=client.V1LabelSelector(
+                match_labels={'MLAD.PROJECT.SERVICE': name}
+            ),
             template=client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(
                     name=name,
                     labels=labels
                 ),
-                spec=client.V1PodSpec(
-                    restart_policy=restart_policy, #Always, OnFailure, Never
+                spec = client.V1PodSpec(
+                    restart_policy='Always',
                     containers=[client.V1Container(
                         name=name,
                         image=image,
-                        image_pull_policy='Always',  # TODO modify to option
+                        image_pull_policy='Always',
                         env=envs,
                         command=command,
-                        resources=client.V1ResourceRequirements(
-                            limits=dict(
-                                list(resources.items())
-                            ),
-                            requests=dict(
-                                list(resources.items())
-                            )
-                        )
+                        resources=_resources,
+                        volume_mounts=_mounts
                     )],
-                    node_selector = constraints,
-                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)] if secrets else None
+                    volumes=_volumes,
+                    node_selector=_constraints,
+                    image_pull_secrets=[client.V1LocalObjectReference(name=secrets)]
+                    if secrets else None
                 )
             )
         )
     )
-    api_response = api.create_namespaced_replication_controller(namespace, body)
+
+    api_response = api.create_namespaced_deployment(namespace, body)
     return api_response
 
 
-def create_services(cli, network, services, extra_labels={}):
+def _create_kind_app(cli, name, image, command, namespace, restart_policy, envs, mounts,
+                     scale, quota, labels, constraints, secrets):
+
+    RESTART_POLICY_STORE = {
+        'never': 'Never',
+        'onfailure': 'OnFailure',
+        'always': 'Always',
+    }
+    CONTROLLER_STORE = {
+        'Never': 'Job',
+        'OnFailure': 'Job',
+        'Always': 'Deployment'
+    }
+
+    restart_policy = RESTART_POLICY_STORE.get(restart_policy.lower(), 'Never')
+    controller = CONTROLLER_STORE.get(restart_policy, 'Job')
+
+    if controller == 'Job':
+        res = _create_job(name, image, command, namespace, restart_policy, envs, mounts, scale,
+                          None, quota, None, labels, constraints, secrets, cli)
+    elif controller == 'Deployment':
+        res = _create_deployment(cli, name, image, command, namespace, envs, mounts, scale,
+                                 quota, None, labels, constraints, secrets)
+    return res, controller
+
+
+def _create_kind_job(cli, name, image, command, namespace, envs, mounts, run_spec, resources,
+                     labels, constraints, secrets):
+
+    RESTART_POLICY_STORE = {
+        'never': 'Never',
+        'onfailure': 'OnFailure',
+        'always': 'Always',
+    }
+
+    restart_policy =  RESTART_POLICY_STORE.get(run_spec['restartPolicy'], 'Never') \
+        if run_spec else 'Never'
+    completions = run_spec['completion'] if run_spec else None
+    parallelism = run_spec['parallelism'] if run_spec else 1
+    res = _create_job(name, image, command, namespace, restart_policy, envs, mounts, parallelism,
+                      completions, None, resources, labels, constraints, secrets, cli)
+    return res
+
+
+def _create_kind_service(cli, name, image, command, namespace, envs, mounts, run_spec,
+                         resources, labels, constraints, secrets):
+    autoscaler_spec = None
+    if run_spec:
+        replicas = run_spec['replicas']
+        autoscaler_spec = run_spec['autoscaler'] if 'autoscaler' in run_spec else None
+    else:
+        replicas = 1
+
+    res = _create_deployment(cli, name, image, command, namespace, envs, mounts, replicas,
+                             None, resources, labels, constraints, secrets)
+    if autoscaler_spec:
+        try:
+            autoscaler_res = _create_autoscaler(cli, namespace, name, labels, autoscaler_spec)
+        except ValueError as e:
+            if 'Invalid value for `conditions`' in str(e):
+                pass
+    return res
+
+
+def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
     if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     namespace = network.metadata.name
-    project_info = inspect_project_network(cli, network)
-    config_labels = get_config_labels(cli, network, 'project-labels')
+    project_info = inspect_project_network(network, cli)
+    config_labels = get_config_labels(network, 'project-labels', cli)
     network_labels = get_labels(network)
-    # Update Project Name
-    #project_info = inspect_project_network(network)
+
     image_name = project_info['image']
     project_base = project_info['base']
-    
+
     instances = []
-    for name in services:
-        service = service_default(services[name])
+    for name, service in services.items():
+        #service = service_default(services[name])
 
         # Check running already
-        if get_services(cli, project_info['key'], extra_filters={'MLAD.PROJECT.SERVICE': name}):
+        if get_services(project_info['key'], extra_filters={'MLAD.PROJECT.SERVICE': name}, cli=cli):
             raise exceptions.Duplicated('Already running service.')
-    
+
+        kind = service['kind']
         image = service['image'] or image_name
+
         env = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
+        env += [f"{key}={service['env'][key]}" for key in service['env'].keys()] \
+            if service['env'] else []
         env += [f"TF_CPP_MIN_LOG_LEVEL=3"]
         env += [f"PROJECT={project_info['project']}"]
         env += [f"USERNAME={project_info['username']}"]
         env += [f"PROJECT_KEY={project_info['key']}"]
         env += [f"PROJECT_ID={project_info['id']}"]
         env += [f"SERVICE={name}"]
-        env += [f"{key}={service['env'][key]}" for key in service['env'].keys()]
-        command = f"{service['command']} {service['arguments']}".strip()
-        labels = copy.copy(network_labels)
-        labels.update(extra_labels)
-        labels['MLAD.PROJECT.SERVICE'] = name
-        
-        replicas = service['deploy']['replicas'] or 1
-        restart_policy = service['deploy']['restart_policy']['condition'] or 'Never'
-        constraints = service['deploy']['constraints']
-
-        # Resource Spec
-        resources = service['deploy']['quota']
-        cpu = resources['cpus'] if 'cpus' in resources else None 
-        gpu = resources['gpus'] if 'gpus' in resources else None
-        mem = resources['mems'] if 'mems' in resources else None
-
-        # if 'mems' in service['deploy']['quota']: 
-        #     data = str(service['deploy']['quota']['mems'])
-        #     size = int(data[:-1])
-        #     unit = data.lower()[-1:]
-        #     if unit == 'g':
-        #         size *= (2**30)
-        #     elif unit == 'm':
-        #         size *= (2**20)
-        #     elif unit == 'k':
-        #         size *= (2**10)
-        #     res_spec['mem_limit'] = size
-        #     res_spec['mem_reservation'] = size
-
-        RESTART_POLICY_STORE = {
-            'never': 'Never',           # JOB Controller
-            'no': 'Never',              # JOB Controller
-            'on_failure': 'OnFailure',  # Job Controller
-            'on-failure': 'OnFailure',  # Job Controller
-            'onfailure': 'OnFailure',   # Replication Controller
-            'always': 'Always',
-        }
-        CONTROLLER_STORE = {
-            'Never': 'job',
-            'OnFailure': 'job',
-            'Always': 'rc'
-        }
-
-        restart_policy = RESTART_POLICY_STORE.get(restart_policy.lower(), 'Never')
-        kind = CONTROLLER_STORE.get(restart_policy, 'job')
-        ports = service['ports'] or [80]
-        
-        # Try to run
-        inst_name = f"{project_base}-{name}"
-        kwargs = {
-            'name': inst_name,
-            #hostname=f'{name}.{{{{.Task.Slot}}}}',
-            'image': image, 
-            'env': env + ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}', 'NODE_HOSTNAME={{.Node.Hostname}}'],
-            'mounts': ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro'],
-            'command': command.split(),
-            'container_labels': labels,
-            'labels': labels,
-            'networks': [{'Target': namespace, 'Aliases': [name]}],
-            'restart_policy': restart_policy,
-            'constraints': constraints,
-        }
-
+        env += ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}',
+                'NODE_HOSTNAME={{.Node.Hostname}}']
         envs = [client.V1EnvVar(name=_.split('=', 1)[0], value=_.split('=', 1)[1])
                for _ in env]
-        command = kwargs.get('command', [])
-        labels = kwargs.get('labels', {})
 
-        config_labels['MLAD.PROJECT.SERVICE']=name
-        config_labels['MLAD.PROJECT.SERVICE.KIND']=kind
-        ingress_path = None
-        if 'expose' in service:
-            if not 'service_type' in service:
-                ingress_path = f"/ingress/{project_info['username']}/{project_info['name']}/{name}"
-            elif service['service_type'] == 'plugin':
-                ingress_path = f"/plugins/{project_info['username']}/{name}"
-            envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
-            config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
+        command = service['command'] or []
+        args = service['args'] or []
+        if isinstance(command, str):
+            command = command.split()
+        if isinstance(args, str):
+            args = args.split()
+        command += args
+
+        labels = copy.copy(network_labels) or {}
+        labels.update(extra_labels)
+        labels['MLAD.PROJECT.SERVICE'] = name
+
+        constraints = service['constraints']
+        ingress = service['ingress'] if 'ingress' in service else None
+        mounts = service['mounts'] or []
+        mounts += ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
+        inst_name = f"{project_base}-{name}" # TBD
+
+        config_labels['MLAD.PROJECT.SERVICE'] = name
+        config_labels['MLAD.PROJECT.SERVICE.KIND'] = kind
 
         # Secrets
         secrets = f"{project_base}-auth"
 
         try:
-            if kind == 'job':
-                restart_policy = kwargs.get(restart_policy, 'Never')
-                ret = _create_job(
-                    cli, name, image, command, 
-                    namespace, envs, restart_policy, replicas,
-                    cpu, gpu, mem, labels, constraints, secrets)
-            elif kind == 'rc':
-                restart_policy = kwargs.get(restart_policy, 'Always')
-                ret = _create_replication_controller(
-                    cli, name, image, command, 
-                    namespace, envs, restart_policy, replicas,
-                    cpu, gpu, mem, labels, constraints, secrets)
-            
-            ret = api.create_namespaced_service(namespace, client.V1Service(
-                metadata=client.V1ObjectMeta(
-                    name=name,
-                    labels=labels
-                ),
-                spec=client.V1ServiceSpec(
-                    selector={'MLAD.PROJECT.SERVICE': name},
-                    ports=[client.V1ServicePort(port=_) for _ in ports]
-                )
-            ))
-            if ingress_path:
-                ingress_ret = create_ingress(cli, namespace, name, service['expose'], ingress_path)
+            if kind == 'App':
+                restart_policy = service['restartPolicy']
+                scale = service['scale']
+                quota = service['quota']
+                ret, controller = _create_kind_app(
+                    cli, name, image, command, namespace, restart_policy, envs, mounts, scale,
+                    quota, labels, constraints, secrets)
+                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = controller
+            elif kind == 'Job':
+                resources = service['resources']
+                run_spec = service['runSpec']
+                ret = _create_kind_job(
+                    cli, name, image, command, namespace, envs, mounts, run_spec, resources, labels,
+                    constraints, secrets)
+                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Job'
+            elif kind == 'Service':
+                resources = service['resources']
+                run_spec = service['runSpec']
+                ret = _create_kind_service(
+                    cli, name, image, command, namespace, envs, mounts, run_spec, resources, labels,
+                    constraints, secrets)
+                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Deployment'
+            instances.append(ret)
 
-            label_body = {
-                "metadata": {
-                    "labels": {'uid':ret.metadata.uid}
-                    }
-            }
-            temp_ret = api.patch_namespaced_service(name, namespace, label_body)
-            instances.append(temp_ret)
+            if service['ports']:
+                ret = api.create_namespaced_service(namespace, client.V1Service(
+                    metadata=client.V1ObjectMeta(
+                        name=name,
+                        labels=labels
+                    ),
+                    spec=client.V1ServiceSpec(
+                        selector={'MLAD.PROJECT.SERVICE': name},
+                        ports=[client.V1ServicePort(port=_) for _ in service['ports']]
+                    )
+                ))
+
+            if ingress:
+                ingress_name = ingress['name']
+                rewritePath = ingress['rewritePath']
+                port = int(ingress['port'])
+                ingress_path = f"/{project_info['username']}/{project_info['name']}/{name}"
+                envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
+                config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
+
+                ingress_ret = create_ingress(cli, namespace, name, ingress_name, port,
+                                             ingress_path, rewritePath)
+
             create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
         except ApiException as e:
-            print(f"Exception Handling CoreV1Api => {e}", file=sys.stderr)
-            if e.headers['Content-Type'] == 'application/json':
-                body = json.loads(e.body)
-                if body['kind'] == 'Status':
-                    msg = body['message']
-                    status = body['code']
-                else:
-                    msg = str(e)
-                    status = 500
+            msg, status = exceptions.handle_k8s_api_error(e)
             err_msg = f'Failed to create services: {msg}'
             raise exceptions.APIError(err_msg, status)
     return instances
@@ -714,37 +858,40 @@ def remove_containers(cli, containers):
 
 
 def _delete_job(cli, name, namespace):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
     api = client.BatchV1Api(cli)
     return api.delete_namespaced_job(name, namespace, propagation_policy='Foreground')
 
 
-def _delete_replication_controller(cli, name, namespace):
-    api = client.CoreV1Api(cli)
-    return api.delete_namespaced_replication_controller(name, 
-        namespace, propagation_policy='Foreground')
+def _delete_deployment(cli, name, namespace):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    api = client.AppsV1Api(cli)
+    return api.delete_namespaced_deployment(name, namespace, propagation_policy='Foreground')
 
 
-def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=False):
+def remove_services(services, disconnHandler=None, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     network_api = client.NetworkingV1beta1Api(cli)
 
     def _get_service_info(service):
-        inspect = inspect_service(cli, service)
+        inspect = inspect_service(service, cli)
         service_name = inspect['name']
         namespace = service.metadata.namespace
         targets = list(inspect['tasks'].keys())
 
-        config_labels = get_config_labels(cli, service,
-            f'service-{service_name}-labels')
+        config_labels = get_config_labels(namespace, f'service-{service_name}-labels', cli)
         kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
-        return service_name, namespace, kind, targets
+        controller = config_labels['MLAD.PROJECT.SERVICE.CONTROLLER']
+        return service_name, namespace, controller, targets
 
     service_to_check = []
     for service in services:
-        service_name, namespace, kind, _ = _get_service_info(service)
-        service_to_check.append((service_name, namespace, kind, _))
+        service_name, namespace, controller, _ = _get_service_info(service)
+        service_to_check.append((service_name, namespace, controller, _))
 
     # For check service deleted
     collector = Collector()
@@ -755,19 +902,22 @@ def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=F
         disconnHandler.add_callback(lambda: monitor.stop())
 
     for service in service_to_check:
-        service_name, namespace, kind, _ = service
+        service_name, namespace, controller, _ = service
         #print(f"Stop {service_name}...")
-        ret = api.delete_namespaced_service(service_name, namespace)
-        if kind == 'job':
-            ret = _delete_job(cli, service_name, namespace)
-        elif kind == 'rc':
-            ret = _delete_replication_controller(cli, service_name, namespace)
-
         try:
-            #check ingress exists
-            ingress = network_api.list_namespaced_ingress(namespace)
-            if service_name in ingress.items:
-                ingress_ret = network_api.delete_namespaced_ingress(service_name, namespace)
+            if controller == 'Job':
+                ret = _delete_job(cli, service_name, namespace)
+            elif controller == 'Deployment':
+                ret = _delete_deployment(cli, service_name, namespace)
+
+            if get_deployed_service(cli, namespace, service_name):
+                api.delete_namespaced_service(service_name, namespace)
+
+            ingress = network_api.list_namespaced_ingress(
+                namespace, label_selector=f'MLAD.PROJECT.SERVICE={service_name}').items
+            if len(ingress) > 0:
+                ingress_name = ingress[0].metadata.name
+                ingress_ret = network_api.delete_namespaced_ingress(ingress_name, namespace)
         except ApiException as e:
             print("Exception when calling ExtensionsV1beta1Api->delete_namespaced_ingress: %s\n" % e)
 
@@ -783,8 +933,8 @@ def remove_services(cli, services, disconnHandler=None, timeout=0xFFFF, stream=F
         for service in services:
             service_removed = False
             name, namespace, kind = _get_service_info(service)
-            if not get_service_from_kind(cli, name, namespace, kind) and \
-                    not get_service(cli, service_name=name, namespace=namespace):
+            if not get_service_from_controller(cli, name, namespace, controller) and \
+                    not get_service(name, namespace, cli):
                 service_removed = True
             else:
                 service_removed = False
@@ -829,6 +979,7 @@ def get_nodes(cli=DEFAULT_CLI):
     return {node.metadata.name: node for node in api.list_node().items}
 
 
+
 def inspect_node(node):
     if not isinstance(node, client.models.v1_node.V1Node):
         raise TypeError('Parameter is not valid type.')
@@ -855,6 +1006,7 @@ def inspect_node(node):
         'engine_version': engine_version,
         'status': {'State': state, 'Addr':addr},
     }
+
 
 def enable_node(node_key, cli = DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
@@ -936,14 +1088,19 @@ def remove_node_labels(node_key, cli = DEFAULT_CLI, *keys):
             raise exceptions.APIError(msg, status)
 
 
-def scale_service(cli, service, scale_spec):
+def scale_service(service, scale_spec, cli=DEFAULT_CLI):
+    controller = None
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
+    if isinstance(service, client.models.v1_deployment.V1Deployment):
+        controller = 'Deployment'
+    elif isinstance(service, client.models.v1_job.V1Job):
+        controller = 'Job'
+    else: raise TypeError('Parameter is not valid type.')
     name = service.metadata.name
     namespace = service.metadata.namespace
-    config_labels = get_config_labels(cli, service, f'service-{name}-labels')
-    kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
-    if kind == 'job':
+
+    if controller == 'Job':
         api = client.BatchV1Api(cli)
         body = {
             "spec": {
@@ -952,16 +1109,17 @@ def scale_service(cli, service, scale_spec):
         }
         ret = api.patch_namespaced_job(
             name=name, namespace=namespace, body=body)
-    elif kind == 'rc':
-        api = client.CoreV1Api(cli)
+    elif controller == 'Deployment':
+        api = client.AppsV1Api(cli)
         body = {
             "spec": {
                 "replicas": scale_spec
             }
         }
-        ret = api.patch_namespaced_replication_controller_scale(
+        ret = api.patch_namespaced_deployment_scale(
             name=name, namespace=namespace, body=body)
     return ret
+
 
 def container_logs(cli, project_key, tail='all', follow=False, timestamps=False):
     instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
@@ -975,14 +1133,16 @@ def container_logs(cli, project_key, tail='all', follow=False, timestamps=False)
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
+
+def get_service_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
     # get running services with service or pod name
     api = client.CoreV1Api(cli)
-    services = get_services(cli, project_key)
+    services = get_services(project_key, cli=cli)
     namespace = get_project_network(cli, project_key=project_key).metadata.name
 
     selected = []
-    sources = [(_['name'], list(_['tasks'].keys())) for _ in [inspect_service(cli, _) for _ in services.values()]]
+    sources = [(_['name'], list(_['tasks'].keys())) for _ in
+               [inspect_service(_, cli) for _ in services.values()]]
     if names_or_ids:
         selected = []
         for _ in sources:
@@ -1009,18 +1169,17 @@ def get_service_with_names_or_ids(cli, project_key, names_or_ids=[]):
         phase = get_pod_info(pod)['phase']
         if not phase == 'Pending':
             targets.append(target)
-        else:
-            print(f'Cannot get logs of pending service: {target[1]}')
 
     if not targets:
         raise exceptions.NotFound("Cannot find running services")
 
     return targets
 
-def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=False,
-                     selected=False, disconnHandler=None, targets=[]):
+
+def get_project_logs(project_key, tail='all', follow=False, timestamps=False,
+                     selected=False, disconnHandler=None, targets=[], cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
-    services = get_services(cli, project_key)
+    services = get_services(project_key, cli=cli)
     namespace = get_project_network(cli, project_key=project_key).metadata.name
 
     handler = LogHandler(cli)
@@ -1047,7 +1206,8 @@ def get_project_logs(cli, project_key, tail='all', follow=False, timestamps=Fals
     else:
         print('Cannot find running containers.', file=sys.stderr)
 
-def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=False):
+
+def create_ingress(cli, namespace, service_name, ingress_name, port, base_path='/', rewrite=False):
     api = client.NetworkingV1beta1Api(cli)
     annotations = {
         "kubernetes.io/ingress.class": "nginx",
@@ -1062,7 +1222,8 @@ def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=Fa
     body = client.NetworkingV1beta1Ingress(
         api_version="networking.k8s.io/v1beta1",
         kind="Ingress",
-        metadata=client.V1ObjectMeta(name=service_name, annotations=annotations),
+        metadata=client.V1ObjectMeta(name=ingress_name, annotations=annotations,
+                                     labels={'MLAD.PROJECT.SERVICE':service_name}),
         spec=client.NetworkingV1beta1IngressSpec(
             rules=[client.NetworkingV1beta1IngressRule(
                 #host="example.com",
@@ -1085,6 +1246,7 @@ def create_ingress(cli, namespace, service_name, port, base_path='/', rewrite=Fa
         body=body
     )
 
+
 def parse_mem(str_mem):
     # Ki to Mi
     if str_mem.endswith('Ki'):
@@ -1094,6 +1256,7 @@ def parse_mem(str_mem):
         mem = float(str_mem)
     return mem
 
+
 def parse_cpu(str_cpu):
     # nano to core
     if str_cpu.endswith('n'):
@@ -1102,6 +1265,7 @@ def parse_cpu(str_cpu):
         # TODO Other units may need to be considered
         cpu = float(str_cpu)
     return cpu
+
 
 def get_node_resources(node, cli = None):
     if cli is None :
@@ -1149,11 +1313,12 @@ def get_node_resources(node, cli = None):
         'gpu': {'capacity': gpu, 'used': used_gpu, 'allocatable': gpu-used_gpu},
     }
 
-def get_project_resources(cli, project_key):
+
+def get_project_resources(project_key, cli=DEFAULT_CLI):
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
     res = {}
-    services = get_services(cli, project_key)
+    services = get_services(project_key, cli=cli)
 
     def gpu_usage(pod):
         used = 0
@@ -1193,6 +1358,7 @@ def get_project_resources(cli, project_key):
 
         res[name] = {'mem': resource['mem'], 'cpu': resource['cpu'], 'gpu': resource['gpu']}
     return res
+
 
 if __name__ == '__main__':
     cli = get_api_client()
