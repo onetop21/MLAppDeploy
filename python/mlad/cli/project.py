@@ -438,11 +438,11 @@ def up(service_names):
     extra_envs = config_core.get_env()
 
     if len(service_names) == 0:
-        res = API.project.create(project['project'], base_labels,
-                                 extra_envs, credential=credential, allow_reuse=False)
+        res = API.project.create(base_labels, extra_envs,
+                                 credential=credential, allow_reuse=False)
     else:
-        res = API.project.create(project['project'], base_labels,
-                                 extra_envs, credential=credential, allow_reuse=True)
+        res = API.project.create(base_labels, extra_envs,
+                                 credential=credential, allow_reuse=True)
     try:
         for _ in res:
             if 'stream' in _:
