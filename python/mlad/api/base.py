@@ -7,8 +7,8 @@ from .exception import raise_error
 
 class APIBase:
 
-    def __init__(self, config):
-        self.baseurl = f'{config.apiserver.address}/api/v1'
+    def __init__(self, config, prefix):
+        self.baseurl = f'{config.apiserver.address}/api/v1/{prefix}'
         self.headers = {'session': config.session}
         self.raise_error = raise_error
 

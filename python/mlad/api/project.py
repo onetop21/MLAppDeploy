@@ -6,11 +6,11 @@ from .base import APIBase
 
 class Project(APIBase):
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__(config, 'project')
 
     def get(self, extra_labels=[]):
         params = {'extra_labels': ','.join(extra_labels)}
-        return self._get('/project', params=params)
+        return self._get('/', params=params)
 
     def create(self, project, base_labels, extra_envs=[], credential=None, allow_reuse=False):
         body = {
@@ -20,7 +20,7 @@ class Project(APIBase):
             'credential': credential
         }
         params = {'allow_reuse': allow_reuse}
-        resp = self._post('/project', params=params, body=body, raw=True, stream=True)
+        resp = self._post('/', params=params, body=body, raw=True, stream=True)
         res = ''
         for _ in resp.iter_content(1024):
             res += _.decode()
@@ -75,4 +75,4 @@ class Project(APIBase):
 
     def resource(self, project_key):
         project_key = project_key.replace('-', '')
-        return self._get(f'{project_key}/resource')
+        return self._get(f'/{project_key}/resource')

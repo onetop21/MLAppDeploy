@@ -4,7 +4,7 @@ from .base import APIBase
 
 class Service(APIBase):
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__(config, 'project')
 
     def get(self, project_key=None, labels=None):
         if project_key is not None:
