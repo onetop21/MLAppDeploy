@@ -1,7 +1,7 @@
 #!/home/onetop21/base3.7/bin/python
 from mlad.cli.validator.yaml_parser import load, dump, SCHEMA_PATH
 from mlad.cli.validator.yaml_validator import Validator
-from mlad.cli.validator.exceptions import InvalidProjectYaml
+from mlad.cli.validator.exceptions import InvalidProjectYaml, InvalidComponentYaml
 from cerberus.validator import DocumentError
 
 
@@ -15,10 +15,7 @@ def validate_project(target):
     except DocumentError as e:
         raise InvalidProjectYaml(str(e))
     if res:
-        output = v.ordered(v.normalized(target))
-        with open("output.yaml", "w") as f:
-            f.write(dump(output))
-        return output
+        return v.ordered(v.normalized(target))
     else:
         print(v.errors)
         raise InvalidProjectYaml(v.errors)
@@ -32,12 +29,8 @@ def validate_component(target):
     try:
         res = v.validate(target)
     except DocumentError as e:
-        raise InvalidProjectYaml(str(e))
+        raise InvalidComponentYaml(str(e))
     if res:
-        output = v.ordered(v.normalized(target))
-        with open("output.yaml", "w") as f:
-            f.write(dump(output))
-        return output
+        return v.ordered(v.normalized(target))
     else:
-        print(v.errors)
-        raise InvalidProjectYaml(v.errors)
+        raise InvalidComponentYaml(v.errors)

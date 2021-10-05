@@ -76,12 +76,11 @@ def install(file_path: str, no_build: bool) -> None:
         spec = OmegaConf.load(file_path)
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
-
-    spec = validators.validate_component(spec)
+    spec = validators.validate_component(OmegaConf.to_container(spec))
 
     labels = {
         'MLAD_BOARD': '',
-        'COMPONENT_NAME': spec.name
+        'COMPONENT_NAME': spec['name']
     }
     if no_build:
         built_images = cli.images.list(filter={'label': labels})
@@ -95,7 +94,7 @@ def install(file_path: str, no_build: bool) -> None:
 
     host_ip = _obtain_host()
     component_specs = []
-    for app_name, component in spec.app.items():
+    for app_name, component in spec['app'].items():
         if 'image' in component:
             image_name = component['image']
             cli.images.pull(image_name)
@@ -111,14 +110,14 @@ def install(file_path: str, no_build: bool) -> None:
         mounts = component.get('mounts', [])
         labels = {
             'MLAD_BOARD': '',
-            'COMPONENT_NAME': spec.name,
+            'COMPONENT_NAME': spec['name'],
             'APP_NAME': app_name
         }
         click.echo(f'Run the container [{app_name}]')
         cli.containers.run(
             image.tags[-1],
             environment=env,
-            name=f'{spec.name}-{app_name}',
+            name=f'{spec["name"]}-{app_name}',
             auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
@@ -127,7 +126,7 @@ def install(file_path: str, no_build: bool) -> None:
             detach=True)
 
         component_specs.append({
-            'name': spec.name,
+            'name': spec['name'],
             'app_name': app_name,
             'hosts': [f'{host_ip}:{p}' for p in ports]
         })
