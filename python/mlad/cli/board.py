@@ -1,4 +1,5 @@
 import os
+import errno
 import socket
 import docker
 import requests
@@ -13,6 +14,8 @@ from mlad.cli.exceptions import (
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
+
+from mlad.cli.validator import validators
 
 cli = docker.from_env()
 lo_cli = docker.APIClient()
@@ -69,7 +72,13 @@ def install(file_path: str, no_build: bool) -> None:
     except docker.errors.NotFound:
         raise MLADBoardNotActivatedError
 
-    spec = OmegaConf.load(file_path)
+    try:
+        spec = OmegaConf.load(file_path)
+    except Exception:
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
+
+    validators.validate_component(spec)
+
     labels = {
         'MLAD_BOARD': '',
         'COMPONENT_NAME': spec.name
