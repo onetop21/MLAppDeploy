@@ -193,4 +193,4 @@ def _obtain_board_image_tag():
     images = cli.images.list(filters={'label': 'MLAD_BOARD'})
     latest_images = [image for image in images
                      if any([tag.endswith('latest') for tag in image.tags])]
-    return latest_images[0].tags[0] if len(latest_images) > 0 else None
+    return latest_images[0].tags[-1] if len(latest_images) > 0 else None
