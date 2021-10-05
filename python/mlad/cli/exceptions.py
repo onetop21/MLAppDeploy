@@ -64,3 +64,9 @@ class ComponentImageNotExistError(Exception):
 
     def __str__(self):
         return f'The component [{self.name}] image does not exist.'
+
+
+class CannotBuildComponentError(Exception):
+
+    def __str__(self):
+        return 'The component spec does not have `workspace` property to build an image.'

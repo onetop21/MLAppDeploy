@@ -10,7 +10,7 @@ from omegaconf import OmegaConf
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError,
-    MLADBoardAlreadyActivatedError
+    MLADBoardAlreadyActivatedError, CannotBuildComponentError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
@@ -77,6 +77,8 @@ def install(file_path: str, no_build: bool) -> None:
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
     spec = validators.validate_component(OmegaConf.to_container(spec))
+    if not no_build and 'workspace' not in spec:
+        raise CannotBuildComponentError
 
     labels = {
         'MLAD_BOARD': '',
