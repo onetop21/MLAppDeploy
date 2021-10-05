@@ -30,18 +30,22 @@ def deactivate():
 @click.option('--no-build', is_flag=True, help='Don\'t build the base image')
 def install(file_path: str, no_build: bool):
     """Install a component and attach it to MLAD board."""
-    click.echo(f'Read the component spec from {file_path or "./mlad-project.yml"}.')
-    board.install(file_path, no_build)
-    click.echo('The component installation is complete.')
-
+    try:
+        click.echo(f'Read the component spec from {file_path or "./mlad-project.yml"}.')
+        board.install(file_path, no_build)
+        click.echo('The component installation is complete.')
+    except Exception as e:
+        click.echo(e)
 
 @click.command()
 @click.argument('name', required=True)
 def uninstall(name: str):
     """Uninstall the component and remove it from MLAD board."""
-    board.uninstall(name)
-    click.echo(f'The component [{name}] is uninstalled')
-
+    try:
+        board.uninstall(name)
+        click.echo(f'The component [{name}] is uninstalled')
+    except Exception as e:
+        click.echo(e)
 
 @click.command()
 def ls():

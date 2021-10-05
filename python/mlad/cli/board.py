@@ -77,7 +77,7 @@ def install(file_path: str, no_build: bool) -> None:
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
 
-    validators.validate_component(spec)
+    spec = validators.validate_component(spec)
 
     labels = {
         'MLAD_BOARD': '',
