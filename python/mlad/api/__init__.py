@@ -41,7 +41,9 @@ def classproperty(func):
 
 class API:
 
-    config = config_core.get()
+    @classproperty
+    def config(cls):
+        return config_core.get()
 
     @classproperty
     @lru_cache(maxsize=None)
