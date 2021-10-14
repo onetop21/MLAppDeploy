@@ -1,4 +1,5 @@
 import os
+import errno
 import socket
 import docker
 import requests
@@ -8,10 +9,13 @@ from typing import List
 from omegaconf import OmegaConf
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
-    MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError
+    MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError,
+    MLADBoardAlreadyActivatedError, CannotBuildComponentError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
+
+from mlad.cli.validator import validators
 
 cli = docker.from_env()
 lo_cli = docker.APIClient()
@@ -22,6 +26,14 @@ def activate() -> None:
     image_tag = _obtain_board_image_tag()
     if image_tag is None:
         raise BoardImageNotExistError
+
+    try:
+        cli.containers.get('mlad-board')
+    except docker.errors.NotFound:
+        pass
+    else:
+        raise MLADBoardAlreadyActivatedError
+
     cli.containers.run(
         image_tag,
         environment=[
@@ -36,6 +48,12 @@ def activate() -> None:
 
 
 def deactivate() -> None:
+
+    try:
+        cli.containers.get('mlad-board')
+    except docker.errors.NotFound:
+        raise MLADBoardNotActivatedError
+
     host_ip = _obtain_host()
     requests.delete(f'{host_ip}:2021/mlad/component', json={
         'name': 'mlad-board'
@@ -54,10 +72,17 @@ def install(file_path: str, no_build: bool) -> None:
     except docker.errors.NotFound:
         raise MLADBoardNotActivatedError
 
-    spec = OmegaConf.load(file_path)
+    try:
+        spec = OmegaConf.load(file_path)
+    except Exception:
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
+    spec = validators.validate_component(OmegaConf.to_container(spec))
+    if not no_build and 'workspace' not in spec:
+        raise CannotBuildComponentError
+
     labels = {
         'MLAD_BOARD': '',
-        'COMPONENT_NAME': spec.name
+        'COMPONENT_NAME': spec['name']
     }
     if no_build:
         built_images = cli.images.list(filter={'label': labels})
@@ -71,7 +96,7 @@ def install(file_path: str, no_build: bool) -> None:
 
     host_ip = _obtain_host()
     component_specs = []
-    for app_name, component in spec.app.items():
+    for app_name, component in spec['app'].items():
         if 'image' in component:
             image_name = component['image']
             cli.images.pull(image_name)
@@ -87,14 +112,14 @@ def install(file_path: str, no_build: bool) -> None:
         mounts = component.get('mounts', [])
         labels = {
             'MLAD_BOARD': '',
-            'COMPONENT_NAME': spec.name,
+            'COMPONENT_NAME': spec['name'],
             'APP_NAME': app_name
         }
         click.echo(f'Run the container [{app_name}]')
         cli.containers.run(
             image.tags[-1],
             environment=env,
-            name=f'{spec.name}-{app_name}',
+            name=f'{spec["name"]}-{app_name}',
             auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
@@ -103,7 +128,7 @@ def install(file_path: str, no_build: bool) -> None:
             detach=True)
 
         component_specs.append({
-            'name': spec.name,
+            'name': spec['name'],
             'app_name': app_name,
             'hosts': [f'{host_ip}:{p}' for p in ports]
         })
@@ -168,4 +193,4 @@ def _obtain_board_image_tag():
     images = cli.images.list(filters={'label': 'MLAD_BOARD'})
     latest_images = [image for image in images
                      if any([tag.endswith('latest') for tag in image.tags])]
-    return latest_images[0].tags[0] if len(latest_images) > 0 else None
+    return latest_images[0].tags[-1] if len(latest_images) > 0 else None

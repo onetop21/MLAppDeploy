@@ -29,7 +29,7 @@ from mlad.cli import config as config_core
 from mlad.api import API
 from mlad.api.exception import APIError, NotFound
 
-from mlad.cli.validator import project_validator
+from mlad.cli.validator import validators
 from mlad.cli.validator.exceptions import InvalidProjectYaml
 
 
@@ -246,8 +246,8 @@ def run(no_build, env, quota, command):
 
     project = utils.get_project(default_project)
     try:
-        project = project_validator.validate(project)
-    except project_validator.InvalidProjectYaml as e:
+        project = validators.validate_project(project)
+    except InvalidProjectYaml as e:
         print('Errors:', e)
         sys.exit(1)
 
@@ -365,8 +365,8 @@ def up(service_names):
 
     project = utils.get_project(default_project)
     try:
-        project = project_validator.validate(project)
-    except project_validator.InvalidProjectYaml as e:
+        project = validators.validate_project(project)
+    except InvalidProjectYaml as e:
         print('Errors:',e)
         sys.exit(1)
 
