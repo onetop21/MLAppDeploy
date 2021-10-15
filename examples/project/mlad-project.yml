@@ -10,7 +10,7 @@ ingress:                           # [OPTIONAL] Describe ingress to expose.
         target: server:1234
 workspace:
     kind: Workspace                # Describe kind of workspace. (*Workspace, Dockerfile)
-    base: python:latest            # Describe base docker image tag.
+    base: repo.ncsoft.net/docker-remote/python:latest            # Describe base docker image tag.
     preps:
       - pip: requirements.txt      # [OPTIONAL] Describe prepare options for run.
 app:

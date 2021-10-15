@@ -1,19 +1,12 @@
-import requests
-from .exception import raise_error
+from .base import APIBase
 
 
-class Node:
-    def __init__(self, url, session):
-        self.url = url
-        self.headers = {'session': session}
+class Node(APIBase):
+    def __init__(self, config):
+        super().__init__(config, 'node')
 
     def list(self):
-        res = requests.get(url=f'{self.url}/node/list', headers=self.headers)
-        raise_error(res)
-        return res.json()
+        return self._get('/list')
 
     def resource(self, names):
-        res = requests.get(url=f'{self.url}/node/resource', headers=self.headers,
-                           params={'names': names})
-        raise_error(res)
-        return res.json()
+        return self._get('/resource', params={'names': names})

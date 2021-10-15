@@ -4,33 +4,58 @@ from .node import Node
 from .service import Service
 from .project import Project
 
-API_PREFIX = '/api/v1'
+from mlad.cli import config as config_core
+from functools import lru_cache
+
+
+class ClassPropertyDescriptor(object):
+
+    def __init__(self, fget, fset=None):
+        self.fget = fget
+        self.fset = fset
+
+    def __get__(self, obj, klass=None):
+        if klass is None:
+            klass = type(obj)
+        return self.fget.__get__(obj, klass)()
+
+    def __set__(self, obj, value):
+        if not self.fset:
+            raise AttributeError("can't set attribute")
+        type_ = type(obj)
+        return self.fset.__get__(obj, type_)(value)
+
+    def setter(self, func):
+        if not isinstance(func, (classmethod, staticmethod)):
+            func = classmethod(func)
+        self.fset = func
+        return self
+
+
+def classproperty(func):
+    if not isinstance(func, (classmethod, staticmethod)):
+        func = classmethod(func)
+
+    return ClassPropertyDescriptor(func)
 
 
 class API:
-    def __init__(self, url=None, session=None):
-        self.session = session
-        if not url:
-            host = 'mlad-service.mlad'
-            port = '8440'
-            self.url = f'http://{host}:{port}{API_PREFIX}'
-        else:
-            self.url = f"{url}{API_PREFIX}"
 
-    def __enter__(self):
-        return self
+    @classproperty
+    def config(cls):
+        return config_core.get()
 
-    def __exit__(self, ety, va, tb):
-        return False
+    @classproperty
+    @lru_cache(maxsize=None)
+    def node(cls):
+        return Node(cls.config)
 
-    @property
-    def node(self):
-        return Node(self.url, self.session)
+    @classproperty
+    @lru_cache(maxsize=None)
+    def project(cls):
+        return Project(cls.config)
 
-    @property
-    def project(self):
-        return Project(self.url, self.session)
-
-    @property
-    def service(self):
-        return Service(self.url, self.session)
+    @classproperty
+    @lru_cache(maxsize=None)
+    def service(cls):
+        return Service(cls.config)

@@ -42,7 +42,8 @@ class InvalidSession(APIError):
 
 
 def error_from_http_errors(e):
-    detail = e.response.json()['detail'] # msg from mlad service http error
+    # msg from mlad service http error
+    detail = e.response.json()['detail']
     msg = detail['msg']
     reason = detail['reason']
     if e.response.status_code == 404:
