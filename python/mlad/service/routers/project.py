@@ -154,7 +154,8 @@ def project_log(project_key: str, tail:str = Query('all'),
 @router.get("/project/{project_key}/resource")
 def project_resource(project_key: str, session: str = Header(None)):
     try:
-        res = ctlr.get_project_resources(project_key)
+        key = project_key.replace('-', '')
+        res = ctlr.get_project_resources(key)
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))

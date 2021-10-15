@@ -73,5 +73,4 @@ class Project(APIBase):
                 print(f"[Retry] {e}", file=sys.stderr)
 
     def resource(self, project_key):
-        project_key = project_key.replace('-', '')
         return self._get(f'/{project_key}/resource')
