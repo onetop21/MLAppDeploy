@@ -112,11 +112,11 @@ def list(no_trunc):
             projects[project_key]['replicas'] += inspect['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
 
-        used = defaultdict(lambda: 0)
+        used = {'cpu': 0, 'gpu': 0, 'mem': 0}
         resources = API.project.resource(project_key)
         for service, resource in resources.items():
-            used['mem'] += resource['mem'] if not resource['mem'] is None else 0
-            used['cpu'] += resource['cpu'] if not resource['cpu'] is None else 0
+            used['mem'] += resource['mem'] if resource['mem'] is not None else 0
+            used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
             used['gpu'] += resource['gpu']
         for k in used:
             used[k] = used[k] if no_trunc else round(used[k], 1)
