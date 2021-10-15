@@ -123,19 +123,19 @@ def list(no_trunc):
 
         projects[project_key].update(used)
 
-    for project in projects:
-        if projects[project]['services'] > 0:
-            running_tasks = f"{projects[project]['tasks']}/{projects[project]['replicas']}"
-            columns.append((projects[project]['username'], projects[project]['project'],
-                            projects[project]['image'], projects[project]['services'],
-                            f"{running_tasks:>5}", projects[project]['hostname'],
-                            projects[project]['workspace'], projects[project]['mem'],
-                            projects[project]['cpu'], projects[project]['gpu']))
+    for project in projects.values():
+        if project['services'] > 0:
+            running_tasks = f"{project['tasks']}/{project['replicas']}"
+            columns.append((project['username'], project['project'],
+                            project['image'], project['services'],
+                            f"{running_tasks:>5}", project['hostname'],
+                            project['workspace'], project['mem'],
+                            project['cpu'], project['gpu']))
         else:
-            columns.append((projects[project]['username'], projects[project]['project'],
-                            projects[project]['image'], '-', '-', projects[project]['hostname'],
-                            projects[project]['workspace'], projects[project]['mem'],
-                            projects[project]['cpu'], projects[project]['gpu']))
+            columns.append((project['username'], project['project'],
+                            project['image'], '-', '-', project['hostname'],
+                            project['workspace'], project['mem'],
+                            project['cpu'], project['gpu']))
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
