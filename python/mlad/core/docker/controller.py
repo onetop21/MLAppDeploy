@@ -523,10 +523,10 @@ def get_images(cli, project_key=None, extra_labels=[]):
     if not isinstance(cli, docker.client.DockerClient):
         raise TypeError('Parameter is not valid type.')
 
-    filters = 'MLAD.PROJECT'
+    filters = ['MLAD.PROJECT.API_VERSION=v1']
     if project_key:
-        filters += f"={project_key}"
-    return cli.images.list(filters={'label': [filters] + extra_labels})
+        filters += [f'MLAD.PROJECT={project_key}']
+    return cli.images.list(filters={'label': filters + extra_labels})
 
 
 def get_image(cli, image_id):
@@ -589,15 +589,21 @@ def build_image(cli, base_labels, tar, dockerfile, no_cache=False, pull=False, s
             if 'error' in _: return (None, resp_stream)
         return (get_image(cli, latest_name), resp_stream)
 
+
 def remove_image(cli, ids, force=False):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    return [ cli.images.remove(image=id, force=force) for id in ids ]
+    if not isinstance(cli, docker.client.DockerClient):
+        raise TypeError('This is not a valid parameter')
+    return [cli.images.remove(image=id, force=force) for id in ids]
+
 
 def prune_images(cli, project_key=None):
-    if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
-    filters = 'MLAD.PROJECT'
-    if project_key: filters+= f'={project_key}'
-    return cli.images.prune(filters={ 'label': filters, 'dangling': True } )
+    if not isinstance(cli, docker.client.DockerClient):
+        raise TypeError('This is not a valid parameter')
+    filters = ['MLAD.PROJECT.API_VERSION=v1']
+    if project_key is not None:
+        filters += [f'MLAD.PROJECT={project_key}']
+    return cli.images.prune(filters={'label': filters, 'dangling': True})
+
 
 def push_images(cli, project_key, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')
