@@ -4,7 +4,6 @@ import tarfile
 import json
 import urllib3
 import requests
-import docker
 from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
 from mlad.cli import config as config_core
@@ -159,13 +158,18 @@ def search(keyword):
     try:
         images = []
         registry_address = config.docker.registry.address
-        catalog = json.loads(requests.get(f"http://{registry_address}/v2/_catalog", verify=False).text)
+        catalog = json.loads(
+            requests.get(f"http://{registry_address}/v2/_catalog", verify=False).text
+        )
         if 'repositories' in catalog:
             repositories = catalog['repositories']
             for repository in repositories:
-                tags = json.loads(requests.get(f'http://{registry_address}/v2/{repository}/tags/list', verify=False).text)
-                images += [ f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags'] ] 
-            found = [ item for item in filter(None, [image if keyword in image else None for image in images]) ]
+                url = f'http://{registry_address}/v2/{repository}/tags/list'
+                tags = json.loads(requests.get(url, verify=False).text)
+                images += [f"{config['docker']['registry']}/{tags['name']}:{tag}"
+                           for tag in tags['tags']] 
+            found = [item for item in filter(None, [image if keyword in image else None
+                                                    for image in images])]
 
             columns = [('REPOSITORY', 'TAG')]
             for item in found:
@@ -175,17 +179,13 @@ def search(keyword):
         else:
             print('No images.', file=sys.stderr)
     except requests.exceptions.ConnectionError:
-        print(f"Cannot connect to docker registry [{config['docker']['registry']}]", file=sys.stderr)
+        print(f"Cannot connect to docker registry [{config['docker']['registry']}]",
+              file=sys.stderr)
 
 
 def remove(ids, force):
-    print('Remove project image...')
     cli = ctlr.get_api_client()
-    try:
-        ctlr.remove_image(cli, ids, force)
-    except docker.errors.ImageNotFound as e:
-        print(e, file=sys.stderr)
-    print('Done.')
+    ctlr.remove_image(cli, ids, force)
 
 
 def prune(all):

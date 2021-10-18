@@ -3,6 +3,9 @@ from mlad.cli import image
 from mlad.cli import project_cli as project
 from mlad.cli.libs import utils
 
+from . import echo_exception
+
+
 # mlad image ls
 # mlad image search [to be delete]
 # mlad image rm
@@ -23,6 +26,7 @@ from mlad.cli.libs import utils
 @click.option('--all', '-a', is_flag=True, help='Show all MLAD related images')
 @click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10")')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
+@echo_exception
 def ls(all, tail, no_trunc):
     '''Show built image list'''
     image.list(all, tail, no_trunc)
@@ -32,6 +36,7 @@ def ls(all, tail, no_trunc):
 @click.option('--quiet', '-q', is_flag=True, help='Do not print detail-log during build a project or plugin')
 @click.option('--no-cache', is_flag=True, help='Do not use the cache when building project or plugin')
 @click.option('--pull', is_flag=True, help='Attempt to pull the base image even if an older image exists locally.')
+@echo_exception
 def build(quiet, no_cache, pull):
     '''Build MLAppDeploy project or plguin'''
     image.build(quiet, no_cache, pull)
@@ -40,13 +45,17 @@ def build(quiet, no_cache, pull):
 @click.command()
 @click.option('--force', '-f', is_flag=True, help='Remove forcely')
 @click.argument('ID', nargs=-1, required=True)
+@echo_exception
 def rm(force, id):
     '''Remove built image'''
+    click.echo('Remove project image...')
     image.remove(id, force)
+    click.echo('Done.')
 
 
 @click.command()
 @click.option('--all', '-a', is_flag=True, help='Remove unused all images')
+@echo_exception
 def prune(all):
     '''Remove unused and untagged images'''
     image.prune(all)
