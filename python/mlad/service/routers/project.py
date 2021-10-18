@@ -52,7 +52,8 @@ def projects(extra_labels: str = '', session: str = Header(None)):
         projects = []
         for k, v in networks.items():
             inspect = ctlr.inspect_project_network(v)
-            projects.append(inspect)
+            if not inspect.get('deleted', False):
+                projects.append(inspect)
         return projects
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
