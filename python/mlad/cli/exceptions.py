@@ -70,3 +70,9 @@ class CannotBuildComponentError(Exception):
 
     def __str__(self):
         return 'The component spec does not have `workspace` property to build an image.'
+
+
+class DockerNotFoundError(Exception):
+
+    def __str__(self):
+        return 'Need to install the docker daemon.'
