@@ -523,10 +523,10 @@ def get_images(cli, project_key=None, extra_labels=[]):
     if not isinstance(cli, docker.client.DockerClient):
         raise TypeError('Parameter is not valid type.')
 
-    filters = 'MLAD.PROJECT'
+    filters = ['MLAD.PROJECT.API_VERSION=v1']
     if project_key:
-        filters += f"={project_key}"
-    return cli.images.list(filters={'label': [filters] + extra_labels})
+        filters += [f'MLAD.PROJECT={project_key}']
+    return cli.images.list(filters={'label': filters + extra_labels})
 
 
 def get_image(cli, image_id):

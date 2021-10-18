@@ -4,7 +4,6 @@ from mlad import __version__
 from mlad.cli import config_cli as config
 from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
-from mlad.cli import plugin_cli as plugin
 from mlad.cli import node_cli as node
 from mlad.cli import context_cli as context
 from mlad.cli import board_cli as board
@@ -55,7 +54,6 @@ else:
 
 main.add_command(image.cli, 'image')
 main.add_command(project.cli, 'project')
-main.add_command(plugin.cli, 'plugin')
 main.add_command(board.cli, 'board')
 
 main.add_dummy_command()

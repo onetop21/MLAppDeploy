@@ -1,9 +1,6 @@
-import sys
-import os
 import click
 from mlad.cli import image
 from mlad.cli import project_cli as project
-from mlad.cli.autocompletion import *
 
 # mlad image ls
 # mlad image search [to be delete]
@@ -20,14 +17,14 @@ from mlad.cli.autocompletion import *
 # mlad image publish [REGISTRY/ORGANIZATION]
 # mlad image deploy [...]
 
+
 @click.command()
-@click.option('--all', '-a', is_flag=True, help='Show all project images')
-@click.option('--plugin', '-p', is_flag=True, help='Show Plugin images')
+@click.option('--all', '-a', is_flag=True, help='Show all MLAD related images')
 @click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10")')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
-def ls(all, plugin, tail, no_trunc):
+def ls(all, tail, no_trunc):
     '''Show built image list'''
-    image.list(all, plugin, tail, no_trunc)
+    image.list(all, tail, no_trunc)
 
 
 @click.command()
