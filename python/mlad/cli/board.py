@@ -10,18 +10,30 @@ from omegaconf import OmegaConf
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError,
-    MLADBoardAlreadyActivatedError, CannotBuildComponentError
+    MLADBoardAlreadyActivatedError, CannotBuildComponentError, DockerNotFoundError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
 
 from mlad.cli.validator import validators
 
-cli = docker.from_env()
-lo_cli = docker.APIClient()
+
+def get_cli():
+    try:
+        return docker.from_env()
+    except Exception:
+        raise DockerNotFoundError
+
+
+def get_lo_cli():
+    try:
+        return docker.APIClient()
+    except Exception:
+        raise DockerNotFoundError
 
 
 def activate() -> None:
+    cli = get_cli()
     config = config_core.get()
     image_tag = _obtain_board_image_tag()
     if image_tag is None:
@@ -48,7 +60,7 @@ def activate() -> None:
 
 
 def deactivate() -> None:
-
+    cli = get_cli()
     try:
         cli.containers.get('mlad-board')
     except docker.errors.NotFound:
@@ -67,6 +79,7 @@ def deactivate() -> None:
 
 
 def install(file_path: str, no_build: bool) -> None:
+    cli = get_cli()
     try:
         cli.containers.get('mlad-board')
     except docker.errors.NotFound:
@@ -140,6 +153,7 @@ def install(file_path: str, no_build: bool) -> None:
 
 
 def uninstall(name: str) -> None:
+    cli = get_cli()
     try:
         cli.containers.get('mlad-board')
     except docker.errors.NotFound:
@@ -159,6 +173,7 @@ def uninstall(name: str) -> None:
 
 
 def list():
+    cli = get_cli()
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
     })
@@ -185,11 +200,13 @@ def _obtain_host():
 
 
 def _obtain_ports(container) -> List[str]:
+    lo_cli = get_lo_cli()
     port_data = lo_cli.inspect_container(container.id)['NetworkSettings']['Ports']
     return [k.replace('/tcp', '') for k in port_data.keys()]
 
 
 def _obtain_board_image_tag():
+    cli = get_cli()
     images = cli.images.list(filters={'label': 'MLAD_BOARD'})
     latest_images = [image for image in images
                      if any([tag.endswith('latest') for tag in image.tags])]

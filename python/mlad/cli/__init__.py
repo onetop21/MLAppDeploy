@@ -8,5 +8,5 @@ def echo_exception(func):
         try:
             func(*args, **kwargs)
         except Exception as e:
-            click.echo(e)
+            click.echo(f'{e.__class__.__name__}: {e}')
     return decorated
