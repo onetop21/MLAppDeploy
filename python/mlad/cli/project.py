@@ -696,22 +696,15 @@ def down_force(services, no_dump):
 def logs(tail, follow, timestamps, names_or_ids):
     project_key = utils.project_key(utils.get_workspace())
     # Block not running.
-    try:
-        API.project.inspect(project_key)
-        logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
-    except NotFound:
-        print('Cannot find running service.', file=sys.stderr)
-        sys.exit(1)
+    API.project.inspect(project_key)
+
+    logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
 
     colorkey = {}
-    try:
-        for _ in logs:
-            if '[Ignored]' in _['stream']:
-                continue
-            _print_log(_, colorkey, 32, 20)
-    except APIError as e:
-        print(e)
-        sys.exit(1)
+    for _ in logs:
+        if '[Ignored]' in _['stream']:
+            continue
+        _print_log(_, colorkey, 32, 20)
 
 
 def scale(scales):

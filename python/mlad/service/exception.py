@@ -34,7 +34,7 @@ class TokenError(Exception):
 
 
 def exception_detail(e):
-    exception=e.__class__.__name__
+    exception = e.__class__.__name__
     msg = str(e)
 
     if 'NotFound' in exception:
