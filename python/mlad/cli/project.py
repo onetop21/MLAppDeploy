@@ -23,6 +23,7 @@ from mlad.api.exception import APIError, NotFound
 
 from mlad.cli.validator import validators
 from mlad.cli.validator.exceptions import InvalidProjectYaml
+from mlad.cli.exceptions import CannotFoundImageError
 
 
 def _parse_log(log, max_name_width=32, len_short_id=10):
@@ -348,11 +349,7 @@ def up(service_names):
     config = config_core.get()
     cli = ctlr.get_api_client()
     project = utils.get_project(default_project)
-    try:
-        project = validators.validate_project(project)
-    except InvalidProjectYaml as e:
-        print('Errors:',e)
-        sys.exit(1)
+    project = validators.validate_project(project)
 
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
@@ -375,8 +372,7 @@ def up(service_names):
 
     # select suitable image
     if not images:
-        print(f"Cannot find built image of project [{project['project']['name']}].", file=sys.stderr)
-        return
+        raise CannotFoundImageError(project['name'])
 
     image = images[0]
     repository = image.labels['MLAD.PROJECT.IMAGE']

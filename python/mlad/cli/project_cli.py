@@ -7,6 +7,8 @@ from mlad.cli.libs import utils
 from mlad.cli.autocompletion import *
 from mlad.cli.libs.auth import auth_admin
 
+from . import echo_exception
+
 
 # mlad project init
 # mlad project ls | mlad ls
@@ -52,7 +54,8 @@ def run(no_build, env, quota, command):
 
 
 @click.command()
-@click.argument('services', nargs=-1, required=False, autocompletion=get_stopped_services_completion)
+@click.argument('services', nargs=-1, required=False)
+@echo_exception
 def up(services):
     '''Deploy and run a project on cluster'''
     project.up(tuple(set(services)))
