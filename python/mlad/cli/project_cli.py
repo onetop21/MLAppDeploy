@@ -6,6 +6,7 @@ from mlad.cli import project
 from mlad.cli.libs import utils
 from mlad.cli.autocompletion import *
 from mlad.cli.libs.auth import auth_admin
+from . import echo_exception
 
 
 # mlad project init
@@ -73,7 +74,8 @@ def down(services, no_dump):
 @click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
 @click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs')
 @click.option('--follow', '-f', is_flag=True, help='Follow log output')
-@click.argument('SERVICES|TASKS', nargs=-1, autocompletion=get_running_services_tasks_completion)
+@click.argument('SERVICES|TASKS', nargs=-1)
+@echo_exception
 def logs(tail, follow, timestamps, **kwargs):
     '''Show current project logs deployed on cluster'''
     filters = kwargs.get('services|tasks')

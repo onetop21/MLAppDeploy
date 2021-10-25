@@ -15,6 +15,8 @@ class APIBase:
     def _get(self, path: str, params: Optional[Dict] = None,
              raw: bool = False, stream: bool = False, timeout: int = 30):
         url = f'{self.baseurl}{path}'
+        if stream:
+            timeout = 1e4
         res = requests.get(url=url, headers=self.headers, params=params,
                            timeout=timeout, stream=stream)
         self.raise_error(res)
@@ -23,6 +25,8 @@ class APIBase:
     def _post(self, path: str, params: Optional[Dict] = None, body: Optional[Dict] = None,
               raw: bool = False, stream: bool = False, timeout: int = 30):
         url = f'{self.baseurl}{path}'
+        if stream:
+            timeout = 1e4
         res = requests.post(url=url, headers=self.headers, params=params, json=body,
                             timeout=timeout, stream=stream)
         self.raise_error(res)
@@ -31,6 +35,8 @@ class APIBase:
     def _delete(self, path: str, params: Optional[Dict] = None, body: Optional[Dict] = None,
                 raw: bool = False, stream: bool = False, timeout: int = 30):
         url = f'{self.baseurl}{path}'
+        if stream:
+            timeout = 1e4
         res = requests.delete(url=url, headers=self.headers, params=params, json=body,
                               timeout=timeout, stream=stream)
         self.raise_error(res)
@@ -39,6 +45,8 @@ class APIBase:
     def _put(self, path: str, params: Optional[Dict] = None, body: Optional[Dict] = None,
              raw: bool = False, stream: bool = False, timeout: int = 30):
         url = f'{self.baseurl}{path}'
+        if stream:
+            timeout = 1e4
         res = requests.put(url=url, headers=self.headers, params=params, json=body,
                            timeout=timeout, stream=stream)
         self.raise_error(res)

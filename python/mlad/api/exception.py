@@ -28,10 +28,8 @@ class NotFound(APIError):
 class ProjectNotFound(NotFound):
     pass
 
-
 class ServiceNotFound(NotFound):
     pass
-
 
 class InvalidLogRequest(NotFound):
     pass

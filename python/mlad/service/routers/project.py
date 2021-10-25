@@ -60,9 +60,9 @@ def projects(extra_labels: str = '', session: str = Header(None)):
 
 
 @router.get("/project/{project_key}")
-def project_inspect(project_key:str, session: str = Header(None)):
+def project_inspect(project_key: str, session: str = Header(None)):
     try:
-        key = str(project_key).replace('-','')
+        key = str(project_key).replace('-', '')
         network = ctlr.get_project_network(project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
@@ -99,7 +99,7 @@ def project_remove(project_key:str, session: str = Header(None)):
 
 
 @router.get("/project/{project_key}/logs")
-def project_log(project_key: str, tail:str = Query('all'),
+def project_log(project_key: str, tail: str = Query('all'),
                 follow: bool = Query(False),
                 timestamps: bool = Query(False),
                 names_or_ids: list = Query(None),
@@ -107,7 +107,7 @@ def project_log(project_key: str, tail:str = Query('all'),
 
     selected = True if names_or_ids else False
     try:
-        key = str(project_key).replace('-','')
+        key = str(project_key).replace('-', '')
         network = ctlr.get_project_network(project_key=key)
         if not network:
             raise InvalidProjectError(project_key)
@@ -124,21 +124,23 @@ def project_log(project_key: str, tail:str = Query('all'),
         class disconnectHandler:
             def __init__(self):
                 self._callbacks = []
+
             def add_callback(self, callback):
                 self._callbacks.append(callback)
+
             async def __call__(self):
                 for cb in self._callbacks:
                     cb()
+
         handler = disconnectHandler()
 
         logs = ctlr.get_project_logs(key, tail, follow, timestamps, selected, handler, targets)
 
-
         def get_logs(logs):
             for _ in logs:
-                _['stream']=_['stream'].decode()
+                _['stream'] =_['stream'].decode()
                 if timestamps:
-                    _['timestamp']=str(_['timestamp'])
+                    _['timestamp'] = str(_['timestamp'])
                 yield json.dumps(_)
 
         return StreamingResponse(get_logs(logs), background=handler)
