@@ -6,6 +6,15 @@ class TokenError(Exception):
     pass
 
 
+class CannotFoundImageError(Exception):
+
+    def __init__(self, name: str):
+        self._name = name
+
+    def __str__(self):
+        return f'Cannot find built image of the project [{self._name}].'
+
+
 class ContextAlreadyExistError(Exception):
 
     def __init__(self, name: str):
