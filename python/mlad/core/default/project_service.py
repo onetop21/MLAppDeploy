@@ -14,9 +14,10 @@ obj = {
             'condition': None,
             'delay': 0,
             'max_attempts': 0,
-            'window': 0 
+            'window': 0
         },
         'replicas': 1,
+        'rewrite_path': False
     }
 }
 
