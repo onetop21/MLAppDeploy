@@ -31,9 +31,9 @@ def list(all, tail, no_trunc):
         project_key = utils.project_key(utils.get_workspace())
         images = ctlr.get_images(cli, project_key)
 
-    data = [('ID', 'BUILD USER', 'NAME', 'VERSION', 'MAINTAINER', 'CREATED')]
+    data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED')]
     if all:
-        data = [('ID', 'BUILD USER', 'NAME', 'VERSION', 'MAINTAINER', 'CREATED', 'WORKSPACE')]
+        data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED', 'WORKSPACE')]
 
     untagged = 0
     for inspect in [ctlr.inspect_image(_) for _ in images[:tail]]:
@@ -44,7 +44,7 @@ def list(all, tail, no_trunc):
                 inspect['short_id'],
                 inspect['username'],
                 inspect['project_name'],
-                f"[{inspect['tag']}]" if inspect['latest'] else f"{inspect['tag']}",
+                inspect['tag'],
                 inspect['maintainer'],
                 inspect['created']
             ]

@@ -543,7 +543,7 @@ def inspect_image(image):
         # for Image
         'id': image.id.split(':',1)[-1],
         'short_id': image.short_id.split(':',1)[-1],
-        'tag': image.labels['MLAD.PROJECT.IMAGE'].rsplit(':',1)[-1],
+        'tag': image.labels['MLAD.PROJECT.IMAGE'],
         'tags': image.tags,
         'latest': headed,
         'version': image.labels['MLAD.PROJECT.VERSION'],
