@@ -529,7 +529,7 @@ def create_services(cli, network, services, extra_labels={}):
         replicas = service['deploy']['replicas'] or 1
         restart_policy = service['deploy']['restart_policy']['condition'] or 'Never'
         constraints = service['deploy']['constraints']
-        rewrite_path = service['deploy']['rewrite_path']
+        rewrite_path = service['rewrite_path']
 
         # Resource Spec
         resources = service['deploy']['quota']
