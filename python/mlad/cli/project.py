@@ -7,7 +7,6 @@ import base64
 import docker
 from datetime import datetime
 from dateutil import parser
-from collections import defaultdict
 from mlad.core.docker import controller as ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
 from mlad.core.default import project as default_project
@@ -345,7 +344,7 @@ def run(no_build, env, quota, command):
     down(None, True)
 
 
-def up(service_names):
+def up():
     config = config_core.get()
     cli = ctlr.get_api_client()
     project = utils.get_project(default_project)
@@ -358,14 +357,13 @@ def up(service_names):
 
     project_key = base_labels['MLAD.PROJECT']
 
-    if not service_names:
-        try:
-            inspect = API.project.inspect(project_key=project_key)
-            if inspect:
-                print('Failed to create project : Already exist project.')
-                sys.exit(1)
-        except NotFound:
-            pass
+    try:
+        inspect = API.project.inspect(project_key=project_key)
+        if inspect:
+            print('Failed to create project : Already exist project.')
+            sys.exit(1)
+    except NotFound:
+        pass
 
     images = ctlr.get_images(cli, project_key=project_key)
     images = [_ for _ in images if base_labels['MLAD.PROJECT.IMAGE'] in _.tags]
@@ -404,16 +402,7 @@ def up(service_names):
         pass
 
     print('Deploying services to cluster...')
-    if service_names:
-        targets = {}
-        for name in service_names:
-            if name in project['app']:
-                targets[name] = project['app'][name]
-            else:
-                print(f'Cannot find service[{name}] in mlad-project.yaml.', file=sys.stderr)
-                sys.exit(1)
-    else:
-        targets = project['app'] or {}
+    targets = project['app'] or {}
 
     if 'ingress' in project:
         ingress = project['ingress']
@@ -434,12 +423,8 @@ def up(service_names):
 
     extra_envs = config_core.get_env()
 
-    if len(service_names) == 0:
-        res = API.project.create(base_labels, extra_envs,
-                                 credential=credential, allow_reuse=False)
-    else:
-        res = API.project.create(base_labels, extra_envs,
-                                 credential=credential, allow_reuse=True)
+    res = API.project.create(base_labels, extra_envs,
+                             credential=credential, allow_reuse=False)
     try:
         for _ in res:
             if 'stream' in _:
@@ -488,7 +473,7 @@ def up(service_names):
     print('Done.')
 
 
-def down(services, no_dump):
+def down(no_dump):
     project_key = utils.project_key(utils.get_workspace())
     workdir = utils.get_project(default_project)['workdir']
 
@@ -498,14 +483,6 @@ def down(services, no_dump):
     except NotFound:
         print('Already stopped project.', file=sys.stderr)
         sys.exit(1)
-
-    if services:
-        running_services = API.service.get(project_key)['inspects']
-        running_svc_names = [_['name'] for _ in running_services]
-        for service_name in services:
-            if service_name not in running_svc_names:
-                print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
-                sys.exit(1)
 
     def _get_log_path():
         timestamp = str(inspect['created'])
@@ -529,10 +506,7 @@ def down(services, no_dump):
 
     with interrupt_handler(message='Wait.', blocked=False):
         running_services = API.service.get(project_key)['inspects']
-
-        def filtering(inspect):
-            return not services or inspect['name'] in services
-        targets = [(_['id'], _['name']) for _ in running_services if filtering(_)]
+        targets = [(_['id'], _['name']) for _ in running_services]
 
         # Save desc & log
         if not no_dump:
@@ -565,23 +539,22 @@ def down(services, no_dump):
                 sys.exit(1)
 
         # Remove Network
-        if not services or not API.service.get(project_key)['inspects']:
-            res = API.project.delete(project_key)
-            try:
-                for _ in res:
-                    if 'stream' in _:
-                        sys.stdout.write(_['stream'])
-                    if 'result' in _:
-                        if _['result'] == 'succeed':
-                            print('Network removed.')
-                        break
-            except APIError as e:
-                print(e)
-                sys.exit(1)
+        res = API.project.delete(project_key)
+        try:
+            for _ in res:
+                if 'stream' in _:
+                    sys.stdout.write(_['stream'])
+                if 'result' in _:
+                    if _['result'] == 'succeed':
+                        print('Network removed.')
+                    break
+        except APIError as e:
+            print(e)
+            sys.exit(1)
     print('Done.')
 
 
-def down_force(services, no_dump):
+def down_force(no_dump):
     '''down project using local k8s for admin'''
     cli = k8s_ctlr.get_api_client(context=k8s_ctlr.get_current_context())
     project_key = utils.project_key(utils.get_workspace())
@@ -601,14 +574,6 @@ def down_force(services, no_dump):
             inspect = k8s_ctlr.inspect_service(svc, cli)
             inspects.append(inspect)
         return inspects
-
-    if services:
-        running_services = _get_running_services()
-        running_svc_names = [_['name'] for _ in running_services]
-        for service_name in services:
-            if service_name not in running_svc_names:
-                print(f'Already stopped service[{service_name}] in project.', file=sys.stderr)
-                sys.exit(1)
 
     def _get_log_path():
         timestamp = str(network_inspect['created'])
@@ -636,11 +601,7 @@ def down_force(services, no_dump):
 
     with interrupt_handler(message='Wait.', blocked=False):
         running_services = _get_running_services()
-
-        def filtering(inspect):
-            return not services or inspect['name'] in services
-
-        targets = [(_['id'], _['name']) for _ in running_services if filtering(_)]
+        targets = [(_['id'], _['name']) for _ in running_services]
 
         # Save desc & log
         if not no_dump:
@@ -677,15 +638,14 @@ def down_force(services, no_dump):
                 sys.exit(1)
 
         # Remove Network
-        if not services or not _get_running_services():
-            res = k8s_ctlr.remove_project_network(network, stream=True, cli=cli)
-            for _ in res:
-                if 'stream' in _:
-                    sys.stdout.write(_['stream'])
-                if 'result' in _:
-                    if _['result'] == 'succeed':
-                        print('Network removed.')
-                    break
+        res = k8s_ctlr.remove_project_network(network, stream=True, cli=cli)
+        for _ in res:
+            if 'stream' in _:
+                sys.stdout.write(_['stream'])
+            if 'result' in _:
+                if _['result'] == 'succeed':
+                    print('Network removed.')
+                break
     print('Done.')
 
 

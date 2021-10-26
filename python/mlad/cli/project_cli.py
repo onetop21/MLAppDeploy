@@ -8,9 +8,6 @@ from mlad.cli.autocompletion import *
 from mlad.cli.libs.auth import auth_admin
 from . import echo_exception
 
-from . import echo_exception
-
-
 # mlad project init
 # mlad project ls | mlad ls
 # mlad project ps | mlad ps
@@ -55,22 +52,20 @@ def run(no_build, env, quota, command):
 
 
 @click.command()
-@click.argument('services', nargs=-1, required=False)
 @echo_exception
-def up(services):
+def up():
     '''Deploy and run a project on cluster'''
-    project.up(tuple(set(services)))
+    project.up()
 
 
 @click.command()
-@click.argument('services', nargs=-1, required=False, autocompletion=get_running_services_completion)
 @click.option('--no-dump', is_flag=True, help='Save log to file before down service')
-def down(services, no_dump):
+def down(no_dump):
     '''Stop and remove current project deployed on cluster'''
     if auth_admin():
-        project.down_force(services, no_dump)
+        project.down_force(no_dump)
     else:
-        project.down(services, no_dump)
+        project.down(no_dump)
 
 
 @click.command()
