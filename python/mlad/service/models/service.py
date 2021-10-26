@@ -33,6 +33,7 @@ class Service(BaseModel):
     # For Plugin
     service_type: Optional[str] = None
     expose: Optional[int] = None
+    rewrite_path: Optional[str] = None
 
 
 class CreateRequest(BaseModel):

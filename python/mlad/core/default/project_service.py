@@ -10,13 +10,14 @@ obj = {
     'deploy': {
         'quota': {},
         'constraints': {},
+        'rewrite_path': False,
         'restart_policy': {
             'condition': None,
             'delay': 0,
             'max_attempts': 0,
-            'window': 0 
+            'window': 0
         },
-        'replicas': 1,
+        'replicas': 1
     }
 }
 

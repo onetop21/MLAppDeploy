@@ -529,6 +529,7 @@ def create_services(cli, network, services, extra_labels={}):
         replicas = service['deploy']['replicas'] or 1
         restart_policy = service['deploy']['restart_policy']['condition'] or 'Never'
         constraints = service['deploy']['constraints']
+        rewrite_path = service['rewrite_path']
 
         # Resource Spec
         resources = service['deploy']['quota']
@@ -626,7 +627,8 @@ def create_services(cli, network, services, extra_labels={}):
                 )
             ))
             if ingress_path:
-                ingress_ret = create_ingress(cli, namespace, name, service['expose'], ingress_path)
+                ingress_ret = create_ingress(cli, namespace, name, service['expose'], ingress_path,
+                                             rewrite=rewrite_path)
 
             label_body = {
                 "metadata": {
