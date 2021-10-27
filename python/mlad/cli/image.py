@@ -23,7 +23,7 @@ PREP_KEY_TO_TEMPLATE = {
 }
 
 
-def list(all, tail, no_trunc):
+def list(all, tail):
     cli = ctlr.get_api_client()
     if all:
         images = ctlr.get_images(cli)
@@ -51,7 +51,7 @@ def list(all, tail, no_trunc):
             if all:
                 row.append(inspect['workspace'])
             data.append(row)
-    utils.print_table(*([data, 'There is no built image.'] + ([0] if no_trunc else [])))
+    utils.print_table(data, 'There is no built image.', 0)
     if untagged:
         print(f'This project has {untagged} untagged images.'
               'Delete untagged images to free the disk space.')
