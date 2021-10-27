@@ -6,7 +6,7 @@ import uuid
 from collections import defaultdict
 import docker
 from mlad.core import exceptions
-from mlad.core.exceptions import NetworkAlreadyExistError
+from mlad.core.exceptions import NetworkAlreadyExistError, DeprecatedError
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
@@ -806,21 +806,8 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
                     cli, name, image, command, namespace, restart_policy, envs, mounts, scale,
                     quota, labels, constraints, secrets)
                 config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = controller
-            elif kind == 'Job':
-                resources = service['resources']
-                run_spec = service['runSpec']
-                ret = _create_kind_job(
-                    cli, name, image, command, namespace, envs, mounts, run_spec, resources, labels,
-                    constraints, secrets)
-                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Job'
-            elif kind == 'Service':
-                resources = service['resources']
-                run_spec = service['runSpec']
-                ret = _create_kind_service(
-                    cli, name, image, command, namespace, envs, mounts, run_spec, resources, labels,
-                    constraints, secrets)
-                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Deployment'
-            instances.append(ret)
+            else:
+                raise DeprecatedError(kind)
 
             if service['ports']:
                 ret = api.create_namespaced_service(namespace, client.V1Service(

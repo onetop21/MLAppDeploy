@@ -59,3 +59,13 @@ class DockerError(Exception):
 
     def __str__(self):
         return 'Invalid docker environment, please install a docker daemon.'
+
+
+class DeprecatedError(Exception):
+
+    def __init__(self, option: str):
+        self.option = option
+
+    def __str__(self):
+        return f'Cannot deploy app for deprecated kind \'{self.option}\'.'
+
