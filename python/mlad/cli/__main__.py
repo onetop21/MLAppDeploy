@@ -59,7 +59,7 @@ else:
     main.add_command(image.cli, 'image')
     main.add_command(project.cli, 'project')
     main.add_command(board.cli, 'board')
-    main.add_command(node.admin.cli if auth_admin() else node.cli, 'node')
+    main.add_command(node.admin_cli if auth_admin() else node.cli, 'node')
 
     main.add_dummy_command()
     main.add_dummy_command('\b\bPrefer:')
