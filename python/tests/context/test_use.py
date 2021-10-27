@@ -1,7 +1,7 @@
 import pytest
 
 from mlad.cli import context
-from mlad.cli.exceptions import NotExistContextError
+from mlad.cli.exceptions import ContextNotFoundError
 
 from . import mock
 
@@ -24,5 +24,5 @@ def test_use():
 
 
 def test_invalid_use():
-    with pytest.raises(NotExistContextError):
+    with pytest.raises(ContextNotFoundError):
         context.use('invalid-use')

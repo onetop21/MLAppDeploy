@@ -1,7 +1,7 @@
 import pytest
 
 from mlad.cli import context
-from mlad.cli.exceptions import NotExistContextError
+from mlad.cli.exceptions import ContextNotFoundError
 
 from . import mock
 
@@ -15,10 +15,10 @@ def teardown_module():
 
 
 def test_get():
-    with pytest.raises(NotExistContextError):
+    with pytest.raises(ContextNotFoundError):
         context.get('test1')
     mock.add('test1')
     context.use('test1')
     context.get('test1')
-    with pytest.raises(NotExistContextError):
+    with pytest.raises(ContextNotFoundError):
         context.get('test2')
