@@ -68,17 +68,6 @@ def build(quiet: bool, no_cache: bool, pull: bool):
     project_key = base_labels['MLAD.PROJECT']
     version = base_labels['MLAD.PROJECT.VERSION']
     image_tag = base_labels['MLAD.PROJECT.IMAGE']
-    # Prepare Latest Image
-    latest_image = None
-    images = ctlr.get_images(cli, project_key=project_key)
-    if len(images) > 0:
-        latest_images = sorted([
-            image
-            for image in images for tag in image.tags
-            if tag.endswith(version)
-        ], key=lambda x: str(x))
-        if len(latest_images) > 0:
-            latest_image = latest_images[0]
 
     workspace = manifest['workspace']
     # For the workspace kind
@@ -116,13 +105,19 @@ def build(quiet: bool, no_cache: bool, pull: bool):
 
     image = ctlr.get_image(cli, image_tag)
 
-    # Check updated
-    if latest_image is not None and latest_image != image:
-        latest_image.tag('remove')
-        cli.images.remove('remove')
-        print(f"Built Image: {image_tag}")
-    else:
-        print('The same image has been built before', file=sys.stderr)
+    # Prepare the previous images
+    images = ctlr.get_images(cli, project_key=project_key)
+    prev_images = [
+        image
+        for image in images
+        for tag in image.tags if tag.endswith(version)
+    ]
+    # Remove the previous images with different ids
+    for prev_image in prev_images:
+        if prev_image != image:
+            prev_image.tag('remove')
+            cli.images.remove('remove')
+    print(f"Built Image: {image_tag}")
 
     return image
 
