@@ -547,7 +547,8 @@ def inspect_image(image):
         'version': image.labels['MLAD.PROJECT.VERSION'],
         'username': image.labels['MLAD.PROJECT.USERNAME'],
         'maintainer': image.attrs['Author'],
-        'created': image.attrs['Created'],
+        # Trim meaningless decimals
+        'created': image.attrs['Created'][:-7],
         # for Project
         'api_version': image.labels['MLAD.PROJECT.API_VERSION'],
         'workspace': image.labels['MLAD.PROJECT.WORKSPACE'] if 'MLAD.PROJECT.WORKSPACE' in image.labels else 'Not Supported',
