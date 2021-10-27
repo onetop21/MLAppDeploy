@@ -40,6 +40,7 @@ def ls(all, tail, no_trunc):
 def build(quiet, no_cache, pull):
     '''Build MLAppDeploy project or plguin'''
     image.build(quiet, no_cache, pull)
+    click.echo('Done.')
 
 
 @click.command()

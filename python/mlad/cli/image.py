@@ -51,10 +51,10 @@ def list(all, tail, no_trunc):
             if all:
                 row.append(inspect['workspace'])
             data.append(row)
-    utils.print_table(*([data, 'No have built image.'] + ([0] if no_trunc else [])))
+    utils.print_table(*([data, 'There is no built image.'] + ([0] if no_trunc else [])))
     if untagged:
         print(f'This project has {untagged} untagged images.'
-              'To free disk spaces up by cleaning gabage images.')
+              'Delete untagged images to free the disk space.')
 
 
 def build(quiet: bool, no_cache: bool, pull: bool):
@@ -65,15 +65,17 @@ def build(quiet: bool, no_cache: bool, pull: bool):
     # Generate Base Labels
     workspace_key = utils.get_workspace()
     base_labels = core_utils.base_labels(workspace_key, config.session, manifest)
-
+    project_key = base_labels['MLAD.PROJECT']
+    version = base_labels['MLAD.PROJECT.VERSION']
+    image_tag = base_labels['MLAD.PROJECT.IMAGE']
     # Prepare Latest Image
     latest_image = None
-    images = ctlr.get_images(cli)
+    images = ctlr.get_images(cli, project_key=project_key)
     if len(images) > 0:
         latest_images = sorted([
             image
             for image in images for tag in image.tags
-            if tag.endswith('latest')
+            if tag.endswith(version)
         ], key=lambda x: str(x))
         if len(latest_images) > 0:
             latest_image = latest_images[0]
@@ -112,21 +114,16 @@ def build(quiet: bool, no_cache: bool, pull: bool):
             if not quiet:
                 sys.stdout.write(_['stream'])
 
-    image = ctlr.get_image(cli, base_labels['MLAD.PROJECT.IMAGE'])
-
-    repository = base_labels['MLAD.PROJECT.IMAGE']
+    image = ctlr.get_image(cli, image_tag)
 
     # Check updated
-    if latest_image != image:
-        if latest_image is not None and len(latest_image.tags) < 2 \
-                and latest_image.tags[-1].endswith(':latest'):
-            latest_image.tag('remove')
-            cli.images.remove('remove')
-        print(f"Built Image: {repository}")
+    if latest_image is not None and latest_image != image:
+        latest_image.tag('remove')
+        cli.images.remove('remove')
+        print(f"Built Image: {image_tag}")
     else:
-        print('The same image has been build before', file=sys.stderr)
+        print('The same image has been built before', file=sys.stderr)
 
-    print('Done.')
     return image
 
 
