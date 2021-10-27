@@ -77,12 +77,6 @@ app:
     #    kind: Service              # [OPTIONAL] Describe kind of app. (*App, Job, Service)
     #    runSpec:                   # [OPTIONAL] Describe spec for running Service. 
     #        replicas: 1
-    #        autoscaler:
-    #            enable: false
-    #            min: 1
-    #            max: 1
-    #            metrics:
-    #              - resources: cpu
     #    resources:                 # [OPTIONAL] Describe resource for the Job
     #        limits:
     #            cpu: 1
