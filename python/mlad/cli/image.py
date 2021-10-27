@@ -53,8 +53,9 @@ def list(all, tail):
             data.append(row)
     utils.print_table(data, 'There is no built image.', 0)
     if untagged:
-        print(f'This project has {untagged} untagged images.'
-              'Delete untagged images to free the disk space.')
+        print(f'This project has {untagged} untagged images. '
+              'Delete untagged images to free the disk space. '
+              'Use command `mlad image prune`')
 
 
 def build(quiet: bool, no_cache: bool, pull: bool):
