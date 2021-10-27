@@ -49,7 +49,7 @@ def main(file):
 
 main.add_command(config.cli, 'config')
 if auth_admin():
-    main.add_command(node.admin_cli, 'node')
+    main.add_command(node.context.cli, 'context')
 
 try:
     check_context()
