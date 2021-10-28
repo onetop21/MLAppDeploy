@@ -104,7 +104,8 @@ def base_labels(workspace: str, session: str, manifest: Dict):
     username = get_username(session)
     key = project_key(workspace)
     basename = f"{username}-{manifest['name']}-{key[:const.SHORT_LEN]}".lower()
-    default_image = f"{username}/{manifest['name']}-{key[:const.SHORT_LEN]}:latest".lower()
+    version = str(manifest['version']).lower()
+    default_image = f"{username}/{manifest['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
     labels = {
         'MLAD.VERSION': '1',
         'MLAD.PROJECT': key,
