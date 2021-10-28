@@ -59,13 +59,13 @@ class Job(AdvancedBase):
     runSpec: Optional[JobRunSpec] = None
 
 
-class SerivceRunSpec(BaseModel):
+class ServiceRunSpec(BaseModel):
     replicas: Optional[int] = 1
 
 
 class Service(AdvancedBase):
     kind = 'Service'
-    runSpec: Optional[SerivceRunSpec] = None
+    runSpec: Optional[ServiceRunSpec] = None
 
 
 class CreateRequest(BaseModel):
