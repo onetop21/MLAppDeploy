@@ -347,23 +347,25 @@ def get_pod_info(pod):
 
     def get_status(container_state):
         if container_state.running:
-            return {'state':'Running', 'detail':None}
+            return {'state': 'Running', 'detail': None}
         if container_state.terminated:
             return {
-                'state':'Terminated', 
-                'detail':{
-                    'reason':container_state.terminated.reason,
-                    'finished': container_state.terminated.finished_at}
+                'state': 'Terminated',
+                'detail': {
+                    'reason': container_state.terminated.reason,
+                    'finished': container_state.terminated.finished_at
                 }
+            }
         if container_state.waiting:
             return {
-                'state':'Waiting', 
-                'detail':{
-                    'reason':container_state.waiting.reason}
+                'state': 'Waiting',
+                'detail': {
+                    'reason': container_state.waiting.reason
                 }
-    
+            }
+
     def parse_status(containers):
-        status = {'state':'Running', 'detail':None}
+        status = {'state': 'Running', 'detail': None}
         # if not running container exits, return that
         completed = 0
         for _ in containers:
@@ -371,7 +373,7 @@ def get_pod_info(pod):
                 return _['status']
             elif _['status']['state'] == 'Terminated':
                 if _['status']['detail']['reason'] == 'Completed':
-                    completed +=1
+                    completed += 1
                     if completed == len(containers):
                         return _['status']
                     else:
@@ -407,7 +409,8 @@ def inspect_service(service, cli=DEFAULT_CLI):
         controller = 'Deployment'
     elif isinstance(service, client.models.v1_job.V1Job):
         controller = 'Job'
-    else: raise TypeError('Parameter is not valid type.')
+    else:
+        raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
 
@@ -415,10 +418,6 @@ def inspect_service(service, cli=DEFAULT_CLI):
     namespace = service.metadata.namespace
     config_labels = get_config_labels(namespace, f'service-{name}-labels', cli)
 
-    if controller == 'Job':
-        replica_ret = _get_job(cli, name, namespace)
-    elif controller == 'Deployment':
-        replica_ret = _get_deployment(cli, name, namespace)
     pod_ret = api.list_namespaced_pod(namespace,
                                       label_selector=f'MLAD.PROJECT.SERVICE={name}')
 
@@ -438,18 +437,17 @@ def inspect_service(service, cli=DEFAULT_CLI):
             'MLAD.VERSION') else '',
         'version': config_labels.get('MLAD.PROJECT.VERSION'),
         'base': config_labels.get('MLAD.PROJECT.BASE'),
-        'image': replica_ret.spec.template.spec.containers[0].image,
         # Replace from labels['MLAD.PROJECT.IMAGE']
-
+        'image': service.spec.template.spec.containers[0].image,
+        'env': service.spec.template.spec.containers[0].env,
         'id': service.metadata.uid,
         'name': config_labels.get('MLAD.PROJECT.SERVICE'),
-        'replicas': replica_ret.spec.parallelism if controller == 'Job'
-            else replica_ret.spec.replicas,
+        'replicas': service.spec.parallelism if controller == 'Job' else service.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': {},
         'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
-        'created': replica_ret.metadata.creation_timestamp,
-        'kind': config_labels.get('MLAD.PROJECT.SERVICE.KIND')
+        'created': service.metadata.creation_timestamp,
+        'kind': config_labels.get('MLAD.PROJECT.SERVICE.KIND'),
     }
 
     deployed_service = get_deployed_service(cli, namespace, name)
