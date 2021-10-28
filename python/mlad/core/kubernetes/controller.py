@@ -422,7 +422,7 @@ def inspect_service(service, cli=DEFAULT_CLI):
                                       label_selector=f'MLAD.PROJECT.SERVICE={name}')
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
-
+    pod_spec = service.spec.template.spec
     inspect = {
         'key': uuid.UUID(config_labels['MLAD.PROJECT']) if config_labels.get(
             'MLAD.VERSION') else '',
@@ -438,8 +438,8 @@ def inspect_service(service, cli=DEFAULT_CLI):
         'version': config_labels.get('MLAD.PROJECT.VERSION'),
         'base': config_labels.get('MLAD.PROJECT.BASE'),
         # Replace from labels['MLAD.PROJECT.IMAGE']
-        'image': service.spec.template.spec.containers[0].image,
-        'env': service.spec.template.spec.containers[0].env,
+        'image': pod_spec.containers[0].image,
+        'env': [{'name': e.name, 'value': e.value} for e in pod_spec.containers[0].env],
         'id': service.metadata.uid,
         'name': config_labels.get('MLAD.PROJECT.SERVICE'),
         'replicas': service.spec.parallelism if controller == 'Job' else service.spec.replicas,
