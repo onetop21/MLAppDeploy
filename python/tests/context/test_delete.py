@@ -1,7 +1,7 @@
 import pytest
 
 from mlad.cli import context
-from mlad.cli.exceptions import CannotDeleteContextError, NotExistContextError
+from mlad.cli.exceptions import CannotDeleteContextError, ContextNotFoundError
 
 from . import mock
 
@@ -27,5 +27,5 @@ def test_delete():
     with pytest.raises(CannotDeleteContextError):
         context.delete('test1')
 
-    with pytest.raises(NotExistContextError):
+    with pytest.raises(ContextNotFoundError):
         context.delete('test4')
