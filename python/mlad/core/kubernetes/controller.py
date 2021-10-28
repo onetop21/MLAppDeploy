@@ -469,37 +469,6 @@ def create_containers(cli, network, services, extra_labels={}):
     return docker_controller.create_containers(docker.from_env(), network, services, extra_labels)
 
 
-def _create_autoscaler(cli, namespace, name, labels, spec):
-    api = client.AutoscalingV2beta2Api(cli)
-
-    metrics = spec['metrics']
-    _metrics = [client.V2beta2MetricSpec(
-        type='Resource',
-        resource=client.V2beta2ResourceMetricSource(
-            name=_['resources'], #ex. cpu, memory
-            target=client.V2beta2MetricTarget(
-                type='Utilization',
-                average_utilization=60
-            )
-        )) for _ in metrics]
-
-    body = client.V2beta2HorizontalPodAutoscaler(
-        metadata=client.V1ObjectMeta(name=name, labels=labels),
-        spec=client.V2beta2HorizontalPodAutoscalerSpec(
-            max_replicas=spec['max'],
-            min_replicas=spec['min'],
-            metrics=_metrics,
-            scale_target_ref=client.V2beta2CrossVersionObjectReference(
-                api_version='apps/v1',
-                kind='Deployment',
-                name=name
-            )
-        )
-    )
-    api_response = api.create_namespaced_horizontal_pod_autoscaler(namespace, body)
-    return api_response
-
-
 def _mounts_to_V1Volume(name, mounts):
     _mounts = []
     _volumes = []
@@ -718,21 +687,13 @@ def _create_kind_job(cli, name, image, command, namespace, envs, mounts, run_spe
 
 def _create_kind_service(cli, name, image, command, namespace, envs, mounts, run_spec,
                          resources, labels, constraints, secrets):
-    autoscaler_spec = None
     if run_spec:
         replicas = run_spec['replicas']
-        autoscaler_spec = run_spec['autoscaler'] if 'autoscaler' in run_spec else None
     else:
         replicas = 1
 
     res = _create_deployment(cli, name, image, command, namespace, envs, mounts, replicas,
                              None, resources, labels, constraints, secrets)
-    if autoscaler_spec:
-        try:
-            autoscaler_res = _create_autoscaler(cli, namespace, name, labels, autoscaler_spec)
-        except ValueError as e:
-            if 'Invalid value for `conditions`' in str(e):
-                pass
     return res
 
 
