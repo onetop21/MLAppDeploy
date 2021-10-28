@@ -7,7 +7,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
-    NotExistContextError, CannotDeleteContextError, InvalidPropertyError,
+    ContextNotFoundError, CannotDeleteContextError, InvalidPropertyError,
     ContextAlreadyExistError
 )
 
@@ -119,7 +119,7 @@ def use(name: str) -> Context:
     config = _load()
     context = _find_context(name, config=config)
     if context is None:
-        raise NotExistContextError(name)
+        raise ContextNotFoundError(name)
 
     config['current-context'] = name
     _save(config)
@@ -129,7 +129,7 @@ def use(name: str) -> Context:
 def _switch(direction: int = 1) -> str:
     config = _load()
     if config['current-context'] is None:
-        raise NotExistContextError('Any Contexts')
+        raise ContextNotFoundError('Any Contexts')
     n_contexts = len(config.contexts)
     index = _find_context(config['current-context'], config=config, index=True)
     next_index = (index + direction) % n_contexts
@@ -150,7 +150,7 @@ def delete(name: str) -> None:
     config = _load()
     index = _find_context(name, config=config, index=True)
     if index is None:
-        raise NotExistContextError(name)
+        raise ContextNotFoundError(name)
     elif config['current-context'] == config.contexts[index].name:
         raise CannotDeleteContextError
     else:
@@ -165,7 +165,7 @@ def get(name: Optional[str] = None) -> Context:
 
     context = _find_context(name, config=config)
     if context is None:
-        raise NotExistContextError(name)
+        raise ContextNotFoundError(name)
     return context
 
 

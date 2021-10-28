@@ -538,24 +538,24 @@ def get_image(cli, image_id):
 def inspect_image(image):
     if not isinstance(image, docker.models.images.Image):
         raise TypeError('Parameter is not valid type.')
-    headed = len([_ for _ in image.tags if _.endswith('latest')]) > 0
     labels = {
         # for Image
-        'id': image.id.split(':',1)[-1],
-        'short_id': image.short_id.split(':',1)[-1],
+        'id': image.id.split(':', 1)[-1],
+        'short_id': image.short_id.split(':', 1)[-1],
         'tag': image.labels['MLAD.PROJECT.IMAGE'],
         'tags': image.tags,
-        'latest': headed,
         'version': image.labels['MLAD.PROJECT.VERSION'],
         'username': image.labels['MLAD.PROJECT.USERNAME'],
         'maintainer': image.attrs['Author'],
-        'created': image.attrs['Created'],
+        # Trim meaningless decimals
+        'created': image.attrs['Created'][:-7],
         # for Project
         'api_version': image.labels['MLAD.PROJECT.API_VERSION'],
         'workspace': image.labels['MLAD.PROJECT.WORKSPACE'] if 'MLAD.PROJECT.WORKSPACE' in image.labels else 'Not Supported',
         'project_name': image.labels['MLAD.PROJECT.NAME'],
     }
     return labels
+
 
 def build_image(cli, base_labels, tar, dockerfile, no_cache=False, pull=False, stream=False):
     if not isinstance(cli, docker.client.DockerClient): raise TypeError('Parameter is not valid type.')

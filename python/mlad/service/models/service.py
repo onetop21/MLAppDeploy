@@ -59,21 +59,13 @@ class Job(AdvancedBase):
     runSpec: Optional[JobRunSpec] = None
 
 
-class AutoScaler(BaseModel):
-    enable: Optional[bool] = False
-    min: Optional[int] = 1
-    max: Optional[int] = 1
-    metrics: Optional[list] = None
-
-
-class SerivceRunSpec(BaseModel):
+class ServiceRunSpec(BaseModel):
     replicas: Optional[int] = 1
-    autoscaler: Optional[AutoScaler] = None
 
 
 class Service(AdvancedBase):
     kind = 'Service'
-    runSpec: Optional[SerivceRunSpec] = None
+    runSpec: Optional[ServiceRunSpec] = None
 
 
 class CreateRequest(BaseModel):

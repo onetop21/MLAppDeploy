@@ -9,6 +9,8 @@ from mlad.cli import context_cli as context
 from mlad.cli import board_cli as board
 from mlad.cli.autocompletion import get_project_file_completion
 from mlad.cli.libs.auth import auth_admin
+from mlad.cli.exceptions import ContextNotFoundError
+from mlad.cli.context import get as check_context
 
 
 class EntryGroup(click.Group):
@@ -47,27 +49,30 @@ def main(file):
 
 main.add_command(config.cli, 'config')
 if auth_admin():
-    main.add_command(node.admin_cli, 'node')
     main.add_command(context.cli, 'context')
+
+try:
+    check_context()
+except ContextNotFoundError:
+    pass
 else:
-    main.add_command(node.cli, 'node')
+    main.add_command(image.cli, 'image')
+    main.add_command(project.cli, 'project')
+    main.add_command(board.cli, 'board')
+    main.add_command(node.admin_cli if auth_admin() else node.cli, 'node')
 
-main.add_command(image.cli, 'image')
-main.add_command(project.cli, 'project')
-main.add_command(board.cli, 'board')
+    main.add_dummy_command()
+    main.add_dummy_command('\b\bPrefer:')
 
-main.add_dummy_command()
-main.add_dummy_command('\b\bPrefer:')
-
-main.add_command(image.ls, 'images')
-main.add_command(image.build, 'build')
-main.add_command(project.run, 'run')
-main.add_command(project.up, 'up')
-main.add_command(project.down, 'down')
-main.add_command(project.logs, 'logs')
-main.add_command(project.ls, 'ls')
-main.add_command(project.ps, 'ps')
-main.add_command(project.scale, 'scale')
+    main.add_command(image.ls, 'images')
+    main.add_command(image.build, 'build')
+    main.add_command(project.run, 'run')
+    main.add_command(project.up, 'up')
+    main.add_command(project.down, 'down')
+    main.add_command(project.logs, 'logs')
+    main.add_command(project.ls, 'ls')
+    main.add_command(project.ps, 'ps')
+    main.add_command(project.scale, 'scale')
 
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@ class ContextAlreadyExistError(Exception):
         return f'The context [{self._name}] already exists.'
 
 
-class NotExistContextError(Exception):
+class ContextNotFoundError(Exception):
 
     def __init__(self, name: str):
         self._name = name
