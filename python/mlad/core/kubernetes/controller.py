@@ -806,6 +806,7 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
                     cli, name, image, command, namespace, restart_policy, envs, mounts, scale,
                     quota, labels, constraints, secrets)
                 config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = controller
+                instances.append(ret)
             else:
                 raise DeprecatedError(kind)
 
