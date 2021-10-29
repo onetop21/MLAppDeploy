@@ -215,7 +215,7 @@ elif [ $BUILD ]; then
             BuildUsage
             ;;
         --name) shift
-            SERVIE_NAME=$1
+            SERVICE_NAME=$1
             ;;
         --)
             shift
