@@ -1,0 +1,37 @@
+!include preset-definitions.yaml
+
+############################
+# MLAppDeploy Project v0.2 #
+############################
+# kind: Project
+# <<: *metadata
+# workspace:
+#   #<<: *dockerfile
+#   kind: Dockerfile
+#   filePath: .
+# ingress:
+#   TEST_INGRESS:
+#     target: test:1234
+# app:
+# #  test1: *comp
+#   test2: *app
+#   test3: *job
+#   test4: *service
+#   #test-x: *app
+
+# app:
+#   server:
+#     kind: Job
+#     command: python server.py
+#     ports: [5555]
+#     resources:
+#       limits:
+#         xpu: 1
+
+kind: Component
+<<: *metadata
+app:
+  server:
+    kind: Component
+    command: python server.py
+    ports: [5555]

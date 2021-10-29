@@ -3,7 +3,7 @@ import sys
 import json
 from pprint import pprint
 from yaml_parser import load, dump
-from yaml_validator import Validator
+from cerberus_kind import Validator
 
 #$1 schema
 #$2 document
@@ -13,12 +13,15 @@ with open(sys.argv[1]) as f:
 with open(sys.argv[2]) as f:
     document = load(f)
 
+print("Schema.")
+pprint(schema, sort_dicts=False)
 print("Document.")
 pprint(document, sort_dicts=False)
-v = Validator(schema)
+v = Validator(schema, ordered=True)
+print(v)
 if v.validate(document):
     print("Verified.")
-    pprint(v.ordered(v.normalized(document)), sort_dicts=False)
+    pprint(v.normalized_by_order(document), sort_dicts=False)
     # with open("output.yaml", "w") as f:
     #     f.write(dump(v.ordered(v.normalized(document))))
 else:

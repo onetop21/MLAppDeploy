@@ -1,0 +1,316 @@
+# Anchor
+x-definitions: 
+  - definition: &metadata
+      apiVersion: 
+        type: string
+        regex: "v[0-9]+"
+        default: v1
+        order: 0
+      name: 
+        type: string
+        required: true
+        empty: false
+        order: 1
+      version: 
+        type: string
+        regex: "[0-9]+\\.[0-9]+\\.[0-9]+"
+        default: 0.0.1
+        order: 2
+      maintainer:
+        type: string
+        default: ${USER}
+        order: 3
+      workdir:                    # Describe workspace directory.
+        type: string
+        default: .
+        order: 4
+  - definition: &workspace
+      base:                       # Describe base docker image tag
+        type: string
+        regex: "(?:.+/)?([^:]+)(?::.+)?"
+        required: true
+      preps:                      # Describe preparations for making envorinment.
+        type: list
+        schema:
+          type: dict
+          schema:
+            run: 
+              type: string
+            add:
+              type: string
+            pip:
+              type: string
+            apt:
+              type: string
+            yum:
+              type: string
+            apk:
+              type: string
+      ignores:                    # Describe exclude files from project.
+        type: list
+        default:
+          - "**/.*"
+        schema:                   # Describe script run after copy files.
+          type: string
+      script:
+        type: string
+      env:                        # Describe environment variables.
+        type: dict
+        valuesrules:
+          schema:
+            type: [string]
+        default:
+          PYTHONUNBUFFERED: "1"      
+      command:                    # Describe application to execute
+        type: [string, list]
+      args:                       # Describe arguments for execute application
+        type: [string, list]
+  - definition: &buildscript
+      buildscript:
+        type: string
+        default: "FROM    python:latest"
+        required: true
+      ignores:                    # Describe exclude files from project.
+        type: list
+        default:
+          - "**/.*"
+        schema:                   # Describe script run after copy files.
+          type: string
+  - definition: &dockerfile
+      filePath:
+        type: string
+        default: 'Dockerfile'
+        required: true
+      ignorePath:
+        type: string
+        default: '.dockerignore'
+  - definition: &ingress
+      target:
+        type: string
+        regex: "[A-Za-z0-9-_]+:[0-9]+"
+        required: true
+      rewritePath: 
+        type: boolean
+        default: true
+  - definition: &component
+      image:                      # Describe image to run docker service for run not built image from workspace.
+        type: string
+        regex: "(?:.+/)?([^:]+)(?::.+)?"
+      env:                        # Describe environment variables additionaly.
+        type: dict
+      ports:                      # Describe expose ports to other services.
+        type: list
+        schema:
+          type: integer
+      command:                    # Describe command to need overwrite.
+        type: [string, list]
+      args:                       # Describe arguments to need overwrite.
+        type: [string, list]
+      mounts:
+        type: list
+        schema:
+          type: string
+          regex: "[A-Za-z0-9-_]+:/\\w+"
+        #- ${datastore:URL}:/storage
+  - definition: &_app_base
+      <<: *component
+      constraints:                # Describe placement constraints.
+        type: dict
+        schema:
+          hostname:
+            type: string
+          label:
+            type: dict
+  - definition: &app
+      <<: *_app_base
+      restartPolicy:              # Describe restart policy. (never, onFailure, always)
+        type: string
+        allowed: [never, onFailure, always]
+        default: never
+        excludes: runSpec
+      scale:                      # Describe number of replicas or parallelism
+        type: integer
+        default: 1
+        excludes: runSpec
+      quota:                      # Describe required system resource quota.
+        type: dict
+        excludes: resources
+        schema:
+          cpu:
+            type: number
+          gpu:
+            type: integer
+          mem:
+            type: string
+            regex: "[0-9]+[GMK]?[i]?"
+  - definition: &app_job
+      <<: *app
+      restartPolicy:
+        type: string
+        allowed: [never, onFailure]
+        default: never
+        excludes: runSpec
+  - definition: &app_service
+      <<: *app
+      restartPolicy:
+        type: string
+        allowed: [always]
+        default: always
+        excludes: runSpec
+  - definition: &_advanced_base
+      resources:
+        type: dict
+        excludes: quota
+        schema:
+          limits:
+            type: dict
+            schema:
+              cpu:
+                type: number
+              gpu:
+                type: integer
+              mem:
+                type: string
+                regex: "[0-9]+[GMK]?[i]?"
+          requests:
+            type: dict
+            schema:
+              cpu:
+                type: number
+              gpu:
+                type: integer
+              mem:
+                type: string
+                regex: "[0-9]+[GMK]?[i]?"
+  - definition: &job
+      <<: *_app_base
+      <<: *_advanced_base
+      runSpec:
+        type: dict
+        excludes: restartPolicy
+        default:
+          restartPolicy:
+          parallelism:
+          completion:
+        schema:
+          restartPolicy:        # never, onFailure
+            type: string
+            allowed: [never, onFailure]
+            default: never
+          parallelism:
+            type: integer
+            default: 1
+          completion:
+            type: integer
+            default: 1
+  - definition: &service
+      <<: *_app_base
+      <<: *_advanced_base
+      runSpec:
+        type: dict
+        excludes: restartPolicy
+        default:
+          replicas:
+          autoscaler:
+            enable:
+        schema:
+          replicas:               # Describe number to run service instances.
+            type: integer
+            default: 1
+          autoscaler:
+            type: dict
+            schema:
+              enable:
+                type: boolean
+                default: false
+              min:
+                type: integer
+                default: 1
+              max:
+                type: integer
+                default: 1
+              metrics:
+                type: list
+                schema: 
+                  type: dict
+                  schema:
+                    resources:
+                      type: string
+                      allowed: [cpu]
+                      default: cpu
+  - definition: &daemon
+      <<: *_app_base
+      <<: *_advanced_base
+      kind:                    # DaemonSet
+        type: string
+        allowed: ['Daemon']
+        required: true
+      # runSpec:
+      #   type: dict
+      #   excludes: restartPolicy
+      #   schema:
+
+############################
+# MLAppDeploy Project v0.2 #
+############################
+__root__:
+  type: dict
+  selector: 
+    train:
+      <<: *metadata
+      workspace: 
+        type: dict
+        required: true
+        selector: 
+          workspace: *workspace
+          buildscript: *buildscript
+          dockerfile: *dockerfile
+        order: 10
+      app:
+        type: dict
+        valuesrules:
+          type: dict
+          selector:
+            app: *app
+        order: 30
+    deployment:
+      <<: *metadata
+      workspace: 
+        type: dict
+        required: true
+        selector: 
+          workspace: *workspace
+          buildscript: *buildscript
+          dockerfile: *dockerfile
+        order: 10
+      ingress:
+        type: dict
+        required: true
+        valuesrules: 
+          type: dict
+          schema: *ingress
+        order: 20
+      app:
+        type: dict
+        valuesrules:
+          type: dict
+          selector:
+            service: *app_service
+        order: 30
+    component:
+      <<: *metadata
+      workspace: 
+        type: dict
+        required: false
+        selector: 
+          workspace: *workspace
+          buildscript: *buildscript
+          dockerfile: *dockerfile
+        order: 10
+      app:
+        type: dict
+        valuesrules:
+          type: dict
+          selector:
+            component: *component
+        order: 30
