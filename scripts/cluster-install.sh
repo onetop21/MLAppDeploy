@@ -88,6 +88,7 @@ function BuildUsage {
     UsageHeader build
     ColorEcho WARN "Arguments"
     ColorEcho      "        --registry=[REPO/ORG]     : Target to deploy service image. (Required)"
+    ColorEcho      "        --name=[SERVICENAME]      : Image name of the service (default: service)"
     ColorEcho      "    -h, --help                    : This page"
     exit 1
 }
@@ -97,6 +98,7 @@ function DeployUsage {
     ColorEcho WARN "Arguments"
     ColorEcho      "        --registry=[REPO/ORG]     : Change target to pull service image."
     ColorEcho      "                                    (Default: ghcr.io/onetop21)"
+    ColorEcho      "        --name=[SERVICENAME]      : Image name of the service (default: service)"
     ColorEcho      "        --ingress=[LB|LOADBALANCER/NP|NODEPORT]"
     ColorEcho      "                                  : Set ingress type to LoadBalancer or NodePort."
     ColorEcho      "                                    (Default: NodePort)"
@@ -202,7 +204,8 @@ elif [ $WORKER ]; then
     fi
 
 elif [ $BUILD ]; then
-    OPTIONS=$(getopt -o f:h --long registry:,help -- "$@")
+    OPTIONS=$(getopt -o f:h --long registry:,name:,help -- "$@")
+    SERVICE_NAME=service
     [ $? -eq 0 ] || BuildUsage
     eval set -- "$OPTIONS"
     while true; do
@@ -212,6 +215,9 @@ elif [ $BUILD ]; then
             ;;
         -h|--help)
             BuildUsage
+            ;;
+        --name) shift
+            SERVICE_NAME=$1
             ;;
         --)
             shift
@@ -228,13 +234,17 @@ elif [ $BUILD ]; then
 
 elif [ $DEPLOY ]; then
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
-    OPTIONS=$(getopt -o brh --long registry:,ingress:,beta,config:,reset,help -- "$@")
+    SERVICE_NAME=service
+    OPTIONS=$(getopt -o brh --long registry:,name:,ingress:,beta,config:,reset,help -- "$@")
     [ $? -eq 0 ] || DeployUsage
     eval set -- "$OPTIONS"
     while true; do
         case "$1" in
         --registry) shift
             REGISTRY_ADDR=$1
+            ;;
+        --name) shift
+            SERVICE_NAME=$1
             ;;
         --ingress) shift
             INGRESS=1
@@ -603,7 +613,7 @@ elif [ $BUILD ]; then
         ColorEcho DEBUG "Verified."
     fi
 
-    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/service
+    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
     # Step 5: Build Service Package
     PrintStep "Build Service Image."
 #    if [[ "$BUILD_FROM" == "local" ]]; then
@@ -722,7 +732,7 @@ elif [ $DEPLOY ]; then
         kubectl delete secret regcred
     fi
 
-    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/service
+    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
     VERSION=`docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r'`
     TAGGED_IMAGE=$IMAGE_NAME:$VERSION
     [ `kubectl get ns mlad >> /dev/null 2>&1; echo $?` -eq 0 ] && IS_EXIST_NS=1
