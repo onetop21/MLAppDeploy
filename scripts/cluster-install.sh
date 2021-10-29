@@ -203,6 +203,7 @@ elif [ $WORKER ]; then
 
 elif [ $BUILD ]; then
     OPTIONS=$(getopt -o f:h --long registry:,help -- "$@")
+    SERVICE_NAME=service
     [ $? -eq 0 ] || BuildUsage
     eval set -- "$OPTIONS"
     while true; do
@@ -212,6 +213,9 @@ elif [ $BUILD ]; then
             ;;
         -h|--help)
             BuildUsage
+            ;;
+        --name) shift
+            SERVIE_NAME=$1
             ;;
         --)
             shift
@@ -228,6 +232,7 @@ elif [ $BUILD ]; then
 
 elif [ $DEPLOY ]; then
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
+    SERVICE_NAME=service
     OPTIONS=$(getopt -o brh --long registry:,ingress:,beta,config:,reset,help -- "$@")
     [ $? -eq 0 ] || DeployUsage
     eval set -- "$OPTIONS"
@@ -235,6 +240,9 @@ elif [ $DEPLOY ]; then
         case "$1" in
         --registry) shift
             REGISTRY_ADDR=$1
+            ;;
+        --name) shift
+            SERVICE_NAME=$1
             ;;
         --ingress) shift
             INGRESS=1
@@ -603,7 +611,7 @@ elif [ $BUILD ]; then
         ColorEcho DEBUG "Verified."
     fi
 
-    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/service
+    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
     # Step 5: Build Service Package
     PrintStep "Build Service Image."
 #    if [[ "$BUILD_FROM" == "local" ]]; then
@@ -722,7 +730,7 @@ elif [ $DEPLOY ]; then
         kubectl delete secret regcred
     fi
 
-    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/service
+    IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
     VERSION=`docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r'`
     TAGGED_IMAGE=$IMAGE_NAME:$VERSION
     [ `kubectl get ns mlad >> /dev/null 2>&1; echo $?` -eq 0 ] && IS_EXIST_NS=1
