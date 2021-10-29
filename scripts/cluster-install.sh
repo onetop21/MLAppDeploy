@@ -88,6 +88,7 @@ function BuildUsage {
     UsageHeader build
     ColorEcho WARN "Arguments"
     ColorEcho      "        --registry=[REPO/ORG]     : Target to deploy service image. (Required)"
+    ColorEcho      "        --name=[SERVICENAME]      : Image name of the service (default: service)"
     ColorEcho      "    -h, --help                    : This page"
     exit 1
 }
@@ -97,6 +98,7 @@ function DeployUsage {
     ColorEcho WARN "Arguments"
     ColorEcho      "        --registry=[REPO/ORG]     : Change target to pull service image."
     ColorEcho      "                                    (Default: ghcr.io/onetop21)"
+    ColorEcho      "        --name=[SERVICENAME]      : Image name of the service (default: service)"
     ColorEcho      "        --ingress=[LB|LOADBALANCER/NP|NODEPORT]"
     ColorEcho      "                                  : Set ingress type to LoadBalancer or NodePort."
     ColorEcho      "                                    (Default: NodePort)"
