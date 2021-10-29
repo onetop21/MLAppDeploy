@@ -202,7 +202,7 @@ elif [ $WORKER ]; then
     fi
 
 elif [ $BUILD ]; then
-    OPTIONS=$(getopt -o f:h --long registry:,help -- "$@")
+    OPTIONS=$(getopt -o f:h --long registry:,name:,help -- "$@")
     SERVICE_NAME=service
     [ $? -eq 0 ] || BuildUsage
     eval set -- "$OPTIONS"
@@ -233,7 +233,7 @@ elif [ $BUILD ]; then
 elif [ $DEPLOY ]; then
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
     SERVICE_NAME=service
-    OPTIONS=$(getopt -o brh --long registry:,ingress:,beta,config:,reset,help -- "$@")
+    OPTIONS=$(getopt -o brh --long registry:,name:,ingress:,beta,config:,reset,help -- "$@")
     [ $? -eq 0 ] || DeployUsage
     eval set -- "$OPTIONS"
     while true; do
