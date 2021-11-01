@@ -155,13 +155,12 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 _dump_logs(service_name, dirpath)
 
         # Remove the services
-        for service in services:
-            lines = API.service.remove(project_key, services=service_names, stream=True)
-            for line in lines:
-                if 'stream' in line:
-                    yield line['stream']
-                if 'result' in line and line['result'] == 'stopped':
-                    break
+        lines = API.service.remove(project_key, services=service_names, stream=True)
+        for line in lines:
+            if 'stream' in line:
+                yield line['stream']
+            if 'result' in line and line['result'] == 'stopped':
+                break
 
         # Remove the project
         print('Remove the project')

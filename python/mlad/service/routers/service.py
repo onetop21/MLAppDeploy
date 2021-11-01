@@ -179,7 +179,7 @@ def service_remove(project_key: str, service_name: str,
 
 
 @router.delete("/project/{project_key}/service")
-def services_remove(project_key: str, req: service.RemoveRequest,
+def remove_services(project_key: str, req: service.RemoveRequest,
                     stream: bool = Query(False),
                     session: str = Header(None)):
     key = str(project_key).replace('-', '')
