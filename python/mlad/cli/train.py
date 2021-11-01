@@ -159,15 +159,16 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             lines = API.service.remove(project_key, services=service_names, stream=True)
             for line in lines:
                 if 'stream' in line:
-                    sys.stdout.write(line['stream'])
+                    yield line['stream']
                 if 'result' in line and line['result'] == 'stopped':
                     break
 
         # Remove the project
+        print('Remove the project')
         lines = API.project.delete(project_key)
         for line in lines:
             if 'stream' in line:
-                sys.stdout.write(line['stream'])
+                yield line['stream']
             if 'result' in line and line['result'] == 'succeed':
                 yield 'The project network was successfully removed.'
                 break
