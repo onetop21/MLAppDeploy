@@ -85,14 +85,14 @@ def up(file: Optional[str]):
     base_labels['MLAD.PROJECT.IMAGE'] = image_tag
 
     # Push image
-    yield f'Upload the image to registry [{registry_address}].'
+    yield f'Upload the image to the registry [{registry_address}]...'
     docker_ctlr.push_image(project_key, image_tag)
 
     # Create a project
     yield 'Deploy services to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, extra_envs, credential=credential, allow_reuse=True)
+    lines = API.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])
