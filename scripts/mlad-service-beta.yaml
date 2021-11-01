@@ -11,8 +11,8 @@ rules:
 - apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io",
               "metrics.k8s.io"]
   resources: ["nodes", "namespaces", "services", "pods", "pods/log", "replicationcontrollers",
-              "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "rolebindings",
-              "ingresses", "podmetrics"]
+              "deployments", "deployments/scale", "replicaset", "jobs", "configmaps", "secrets",
+              "events", "rolebindings", "ingresses", "podmetrics"]
   verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
 ---
 kind: ClusterRoleBinding
