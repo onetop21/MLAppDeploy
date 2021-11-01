@@ -2,7 +2,7 @@ import requests
 
 from typing import Optional, Dict
 
-from .exception import raise_error
+from .exceptions import raise_error
 
 
 class APIBase:
