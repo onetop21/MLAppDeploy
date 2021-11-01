@@ -89,7 +89,7 @@ def install(file_path: str, no_build: bool) -> None:
         spec = OmegaConf.load(file_path)
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
-    spec = validators.validate_component(OmegaConf.to_container(spec))
+    spec = validators.validate(OmegaConf.to_container(spec))
     if not no_build and 'workspace' not in spec:
         raise CannotBuildComponentError
 

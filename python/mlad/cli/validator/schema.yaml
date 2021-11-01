@@ -5,7 +5,6 @@ x-definitions:
         type: string
         regex: "v[0-9]+"
         default: v1
-        description: Schema version for MLAppDeploy project.
         order: 0
       name:
         type: string
@@ -26,10 +25,6 @@ x-definitions:
         default: .
         order: 4
   - definition: &workspace
-      kind:
-        type: string
-        allowed: [Workspace]
-        default: Workspace
       base:                       # Describe base docker image tag
         type: string
         regex: "(?:.+/)?([^:]+)(?::.+)?"
@@ -61,20 +56,19 @@ x-definitions:
         type: string
       env:                        # Describe environment variables.
         type: dict
+        valuesrules:
+          schema:
+            type: [string]
         default:
-          PYTHONUNBUFFERED: 1
+          PYTHONUNBUFFERED: "1"
       command:                    # Describe application to execute
         type: [string, list]
       args:                       # Describe arguments for execute application
         type: [string, list]
-  - definition: &dockerfile
-      kind:
+  - definition: &buildscript
+      buildscript:
         type: string
-        allowed: [Dockerfile]
-        required: true
-      script:
-        type: string
-        excludes: [filePath, ignorePath]
+        default: "FROM    python:latest"
         required: true
       ignores:                    # Describe exclude files from project.
         type: list
@@ -82,14 +76,14 @@ x-definitions:
           - "**/.*"
         schema:                   # Describe script run after copy files.
           type: string
-        excludes: [filePath, ignorePath]
+  - definition: &dockerfile
       filePath:
         type: string
-        excludes: [script, ignores]
+        default: 'Dockerfile'
         required: true
       ignorePath:
         type: string
-        excludes: [script, ignores]
+        default: '.dockerignore'
   - definition: &ingress
       target:
         type: string
@@ -99,10 +93,6 @@ x-definitions:
         type: boolean
         default: true
   - definition: &component
-      kind:
-        type: string
-        default: Component
-        allowed: ['Component']
       image:                      # Describe image to run docker service for run not built image from workspace.
         type: string
         regex: "(?:.+/)?([^:]+)(?::.+)?"
@@ -124,10 +114,6 @@ x-definitions:
         #- ${datastore:URL}:/storage
   - definition: &_app_base
       <<: *component
-      kind:                       # component
-        type: string
-        default: App
-        allowed: ['App']
       constraints:                # Describe placement constraints.
         type: dict
         schema:
@@ -157,6 +143,20 @@ x-definitions:
           mem:
             type: string
             regex: "[0-9]+[GMK]?[i]?"
+  - definition: &app_job
+      <<: *app
+      restartPolicy:
+        type: string
+        allowed: [never, onFailure]
+        default: never
+        excludes: runSpec
+  - definition: &app_service
+      <<: *app
+      restartPolicy:
+        type: string
+        allowed: [always]
+        default: always
+        excludes: runSpec
   - definition: &_advanced_base
       resources:
         type: dict
@@ -185,13 +185,13 @@ x-definitions:
   - definition: &job
       <<: *_app_base
       <<: *_advanced_base
-      kind:                     # job
-        type: string
-        allowed: ['Job']
-        required: true
       runSpec:
         type: dict
         excludes: restartPolicy
+        default:
+          restartPolicy:
+          parallelism:
+          completion:
         schema:
           restartPolicy:        # never, onFailure
             type: string
@@ -206,13 +206,13 @@ x-definitions:
   - definition: &service
       <<: *_app_base
       <<: *_advanced_base
-      kind:                     # Deployment
-        type: string
-        allowed: ['Service']
-        required: true
       runSpec:
         type: dict
         excludes: restartPolicy
+        default:
+          replicas:
+          autoscaler:
+            enable:
         schema:
           replicas:               # Describe number to run service instances.
             type: integer
@@ -249,3 +249,68 @@ x-definitions:
       #   type: dict
       #   excludes: restartPolicy
       #   schema:
+
+############################
+# MLAppDeploy Project v0.2 #
+############################
+__root__:
+  type: dict
+  selector:
+    train:
+      <<: *metadata
+      workspace:
+        type: dict
+        required: true
+        selector:
+          workspace: *workspace
+          buildscript: *buildscript
+          dockerfile: *dockerfile
+        order: 10
+      app:
+        type: dict
+        valuesrules:
+          type: dict
+          selector:
+            app: *app
+        order: 30
+    deployment:
+      <<: *metadata
+      workspace:
+        type: dict
+        required: true
+        selector:
+          workspace: *workspace
+          buildscript: *buildscript
+          dockerfile: *dockerfile
+        order: 10
+      ingress:
+        type: dict
+        required: true
+        valuesrules:
+          type: dict
+          schema: *ingress
+        order: 20
+      app:
+        type: dict
+        valuesrules:
+          type: dict
+          selector:
+            service: *app_service
+        order: 30
+    component:
+      <<: *metadata
+      workspace:
+        type: dict
+        required: false
+        selector:
+          workspace: *workspace
+          buildscript: *buildscript
+          dockerfile: *dockerfile
+        order: 10
+      app:
+        type: dict
+        valuesrules:
+          type: dict
+          selector:
+            component: *component
+        order: 30
