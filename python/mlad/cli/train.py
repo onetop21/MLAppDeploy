@@ -115,11 +115,13 @@ def up(file: Optional[str]):
 
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     _process_file(file)
+    project_key_assigned = project_key is not None
     if project_key is None:
         project_key = utils.project_key(utils.get_workspace())
 
     def _get_log_dirpath(project: Dict) -> Path:
-        workdir = utils.get_project(default_project)['workdir']
+        workdir = utils.get_project(default_project)['workdir'] \
+            if not project_key_assigned else str(Path().absolute())
         timestamp = str(project['created'])
         time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
         path = Path(f'{workdir}/.logs/{time}')
@@ -163,11 +165,10 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 break
 
         # Remove the project
-        print('Remove the project')
         lines = API.project.delete(project_key)
         for line in lines:
             if 'stream' in line:
-                yield line['stream']
+                sys.stdout.write(line['stream'])
             if 'result' in line and line['result'] == 'succeed':
                 yield 'The project network was successfully removed.'
                 break

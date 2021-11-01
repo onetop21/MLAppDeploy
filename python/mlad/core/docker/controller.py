@@ -188,7 +188,7 @@ def remove_project_network(cli, network, timeout=0xFFFF, stream=False):
                 break
             else:
                 padding = '\033[1A\033[K' if tick else ''
-                message = f"{padding}Wait to remove network [{tick}s]\n"
+                message = f"{padding}Wait for removing the network [{tick}s]\n"
                 yield {'stream': message}
                 time.sleep(1)
         if not removed:
