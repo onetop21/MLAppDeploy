@@ -122,7 +122,9 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         workdir = utils.get_project(default_project)['workdir']
         timestamp = str(project['created'])
         time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
-        return Path(f'{workdir}/.logs/{time}').mkdir(exist_ok=True, parents=True)
+        path = Path(f'{workdir}/.logs/{time}')
+        path.mkdir(exist_ok=True, parents=True)
+        return path
 
     def _dump_logs(service_name: str, dirpath: Path):
         path = dirpath / f'{service_name}.log'
