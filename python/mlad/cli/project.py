@@ -22,7 +22,7 @@ from mlad.api.exception import APIError, NotFound
 
 from mlad.cli.validator import validators
 from mlad.cli.validator.exceptions import InvalidProjectYaml
-from mlad.cli.exceptions import CannotFoundImageError
+from mlad.cli.exceptions import ImageNotFoundError
 
 
 def _parse_log(log, max_name_width=32, len_short_id=10):
@@ -370,7 +370,7 @@ def up():
 
     # select suitable image
     if not images:
-        raise CannotFoundImageError(project['name'])
+        raise ImageNotFoundError(project['name'])
 
     image = images[0]
     repository = image.labels['MLAD.PROJECT.IMAGE']

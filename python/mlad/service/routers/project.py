@@ -60,7 +60,7 @@ def projects(extra_labels: str = '', session: str = Header(None)):
 
 
 @router.get("/project/{project_key}")
-def project_inspect(project_key: str, session: str = Header(None)):
+def inspect_project(project_key: str, session: str = Header(None)):
     try:
         key = str(project_key).replace('-', '')
         network = ctlr.get_project_network(project_key=key)
@@ -75,7 +75,7 @@ def project_inspect(project_key: str, session: str = Header(None)):
 
 
 @router.delete("/project/{project_key}")
-def project_remove(project_key:str, session: str = Header(None)):
+def remove_project(project_key: str, session: str = Header(None)):
     try:
         key = str(project_key).replace('-','')
         network = ctlr.get_project_network(project_key=key)
