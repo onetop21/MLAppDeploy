@@ -1,5 +1,4 @@
 import json
-import traceback
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
 from fastapi.responses import StreamingResponse
@@ -212,7 +211,6 @@ def remove_services(project_key: str, req: service.RemoveRequest,
     except InvalidSessionError as e:
         raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
-        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
         return StreamingResponse(remove_service(res), background=handler)
