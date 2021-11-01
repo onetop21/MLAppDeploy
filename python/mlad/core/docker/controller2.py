@@ -21,11 +21,9 @@ def obtain_credential():
     cli = get_cli()
     headers = {'X-Registry-Config': b''}
     docker.api.build.BuildApiMixin._set_auth_headers(cli.api, headers)
-    print(headers)
     headers = {'auths': json.loads(
-        base64.urlsafe_b64decode(headers['X-Registry-Config'] or b'e30k'))
-    }
-    print(headers)
+        base64.urlsafe_b64decode(headers['X-Registry-Config'] or b'e30K')
+    )}
     encoded = base64.urlsafe_b64encode(json.dumps(headers).encode())
     return encoded.decode()
 

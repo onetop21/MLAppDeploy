@@ -1,8 +1,7 @@
 import os
 import sys
-import datetime
 
-
+from datetime import datetime
 from typing import Optional, Dict
 from pathlib import Path
 
