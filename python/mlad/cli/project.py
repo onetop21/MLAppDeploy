@@ -18,7 +18,7 @@ from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
 from mlad.cli import config as config_core
 from mlad.api import API
-from mlad.api.exception import APIError, NotFound
+from mlad.api.exceptions import APIError, NotFound
 
 from mlad.cli.validator import validators
 from mlad.cli.validator.exceptions import InvalidProjectYaml

@@ -1,11 +1,14 @@
 import json
+import traceback
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from mlad.core.exceptions import APIError
 from mlad.service.models import service
-from mlad.service.exception import InvalidProjectError,InvalidServiceError, \
-    InvalidSessionError, exception_detail
+from mlad.service.exception import (
+    InvalidProjectError, InvalidServiceError, InvalidSessionError,
+    exception_detail
+)
 from mlad.service.libs import utils
 from mlad.core.kubernetes import controller as ctlr
 
@@ -209,6 +212,7 @@ def services_remove(project_key: str, req: service.RemoveRequest,
     except InvalidSessionError as e:
         raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
         return StreamingResponse(remove_service(res), background=handler)
