@@ -233,7 +233,7 @@ def run(no_build, env, quota, command):
 
     project = utils.get_project(default_project)
     try:
-        project = validators.validate_project(project)
+        project = validators.validate(project)
     except InvalidProjectYaml as e:
         print('Errors:', e)
         sys.exit(1)
