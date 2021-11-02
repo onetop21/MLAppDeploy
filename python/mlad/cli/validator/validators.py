@@ -16,8 +16,7 @@ def validate(target):
     except DocumentError as e:
         raise InvalidProjectYaml(str(e))
     if res:
-        return v.normalized_by_order(document)
-        return v.ordered(v.normalized(target))
+        return v.normalized_by_order(target)
     else:
         print(v.errors)
         raise InvalidProjectYaml(v.errors)

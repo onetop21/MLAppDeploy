@@ -348,7 +348,7 @@ def up():
     config = config_core.get()
     cli = ctlr.get_api_client()
     project = utils.get_project(default_project)
-    project = validators.validate_project(project)
+    project = validators.validate(project)
 
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
