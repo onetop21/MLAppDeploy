@@ -7,6 +7,7 @@ from mlad.cli import project_cli as project
 from mlad.cli import node_cli as node
 from mlad.cli import context_cli as context
 from mlad.cli import board_cli as board
+from mlad.cli import train_cli as train
 from mlad.cli.autocompletion import get_project_file_completion
 from mlad.cli.libs.auth import auth_admin
 from mlad.cli.exceptions import ContextNotFoundError
@@ -58,6 +59,7 @@ except ContextNotFoundError:
 else:
     main.add_command(image.cli, 'image')
     main.add_command(project.cli, 'project')
+    main.add_command(train.cli, 'train')
     main.add_command(board.cli, 'board')
     main.add_command(node.admin_cli if auth_admin() else node.cli, 'node')
 

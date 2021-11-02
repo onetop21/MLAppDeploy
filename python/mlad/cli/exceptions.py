@@ -6,7 +6,7 @@ class TokenError(Exception):
     pass
 
 
-class CannotFoundImageError(Exception):
+class ImageNotFoundError(Exception):
 
     def __init__(self, name: str):
         self._name = name
@@ -85,3 +85,12 @@ class DockerNotFoundError(Exception):
 
     def __str__(self):
         return 'Need to install the docker daemon.'
+
+
+class ProjectAlreadyExistError(Exception):
+
+    def __init__(self, project_key: str):
+        self.project_key = project_key
+
+    def __str__(self):
+        return f'Failed to create a project: [{self.project_key}] already exists.'

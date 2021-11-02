@@ -18,11 +18,11 @@ from mlad.cli.libs import interrupt_handler
 from mlad.cli.Format import PROJECT
 from mlad.cli import config as config_core
 from mlad.api import API
-from mlad.api.exception import APIError, NotFound
+from mlad.api.exceptions import APIError, NotFound
 
 from mlad.cli.validator import validators
 from mlad.cli.validator.exceptions import InvalidProjectYaml
-from mlad.cli.exceptions import CannotFoundImageError
+from mlad.cli.exceptions import ImageNotFoundError
 
 
 def _parse_log(log, max_name_width=32, len_short_id=10):
@@ -348,7 +348,7 @@ def up():
     config = config_core.get()
     cli = ctlr.get_api_client()
     project = utils.get_project(default_project)
-    project = validators.validate_project(project)
+    project = validators.validate(project)
 
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
@@ -370,7 +370,7 @@ def up():
 
     # select suitable image
     if not images:
-        raise CannotFoundImageError(project['name'])
+        raise ImageNotFoundError(project['name'])
 
     image = images[0]
     repository = image.labels['MLAD.PROJECT.IMAGE']

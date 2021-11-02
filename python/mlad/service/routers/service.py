@@ -4,8 +4,10 @@ from fastapi import APIRouter, Query, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from mlad.core.exceptions import APIError
 from mlad.service.models import service
-from mlad.service.exception import InvalidProjectError,InvalidServiceError, \
-    InvalidSessionError, exception_detail
+from mlad.service.exception import (
+    InvalidProjectError, InvalidServiceError, InvalidSessionError,
+    exception_detail
+)
 from mlad.service.libs import utils
 from mlad.core.kubernetes import controller as ctlr
 
@@ -176,7 +178,7 @@ def service_remove(project_key: str, service_name: str,
 
 
 @router.delete("/project/{project_key}/service")
-def services_remove(project_key: str, req: service.RemoveRequest,
+def remove_services(project_key: str, req: service.RemoveRequest,
                     stream: bool = Query(False),
                     session: str = Header(None)):
     key = str(project_key).replace('-', '')

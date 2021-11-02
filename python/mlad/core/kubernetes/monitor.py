@@ -37,9 +37,8 @@ class DelMonitor(Thread):
             services[name] = targets
             all_targets.extend(targets)
         w = watch.Watch()
-        print(f'Watch start to check service removed')
         service_removed = False
-        msg = f"Wait to remove services..\n"
+        msg = "Wait for the services to be removed...\n"
         self.collector.queue.put({'stream': msg})
         try:
             wrapped_api = DelMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
@@ -52,7 +51,7 @@ class DelMonitor(Thread):
                     if pod in services[service]:
                         services[service].remove(pod)
                         if not services[service]:
-                            msg = f'Service \'{service}\' removed.'
+                            msg = f'Service \'{service}\' was removed.'
                             self.collector.queue.put({'result': 'succeed', 'stream': msg})
                         all_targets.remove(pod)
                         if not all_targets:
@@ -61,7 +60,7 @@ class DelMonitor(Thread):
         except urllib3.exceptions.ReadTimeoutError as e: #for timeout
             pass
         if service_removed:
-            msg = f"All Service removed."
+            msg = "All Services were removed."
             self.collector.queue.put({'result': 'completed', 'stream': msg})
         else:
             for svc, target in services.items():
