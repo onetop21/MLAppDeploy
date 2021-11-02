@@ -66,3 +66,4 @@ def cli():
 
 cli.add_command(up)
 cli.add_command(down)
+cli.add_command(scale)
