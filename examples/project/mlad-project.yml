@@ -4,10 +4,10 @@ maintainer: root                   # Describe maintainer. (*env.USER)
 name: example                      # Describe project name.
 version: 0.0.1                     # Describe verison. (*1.0.0)
 workdir: .
-ingress:                           # [OPTIONAL] Describe ingress to expose.
-    test-ingress:
-        rewritePath: true
-        target: server:1234
+# ingress:                           # [OPTIONAL] Describe ingress to expose.
+#     test-ingress:
+#         rewritePath: true
+#         target: server:1234
 workspace:
     kind: Workspace                # Describe kind of workspace. (*Workspace, Dockerfile)
     base: python:latest            # Describe base docker image tag.
