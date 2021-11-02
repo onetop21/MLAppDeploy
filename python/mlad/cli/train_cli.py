@@ -38,9 +38,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
 
 @click.command()
-@click.argument('scales', required=True, nargs=-1,
-                help=('App name and applied scale, '
-                      'format: [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]'))
+@click.argument('scales', required=True, nargs=-1)
 @click.option('--file', '-f', default=None, help=(
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
@@ -48,7 +46,9 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 @click.option('--project-key', '-p', help='Project Key', default=None)
 @echo_exception
 def scale(scales: List[str], file: Optional[str], project_key: Optional[str]):
-    '''Change the scale of one of the running apps.'''
+    '''Change the scale of one of the running apps.
+    Format: mlad train scale [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
+    '''
     parsed_scales = []
     for scale in scales:
         app_name, value = scale.split('=')
