@@ -2,7 +2,7 @@ import os
 import sys
 
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 
 import yaml
@@ -173,6 +173,21 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 yield 'The project network was successfully removed.'
                 break
     yield 'Done.'
+
+
+def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optional[str]):
+    _process_file(file)
+    if project_key is None:
+        project_key = utils.project_key(utils.get_workspace())
+
+    API.project.inspect(project_key)
+
+    service_names = [service['name'] for service in API.service.get(project_key)['inspects']]
+
+    for target_name, value in scales:
+        if target_name in service_names:
+            API.service.scale(project_key, target_name, value)
+            yield f'Scale updated [{target_name}] = {value}'
 
 
 def _get_registry_address(config: context.Context):
