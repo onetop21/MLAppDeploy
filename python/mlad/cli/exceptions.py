@@ -90,7 +90,7 @@ class DockerNotFoundError(Exception):
 class ProjectAlreadyExistError(Exception):
 
     def __init__(self, project_key: str):
-        self.project_Key = project_key
-    
+        self.project_key = project_key
+
     def __str__(self):
         return f'Failed to create a project: [{self.project_key}] already exists.'
