@@ -17,6 +17,5 @@ def validate(target):
     if res:
         return v.normalized_by_order(target)
     else:
-        print(v.errors)
         raise InvalidProjectYaml(v.errors)
 
