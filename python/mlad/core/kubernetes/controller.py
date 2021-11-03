@@ -1036,35 +1036,20 @@ def remove_node_labels(node_key, cli = DEFAULT_CLI, *keys):
 
 
 def scale_service(service, scale_spec, cli=DEFAULT_CLI):
-    controller = None
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
-    if isinstance(service, client.models.v1_deployment.V1Deployment):
-        controller = 'Deployment'
-    elif isinstance(service, client.models.v1_job.V1Job):
-        controller = 'Job'
-    else: raise TypeError('Parameter is not valid type.')
+    if not isinstance(service, client.models.v1_deployment.V1Deployment):
+        raise TypeError('Target service is not a deployment object.')
     name = service.metadata.name
     namespace = service.metadata.namespace
-
-    if controller == 'Job':
-        api = client.BatchV1Api(cli)
-        body = {
-            "spec": {
-                "parallelism": scale_spec
-            }
+    api = client.AppsV1Api(cli)
+    body = {
+        "spec": {
+            "replicas": scale_spec
         }
-        ret = api.patch_namespaced_job(
-            name=name, namespace=namespace, body=body)
-    elif controller == 'Deployment':
-        api = client.AppsV1Api(cli)
-        body = {
-            "spec": {
-                "replicas": scale_spec
-            }
-        }
-        ret = api.patch_namespaced_deployment_scale(
-            name=name, namespace=namespace, body=body)
+    }
+    ret = api.patch_namespaced_deployment_scale(
+        name=name, namespace=namespace, body=body)
     return ret
 
 
