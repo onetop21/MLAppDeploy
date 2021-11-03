@@ -52,7 +52,7 @@ def serve(file: Optional[str]):
     image = images[0]
 
     # Re-tag the image
-    registry_address = _get_registry_address(config)
+    registry_address = utils.get_registry_address(config)
     image_tag = f'{registry_address}/{image_tag}'
     image.tag(image_tag)
     base_labels['MLAD.PROJECT.IMAGE'] = image_tag
@@ -106,12 +106,3 @@ def kill(project_key: str, no_dump: bool):
     stream = down(None, project_key, no_dump)
     for msg in stream :
         yield msg
-
-
-def _get_registry_address(config: context.Context):
-    parsed = utils.parse_url(config.docker.registry.address)
-    registry_address = parsed['address']
-    namespace = config.docker.registry.namespace
-    if namespace is not None:
-        registry_address += f'/{namespace}'
-    return registry_address

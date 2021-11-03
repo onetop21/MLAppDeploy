@@ -3,6 +3,7 @@ from mlad.core.libs import utils
 
 workspace_default = {
     'apiVersion': 'v1',
+    'kind': 'Train',
     'name': 'Unknown',
     'version': '0.0.1',
     'maintainer': 'Unknown',
@@ -17,30 +18,45 @@ workspace_default = {
         },
         'ignores': ['**/.*'],
         'command': '',
-        'arguments': '',
+        'args': '',
     },
-    'ingress': {},
     'app': {}
 }
 
 dockerfile_default = {
     'apiVersion': 'v1',
+    'kind': 'Train',
     'name': 'Unknown',
     'version': '0.0.1',
     'maintainer': 'Unknown',
     'workdir': './',
     'workspace': {
         'kind': 'Dockerfile',
-        'ignores': ['**/.*'],
+        'filePath': 'Dockerfile',
+        'ignorePath': '.dockerignore',
     },
-    'ingress': {},
     'app': {}
 }
 
+buildscript_default = {
+    'apiVersion': 'v1',
+    'kind': 'Train',
+    'name': 'Unknown',
+    'version': '0.0.1',
+    'maintainer': 'Unknown',
+    'workdir': './',
+    'workspace': {
+        'kind': 'Buildscript',
+        'buildscript': 'FROM    python:latest',
+        'ignores': ['**/.*'],
+    },
+    'app': {}
+}
 
 def update(x):
     kind = x['workspace'].get('kind', 'Workspace')
-    return utils.update_obj(workspace_default if kind == 'Workspace' else dockerfile_default, x)
+    return utils.update_obj(workspace_default if kind == 'Workspace' else
+                            dockerfile_default if kind == 'Dockerfile' else buildscript_default, x)
 
 
 sys.modules[__name__] = lambda x: update(x)

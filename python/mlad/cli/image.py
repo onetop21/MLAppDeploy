@@ -75,10 +75,10 @@ def build(quiet: bool, no_cache: bool, pull: bool):
     version = base_labels['MLAD.PROJECT.VERSION']
     image_tag = base_labels['MLAD.PROJECT.IMAGE']
 
-    workspace = manifest['workspace']
+    workspace = project['workspace']
     # For the workspace kind
     if workspace['kind'] == 'Workspace':
-        payload = _obtain_workspace_payload(workspace, manifest['maintainer'])
+        payload = _obtain_workspace_payload(workspace, project['maintainer'])
     # For the dockerfile kind
     else:
         if 'dockerfile' in workspace:
@@ -91,7 +91,7 @@ def build(quiet: bool, no_cache: bool, pull: bool):
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(payload)
     with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-        for name, arcname in utils.arcfiles(manifest['workdir'], workspace['ignores']):
+        for name, arcname in utils.arcfiles(project['workdir'], workspace['ignores']):
             tar.add(name, arcname)
         tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
     tarbytes.seek(0)
@@ -138,7 +138,7 @@ def _obtain_workspace_payload(workspace, maintainer):
         prep_docker_formats.append(template.format(SRC=prep[key]))
 
     commands = [f'"{item}"' for item in workspace['command'].split()] + \
-        [f'"{item}"' for item in workspace['arguments'].split()]
+        [f'"{item}"' for item in workspace['args'].split()]
 
     return DOCKERFILE.format(
         BASE=workspace['base'],

@@ -57,7 +57,7 @@ def up(file: Optional[str]):
     image = images[0]
 
     # Re-tag the image
-    registry_address = _get_registry_address(config)
+    registry_address = utils.get_registry_address(config)
     image_tag = f'{registry_address}/{image_tag}'
     image.tag(image_tag)
     base_labels['MLAD.PROJECT.IMAGE'] = image_tag
@@ -168,12 +168,3 @@ def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optio
         if target_name in service_names:
             API.service.scale(project_key, target_name, value)
             yield f'Scale updated [{target_name}] = {value}'
-
-
-def _get_registry_address(config: context.Context):
-    parsed = utils.parse_url(config.docker.registry.address)
-    registry_address = parsed['address']
-    namespace = config.docker.registry.namespace
-    if namespace is not None:
-        registry_address += f'/{namespace}'
-    return registry_address

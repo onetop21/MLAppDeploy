@@ -100,34 +100,34 @@ def change_key_style(dct):
 
 
 # Manage Project and Network
-def base_labels(workspace: str, session: str, manifest: Dict, build: bool = False):
+def base_labels(workspace: str, session: str, project: Dict, build: bool = False):
     # workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
     username = get_username(session)
     key = project_key(workspace)
-    basename = f"{username}-{manifest['name']}-{key[:const.SHORT_LEN]}".lower()
+    basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}".lower()
 
-    kind = manifest['kind']
+    kind = project['kind']
     if not build and kind == 'Deployment':
         deploy_key = shortuuid.uuid()
         key = f"{project_key(workspace)}-{deploy_key}"
-        basename = f"{username}-{manifest['name']}-{key[:const.SHORT_LEN]}-" \
+        basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}-" \
                    f"{deploy_key[:const.SHORT_LEN]}".lower()
 
-    version = str(manifest['version']).lower()
-    default_image = f"{username}/{manifest['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
+    version = str(project['version']).lower()
+    default_image = f"{username}/{project['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
     labels = {
         'MLAD.VERSION': '1',
         'MLAD.PROJECT': key,
         'MLAD.PROJECT.WORKSPACE': workspace,
         'MLAD.PROJECT.USERNAME': username,
-        'MLAD.PROJECT.API_VERSION': manifest['apiVersion'],
-        'MLAD.PROJECT.NAME': manifest['name'].lower(),
-        'MLAD.PROJECT.MAINTAINER': manifest['maintainer'],
-        'MLAD.PROJECT.VERSION': str(manifest['version']).lower(),
+        'MLAD.PROJECT.API_VERSION': project['apiVersion'],
+        'MLAD.PROJECT.NAME': project['name'].lower(),
+        'MLAD.PROJECT.MAINTAINER': project['maintainer'],
+        'MLAD.PROJECT.VERSION': str(project['version']).lower(),
         'MLAD.PROJECT.BASE': basename,
         'MLAD.PROJECT.IMAGE': default_image,
         'MLAD.PROJECT.SESSION': session,
-        'MLAD.PROJECT.KIND': manifest['kind']
+        'MLAD.PROJECT.KIND': project['kind']
     }
     return labels
