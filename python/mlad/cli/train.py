@@ -20,7 +20,7 @@ from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 
 from mlad.api import API
-from mlad.api.exceptions import ProjectNotFound
+from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest
 
 
 def _process_file(file: Optional[str]):
@@ -132,10 +132,13 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     def _dump_logs(service_name: str, dirpath: Path):
         path = dirpath / f'{service_name}.log'
         with open(path, 'w') as log_file:
-            logs = API.project.log(project_key, timestamps=True, names_or_ids=[service_name])
-            for log in logs:
-                log = _parse_log(log)
-                log_file.write(log)
+            try:
+                logs = API.project.log(project_key, timestamps=True, names_or_ids=[service_name])
+                for log in logs:
+                    log = _parse_log(log)
+                    log_file.write(log)
+            except InvalidLogRequest:
+                return f'There is no log in [{service_name}].'
         return f'The log file of service [{service_name}] saved.'
 
     # Check the project already exists
