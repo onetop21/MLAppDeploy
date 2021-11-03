@@ -4,14 +4,18 @@ import tarfile
 import json
 import urllib3
 import requests
-from mlad.core.docker import controller as ctlr
-from mlad.core.libs import utils as core_utils
+
 from mlad.cli import config as config_core
+from mlad.cli.validator import validators
 from mlad.cli.libs import utils
 from mlad.cli.Format import (
     DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT,
     DOCKERFILE_REQ_ADD, DOCKERFILE_REQ_RUN, DOCKERFILE_REQ_APK, DOCKERFILE_REQ_YUM
 )
+
+from mlad.core.docker import controller as ctlr
+from mlad.core.libs import utils as core_utils
+from mlad.core.default import project as default_project
 
 PREP_KEY_TO_TEMPLATE = {
     'run': DOCKERFILE_REQ_RUN,
@@ -61,11 +65,12 @@ def list(all, tail):
 def build(quiet: bool, no_cache: bool, pull: bool):
     config = config_core.get()
     cli = ctlr.get_api_client()
-    manifest = utils.get_manifest()
+    project = utils.get_project(default_project)
+    project = validators.validate(project)
 
     # Generate Base Labels
     workspace_key = utils.get_workspace()
-    base_labels = core_utils.base_labels(workspace_key, config.session, manifest)
+    base_labels = core_utils.base_labels(workspace_key, config.session, project, build=True)
     project_key = base_labels['MLAD.PROJECT']
     version = base_labels['MLAD.PROJECT.VERSION']
     image_tag = base_labels['MLAD.PROJECT.IMAGE']

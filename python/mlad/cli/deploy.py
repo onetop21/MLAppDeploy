@@ -2,7 +2,7 @@ import os
 import sys
 
 from datetime import datetime
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict
 from pathlib import Path
 
 import yaml
@@ -12,7 +12,7 @@ from mlad.cli import context
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ProjectAlreadyExistError, ImageNotFoundError
+    ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError
 )
 
 from mlad.core.docker import controller2 as docker_ctlr
@@ -23,7 +23,7 @@ from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound
 
 
-def up(file: Optional[str]):
+def serve(file: Optional[str]):
 
     utils.process_file(file)
     config = config_core.get()
@@ -31,26 +31,20 @@ def up(file: Optional[str]):
     project = validators.validate(project)
 
     kind = project['kind']
-    if not kind == 'Train':
+    if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
         config.session,
-        project
-    )
+        project)
 
-    # Check the project already exists
     project_key = base_labels['MLAD.PROJECT']
-    try:
-        API.project.inspect(project_key=project_key)
-        raise ProjectAlreadyExistError(project_key)
-    except ProjectNotFound:
-        pass
 
     # Find suitable image
+    base_key = base_labels['MLAD.PROJECT'].rsplit('-', 1)[0]
     image_tag = base_labels['MLAD.PROJECT.IMAGE']
-    images = [image for image in docker_ctlr.get_images(project_key=project_key)
+    images = [image for image in docker_ctlr.get_images(project_key=base_key)
               if image_tag in image.tags]
     if len(images) == 0:
         raise ImageNotFoundError(image_tag)
@@ -64,8 +58,7 @@ def up(file: Optional[str]):
 
     # Push image
     yield f'Upload the image to the registry [{registry_address}]...'
-    for line in docker_ctlr.push_image(image_tag):
-        yield line
+    docker_ctlr.push_image(image_tag)
 
     # Create a project
     yield 'Deploy services to the cluster...'
@@ -78,10 +71,23 @@ def up(file: Optional[str]):
         if 'result' in line and line['result'] == 'succeed':
             break
 
+    # Apply ingress for service
+    apps = project.get('app', dict())
+    ingress = project['ingress']
+    for name, value in ingress.items():
+        service_name, port = value['target'].split(':')
+        if service_name in apps.keys():
+            apps[service_name]['ingress'] = {
+                'name': name,
+                'rewritePath': value['rewritePath'],
+                'port': port
+            }
+
     # Create services
     services = []
-    for name, value in project.get('app', dict()).items():
+    for name, value in apps.items():
         value['name'] = name
+        value['kind'] = 'App' # TODO to be deleted
         services.append(value)
 
     yield 'Start services...'
@@ -91,17 +97,13 @@ def up(file: Optional[str]):
             pass
 
     yield 'Done.'
+    yield f'Project key : {project_key}'
 
 
-def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
-    _process_file(file)
-    project_key_assigned = project_key is not None
-    if project_key is None:
-        project_key = utils.project_key(utils.get_workspace())
+def kill(project_key: str, no_dump: bool):
 
     def _get_log_dirpath(project: Dict) -> Path:
-        workdir = utils.get_project(default_project)['workdir'] \
-            if not project_key_assigned else str(Path().absolute())
+        workdir = str(Path().absolute())
         timestamp = str(project['created'])
         time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
         path = Path(f'{workdir}/.logs/{time}')
@@ -115,7 +117,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             for log in logs:
                 log = utils.parse_log(log)
                 log_file.write(log)
-        return f'The log file of service [{service_name}] saved.'
+            return f'The log file of service [{service_name}] saved.'
 
     # Check the project already exists
     project = API.project.inspect(project_key=project_key)
@@ -153,21 +155,6 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 yield 'The project network was successfully removed.'
                 break
     yield 'Done.'
-
-
-def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optional[str]):
-    _process_file(file)
-    if project_key is None:
-        project_key = utils.project_key(utils.get_workspace())
-
-    API.project.inspect(project_key)
-
-    service_names = [service['name'] for service in API.service.get(project_key)['inspects']]
-
-    for target_name, value in scales:
-        if target_name in service_names:
-            API.service.scale(project_key, target_name, value)
-            yield f'Scale updated [{target_name}] = {value}'
 
 
 def _get_registry_address(config: context.Context):

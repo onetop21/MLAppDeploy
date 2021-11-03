@@ -9,7 +9,6 @@ from mlad.cli.validator.exceptions import InvalidProjectYaml, InvalidComponentYa
 def validate(target):
     with open(f'{SCHEMA_PATH}/schema.yaml') as f:
         schema = load(f)
-
     v = Validator(schema, ordered=True)
     try:
         res = v.validate(target)

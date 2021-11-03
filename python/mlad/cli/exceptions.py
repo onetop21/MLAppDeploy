@@ -94,3 +94,13 @@ class ProjectAlreadyExistError(Exception):
 
     def __str__(self):
         return f'Failed to create a project: [{self.project_key}] already exists.'
+
+
+class InvalidProjectKindError(Exception):
+
+    def __init__(self, kind: str, command: str = 'train'):
+        self.kind = kind
+        self.command = command
+
+    def __str__(self):
+        return f'Only kind "{self.kind}" is invalid for "{self.command}" command.'

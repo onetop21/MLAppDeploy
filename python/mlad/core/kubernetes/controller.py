@@ -69,10 +69,12 @@ def get_project_network(cli=DEFAULT_CLI, **kwargs):
     if kwargs.get('project_key'):
         namespaces = api.list_namespace(label_selector=f"MLAD.PROJECT={kwargs.get('project_key')}")
     elif kwargs.get('project_id'):
-        namespaces = api.list_namespace(label_selector=f"MLAD.PROJECT.ID={kwargs.get('project_id')}")
+        namespaces = api.list_namespace(label_selector=
+                                        f"MLAD.PROJECT.ID={kwargs.get('project_id')}")
     elif kwargs.get('network_id'):
         all_namespaces = api.list_namespace(label_selector="MLAD.PROJECT")
-        namespaces = list(filter(lambda _: _.metadata.uid == kwargs.get('network_id'), all_namespaces))
+        namespaces = list(filter(lambda _: _.metadata.uid ==
+                                           kwargs.get('network_id'), all_namespaces))
     else:
         raise TypeError('At least one parameter is required.')
     if not namespaces.items:
@@ -125,12 +127,12 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
         raise TypeError('Parameter is not valid type.')
     labels = get_labels(network)
     if network.metadata.deletion_timestamp:
-        return {'deleted': True, 'key': uuid.UUID(labels['MLAD.PROJECT'])}
+        return {'deleted': True, 'key': labels['MLAD.PROJECT']}
     created = network.metadata.creation_timestamp
     config_labels = get_config_labels(network, 'project-labels', cli)
     hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
     return {
-        'key': uuid.UUID(labels['MLAD.PROJECT']),
+        'key': labels['MLAD.PROJECT'],
         'workspace': {
             'hostname': hostname,
             'path': path
@@ -228,7 +230,7 @@ def remove_project_network(network, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
     def resp_stream():
         removed = False
         for tick in range(timeout):
-            if not get_project_network(cli, project_key=network_info['key'].hex):
+            if not get_project_network(cli, project_key=network_info['key']):
                 removed = True
                 break
             else:
@@ -245,7 +247,7 @@ def remove_project_network(network, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
     if stream:
         return resp_stream()
     else:
-        return (not get_project_network(cli, project_key=network_info['key'].hex), (_ for _ in resp_stream()))
+        return (not get_project_network(cli, project_key=network_info['key']), (_ for _ in resp_stream()))
 
 
 # Manage services and tasks
@@ -424,7 +426,7 @@ def inspect_service(service, cli=DEFAULT_CLI):
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = service.spec.template.spec
     inspect = {
-        'key': uuid.UUID(config_labels['MLAD.PROJECT']) if config_labels.get(
+        'key': config_labels['MLAD.PROJECT'] if config_labels.get(
             'MLAD.VERSION') else '',
         'workspace': {
             'hostname': hostname,

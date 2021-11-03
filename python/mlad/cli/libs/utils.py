@@ -7,7 +7,7 @@ import socket
 import hashlib
 import itertools
 import jwt
-from typing import Dict
+from typing import Dict, Optional
 from pathlib import Path
 from functools import lru_cache
 from urllib.parse import urlparse
@@ -325,3 +325,30 @@ def get_username(session):
         return decoded["user"]
     else:
         raise RuntimeError("Session key is invalid.")
+
+
+# Process file option for cli
+def process_file(file: Optional[str]):
+    if file is not None and not os.path.isfile(file):
+        raise FileNotFoundError('Project file is not exist.')
+    file = file or os.environ.get(PROJECT_FILE_ENV_KEY, None)
+    if file is not None:
+        os.environ[PROJECT_FILE_ENV_KEY] = file
+
+
+# Pasre log output for cli
+def parse_log(log: Dict, max_name_width: int = 32, len_short_id: int = 20) -> str:
+    name = log['name']
+    name_width = min(max_name_width, log['name_width'])
+    if 'task_id' in log:
+        name = f'{name}.{log["task_id"][:len_short_id]}'
+        name_width = min(max_name_width, name_width + len_short_id + 1)
+    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
+    timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
+    if msg.startswith('Error'):
+        return msg
+    else:
+        if timestamp is not None:
+            return f'{timestamp} {name}: {msg}'
+        else:
+            return f'{name}: {msg}'
