@@ -43,6 +43,7 @@ def push_image(tag: str):
         for line in lines:
             if 'error' in line:
                 raise docker.errors.APIError(line['error'], None)
-            yield line['stream']
+            elif 'stream' in line:
+                yield line['stream']
     except StopIteration:
         pass
