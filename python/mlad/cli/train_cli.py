@@ -27,7 +27,7 @@ def up(file: Optional[str]):
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
 )
-@click.option('--project-key', '-p', help='Project Key', default=None)
+@click.option('--project-key', '-k', help='Project Key', default=None)
 @click.option('--no-dump', is_flag=True,
               help='Save the log before shutting down the services')
 @echo_exception
@@ -43,7 +43,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
 )
-@click.option('--project-key', '-p', help='Project Key', default=None)
+@click.option('--project-key', '-k', help='Project Key', default=None)
 @echo_exception
 def scale(scales: List[str], file: Optional[str], project_key: Optional[str]):
     '''Change the scale of one of the running apps.
