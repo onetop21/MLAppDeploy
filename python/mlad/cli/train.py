@@ -32,7 +32,7 @@ def up(file: Optional[str]):
 
     kind = project['kind']
     if not kind == 'Train':
-        raise InvalidProjectKindError('Deployment', 'deploy')
+        raise InvalidProjectKindError('Train', 'train')
 
     base_labels = core_utils.base_labels(
         utils.get_workspace(),

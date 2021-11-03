@@ -405,6 +405,15 @@ def get_pod_info(pod):
     return pod_info
 
 
+def _get_ingress_nginx_port(cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    ingress_ctrl = api.read_namespaced_service('ingress-nginx-controller', 'ingress-nginx')
+    port = next((port for port in ingress_ctrl.spec.ports if port.name == 'http')).node_port
+    return port
+
+
 def inspect_service(service, cli=DEFAULT_CLI):
     controller = None
     if isinstance(service, client.models.v1_deployment.V1Deployment):
@@ -450,6 +459,7 @@ def inspect_service(service, cli=DEFAULT_CLI):
         'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
         'created': service.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.SERVICE.KIND'),
+        'ingress_port': _get_ingress_nginx_port(cli)
     }
 
     deployed_service = get_deployed_service(cli, namespace, name)
@@ -793,6 +803,8 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
 
                 ingress_ret = create_ingress(cli, namespace, name, ingress_name, port,
                                              ingress_path, rewritePath)
+            else:
+                config_labels['MLAD.PROJECT.INGRESS'] = None
 
             create_config_labels(cli, f'service-{name}-labels', namespace, config_labels)
         except ApiException as e:

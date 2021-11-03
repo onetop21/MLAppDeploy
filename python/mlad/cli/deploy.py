@@ -94,12 +94,19 @@ def serve(file: Optional[str]):
 
     yield 'Start services...'
     with interrupt_handler(message='Wait...', blocked=True) as h:
-        API.service.create(project_key, services)
+        res = API.service.create(project_key, services)
         if h.interrupted:
             pass
 
     yield 'Done.'
-    yield f'Project key : {project_key}'
+    yield f'{utils.INFO_COLOR}Project key : {project_key}{utils.CLEAR_COLOR}'
+
+    # Get ingress path for deployed service
+    address = config['apiserver']['address'].rsplit(':', 1)[0]
+    for service in res:
+        if service['ingress']:
+            path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
+            yield f'{utils.INFO_COLOR}[{service["name"]}] Ingress Path : {path}{utils.CLEAR_COLOR}'
 
 
 def kill(project_key: str, no_dump: bool):
