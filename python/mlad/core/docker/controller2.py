@@ -36,7 +36,7 @@ def get_images(project_key: str = None, extra_labels: List[str] = []):
     return cli.images.list(filters={'label': filters + extra_labels})
 
 
-def push_image(project_key: str, tag: str):
+def push_image(tag: str):
     cli = get_cli()
     try:
         lines = cli.images.push(tag, stream=True, decode=True)

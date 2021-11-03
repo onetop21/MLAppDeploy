@@ -85,7 +85,8 @@ def up(file: Optional[str]):
 
     # Push image
     yield f'Upload the image to the registry [{registry_address}]...'
-    docker_ctlr.push_image(project_key, image_tag)
+    for line in docker_ctlr.push_image(image_tag):
+        yield line
 
     # Create a project
     yield 'Deploy services to the cluster...'
