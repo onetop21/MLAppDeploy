@@ -136,7 +136,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             for log in logs:
                 log = _parse_log(log)
                 log_file.write(log)
-            yield f'The log file of service [{service_name}] saved.'
+        return f'The log file of service [{service_name}] saved.'
 
     # Check the project already exists
     project = API.project.inspect(project_key=project_key)
@@ -155,7 +155,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
             for service_name in service_names:
-                _dump_logs(service_name, dirpath)
+                yield _dump_logs(service_name, dirpath)
 
         # Remove the services
         lines = API.service.remove(project_key, services=service_names, stream=True)
