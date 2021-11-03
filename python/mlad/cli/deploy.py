@@ -9,6 +9,7 @@ import yaml
 
 from mlad.cli import config as config_core
 from mlad.cli import context
+from mlad.cli.train import down
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
@@ -102,60 +103,9 @@ def serve(file: Optional[str]):
 
 
 def kill(project_key: str, no_dump: bool):
-
-    def _get_log_dirpath(project: Dict) -> Path:
-        workdir = str(Path().absolute())
-        timestamp = str(project['created'])
-        time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
-        path = Path(f'{workdir}/.logs/{time}')
-        path.mkdir(exist_ok=True, parents=True)
-        return path
-
-    def _dump_logs(service_name: str, dirpath: Path):
-        path = dirpath / f'{service_name}.log'
-        with open(path, 'w') as log_file:
-            logs = API.project.log(project_key, timestamps=True, names_or_ids=[service_name])
-            for log in logs:
-                log = utils.parse_log(log)
-                log_file.write(log)
-            return f'The log file of service [{service_name}] saved.'
-
-    # Check the project already exists
-    project = API.project.inspect(project_key=project_key)
-
-    with interrupt_handler(message='Wait...', blocked=False):
-        services = API.service.get(project_key)['inspects']
-        service_names = [service['name'] for service in services]
-
-        # Dump logs
-        if not no_dump:
-            dirpath = _get_log_dirpath(project)
-            filepath = dirpath / 'description.yml'
-            yield f'{utils.INFO_COLOR}Project Log Storage: {dirpath}{utils.CLEAR_COLOR}'
-            if not os.path.isfile(filepath):
-                project['created'] = datetime.fromtimestamp(project['created'])
-                with open(filepath, 'w') as log_file:
-                    yaml.dump(project, log_file)
-            for service_name in service_names:
-                yield _dump_logs(service_name, dirpath)
-
-        # Remove the services
-        lines = API.service.remove(project_key, services=service_names, stream=True)
-        for line in lines:
-            if 'stream' in line:
-                yield line['stream']
-            if 'result' in line and line['result'] == 'stopped':
-                break
-
-        # Remove the project
-        lines = API.project.delete(project_key)
-        for line in lines:
-            if 'stream' in line:
-                sys.stdout.write(line['stream'])
-            if 'result' in line and line['result'] == 'succeed':
-                yield 'The project network was successfully removed.'
-                break
-    yield 'Done.'
+    stream = down(None, project_key, no_dump)
+    for msg in stream :
+        yield msg
 
 
 def _get_registry_address(config: context.Context):
