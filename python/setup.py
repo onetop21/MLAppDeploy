@@ -38,7 +38,7 @@ def main():
         'kubernetes>=12.0.0,<13.0.0',
         'PyJWT>=2.1.0,<3.0.0',
         'Cerberus>=1.3.0,<1.4.0',
-        'cerberus-kind==0.0.3'
+        'cerberus-kind==0.0.4'
       ],
       entry_points='''
         [console_scripts]
