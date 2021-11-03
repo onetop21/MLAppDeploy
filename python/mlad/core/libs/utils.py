@@ -3,7 +3,9 @@ import uuid
 import json
 import base64
 import jwt
+import shortuuid
 from typing import Dict
+
 from mlad.core.libs import constants as const
 from mlad.core import exceptions
 
@@ -107,7 +109,6 @@ def base_labels(workspace: str, session: str, manifest: Dict, build: bool = Fals
 
     kind = manifest['kind']
     if not build and kind == 'Deployment':
-        import shortuuid
         deploy_key = shortuuid.uuid()
         key = f"{project_key(workspace)}-{deploy_key}"
         basename = f"{username}-{manifest['name']}-{key[:const.SHORT_LEN]}-" \

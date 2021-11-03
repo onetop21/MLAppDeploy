@@ -68,7 +68,7 @@ def up(file: Optional[str]):
         yield line
 
     # Create a project
-    yield 'Deploy services to the cluster...'
+    yield 'Deploy applications to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
     lines = API.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
@@ -94,7 +94,7 @@ def up(file: Optional[str]):
 
 
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
-    _process_file(file)
+    utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
         project_key = utils.project_key(utils.get_workspace())
@@ -156,7 +156,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
 
 def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optional[str]):
-    _process_file(file)
+    utils.process_file(file)
     if project_key is None:
         project_key = utils.project_key(utils.get_workspace())
 
