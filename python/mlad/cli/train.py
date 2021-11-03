@@ -114,7 +114,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             try:
                 logs = API.project.log(project_key, timestamps=True, names_or_ids=[service_name])
                 for log in logs:
-                    log = _parse_log(log)
+                    log = utils.parse_log(log)
                     log_file.write(log)
             except InvalidLogRequest:
                 return f'There is no log in [{service_name}].'
