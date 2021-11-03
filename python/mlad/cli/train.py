@@ -131,7 +131,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         if not no_dump:
             dirpath = _get_log_dirpath(project)
             filepath = dirpath / 'description.yml'
-            yield f'{utils.INFO_COLOR}Project Log Storage: {dirpath}{utils.CLEAR_COLOR}'
+            yield utils.print_info(f'Project Log Storage: {dirpath}')
             if not os.path.isfile(filepath):
                 project['created'] = datetime.fromtimestamp(project['created'])
                 with open(filepath, 'w') as log_file:

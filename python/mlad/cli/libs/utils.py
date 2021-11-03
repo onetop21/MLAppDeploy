@@ -241,6 +241,10 @@ def color_index():
     return next(_color_counter) % len(color_table())
 
 
+def print_info(line):
+    return f'{INFO_COLOR}{line}{CLEAR_COLOR}'
+
+
 ###############
 def match(filepath, ignores):
     result = False

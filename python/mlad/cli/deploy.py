@@ -99,14 +99,14 @@ def serve(file: Optional[str]):
             pass
 
     yield 'Done.'
-    yield f'{utils.INFO_COLOR}Project key : {project_key}{utils.CLEAR_COLOR}'
+    yield utils.print_info(f'Project key : {project_key}')
 
     # Get ingress path for deployed service
     address = config['apiserver']['address'].rsplit(':', 1)[0]
     for service in res:
         if service['ingress']:
             path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
-            yield f'{utils.INFO_COLOR}[{service["name"]}] Ingress Path : {path}{utils.CLEAR_COLOR}'
+            yield utils.print_info(f'[{service["name"]}] Ingress Path : {path}')
 
 
 def kill(project_key: str, no_dump: bool):
