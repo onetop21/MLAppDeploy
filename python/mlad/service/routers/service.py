@@ -16,11 +16,11 @@ router = APIRouter()
 
 
 def _check_project_key(project_key, service):
-    inspect_key = str(ctlr.inspect_service(service)['key']).replace('-','')
+    inspect_key = str(ctlr.inspect_service(service)['key'])
     if project_key == inspect_key:
         return True
     else:
-        raise InvalidServiceError(project_key, service.short_id)
+        raise InvalidServiceError(project_key, service.metadata.name)
 
 
 def _check_session_key(project_key, session):
@@ -65,12 +65,11 @@ def service_list(project_key:str,
                        for label in labels}
     inspects=[] 
     try:
-        key = str(project_key).replace('-','')
-        network = ctlr.get_project_network(project_key=key)
+        network = ctlr.get_project_network(project_key=project_key)
         if not network:
             raise InvalidProjectError(project_key)
 
-        services = ctlr.get_services(key, extra_filters=labels_dict)
+        services = ctlr.get_services(project_key, extra_filters=labels_dict)
         for service in services.values():
             inspect = ctlr.inspect_service(service)
             inspects.append(inspect)
@@ -86,9 +85,8 @@ def service_list(project_key:str,
 def service_create(project_key:str, req:service.CreateRequest,
                    session: str = Header(None)):
     targets = req.json
-    key = str(project_key).replace('-', '')
     try:
-        network = ctlr.get_project_network(project_key=key)
+        network = ctlr.get_project_network(project_key=project_key)
         if not network:
             raise InvalidProjectError(project_key)
         services = ctlr.create_services(network, targets)
@@ -105,11 +103,10 @@ def service_create(project_key:str, req:service.CreateRequest,
 @router.get("/project/{project_key}/service/{service_name}")
 def service_inspect(project_key:str, service_name:str,
                     session: str = Header(None)):
-    key = str(project_key).replace('-', '')
     try:
         namespace = ctlr.get_project_network(project_key=project_key).metadata.name
         service = ctlr.get_service(service_name, namespace)
-        if _check_project_key(key, service):
+        if _check_project_key(project_key, service):
             inspect = ctlr.inspect_service(service)
         return inspect
     except InvalidServiceError as e:
@@ -121,11 +118,10 @@ def service_inspect(project_key:str, service_name:str,
 @router.get("/project/{project_key}/service/{service_name}/tasks")
 def service_tasks(project_key:str, service_name:str,
                   session: str = Header(None)):
-    key = str(project_key).replace('-', '')
     try:
         namespace = ctlr.get_project_network(project_key=project_key).metadata.name
         service = ctlr.get_service(service_name, namespace)
-        if _check_project_key(key, service):
+        if _check_project_key(project_key, service):
             tasks = ctlr.inspect_service(service)['tasks']
         return tasks
     except InvalidServiceError as e:
@@ -137,11 +133,10 @@ def service_tasks(project_key:str, service_name:str,
 @router.put("/project/{project_key}/service/{service_name}/scale")
 def service_scale(project_key:str, service_name:str,
                   req: service.ScaleRequest, session: str = Header(None)):
-    key = str(project_key).replace('-','')
     try:
         namespace = ctlr.get_project_network(project_key=project_key).metadata.name
         service = ctlr.get_service(service_name, namespace)
-        if _check_project_key(key, service):
+        if _check_project_key(project_key, service):
             ctlr.scale_service(service, req.scale_spec)
     except InvalidServiceError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
@@ -181,7 +176,6 @@ def service_remove(project_key: str, service_name: str,
 def remove_services(project_key: str, req: service.RemoveRequest,
                     stream: bool = Query(False),
                     session: str = Header(None)):
-    key = str(project_key).replace('-', '')
     try:
         _check_session_key(project_key, session)
         namespace = ctlr.get_project_network(project_key=project_key).metadata.name

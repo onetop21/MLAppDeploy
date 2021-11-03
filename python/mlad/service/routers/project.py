@@ -62,8 +62,7 @@ def projects(extra_labels: str = '', session: str = Header(None)):
 @router.get("/project/{project_key}")
 def inspect_project(project_key: str, session: str = Header(None)):
     try:
-        key = str(project_key).replace('-', '')
-        network = ctlr.get_project_network(project_key=key)
+        network = ctlr.get_project_network(project_key=project_key)
         if not network:
             raise InvalidProjectError(project_key)
         inspect = ctlr.inspect_project_network(network)
@@ -77,8 +76,7 @@ def inspect_project(project_key: str, session: str = Header(None)):
 @router.delete("/project/{project_key}")
 def remove_project(project_key: str, session: str = Header(None)):
     try:
-        key = str(project_key).replace('-','')
-        network = ctlr.get_project_network(project_key=key)
+        network = ctlr.get_project_network(project_key=project_key)
         _check_session_key(network, session)
         if not network:
             raise InvalidProjectError(project_key)           
@@ -107,13 +105,12 @@ def project_log(project_key: str, tail: str = Query('all'),
 
     selected = True if names_or_ids else False
     try:
-        key = str(project_key).replace('-', '')
-        network = ctlr.get_project_network(project_key=key)
+        network = ctlr.get_project_network(project_key=project_key)
         if not network:
             raise InvalidProjectError(project_key)
 
         try:
-            targets = ctlr.get_service_with_names_or_ids(key, names_or_ids)
+            targets = ctlr.get_service_with_names_or_ids(project_key, names_or_ids)
         except exceptions.NotFound as e:
             if 'running' in str(e):
                 raise InvalidLogRequest("Cannot find running services.")
@@ -134,7 +131,7 @@ def project_log(project_key: str, tail: str = Query('all'),
 
         handler = disconnectHandler()
 
-        logs = ctlr.get_project_logs(key, tail, follow, timestamps, selected, handler, targets)
+        logs = ctlr.get_project_logs(project_key, tail, follow, timestamps, selected, handler, targets)
 
         def get_logs(logs):
             for _ in logs:
@@ -157,8 +154,7 @@ def project_log(project_key: str, tail: str = Query('all'),
 @router.get("/project/{project_key}/resource")
 def project_resource(project_key: str, session: str = Header(None)):
     try:
-        key = project_key.replace('-', '')
-        res = ctlr.get_project_resources(key)
+        res = ctlr.get_project_resources(project_key)
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))

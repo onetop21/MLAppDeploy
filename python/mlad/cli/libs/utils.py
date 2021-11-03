@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import os
 import re
@@ -7,7 +9,7 @@ import socket
 import hashlib
 import itertools
 import jwt
-from typing import Dict
+from typing import Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 from functools import lru_cache
 from urllib.parse import urlparse
@@ -17,6 +19,9 @@ from getpass import getuser
 from mlad.cli.libs.exceptions import InvalidURLError
 from mlad.core.default import project as project_default
 from mlad.cli.libs.auth import auth_admin
+
+if TYPE_CHECKING:
+    from mlad.cli.context import Context
 
 
 HOME = str(Path.home())
@@ -111,7 +116,7 @@ def get_project(default_project):
 
     # replace workdir to abspath
     project_file = get_project_file()
-    #project = default_project(project)
+    project = default_project(project)
     path = project.get('workdir', './')
     if not os.path.isabs(path):
         project['workdir'] = os.path.normpath(
@@ -124,48 +129,8 @@ def get_project(default_project):
         print('Syntax Error: Project and service require a name to '
               'follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
+
     return project
-
-
-@lru_cache(maxsize=None)
-def manifest_file(ty='project'):
-    # Patch for WSL2 (/home/... -> /mnt/c/Users...)
-    if ty == 'project':
-        return os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
-    elif ty == 'plugin':
-        return os.path.realpath(DEFAULT_PLUGIN_FILE)
-
-
-@lru_cache(maxsize=None)
-def read_manifest(path):
-    if os.path.isfile(path):
-        manifest = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
-        return manifest
-    else:
-        return None
-
-
-def get_manifest() -> Dict:
-    default = project_default
-    manifest_path = os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
-    manifest = read_manifest(manifest_path)
-    if manifest is None:
-        print('Need to generate manifest file before.', file=sys.stderr)
-        print(f'$ {sys.argv[0]} --help', file=sys.stderr)
-        sys.exit(1)
-
-    # replace workdir to abspath
-    manifest = default(manifest)
-    path = manifest.get('workdir', './')
-    if not os.path.isabs(path):
-        manifest['workdir'] = os.path.normpath(
-            os.path.join(os.path.dirname(manifest_path), path)
-        )
-    if not check_podname_syntax(manifest['name']):
-        print('Syntax Error: Project(Component) and service require a name '
-              'to follow standard as defined in RFC1123.', file=sys.stderr)
-        sys.exit(1)
-    return manifest
 
 
 def print_table(data, no_data_msg=None, max_width=32, upper=True):
@@ -325,3 +290,39 @@ def get_username(session):
         return decoded["user"]
     else:
         raise RuntimeError("Session key is invalid.")
+
+
+# Process file option for cli
+def process_file(file: Optional[str]):
+    if file is not None and not os.path.isfile(file):
+        raise FileNotFoundError('Project file is not exist.')
+    file = file or os.environ.get(PROJECT_FILE_ENV_KEY, None)
+    if file is not None:
+        os.environ[PROJECT_FILE_ENV_KEY] = file
+
+
+# Pasre log output for cli
+def parse_log(log: Dict, max_name_width: int = 32, len_short_id: int = 20) -> str:
+    name = log['name']
+    name_width = min(max_name_width, log['name_width'])
+    if 'task_id' in log:
+        name = f'{name}.{log["task_id"][:len_short_id]}'
+        name_width = min(max_name_width, name_width + len_short_id + 1)
+    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
+    timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
+    if msg.startswith('Error'):
+        return msg
+    else:
+        if timestamp is not None:
+            return f'{timestamp} {name}: {msg}'
+        else:
+            return f'{name}: {msg}'
+
+
+def get_registry_address(config: Context):
+    parsed = parse_url(config.docker.registry.address)
+    registry_address = parsed['address']
+    namespace = config.docker.registry.namespace
+    if namespace is not None:
+        registry_address += f'/{namespace}'
+    return registry_address

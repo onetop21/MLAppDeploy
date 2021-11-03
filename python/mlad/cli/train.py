@@ -23,37 +23,16 @@ from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest
 
 
-def _process_file(file: Optional[str]):
-    if file is not None and not os.path.isfile(file):
-        raise FileNotFoundError('Project file is not exist.')
-    file = file or os.environ.get(utils.PROJECT_FILE_ENV_KEY, None)
-    if file is not None:
-        os.environ[utils.PROJECT_FILE_ENV_KEY] = file
-
-
-def _parse_log(log: Dict, max_name_width: int = 32, len_short_id: int = 20) -> str:
-    name = log['name']
-    name_width = min(max_name_width, log['name_width'])
-    if 'task_id' in log:
-        name = f'{name}.{log["task_id"][:len_short_id]}'
-        name_width = min(max_name_width, name_width + len_short_id + 1)
-    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
-    timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
-    if msg.startswith('Error'):
-        return msg
-    else:
-        if timestamp is not None:
-            return f'{timestamp} {name}: {msg}'
-        else:
-            return f'{name}: {msg}'
-
-
 def up(file: Optional[str]):
 
-    _process_file(file)
+    utils.process_file(file)
     config = config_core.get()
     project = utils.get_project(default_project)
     project = validators.validate(project)
+
+    kind = project['kind']
+    if not kind == 'Train':
+        raise InvalidProjectKindError('Deployment', 'deploy')
 
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
@@ -78,7 +57,7 @@ def up(file: Optional[str]):
     image = images[0]
 
     # Re-tag the image
-    registry_address = _get_registry_address(config)
+    registry_address = utils.get_registry_address(config)
     image_tag = f'{registry_address}/{image_tag}'
     image.tag(image_tag)
     base_labels['MLAD.PROJECT.IMAGE'] = image_tag
@@ -89,7 +68,7 @@ def up(file: Optional[str]):
         yield line
 
     # Create a project
-    yield 'Deploy services to the cluster...'
+    yield 'Deploy applications to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
     lines = API.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
@@ -115,7 +94,7 @@ def up(file: Optional[str]):
 
 
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
-    _process_file(file)
+    utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
         project_key = utils.project_key(utils.get_workspace())
@@ -135,7 +114,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             try:
                 logs = API.project.log(project_key, timestamps=True, names_or_ids=[service_name])
                 for log in logs:
-                    log = _parse_log(log)
+                    log = utils.parse_log(log)
                     log_file.write(log)
             except InvalidLogRequest:
                 return f'There is no log in [{service_name}].'
@@ -180,7 +159,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
 
 def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optional[str]):
-    _process_file(file)
+    utils.process_file(file)
     if project_key is None:
         project_key = utils.project_key(utils.get_workspace())
 
@@ -192,12 +171,3 @@ def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optio
         if target_name in service_names:
             API.service.scale(project_key, target_name, value)
             yield f'Scale updated [{target_name}] = {value}'
-
-
-def _get_registry_address(config: context.Context):
-    parsed = utils.parse_url(config.docker.registry.address)
-    registry_address = parsed['address']
-    namespace = config.docker.registry.namespace
-    if namespace is not None:
-        registry_address += f'/{namespace}'
-    return registry_address
