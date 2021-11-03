@@ -1,7 +1,5 @@
-import os
-
 import click
-from typing import Optional
+from typing import Optional, List
 
 from mlad.cli import train
 from mlad.cli.libs import utils
@@ -39,6 +37,27 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         click.echo(line)
 
 
+@click.command()
+@click.argument('scales', required=True, nargs=-1)
+@click.option('--file', '-f', default=None, help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+)
+@click.option('--project-key', '-p', help='Project Key', default=None)
+@echo_exception
+def scale(scales: List[str], file: Optional[str], project_key: Optional[str]):
+    '''Change the scale of one of the running apps.
+    Format: mlad train scale [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
+    '''
+    parsed_scales = []
+    for scale in scales:
+        app_name, value = scale.split('=')
+        value = int(value)
+        parsed_scales.append((app_name, value))
+    for line in train.scale(parsed_scales, file, project_key):
+        click.echo(line)
+
+
 @click.group('train')
 def cli():
     '''Related to the train objects'''
@@ -47,3 +66,4 @@ def cli():
 
 cli.add_command(up)
 cli.add_command(down)
+cli.add_command(scale)

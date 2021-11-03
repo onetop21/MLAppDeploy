@@ -2,7 +2,7 @@ import os
 import sys
 
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 
 import yaml
@@ -85,7 +85,8 @@ def up(file: Optional[str]):
 
     # Push image
     yield f'Upload the image to the registry [{registry_address}]...'
-    docker_ctlr.push_image(project_key, image_tag)
+    for line in docker_ctlr.push_image(image_tag):
+        yield line
 
     # Create a project
     yield 'Deploy services to the cluster...'
@@ -135,7 +136,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             for log in logs:
                 log = _parse_log(log)
                 log_file.write(log)
-            yield f'The log file of service [{service_name}] saved.'
+        return f'The log file of service [{service_name}] saved.'
 
     # Check the project already exists
     project = API.project.inspect(project_key=project_key)
@@ -154,7 +155,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
             for service_name in service_names:
-                _dump_logs(service_name, dirpath)
+                yield _dump_logs(service_name, dirpath)
 
         # Remove the services
         lines = API.service.remove(project_key, services=service_names, stream=True)
@@ -173,6 +174,21 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 yield 'The project network was successfully removed.'
                 break
     yield 'Done.'
+
+
+def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optional[str]):
+    _process_file(file)
+    if project_key is None:
+        project_key = utils.project_key(utils.get_workspace())
+
+    API.project.inspect(project_key)
+
+    service_names = [service['name'] for service in API.service.get(project_key)['inspects']]
+
+    for target_name, value in scales:
+        if target_name in service_names:
+            API.service.scale(project_key, target_name, value)
+            yield f'Scale updated [{target_name}] = {value}'
 
 
 def _get_registry_address(config: context.Context):

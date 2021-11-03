@@ -36,13 +36,14 @@ def get_images(project_key: str = None, extra_labels: List[str] = []):
     return cli.images.list(filters={'label': filters + extra_labels})
 
 
-def push_image(project_key: str, tag: str):
+def push_image(tag: str):
     cli = get_cli()
     try:
         lines = cli.images.push(tag, stream=True, decode=True)
         for line in lines:
             if 'error' in line:
                 raise docker.errors.APIError(line['error'], None)
-            yield line['stream']
+            elif 'stream' in line:
+                yield line['stream']
     except StopIteration:
         pass
