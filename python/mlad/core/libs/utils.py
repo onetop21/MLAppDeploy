@@ -3,8 +3,9 @@ import uuid
 import json
 import base64
 import jwt
-import shortuuid
 from typing import Dict
+
+import shortuuid
 
 from mlad.core.libs import constants as const
 from mlad.core import exceptions
