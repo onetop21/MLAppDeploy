@@ -2,11 +2,15 @@ import sys
 import os
 import time
 import json
+
+from typing import Optional, List
+from datetime import datetime
+from dateutil import parser
+
 import yaml
 import base64
 import docker
-from datetime import datetime
-from dateutil import parser
+
 from mlad.core.docker import controller as ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
 from mlad.core.default import project as default_project
@@ -80,22 +84,20 @@ def init(name, version, maintainer):
         ))
 
 
-def list(no_trunc):
+def list(no_trunc: bool):
     projects = {}
-    try:
-        networks = API.project.get()
-    except APIError as e:
-        print(e)
-        sys.exit(1)
+    networks = API.project.get()
 
-    columns = [('USERNAME', 'PROJECT', 'IMAGE', 'SERVICES',
-                'TASKS', 'HOSTNAME', 'WORKSPACE',
+    columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'IMAGE',
+                'SERVICES', 'TASKS', 'HOSTNAME', 'WORKSPACE',
                 'MEM(Mi)', 'CPU', 'GPU')]
     for network in networks:
         project_key = network['key']
         default = {
             'username': network['username'],
             'project': network['project'],
+            'kind': network['kind'],
+            'key': network['key'],
             'image': network['image'],
             'services': 0, 'replicas': 0, 'tasks': 0,
             'hostname': network['workspace']['hostname'],
@@ -127,21 +129,25 @@ def list(no_trunc):
         if project['services'] > 0:
             running_tasks = f"{project['tasks']}/{project['replicas']}"
             columns.append((project['username'], project['project'],
+                            project['kind'], project['key'],
                             project['image'], project['services'],
                             f"{running_tasks:>5}", project['hostname'],
                             project['workspace'], project['mem'],
                             project['cpu'], project['gpu']))
         else:
             columns.append((project['username'], project['project'],
+                            project['kind'], project['key'],
                             project['image'], '-', '-', project['hostname'],
                             project['workspace'], project['mem'],
                             project['cpu'], project['gpu']))
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
-def status(all, no_trunc):
+def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool):
+    utils.process_file()
     config = config_core.get()
-    project_key = utils.project_key(utils.get_workspace())
+    if project_key is None:
+        project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     try:
         inspect = API.project.inspect(project_key=project_key)
@@ -649,8 +655,11 @@ def down_force(no_dump):
     print('Done.')
 
 
-def logs(tail, follow, timestamps, names_or_ids):
-    project_key = utils.project_key(utils.get_workspace())
+def logs(file: Optional[str], project_key: Optional[str],
+         tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
+    utils.process_file()
+    if project_key is None:
+        project_key = utils.project_key(utils.get_workspace())
     # Block not running.
     API.project.inspect(project_key)
 
