@@ -144,7 +144,7 @@ def list(no_trunc: bool):
 
 
 def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool):
-    utils.process_file()
+    utils.process_file(file)
     config = config_core.get()
     if project_key is None:
         project_key = utils.project_key(utils.get_workspace())
@@ -657,7 +657,7 @@ def down_force(no_dump):
 
 def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
-    utils.process_file()
+    utils.process_file(file)
     if project_key is None:
         project_key = utils.project_key(utils.get_workspace())
     # Block not running.
