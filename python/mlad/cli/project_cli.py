@@ -48,7 +48,7 @@ def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: boo
 @click.option('--project-key', '-k', help='Project Key', default=None)
 @click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
 @click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs')
-@click.option('--follow', '-f', is_flag=True, help='Follow log output')
+@click.option('--follow', is_flag=True, help='Follow log output')
 @click.argument('SERVICES|TASKS', nargs=-1)
 @echo_exception
 def logs(file: Optional[str], project_key: Optional[str],
