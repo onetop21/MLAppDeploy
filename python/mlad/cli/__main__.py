@@ -43,7 +43,7 @@ class EntryGroup(click.Group):
 
 @click.group(cls=EntryGroup)
 @click.version_option(version=__version__, prog_name='MLAppDeploy')
-def main(file):
+def main():
     '''Machine Learning Application Deployment Tool (https://github.com/onetop21/MLAppDeploy)'''
     pass
 
