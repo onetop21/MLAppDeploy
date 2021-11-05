@@ -1,12 +1,8 @@
 import sys
 import io
 import tarfile
-import json
-import urllib3
 
 from typing import Optional
-
-import requests
 
 from mlad.cli import config as config_core
 from mlad.cli.validator import validators
@@ -16,7 +12,7 @@ from mlad.cli.Format import (
     DOCKERFILE_REQ_ADD, DOCKERFILE_REQ_RUN, DOCKERFILE_REQ_APK, DOCKERFILE_REQ_YUM
 )
 
-from mlad.core.docker import controller as ctlr
+from mlad.core.docker import controller2 as ctlr
 from mlad.core.libs import utils as core_utils
 from mlad.core.default import project as default_project
 
@@ -31,19 +27,18 @@ PREP_KEY_TO_TEMPLATE = {
 
 
 def list(all, tail):
-    cli = ctlr.get_api_client()
     if all:
-        images = ctlr.get_images(cli)
+        images = ctlr.get_images()
     else:
         project_key = utils.project_key(utils.get_workspace())
-        images = ctlr.get_images(cli, project_key)
+        images = ctlr.get_images(project_key=project_key)
 
     data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED')]
     if all:
         data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED', 'WORKSPACE')]
 
     untagged = 0
-    for inspect in [ctlr.inspect_image(_) for _ in images[:tail]]:
+    for inspect in [ctlr.inspect_image(image) for image in images[:tail]]:
         if len(inspect['tags']) == 0:
             untagged += 1
         else:
@@ -68,7 +63,6 @@ def list(all, tail):
 def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
     utils.process_file(file)
     config = config_core.get()
-    cli = ctlr.get_api_client()
     project = utils.get_project(default_project)
     project = validators.validate(project)
 
@@ -101,7 +95,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
     tarbytes.seek(0)
 
     # Build Image
-    build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name,
+    build_output = ctlr.build_image(base_labels, tarbytes, dockerfile_info.name,
                                     no_cache, pull, stream=True)
 
     # Print build output
@@ -113,10 +107,10 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
             if not quiet:
                 sys.stdout.write(_['stream'])
 
-    image = ctlr.get_image(cli, image_tag)
+    image = ctlr.get_image(image_tag)
 
     # Prepare the previous images
-    images = ctlr.get_images(cli, project_key=project_key)
+    images = ctlr.get_images(project_key=project_key)
     prev_images = [
         image
         for image in images
@@ -126,7 +120,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
     for prev_image in prev_images:
         if prev_image != image:
             prev_image.tag('remove')
-            cli.images.remove('remove')
+            ctlr.remove_image(['remove'])
     print(f"Built Image: {image_tag}")
 
     return image
@@ -154,49 +148,16 @@ def _obtain_workspace_payload(workspace, maintainer):
     )
 
 
-def search(keyword):
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    config = config_core.get()
-    try:
-        images = []
-        registry_address = config.docker.registry.address
-        catalog = json.loads(
-            requests.get(f"http://{registry_address}/v2/_catalog", verify=False).text
-        )
-        if 'repositories' in catalog:
-            repositories = catalog['repositories']
-            for repository in repositories:
-                url = f'http://{registry_address}/v2/{repository}/tags/list'
-                tags = json.loads(requests.get(url, verify=False).text)
-                images += [f"{config['docker']['registry']}/{tags['name']}:{tag}"
-                           for tag in tags['tags']] 
-            found = [item for item in filter(None, [image if keyword in image else None
-                                                    for image in images])]
-
-            columns = [('REPOSITORY', 'TAG')]
-            for item in found:
-                repo, tag = item.rsplit(':', 1)
-                columns.append((repo, tag))
-            utils.print_table(columns, 'Cannot find image.', 48)
-        else:
-            print('No images.', file=sys.stderr)
-    except requests.exceptions.ConnectionError:
-        print(f"Cannot connect to docker registry [{config['docker']['registry']}]",
-              file=sys.stderr)
-
-
 def remove(ids, force):
-    cli = ctlr.get_api_client()
-    ctlr.remove_image(cli, ids, force)
+    ctlr.remove_image(ids, force)
 
 
 def prune(all):
-    cli = ctlr.get_api_client()
     if all:
-        result = ctlr.prune_images(cli)
+        result = ctlr.prune_images()
     else:
         project_key = utils.project_key(utils.get_workspace())
-        result = ctlr.prune_images(cli, project_key)
+        result = ctlr.prune_images(project_key)
 
     if result['ImagesDeleted'] and len(result['ImagesDeleted']):
         for deleted in result['ImagesDeleted']:

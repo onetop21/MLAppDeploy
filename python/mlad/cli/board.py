@@ -7,10 +7,11 @@ import click
 
 from typing import List
 from omegaconf import OmegaConf
+from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError,
-    MLADBoardAlreadyActivatedError, CannotBuildComponentError, DockerNotFoundError
+    MLADBoardAlreadyActivatedError, CannotBuildComponentError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils

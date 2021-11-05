@@ -12,7 +12,7 @@ from mlad.cli import context
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ProjectAlreadyExistError, ImageNotFoundError
+    ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError
 )
 
 from mlad.core.docker import controller2 as docker_ctlr
