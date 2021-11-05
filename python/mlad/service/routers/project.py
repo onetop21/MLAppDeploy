@@ -130,7 +130,7 @@ def project_log(project_key: str, tail: str = Query('all'),
                     cb()
 
         handler = disconnectHandler()
-
+    
         logs = ctlr.get_project_logs(project_key, tail, follow, timestamps, selected, handler, targets)
 
         def get_logs(logs):

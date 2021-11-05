@@ -144,6 +144,7 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
         'version': config_labels['MLAD.PROJECT.VERSION'],
         'base': config_labels['MLAD.PROJECT.BASE'],
         'image': config_labels['MLAD.PROJECT.IMAGE'],
+        'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
         'created': int(time.mktime(created.timetuple()))
     }
 

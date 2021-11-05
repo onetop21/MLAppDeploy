@@ -43,11 +43,9 @@ class EntryGroup(click.Group):
 
 @click.group(cls=EntryGroup)
 @click.version_option(version=__version__, prog_name='MLAppDeploy')
-@click.option('--file', '-f', default=None, hidden=True, autocompletion=get_project_file_completion,
-              help='Specify an alternate project file')
-def main(file):
+def main():
     '''Machine Learning Application Deployment Tool (https://github.com/onetop21/MLAppDeploy)'''
-    project.cli_args(file)
+    pass
 
 
 main.add_command(config.cli, 'config')
@@ -71,13 +69,15 @@ else:
 
     main.add_command(image.ls, 'images')
     main.add_command(image.build, 'build')
-    main.add_command(project.run, 'run')
-    main.add_command(project.up, 'up')
-    main.add_command(project.down, 'down')
+    # main.add_command(project.run, 'run')
+    main.add_command(train.up, 'up')
+    main.add_command(train.down, 'down')
+    main.add_command(deploy.serve, 'serve')
+    main.add_command(deploy.kill, 'kill')
     main.add_command(project.logs, 'logs')
     main.add_command(project.ls, 'ls')
     main.add_command(project.ps, 'ps')
-    main.add_command(project.scale, 'scale')
+    # main.add_command(project.scale, 'scale')
 
 
 if __name__ == '__main__':

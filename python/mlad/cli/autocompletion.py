@@ -8,7 +8,7 @@ from mlad.core.docker import controller as ctlr
 from mlad.cli.libs import utils
 from mlad.cli import config as config_core
 from mlad.api import API
-from mlad.api.exception import APIError
+from mlad.api.exceptions import APIError
 
 
 def get_project_file_completion(ctx, args, incomplete):
