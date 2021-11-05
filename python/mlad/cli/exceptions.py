@@ -81,12 +81,6 @@ class CannotBuildComponentError(Exception):
         return 'The component spec does not have `workspace` property to build an image.'
 
 
-class DockerNotFoundError(Exception):
-
-    def __str__(self):
-        return 'Need to install the docker daemon.'
-
-
 class ProjectAlreadyExistError(Exception):
 
     def __init__(self, project_key: str):

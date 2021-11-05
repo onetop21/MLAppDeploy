@@ -69,3 +69,8 @@ class DeprecatedError(Exception):
     def __str__(self):
         return f'Cannot deploy app for deprecated kind \'{self.option}\'.'
 
+
+class DockerNotFoundError(Exception):
+
+    def __str__(self):
+        return 'Need to install the docker daemon.'
