@@ -1,25 +1,16 @@
 import click
 from mlad.cli import image
-from mlad.cli import project_cli as project
-from mlad.cli.libs import utils
 
 from . import echo_exception
 
 
 # mlad image ls
-# mlad image search [to be delete]
 # mlad image rm
 # mlad image prune
 
 ####################
 # mlad image build {From Project}
-# mlad image export [KEY] [FILENAME]
-# mlad image import [FILENAME]
-# mlad image commit
-# -> docker tag, (git commit, git tag) if has .git dir
 
-# mlad image publish [REGISTRY/ORGANIZATION]
-# mlad image deploy [...]
 
 
 @click.command()
@@ -62,11 +53,9 @@ def prune(all):
 
 
 @click.group('image')
-@click.option('--file', '-f', default=None, help=f"Specify an alternate project file\t\t\t\n\
-        Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable")
 def cli(file):
     '''Manage Docker Image'''
-    project.cli_args(file)
+    pass
 
 
 cli.add_command(ls)
