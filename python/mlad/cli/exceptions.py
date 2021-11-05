@@ -97,4 +97,4 @@ class InvalidProjectKindError(Exception):
         self.command = command
 
     def __str__(self):
-        return f'Only kind "{self.kind}" is invalid for "{self.command}" command.'
+        return f'Only kind "{self.kind}" is valid for "{self.command}" command.'
