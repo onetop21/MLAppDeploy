@@ -1,5 +1,5 @@
 import click
-from typing import Optional, Dict
+from typing import Optional, List
 
 from mlad.cli import deploy
 from mlad.cli.libs import utils
@@ -31,6 +31,23 @@ def serve(file: Optional[str]):
 def kill(project_key: str, no_dump: bool):
     '''Stop and remove the train object on the cluster.'''
     for line in deploy.kill(project_key, no_dump):
+        click.echo(line)
+
+
+@click.command()
+@click.argument('project-key', required=True)
+@click.argument('scales', required=True, nargs=-1)
+@echo_exception
+def scale(project_key: str, scales: List[str]):
+    '''Change the scale of one of the running apps.
+    Format: mlad deploy scale [PROJECT_KEY] [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
+    '''
+    parsed_scales = []
+    for scale in scales:
+        app_name, value = scale.split('=')
+        value = int(value)
+        parsed_scales.append((app_name, value))
+    for line in deploy.scale(parsed_scales, project_key):
         click.echo(line)
 
 

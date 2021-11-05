@@ -1,19 +1,13 @@
-import os
 import sys
 
-from datetime import datetime
-from typing import Optional, Dict
-from pathlib import Path
-
-import yaml
+from typing import Optional, List, Tuple
 
 from mlad.cli import config as config_core
-from mlad.cli import context
-from mlad.cli.train import down
+from mlad.cli import train
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError
+    ImageNotFoundError, InvalidProjectKindError
 )
 
 from mlad.core.docker import controller2 as docker_ctlr
@@ -21,7 +15,6 @@ from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 
 from mlad.api import API
-from mlad.api.exceptions import ProjectNotFound
 
 
 def serve(file: Optional[str]):
@@ -110,6 +103,8 @@ def serve(file: Optional[str]):
 
 
 def kill(project_key: str, no_dump: bool):
-    stream = down(None, project_key, no_dump)
-    for msg in stream :
-        yield msg
+    return train.down(None, project_key, no_dump)
+
+
+def scale(project_key: str, scales: List[Tuple[str, int]]):
+    return train.scale(scales, None, project_key)
