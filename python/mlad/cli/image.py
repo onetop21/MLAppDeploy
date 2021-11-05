@@ -2,6 +2,8 @@ import sys
 import io
 import tarfile
 
+from typing import Optional
+
 from mlad.cli import config as config_core
 from mlad.cli.validator import validators
 from mlad.cli.libs import utils
@@ -58,7 +60,8 @@ def list(all, tail):
               'Use command `mlad image prune`')
 
 
-def build(quiet: bool, no_cache: bool, pull: bool):
+def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
+    utils.process_file(file)
     config = config_core.get()
     project = utils.get_project(default_project)
     project = validators.validate(project)

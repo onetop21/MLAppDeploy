@@ -1,123 +1,70 @@
-import sys
-import os
 import getpass
 import click
+from typing import Optional
 from mlad.cli import project
 from mlad.cli.libs import utils
-from mlad.cli.autocompletion import *
-from mlad.cli.libs.auth import auth_admin
 from . import echo_exception
 
 # mlad project init
 # mlad project ls | mlad ls
 # mlad project ps | mlad ps
-# mlad project up | mlad up
-# mlad project down | mlad down
 # mlad prjoect logs | mlad logs
-# mlad prjoect scale [service=num]
 
 
 @click.command()
 @click.option('--name', '-n', help='Project name')
 @click.option('--version', '-v', default='0.0.1', help='Project version')
 @click.option('--maintainer', '-m', default=getpass.getuser(), help='Project maintainer')
-def init(name, version, maintainer):
+def init(name: str, version: str, maintainer: str):
     '''Initialize MLAppDeploy project'''
     project.init(name, version, maintainer)
 
 
 @click.command()
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
-def ls(no_trunc):
+def ls(no_trunc: bool):
     '''Show projects deployed on cluster'''
     project.list(no_trunc)
 
 
 @click.command()
+@click.option('--file', '-f', default=None, help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+)
+@click.option('--project-key', '-k', help='Project Key', default=None)
 @click.option('--all', '-a', is_flag=True, help='Show included shutdown service')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
-def ps(all, no_trunc):
+def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool):
     '''Show project status deployed on cluster'''
-    project.status(all, no_trunc)
-
-
-@click.command(context_settings={"ignore_unknown_options": True})
-@click.option('--no-build', is_flag=True, help='Run without project build.')
-@click.option('--env', is_flag=True, help='Set all os envs for run')
-@click.option('--quota', type=click.STRING, multiple=True, help='Set quota for run')
-@click.argument('command', nargs=-1, required=True)
-def run(no_build, env, quota, command):
-    '''Run project with minimal options for app without definition'''
-    project.run(no_build, env, quota, command)
+    project.status(file, project_key, all, no_trunc)
 
 
 @click.command()
-@echo_exception
-def up():
-    '''Deploy and run a project on cluster'''
-    project.up()
-
-
-@click.command()
-@click.option('--no-dump', is_flag=True, help='Save log to file before down service')
-def down(no_dump):
-    '''Stop and remove current project deployed on cluster'''
-    if auth_admin():
-        project.down_force(no_dump)
-    else:
-        project.down(no_dump)
-
-
-@click.command()
+@click.option('--file', '-f', default=None, help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+)
+@click.option('--project-key', '-k', help='Project Key', default=None)
 @click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
 @click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs')
-@click.option('--follow', '-f', is_flag=True, help='Follow log output')
+@click.option('--follow', is_flag=True, help='Follow log output')
 @click.argument('SERVICES|TASKS', nargs=-1)
 @echo_exception
-def logs(tail, follow, timestamps, **kwargs):
+def logs(file: Optional[str], project_key: Optional[str],
+         tail: bool, follow: bool, timestamps: bool, **kwargs):
     '''Show current project logs deployed on cluster'''
     filters = kwargs.get('services|tasks')
-    project.logs(tail, follow, timestamps, filters)
-
-
-@click.command()
-@click.argument('scales', nargs=-1, autocompletion=get_running_services_completion)
-def scale(scales):
-    '''Change replicas count of running service in deployed on cluster'''
-    project.scale(scales)
-
-
-@click.command()
-def update():
-    '''Update Running Project or Service Deployed on Cluster'''
+    project.logs(file, project_key, tail, follow, timestamps, filters)
 
 
 @click.group('project')
-@click.option('--file', '-f', default=None, help=f"Specify an alternate project file\t\t\t\n\
-        Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable",
-        autocompletion=get_project_file_completion)
 def cli(file):
-    '''Manage machine learning projects'''
-    cli_args(file)
-
-
-def cli_args(file):
-    if file != None and not os.path.isfile(file):
-        click.echo('Project file is not exist.')
-        sys.exit(1)
-    file = file or os.environ.get(utils.PROJECT_FILE_ENV_KEY, None)
-    if file:
-        os.environ[utils.PROJECT_FILE_ENV_KEY] = file
+    '''Commands for inspecting and initializing project objects.'''
+    pass
 
 
 cli.add_command(init)
 cli.add_command(ls)
 cli.add_command(ps)
-cli.add_command(run)
-cli.add_command(up)
-cli.add_command(down)
 cli.add_command(logs)
-cli.add_command(scale)
-cli.add_command(update)
-
-#sys.modules[__name__] = project

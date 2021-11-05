@@ -1,7 +1,7 @@
 import sys
 from mlad.cli.libs import utils
 from mlad.api import API
-from mlad.api.exception import APIError
+from mlad.api.exceptions import APIError
 from mlad.core import exceptions as CoreException
 from mlad.core.kubernetes import controller as ctlr
 
