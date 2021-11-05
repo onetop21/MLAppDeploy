@@ -59,3 +59,4 @@ def cli():
 
 cli.add_command(serve)
 cli.add_command(kill)
+cli.add_command(scale)
