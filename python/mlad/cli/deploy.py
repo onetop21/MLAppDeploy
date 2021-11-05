@@ -106,5 +106,5 @@ def kill(project_key: str, no_dump: bool):
     return train.down(None, project_key, no_dump)
 
 
-def scale(project_key: str, scales: List[Tuple[str, int]]):
+def scale(scales: List[Tuple[str, int]], project_key: str):
     return train.scale(scales, None, project_key)
