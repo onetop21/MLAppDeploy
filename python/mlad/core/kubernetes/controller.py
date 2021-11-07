@@ -553,8 +553,8 @@ def _constraints_to_labels(constraints):
 
 
 def _create_job(name, image, command, namespace='default', restart_policy='Never',
-                envs=None, mounts=None, parallelism=None, completions=None, quota=None, resources=None,
-                labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
+                envs=None, mounts=None, parallelism=None, completions=None, quota=None,
+                resources=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(resources=quota) if quota \
         else _resources_to_V1Resource(type='Resources', resources=resources) if resources \
@@ -600,9 +600,9 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
     return api_response
 
 
-def _create_deployment(cli, name, image, command, namespace='default',
+def _create_deployment(name, image, command, namespace='default',
                        envs=None, mounts=None, replicas=1, quota=None, resources=None,
-                       labels=None, constraints=None, secrets=None):
+                       labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(resources=quota) if quota \
         else _resources_to_V1Resource(type='Resources', resources=resources) if resources \
@@ -720,6 +720,12 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
     image_name = project_info['image']
     project_base = project_info['base']
 
+    RESTART_POLICY_STORE = {
+        'never': 'Never',
+        'onfailure': 'OnFailure',
+        'always': 'Always',
+    }
+
     instances = []
     for name, service in services.items():
         #service = service_default(services[name])
@@ -769,18 +775,22 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
         # Secrets
         secrets = f"{project_base}-auth"
 
+        restart_policy = RESTART_POLICY_STORE.get(service['restartPolicy'].lower(), 'Never')
+        scale = service['scale']
+        quota = service['quota']
+
         try:
-            if kind == 'App':
-                restart_policy = service['restartPolicy']
-                scale = service['scale']
-                quota = service['quota']
-                ret, controller = _create_kind_app(
-                    cli, name, image, command, namespace, restart_policy, envs, mounts, scale,
-                    quota, labels, constraints, secrets)
-                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = controller
-                instances.append(ret)
-            else:
-                raise DeprecatedError(kind)
+            if kind == 'Job':
+                ret = _create_job(name, image, command, namespace, restart_policy, envs, mounts,
+                                  scale, None, quota, None, labels, constraints, secrets, cli)
+                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Job'
+            elif kind == 'Service':
+                ret = _create_deployment(name, image, command, namespace, envs, mounts, scale,
+                                         quota, None, labels, constraints, secrets, cli)
+                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Deployment'
+            else :
+                raise DeprecatedError
+            instances.append(ret)
 
             if service['ports']:
                 ret = api.create_namespaced_service(namespace, client.V1Service(

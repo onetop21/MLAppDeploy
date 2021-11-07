@@ -83,7 +83,6 @@ def serve(file: Optional[str]):
     services = []
     for name, value in apps.items():
         value['name'] = name
-        value['kind'] = 'App' # TODO to be deleted
         services.append(value)
 
     yield 'Start services...'

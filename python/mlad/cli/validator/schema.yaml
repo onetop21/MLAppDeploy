@@ -271,7 +271,8 @@ __root__:
         valuesrules:
           type: dict
           selector:
-            app: *app
+            job: *app_job
+            service: *app_service
         order: 30
     deployment:
       <<: *metadata
