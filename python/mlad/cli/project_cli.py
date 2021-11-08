@@ -2,7 +2,7 @@ import getpass
 import click
 from typing import Optional
 from mlad.cli import project
-from mlad.cli.libs import utils
+from mlad.cli.libs import utils, MutuallyExclusiveOption
 from . import echo_exception
 
 # mlad project init
@@ -30,9 +30,11 @@ def ls(no_trunc: bool):
 @click.command()
 @click.option('--file', '-f', default=None, help=(
     'Specify an alternate project file\t\t\t\n'
-    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
 )
-@click.option('--project-key', '-k', help='Project Key', default=None)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
 @click.option('--all', '-a', is_flag=True, help='Show included shutdown service')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
 def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool):
@@ -43,9 +45,11 @@ def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: boo
 @click.command()
 @click.option('--file', '-f', default=None, help=(
     'Specify an alternate project file\t\t\t\n'
-    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
 )
-@click.option('--project-key', '-k', help='Project Key', default=None)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
 @click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
 @click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs')
 @click.option('--follow', is_flag=True, help='Follow log output')
