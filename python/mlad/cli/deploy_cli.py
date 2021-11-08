@@ -51,6 +51,14 @@ def scale(project_key: str, scales: List[str]):
         click.echo(line)
 
 
+@click.command()
+@echo_exception
+def ingress():
+    '''Show the ingress information of running services.'''
+    for line in deploy.ingress():
+        click.echo(line)
+
+
 @click.group('deploy')
 def cli():
     '''Related to the deploy objects'''
@@ -60,3 +68,4 @@ def cli():
 cli.add_command(serve)
 cli.add_command(kill)
 cli.add_command(scale)
+cli.add_command(ingress)

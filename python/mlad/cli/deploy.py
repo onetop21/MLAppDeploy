@@ -108,3 +108,18 @@ def kill(project_key: str, no_dump: bool):
 
 def scale(scales: List[Tuple[str, int]], project_key: str):
     return train.scale(scales, None, project_key)
+
+
+def ingress():
+    config = config_core.get()
+    address = config['apiserver']['address'].rsplit(':', 1)[0]
+    services = API.service.get()['inspects']
+    rows = [('USERNAME', 'NAME', 'KEY', 'PATH')]
+    for service in services:
+        if 'ingress' in service:
+            username = service['username']
+            name = service['project']
+            key = service['key']
+            path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
+            rows.append((username, name, key, path))
+    utils.print_table(rows, 'Cannot find running deployments', 0, False)
