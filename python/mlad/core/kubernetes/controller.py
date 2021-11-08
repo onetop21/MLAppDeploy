@@ -293,7 +293,8 @@ def get_services(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
     if project_key:
         return dict([(_.metadata.labels['MLAD.PROJECT.SERVICE'], _) for _ in services])
     else:
-        return dict([(_.metadata.name, _) for _ in services])
+        return dict([(f'{_.metadata.labels["MLAD.PROJECT"]}/{_.metadata.name}', _)
+                     for _ in services])
 
 
 def get_deployed_service(cli, namespace, name):

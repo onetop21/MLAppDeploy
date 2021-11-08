@@ -116,7 +116,7 @@ def ingress():
     services = API.service.get()['inspects']
     rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
     for service in services:
-        if 'ingress' in service:
+        if service['ingress'] != '':
             username = service['username']
             project_name = service['project']
             app_name = service['name']
