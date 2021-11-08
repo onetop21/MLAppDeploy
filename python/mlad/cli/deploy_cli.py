@@ -55,8 +55,7 @@ def scale(project_key: str, scales: List[str]):
 @echo_exception
 def ingress():
     '''Show the ingress information of running services.'''
-    for line in deploy.ingress():
-        click.echo(line)
+    deploy.ingress()
 
 
 @click.group('deploy')
