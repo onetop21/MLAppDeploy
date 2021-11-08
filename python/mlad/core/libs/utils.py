@@ -3,6 +3,7 @@ import uuid
 import json
 import base64
 import jwt
+import hashlib
 from typing import Dict
 
 import shortuuid
@@ -70,7 +71,6 @@ def generate_unique_id(length=None):
 
 
 def hash(body: str = None):
-    import hashlib
     if body:
         return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
     else:

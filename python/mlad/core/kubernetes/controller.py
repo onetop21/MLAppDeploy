@@ -272,9 +272,9 @@ def get_service(name, namespace, cli = DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     key = f'service-{name}-labels'
     config_labels = get_config_labels(namespace, key, cli)
-    controller = config_labels['MLAD.PROJECT.SERVICE.CONTROLLER']
+    kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
     name = config_labels['MLAD.PROJECT.SERVICE']
-    service = get_service_from_controller(cli, name, namespace, controller)
+    service = get_service_from_kind(cli, name, namespace, kind)
     return service
 
 
@@ -308,17 +308,17 @@ def get_deployed_service(cli, namespace, name):
         return service.items[0]
 
 
-def get_service_from_controller(cli, service_name, namespace, controller):
+def get_service_from_kind(cli, service_name, namespace, kind):
     # get job or rc of service
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     core_api = client.CoreV1Api(cli)
     batch_api = client.BatchV1Api(cli)
     apps_api = client.AppsV1Api(cli)
-    if controller == 'Job':
+    if kind == 'Job':
         service = batch_api.list_namespaced_job(
             namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
-    elif controller == 'Deployment':
+    elif kind == 'Service':
         service = apps_api.list_namespaced_deployment(
             namespace, label_selector=f"MLAD.PROJECT.SERVICE={service_name}")
 
@@ -416,11 +416,11 @@ def _get_ingress_nginx_port(cli=DEFAULT_CLI):
 
 
 def inspect_service(service, cli=DEFAULT_CLI):
-    controller = None
+    kind = None
     if isinstance(service, client.models.v1_deployment.V1Deployment):
-        controller = 'Deployment'
+        kind = 'Service'
     elif isinstance(service, client.models.v1_job.V1Job):
-        controller = 'Job'
+        kind = 'Job'
     else:
         raise TypeError('Parameter is not valid type.')
 
@@ -454,7 +454,7 @@ def inspect_service(service, cli=DEFAULT_CLI):
         'env': [{'name': e.name, 'value': e.value} for e in pod_spec.containers[0].env],
         'id': service.metadata.uid,
         'name': config_labels.get('MLAD.PROJECT.SERVICE'),
-        'replicas': service.spec.parallelism if controller == 'Job' else service.spec.replicas,
+        'replicas': service.spec.parallelism if kind == 'Job' else service.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': {},
         'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
@@ -783,11 +783,9 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
             if kind == 'Job':
                 ret = _create_job(name, image, command, namespace, restart_policy, envs, mounts,
                                   scale, None, quota, None, labels, constraints, secrets, cli)
-                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Job'
             elif kind == 'Service':
                 ret = _create_deployment(name, image, command, namespace, envs, mounts, scale,
                                          quota, None, labels, constraints, secrets, cli)
-                config_labels['MLAD.PROJECT.SERVICE.CONTROLLER'] = 'Deployment'
             else :
                 raise DeprecatedError
             instances.append(ret)
@@ -857,13 +855,12 @@ def remove_services(services, disconnHandler=None, timeout=0xFFFF, stream=False,
 
         config_labels = get_config_labels(namespace, f'service-{service_name}-labels', cli)
         kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
-        controller = config_labels['MLAD.PROJECT.SERVICE.CONTROLLER']
-        return service_name, namespace, controller, targets
+        return service_name, namespace, kind, targets
 
     service_to_check = []
     for service in services:
-        service_name, namespace, controller, _ = _get_service_info(service)
-        service_to_check.append((service_name, namespace, controller, _))
+        service_name, namespace, kind, _ = _get_service_info(service)
+        service_to_check.append((service_name, namespace, kind, _))
 
     # For check service deleted
     collector = Collector()
@@ -874,12 +871,12 @@ def remove_services(services, disconnHandler=None, timeout=0xFFFF, stream=False,
         disconnHandler.add_callback(lambda: monitor.stop())
 
     for service in service_to_check:
-        service_name, namespace, controller, _ = service
+        service_name, namespace, kind, _ = service
         #print(f"Stop {service_name}...")
         try:
-            if controller == 'Job':
+            if kind == 'Job':
                 ret = _delete_job(cli, service_name, namespace)
-            elif controller == 'Deployment':
+            elif kind == 'Service':
                 ret = _delete_deployment(cli, service_name, namespace)
 
             if get_deployed_service(cli, namespace, service_name):
@@ -905,7 +902,7 @@ def remove_services(services, disconnHandler=None, timeout=0xFFFF, stream=False,
         for service in services:
             service_removed = False
             name, namespace, kind = _get_service_info(service)
-            if not get_service_from_controller(cli, name, namespace, controller) and \
+            if not get_service_from_kind(cli, name, namespace, kind) and \
                     not get_service(name, namespace, cli):
                 service_removed = True
             else:
