@@ -114,12 +114,13 @@ def ingress():
     config = config_core.get()
     address = config['apiserver']['address'].rsplit(':', 1)[0]
     services = API.service.get()['inspects']
-    rows = [('USERNAME', 'NAME', 'KEY', 'PATH')]
+    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
     for service in services:
         if 'ingress' in service:
             username = service['username']
-            name = service['project']
+            project_name = service['project']
+            app_name = service['name']
             key = service['key']
             path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
-            rows.append((username, name, key, path))
+            rows.append((username, project_name, app_name, key, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
