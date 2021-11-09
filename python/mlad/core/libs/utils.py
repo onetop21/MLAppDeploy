@@ -6,6 +6,7 @@ import jwt
 import hashlib
 from typing import Dict
 
+from mlad.cli.libs import workspace_key
 from mlad.core.libs import constants as const
 from mlad.core import exceptions
 
@@ -102,7 +103,7 @@ def base_labels(workspace: str, session: str, project: Dict, build: bool = False
     # workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
     username = get_username(session)
-    key = project_key(workspace)
+    key = workspace_key(workspace=workspace)
     kind = project['kind']
     version = str(project['version']).lower()
     default_image = f"{username}/{project['name']}-{key[:const.SHORT_LEN]}:{version}".lower()

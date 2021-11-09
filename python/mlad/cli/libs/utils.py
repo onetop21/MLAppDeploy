@@ -48,7 +48,9 @@ def get_workspace():
     return key
 
 
-def workspace_key():
+def workspace_key(workspace=None):
+    if workspace is not None:
+        return hash(workspace).hex
     return hash(get_workspace()).hex
 
 
