@@ -28,6 +28,7 @@ def serve(file: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
+    workspace = utils.get_workspace()
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
         config.session,
@@ -36,7 +37,7 @@ def serve(file: Optional[str]):
     project_key = base_labels['MLAD.PROJECT']
 
     # Find suitable image
-    base_key = base_labels['MLAD.PROJECT'].rsplit('-', 1)[0]
+    base_key = utils.project_key(workspace)
     image_tag = base_labels['MLAD.PROJECT.IMAGE']
     images = [image for image in docker_ctlr.get_images(project_key=base_key)
               if image_tag in image.tags]
@@ -82,7 +83,6 @@ def serve(file: Optional[str]):
     services = []
     for name, value in apps.items():
         value['name'] = name
-        value['kind'] = 'App' # TODO to be deleted
         services.append(value)
 
     yield 'Start services...'

@@ -3,6 +3,7 @@ import uuid
 import json
 import base64
 import jwt
+import hashlib
 from typing import Dict
 
 import shortuuid
@@ -69,9 +70,11 @@ def generate_unique_id(length=None):
         return UUID
 
 
-def hash(body: str):
-    import hashlib
-    return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
+def hash(body: str = None):
+    if body:
+        return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
+    else:
+        return uuid.uuid4().hex
 
 
 def encode_dict(body):
@@ -106,17 +109,14 @@ def base_labels(workspace: str, session: str, project: Dict, build: bool = False
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
     username = get_username(session)
     key = project_key(workspace)
-    basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}".lower()
-
     kind = project['kind']
-    if not build and kind == 'Deployment':
-        deploy_key = shortuuid.uuid()
-        key = f"{project_key(workspace)}-{deploy_key}"
-        basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}-" \
-                   f"{deploy_key[:const.SHORT_LEN]}".lower()
-
     version = str(project['version']).lower()
     default_image = f"{username}/{project['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
+
+    if not build and kind == 'Deployment':
+        key = hash()
+    basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}".lower()
+
     labels = {
         'MLAD.VERSION': '1',
         'MLAD.PROJECT': key,

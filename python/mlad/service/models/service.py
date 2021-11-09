@@ -68,6 +68,18 @@ class Service(AdvancedBase):
     runSpec: Optional[ServiceRunSpec] = None
 
 
+###
+
+class AppJob(App):
+    kind = 'Job'
+    restartPolicy: Optional[str] = 'never' # Never | onFailure
+
+
+class AppService(App):
+    kind = 'Service'
+    restartPolicy: Optional[str] = 'always'
+
+
 class CreateRequest(BaseModel):
     services: List[dict]
 
@@ -79,9 +91,9 @@ class CreateRequest(BaseModel):
             if kind == 'App':
                 _ = App(**_)
             elif kind == 'Job':
-                _ = Job(**_)
+                _ = AppJob(**_)
             elif kind == 'Service':
-                _ = Service(**_)
+                _ = AppService(**_)
             service = json.loads(_.json())
             targets[_.name]=service
             del targets[_.name]['name']
