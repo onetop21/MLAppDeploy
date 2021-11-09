@@ -6,14 +6,8 @@ import jwt
 import hashlib
 from typing import Dict
 
-import shortuuid
-
 from mlad.core.libs import constants as const
 from mlad.core import exceptions
-
-
-def project_key(workspace):
-    return hash(workspace).hex
 
 
 def get_username(session):

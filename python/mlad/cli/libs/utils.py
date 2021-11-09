@@ -48,8 +48,8 @@ def get_workspace():
     return key
 
 
-def project_key(workspace):
-    return hash(workspace).hex
+def workspace_key():
+    return hash(get_workspace()).hex
 
 
 def read_config():

@@ -30,7 +30,7 @@ def list(all, tail):
     if all:
         images = ctlr.get_images()
     else:
-        project_key = utils.project_key(utils.get_workspace())
+        project_key = utils.workspace_key()
         images = ctlr.get_images(project_key=project_key)
 
     data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED')]
@@ -156,7 +156,7 @@ def prune(all):
     if all:
         result = ctlr.prune_images()
     else:
-        project_key = utils.project_key(utils.get_workspace())
+        project_key = utils.workspace_key()
         result = ctlr.prune_images(project_key)
 
     if result['ImagesDeleted'] and len(result['ImagesDeleted']):
