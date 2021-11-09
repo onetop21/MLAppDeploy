@@ -4,6 +4,21 @@ import requests
 from .base import APIBase
 
 
+def _parse_partial_json(value: str):
+    i = 0
+    li = 0
+    objs = []
+    while i < len(value) - 1:
+        i += 1
+        if value[i] == '}' and (i == len(value) - 1 or value[i + 1] == '{'):
+            try:
+                objs.append(json.loads(value[li: i + 1]))
+                li = i + 1
+            except json.JSONDecodeError:
+                continue
+    return objs, value[li:]
+
+
 class Project(APIBase):
     def __init__(self, config):
         super().__init__(config, 'project')
@@ -50,24 +65,10 @@ class Project(APIBase):
                 resp = self._get(f'/{project_key}/logs', params=params, raw=True, stream=True)
                 res = ''
                 for _ in resp.iter_content(1024):
-                    res += _.decode()
-                    try:
-                        dict_res = json.loads(res)
-                    except json.JSONDecodeError as e:
-                        log = _.decode()
-                        if "stream" in log:
-                            # new log line but error occurs cuz tqdm
-                            name = log.split('\"name\": \"')[1].split('\"')[0]
-                            name_width = int(log.split('\"name_width\": ')[1].split(',')[0])
-                            dict_res = {
-                                "name": name, "name_width": name_width,
-                                "stream": f"[Ignored] Stream Broken : {e}"
-                            }
-                        else:
-                            continue
-                    else:
-                        res = ''
-                    yield dict_res
+                    res += _.decode('utf-8', 'replace')
+                    objs, res = _parse_partial_json(res)
+                    for obj in objs:
+                        yield obj
                 break
             except requests.exceptions.ChunkedEncodingError as e:
                 print(f"[Retry] {e}", file=sys.stderr)
