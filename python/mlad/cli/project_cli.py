@@ -59,7 +59,7 @@ def logs(file: Optional[str], project_key: Optional[str],
 
 
 @click.group('project')
-def cli(file):
+def cli():
     '''Commands for inspecting and initializing project objects.'''
     pass
 
