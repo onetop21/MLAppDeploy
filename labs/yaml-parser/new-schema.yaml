@@ -11,6 +11,8 @@ x-definitions:
         required: true
         empty: false
         order: 1
+        description: Hello World
+        multiline: True
       version: 
         type: string
         regex: "[0-9]+\\.[0-9]+\\.[0-9]+"
@@ -143,14 +145,16 @@ x-definitions:
           mem:
             type: string
             regex: "[0-9]+[GMK]?[i]?"
-  - definition: &app_job
+  - definition: &job
       <<: *app
       restartPolicy:
         type: string
         allowed: [never, onFailure]
         default: never
         excludes: runSpec
-  - definition: &app_service
+        dependencies:
+          scale: 1
+  - definition: &service
       <<: *app
       restartPolicy:
         type: string
@@ -182,7 +186,7 @@ x-definitions:
               mem:
                 type: string
                 regex: "[0-9]+[GMK]?[i]?"
-  - definition: &job
+  - definition: &job_advanced
       <<: *_app_base
       <<: *_advanced_base
       runSpec:
@@ -203,7 +207,7 @@ x-definitions:
           completion:
             type: integer
             default: 1
-  - definition: &service
+  - definition: &_advanced
       <<: *_app_base
       <<: *_advanced_base
       runSpec:
@@ -271,7 +275,8 @@ __root__:
         valuesrules:
           type: dict
           selector:
-            app: *app
+            job: *job
+            service: *service
         order: 30
     deployment:
       <<: *metadata
@@ -295,7 +300,7 @@ __root__:
         valuesrules:
           type: dict
           selector:
-            service: *app_service
+            service: *service
         order: 30
     component:
       <<: *metadata

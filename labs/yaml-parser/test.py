@@ -3,7 +3,7 @@ import sys
 import json
 from pprint import pprint
 from yaml_parser import load, dump
-from cerberus_kind import Validator
+from yaml_validator import Validator
 
 #$1 schema
 #$2 document
@@ -18,7 +18,6 @@ pprint(schema, sort_dicts=False)
 print("Document.")
 pprint(document, sort_dicts=False)
 v = Validator(schema, ordered=True)
-print(v)
 if v.validate(document):
     print("Verified.")
     pprint(v.normalized_by_order(document), sort_dicts=False)
