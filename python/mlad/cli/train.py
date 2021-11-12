@@ -97,7 +97,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
-        project_key = utils.project_key(utils.get_workspace())
+        project_key = utils.workspace_key()
 
     def _get_log_dirpath(project: Dict) -> Path:
         workdir = utils.get_project(default_project)['workdir'] \
@@ -161,7 +161,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optional[str]):
     utils.process_file(file)
     if project_key is None:
-        project_key = utils.project_key(utils.get_workspace())
+        project_key = utils.workspace_key()
 
     API.project.inspect(project_key)
 

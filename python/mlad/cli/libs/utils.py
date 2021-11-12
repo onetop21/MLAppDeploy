@@ -48,8 +48,10 @@ def get_workspace():
     return key
 
 
-def project_key(workspace):
-    return hash(workspace).hex
+def workspace_key(workspace=None):
+    if workspace is not None:
+        return hash(workspace).hex
+    return hash(get_workspace()).hex
 
 
 def read_config():

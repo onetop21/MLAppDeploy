@@ -28,7 +28,6 @@ def serve(file: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
-    workspace = utils.get_workspace()
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
         config.session,
@@ -37,7 +36,7 @@ def serve(file: Optional[str]):
     project_key = base_labels['MLAD.PROJECT']
 
     # Find suitable image
-    base_key = utils.project_key(workspace)
+    base_key = utils.workspace_key()
     image_tag = base_labels['MLAD.PROJECT.IMAGE']
     images = [image for image in docker_ctlr.get_images(project_key=base_key)
               if image_tag in image.tags]
