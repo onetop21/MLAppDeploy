@@ -33,7 +33,8 @@ def ls(all, tail):
 @echo_exception
 def build(file, quiet, no_cache, pull):
     '''Build MLAppDeploy project or plguin'''
-    image.build(file, quiet, no_cache, pull)
+    for line in image.build(file, quiet, no_cache, pull):
+        click.echo(line)
     click.echo('Done.')
 
 

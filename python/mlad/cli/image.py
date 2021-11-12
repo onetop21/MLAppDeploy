@@ -123,7 +123,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
         if prev_image != image:
             prev_image.tag('remove')
             ctlr.remove_image(['remove'])
-    print(f"Built Image: {repository}")
+    yield f'Built Image: {repository}'
 
     # Push image
     yield f'Upload the image to the registry [{registry_address}]...'
