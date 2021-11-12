@@ -67,11 +67,13 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
     project = validators.validate(project)
 
     # Generate Base Labels
-    workspace_key = utils.get_workspace()
-    base_labels = core_utils.base_labels(workspace_key, config.session, project, build=True)
+    workspace = utils.get_workspace()
+    registry_address = utils.get_registry_address(config)
+    base_labels = core_utils.base_labels(
+        workspace, config.session, project, registry_address, build=True)
     project_key = base_labels['MLAD.PROJECT']
     version = base_labels['MLAD.PROJECT.VERSION']
-    image_tag = base_labels['MLAD.PROJECT.IMAGE']
+    repository = base_labels['MLAD.PROJECT.IMAGE']
 
     workspace = project['workspace']
     # For the workspace kind
@@ -107,21 +109,26 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
             if not quiet:
                 sys.stdout.write(_['stream'])
 
-    image = ctlr.get_image(image_tag)
+    image = ctlr.get_image(repository)
 
     # Prepare the previous images
     images = ctlr.get_images(project_key=project_key)
     prev_images = [
-        image
-        for image in images
-        for tag in image.tags if tag.endswith(version)
+        im
+        for im in images
+        for tag in im.tags if tag.endswith(version)
     ]
     # Remove the previous images with different ids
     for prev_image in prev_images:
         if prev_image != image:
             prev_image.tag('remove')
             ctlr.remove_image(['remove'])
-    print(f"Built Image: {image_tag}")
+    print(f"Built Image: {repository}")
+
+    # Push image
+    yield f'Upload the image to the registry [{registry_address}]...'
+    for line in ctlr.push_image(repository):
+        yield line
 
     return image
 

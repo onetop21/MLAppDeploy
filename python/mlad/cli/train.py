@@ -8,7 +8,6 @@ from pathlib import Path
 import yaml
 
 from mlad.cli import config as config_core
-from mlad.cli import context
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
@@ -37,7 +36,8 @@ def up(file: Optional[str]):
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
         config.session,
-        project
+        project,
+        utils.get_registry_address(config)
     )
 
     # Check the project already exists
@@ -54,18 +54,6 @@ def up(file: Optional[str]):
               if image_tag in image.tags]
     if len(images) == 0:
         raise ImageNotFoundError(image_tag)
-    image = images[0]
-
-    # Re-tag the image
-    registry_address = utils.get_registry_address(config)
-    image_tag = f'{registry_address}/{image_tag}'
-    image.tag(image_tag)
-    base_labels['MLAD.PROJECT.IMAGE'] = image_tag
-
-    # Push image
-    yield f'Upload the image to the registry [{registry_address}]...'
-    for line in docker_ctlr.push_image(image_tag):
-        yield line
 
     # Create a project
     yield 'Deploy applications to the cluster...'
