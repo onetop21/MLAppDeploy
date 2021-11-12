@@ -85,7 +85,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
             with open(workspace['dockerfile'], 'r') as dockerfile:
                 payload = dockerfile.read()
         else:
-            payload = workspace['script']
+            payload = workspace['buildscript']
 
     tarbytes = io.BytesIO()
     dockerfile_info = tarfile.TarInfo('.dockerfile')
