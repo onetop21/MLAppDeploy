@@ -151,7 +151,6 @@ def service_remove(project_key: str, service_name: str,
                    session: str = Header(None)):
     try:
         _check_session_key(project_key, session)
-        service = ctlr.get_service(name, namespace)
         if _check_project_key(project_key, service):
             res = ctlr.remove_services([service], stream=stream)
 
@@ -209,4 +208,4 @@ def remove_services(project_key: str, req: service.RemoveRequest,
     if stream:
         return StreamingResponse(remove_service(res), background=handler)
     else:
-        return {'message': f"services removed"}
+        return {'message': "services removed"}
