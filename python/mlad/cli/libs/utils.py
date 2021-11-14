@@ -17,8 +17,6 @@ from omegaconf import OmegaConf
 from getpass import getuser
 
 from mlad.cli.libs.exceptions import InvalidURLError
-from mlad.core.default import project as project_default
-from mlad.cli.libs.auth import auth_admin
 
 if TYPE_CHECKING:
     from mlad.cli.context import Context
@@ -50,8 +48,10 @@ def get_workspace():
     return key
 
 
-def project_key(workspace):
-    return hash(workspace).hex
+def workspace_key(workspace=None):
+    if workspace is not None:
+        return hash(workspace).hex
+    return hash(get_workspace()).hex
 
 
 def read_config():
@@ -61,7 +61,6 @@ def read_config():
         print('Need to initialize configuration before.\nTry to run "mlad config init"',
               file=sys.stderr)
         sys.exit(1)
-
 
 
 def get_completion(shell='bash'):

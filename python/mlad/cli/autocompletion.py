@@ -86,7 +86,7 @@ def get_stopped_services_completion(ctx, args, incomplete):
     if project_file:
         utils.apply_project_arguments(project_file[-1], None)
     project = utils.get_project(default_project)
-    project_key = utils.project_key(utils.get_workspace())
+    project_key = utils.workspace_key()
     try:
         with API(config.mlad.address, config.mlad.token.user) as api:
             services = [_['name'] for _ in api.service.get(project_key)['inspects']]
@@ -103,7 +103,7 @@ def get_running_services_completion(ctx, args, incomplete):
                     if _ in ['-f', '--file']] if os.path.isfile(_)]
     if project_file:
         utils.apply_project_arguments(project_file[-1], None)
-    project_key = utils.project_key(utils.get_workspace())
+    project_key = utils.workspace_key()
     try:
         with API(config.apiserver.address, config.session) as api:
             services = [_['name'] for _ in api.service.get(project_key)['inspects']]
@@ -119,7 +119,7 @@ def get_running_services_tasks_completion(ctx, args, incomplete):
                     if _ in ['-f', '--file']] if os.path.isfile(_)]
     if project_file:
         utils.apply_project_arguments(project_file[-1], None)
-    project_key = utils.project_key(utils.get_workspace())
+    project_key = utils.workspace_key()
     try:
         with API(config.apiserver.address, config.session) as api:
             services = dict([(_['name'], _['tasks']) for _ in api.service.get(project_key)['inspects']])

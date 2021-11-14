@@ -2,7 +2,7 @@ import click
 from typing import Optional, List
 
 from mlad.cli import train
-from mlad.cli.libs import utils
+from mlad.cli.libs import utils, MutuallyExclusiveOption
 
 from . import echo_exception
 
@@ -25,9 +25,11 @@ def up(file: Optional[str]):
 @click.command()
 @click.option('--file', '-f', default=None, help=(
     'Specify an alternate project file\t\t\t\n'
-    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
 )
-@click.option('--project-key', '-k', help='Project Key', default=None)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
 @click.option('--no-dump', is_flag=True,
               help='Save the log before shutting down the services')
 @echo_exception
@@ -41,9 +43,11 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 @click.argument('scales', required=True, nargs=-1)
 @click.option('--file', '-f', default=None, help=(
     'Specify an alternate project file\t\t\t\n'
-    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
 )
-@click.option('--project-key', '-k', help='Project Key', default=None)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
 @echo_exception
 def scale(scales: List[str], file: Optional[str], project_key: Optional[str]):
     '''Change the scale of one of the running apps.

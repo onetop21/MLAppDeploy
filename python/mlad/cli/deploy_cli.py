@@ -25,6 +25,19 @@ def serve(file: Optional[str]):
 
 @click.command()
 @click.argument('project-key', required=True)
+@click.option('--file', '-f', default=None, help=(
+    'Specify an project file to be used for update.\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+)
+@echo_exception
+def update(project_key: str, file: Optional[str]):
+    '''Stop and remove the train object on the cluster.'''
+    for line in deploy.update(project_key, file):
+        click.echo(line)
+
+
+@click.command()
+@click.argument('project-key', required=True)
 @click.option('--no-dump', is_flag=True,
               help='Save the log before shutting down the services')
 @echo_exception
@@ -51,6 +64,13 @@ def scale(project_key: str, scales: List[str]):
         click.echo(line)
 
 
+@click.command()
+@echo_exception
+def ingress():
+    '''Show the ingress information of running services.'''
+    deploy.ingress()
+
+
 @click.group('deploy')
 def cli():
     '''Related to the deploy objects'''
@@ -58,5 +78,7 @@ def cli():
 
 
 cli.add_command(serve)
+cli.add_command(update)
 cli.add_command(kill)
 cli.add_command(scale)
+cli.add_command(ingress)

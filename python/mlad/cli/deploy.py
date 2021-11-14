@@ -37,7 +37,7 @@ def serve(file: Optional[str]):
     project_key = base_labels['MLAD.PROJECT']
 
     # Find suitable image
-    base_key = utils.project_key(workspace)
+    base_key = utils.workspace_key()
     image_tag = base_labels['MLAD.PROJECT.IMAGE']
     images = [image for image in docker_ctlr.get_images(project_key=base_key)
               if image_tag in image.tags]
@@ -108,3 +108,42 @@ def kill(project_key: str, no_dump: bool):
 
 def scale(scales: List[Tuple[str, int]], project_key: str):
     return train.scale(scales, None, project_key)
+
+
+def ingress():
+    config = config_core.get()
+    address = config['apiserver']['address'].rsplit(':', 1)[0]
+    services = API.service.get()['inspects']
+    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
+    for service in services:
+        if service['ingress'] != '':
+            username = service['username']
+            project_name = service['project']
+            app_name = service['name']
+            key = service['key']
+            path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
+            rows.append((username, project_name, app_name, key, path))
+    utils.print_table(rows, 'Cannot find running deployments', 0, False)
+
+
+def update(project_key: str, file: Optional[str]):
+
+    # Check the project already exists
+    project = API.project.inspect(project_key=project_key)
+    # get previous yaml
+
+    # Get update project file
+    utils.process_file(file)
+    config = config_core.get()
+    project = utils.get_project(default_project)
+    project = validators.validate(project)
+
+    kind = project['kind']
+    if not kind == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'deploy')
+
+    # validate schema change => image, command
+    # image 없으면
+
+    # rollout update
+    # api.service.update(project_key, service_name, update_spec) ?

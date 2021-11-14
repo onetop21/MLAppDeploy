@@ -147,7 +147,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
     utils.process_file(file)
     config = config_core.get()
     if project_key is None:
-        project_key = utils.project_key(utils.get_workspace())
+        project_key = utils.workspace_key()
     # Block not running.
     try:
         inspect = API.project.inspect(project_key=project_key)
@@ -480,7 +480,7 @@ def up():
 
 
 def down(no_dump):
-    project_key = utils.project_key(utils.get_workspace())
+    project_key = utils.workspace_key()
     workdir = utils.get_project(default_project)['workdir']
 
     # Block duplicated running.
@@ -563,7 +563,7 @@ def down(no_dump):
 def down_force(no_dump):
     '''down project using local k8s for admin'''
     cli = k8s_ctlr.get_api_client(context=k8s_ctlr.get_current_context())
-    project_key = utils.project_key(utils.get_workspace())
+    project_key = utils.workspace_key()
     workdir = utils.get_project(default_project)['workdir']
     network = k8s_ctlr.get_project_network(cli, project_key=project_key)
 
@@ -659,7 +659,7 @@ def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
     utils.process_file(file)
     if project_key is None:
-        project_key = utils.project_key(utils.get_workspace())
+        project_key = utils.workspace_key()
     # Block not running.
     API.project.inspect(project_key)
 
@@ -674,7 +674,7 @@ def logs(file: Optional[str], project_key: Optional[str],
 
 def scale(scales):
     scale_spec = dict([scale.split('=') for scale in scales])
-    project_key = utils.project_key(utils.get_workspace())
+    project_key = utils.workspace_key()
     try:
         API.project.inspect(project_key)
     except NotFound:
