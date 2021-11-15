@@ -44,8 +44,8 @@ class InvalidSession(APIError):
 def error_from_http_errors(e):
     # msg from mlad service http error
     detail = e.response.json()['detail']
-    msg = detail['msg']
-    reason = detail['reason']
+    msg = detail['msg'] if 'msg' in detail else detail
+    reason = detail['reason'] if 'reason' in detail else ''
     if e.response.status_code == 404:
         if reason == 'ProjectNotFound':
             cls = ProjectNotFound
