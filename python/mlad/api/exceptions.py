@@ -53,6 +53,7 @@ def error_from_http_errors(e):
             cls = ServiceNotFound
         else:
             cls = NotFound
+            msg = 'Check the server address and paths.'
     elif e.response.status_code == 401:
         cls = InvalidSession
     elif e.response.status_code == 400:
