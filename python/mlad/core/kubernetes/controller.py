@@ -1367,7 +1367,7 @@ if __name__ == '__main__':
     #if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
 
     project = {'name': 'test_project', 'author': 'onetop21', 'version': 'v0.0.1'}
-    labels = utils.base_labels("onetop21-linux@/home/onetop21/workspace/MLAppDeploy/example", 'onetop21', project, '172.20.41.118:5000')
+    labels = utils.base_labels("onetop21-linux@/home/onetop21/workspace/MLAppDeploy/example", 'onetop21', project, 'http://harbor.sailio.ncsoft.com', '172.20.41.118:5000')
     try:
         v1.create_namespaced_config_map(
             'hello-cluster', 

@@ -99,15 +99,17 @@ def change_key_style(dct):
 
 
 # Manage Project and Network
-def base_labels(workspace: str, session: str, project: Dict, build: bool = False):
+def base_labels(workspace: str, session: str, project: Dict,
+                registry_address: str, build: bool = False):
     # workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
     username = get_username(session)
     key = utils.workspace_key(workspace=workspace)
     kind = project['kind']
     version = str(project['version']).lower()
-    default_image = f"{username}/{project['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
-
+    repository = f"{username}/{project['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
+    if kind in ['Deployment', 'Train']:
+        repository = f'{registry_address}/' + repository
     if not build and kind == 'Deployment':
         key = hash()
     basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}".lower()
@@ -122,7 +124,7 @@ def base_labels(workspace: str, session: str, project: Dict, build: bool = False
         'MLAD.PROJECT.MAINTAINER': project['maintainer'],
         'MLAD.PROJECT.VERSION': str(project['version']).lower(),
         'MLAD.PROJECT.BASE': basename,
-        'MLAD.PROJECT.IMAGE': default_image,
+        'MLAD.PROJECT.IMAGE': repository,
         'MLAD.PROJECT.SESSION': session,
         'MLAD.PROJECT.KIND': project['kind']
     }
