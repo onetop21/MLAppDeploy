@@ -1,3 +1,4 @@
+import json
 from requests.exceptions import HTTPError
 
 
@@ -43,9 +44,12 @@ class InvalidSession(APIError):
 
 def error_from_http_errors(e):
     # msg from mlad service http error
-    detail = e.response.json()['detail']
-    msg = detail['msg']
-    reason = detail['reason']
+    try:
+        detail = e.response.json()['detail']
+        msg = detail['msg'] if 'msg' in detail else detail
+        reason = detail['reason'] if 'reason' in detail else ''
+    except json.JSONDecodeError:
+        raise APIError(e.response.text, e.response)
     if e.response.status_code == 404:
         if reason == 'ProjectNotFound':
             cls = ProjectNotFound
@@ -53,6 +57,7 @@ def error_from_http_errors(e):
             cls = ServiceNotFound
         else:
             cls = NotFound
+            msg = 'Check the server address and paths.'
     elif e.response.status_code == 401:
         cls = InvalidSession
     elif e.response.status_code == 400:
