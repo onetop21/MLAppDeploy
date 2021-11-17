@@ -155,22 +155,17 @@ def update(project_key: str, file: Optional[str]):
             if diff_type == 'change':
                 diff_schema[name][key] = update[key]
                 _validate(key)
-            elif diff_type == 'add':
+            else:
                 if key:
                     _validate(key)
                     diff_schema[name][key] = update[key]
                 else:
                     for key, value in value:
                         _validate(key)
-                        diff_schema[name][key] = update[key]
-            elif diff_type == 'remove':
-                if key:
-                    _validate(key)
-                    diff_schema[name][key] = update[key]
-                else:
-                    for key, value in value:
-                        _validate(key)
-                        diff_schema[name][key] = None
+                        if diff_type == 'add':
+                            diff_schema[name][key] = update[key]
+                        elif diff_type == 'remove':
+                            diff_schema[name][key] = None
 
     # Update services
     update_specs = []
