@@ -94,7 +94,9 @@ spec:
   - http:
       paths:
       - path: /beta(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: mlad-service-beta
-            port: 8440
+            port:
+              number: 8440
