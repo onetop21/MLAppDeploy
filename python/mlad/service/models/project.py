@@ -1,4 +1,4 @@
-from typing import Any, List, Union
+from typing import Any, List, Union, Optional
 from pydantic import BaseModel
 
 from mlad.service.models.service import Quota
@@ -7,7 +7,7 @@ from mlad.service.models.service import Quota
 class CreateRequest(BaseModel):
     base_labels: dict
     extra_envs: list
-    project_yaml: dict
+    project_yaml: Optional[dict] = None
     credential: str
 
 
