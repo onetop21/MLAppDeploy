@@ -10,11 +10,11 @@ def init(address) -> context.Context:
 
 
 def set(*args) -> None:
-    return context.set('default', *args)
+    return context.set(context.current(), *args)
 
 
 def get() -> context.Context:
-    return context.get('default')
+    return context.get()
 
 
 def env(unset=False) -> Tuple[List[str], str]:
