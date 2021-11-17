@@ -91,7 +91,9 @@ spec:
   - http:
       paths:
       - path: /
+        pathType: ImplementationSpecific
         backend:
           service:
             name: mlad-service
-            port: 8440
+            port:
+              number: 8440
