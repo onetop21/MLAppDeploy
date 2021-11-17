@@ -25,15 +25,16 @@ def get_api_client(config_file='~/.kube/config', context=None):
         if context:
             return config.new_client_from_config(context=context)
         else:
+
             return config.new_client_from_config(config_file=config_file)
-    except config.config_exception.ConfigException:
+    except config.config_exception.ConfigException as e:
         pass
     try:
         from kubernetes.client.api_client import ApiClient
         config.load_incluster_config()
         # If Need, set configuration parameter from client.Configuration
         return ApiClient()
-    except config.config_exception.ConfigException:
+    except config.config_exception.ConfigException as e:
         return None
 
 
@@ -131,6 +132,7 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
     created = network.metadata.creation_timestamp
     config_labels = get_config_labels(network, 'project-labels', cli)
     hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
+
     return {
         'key': labels['MLAD.PROJECT'],
         'workspace': {
@@ -145,7 +147,8 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
         'base': config_labels['MLAD.PROJECT.BASE'],
         'image': config_labels['MLAD.PROJECT.IMAGE'],
         'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
-        'created': int(time.mktime(created.timetuple()))
+        'created': int(time.mktime(created.timetuple())),
+        'project_yaml': network.metadata.annotations['MLAD.PROJECT.YAML']
     }
 
 
@@ -156,7 +159,7 @@ def get_project_session(network, cli=DEFAULT_CLI):
     return config_labels['MLAD.PROJECT.SESSION']
 
 
-def create_project_network(base_labels, extra_envs, credential, allow_reuse=False, stream=False,
+def create_project_network(base_labels, extra_envs, project_yaml, credential, allow_reuse=False, stream=False,
                            cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
@@ -191,11 +194,15 @@ def create_project_network(base_labels, extra_envs, credential, allow_reuse=Fals
                 'MLAD.PROJECT.NAME': labels['MLAD.PROJECT.NAME'],
                 #'MLAD.PROJECT.TYPE': labels['MLAD.PROJECT.TYPE'],
             }
+            annotations = {
+                'MLAD.PROJECT.YAML': json.dumps(project_yaml) if project_yaml else None
+            }
             api.create_namespace(
                 client.V1Namespace(
                     metadata=client.V1ObjectMeta(
                         name=network_name,
-                        labels=keys
+                        labels=keys,
+                        annotations=annotations
                     )
                 )
             )
@@ -249,6 +256,78 @@ def remove_project_network(network, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
         return resp_stream()
     else:
         return (not get_project_network(cli, project_key=network_info['key']), (_ for _ in resp_stream()))
+
+
+def update_project_network(network, update_yaml, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace):
+        raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    name = network.metadata.name
+    network.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
+    print(network.metadata.annotations['MLAD.PROJECT.YAML'])
+    try:
+        res = api.patch_namespace(name, network)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find network {name}.')
+        else:
+            raise exceptions.APIError(msg, status)
+
+
+def update_services(network, services, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
+    api = client.AppsV1Api(cli)
+    namespace = network.metadata.name
+
+    instances = []
+    for service in services:
+        service = service.dict()
+        service_name = service['name']
+        deployment = _get_deployment(cli, service_name, namespace)
+
+        scale = service['scale']
+        command = service['command'] or []
+        args = service['args'] or []
+        quota = service['quota'] or {}
+
+        # parse
+        resources = _resources_to_V1Resource(resources=quota)
+
+        if isinstance(command, str):
+            command = command.split()
+        if isinstance(args, str):
+            args = args.split()
+        command += args
+        
+        # update
+        deployment.spec.replicas = scale
+
+        container_spec = deployment.spec.template.spec.containers[0]
+        container_spec.command = command
+        container_spec.resources = resources
+
+        if service['image'] is not None:
+            container_spec.image = service['image']
+
+        if service['env'] is not None:
+            current = {env.name : env.value for env in container_spec.env}
+            current.update(service['env'])
+            env = [client.V1EnvVar(name=k, value=v) for k, v in current.items()]
+            container_spec.env = env
+
+        try:
+            deployment.metadata.annotations['kubernetes.io/change-cause'] = f'MLAD/{service}'
+            res = api.patch_namespaced_deployment(service_name, namespace, deployment)
+            instances.append(res)
+        except ApiException as e:
+            msg, status = exceptions.handle_k8s_api_error(e)
+            err_msg = f'Failed to update services: {msg}'
+            raise exceptions.APIError(err_msg, status)
+    return instances
 
 
 # Manage services and tasks
@@ -1174,6 +1253,7 @@ def create_ingress(cli, namespace, service_name, ingress_name, port, base_path='
         annotations.update({
             "nginx.ingress.kubernetes.io/rewrite-target": "/$2"
         })
+
     body = client.NetworkingV1beta1Ingress(
         api_version="networking.k8s.io/v1beta1",
         kind="Ingress",

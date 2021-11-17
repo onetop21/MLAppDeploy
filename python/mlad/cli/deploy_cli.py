@@ -31,7 +31,9 @@ def serve(file: Optional[str]):
 )
 @echo_exception
 def update(project_key: str, file: Optional[str]):
-    '''Stop and remove the train object on the cluster.'''
+    '''Update deployed service with updated project file.\n
+    Valid options for update : [image, command, args, scale, env, quota]'''
+
     for line in deploy.update(project_key, file):
         click.echo(line)
 

@@ -27,11 +27,12 @@ class Project(APIBase):
         params = {'extra_labels': ','.join(extra_labels)}
         return self._get('', params=params)
 
-    def create(self, base_labels, extra_envs=[], credential=None, allow_reuse=False):
+    def create(self, base_labels, extra_envs=[], project_yaml=None, credential=None, allow_reuse=False):
         body = {
             'base_labels': base_labels,
             'extra_envs': extra_envs,
-            'credential': credential
+            'project_yaml': project_yaml,
+            'credential': credential,
         }
         params = {'allow_reuse': allow_reuse}
         resp = self._post('', params=params, body=body, raw=True, stream=True)
@@ -75,3 +76,10 @@ class Project(APIBase):
 
     def resource(self, project_key):
         return self._get(f'/{project_key}/resource')
+
+    def update(self, project_key, update_yaml, services):
+        body = {
+            'update_yaml': update_yaml,
+            'services': services
+        }
+        return self._post(f'/{project_key}', body=body)

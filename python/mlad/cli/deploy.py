@@ -1,13 +1,16 @@
 import sys
+import json
 
 from typing import Optional, List, Tuple
+
+from dictdiffer import diff
 
 from mlad.cli import config as config_core
 from mlad.cli import train
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ImageNotFoundError, InvalidProjectKindError
+    ImageNotFoundError, InvalidProjectKindError, InvalidUpdateOptionError
 )
 
 from mlad.core.docker import controller2 as docker_ctlr
@@ -60,7 +63,7 @@ def serve(file: Optional[str]):
     yield 'Deploy applications to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
+    lines = API.project.create(base_labels, extra_envs, project_yaml=project, credential=credential, allow_reuse=False)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])
@@ -128,11 +131,9 @@ def ingress():
 
 def update(project_key: str, file: Optional[str]):
 
-    # Check the project already exists
     project = API.project.inspect(project_key=project_key)
-    # get previous yaml
+    cur_project_yaml = json.loads(project['project_yaml'])
 
-    # Get update project file
     utils.process_file(file)
     config = config_core.get()
     project = utils.get_project(default_project)
@@ -142,8 +143,46 @@ def update(project_key: str, file: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
-    # validate schema change => image, command
-    # image 없으면
+    update_key_store = ['image', 'command', 'args', 'scale', 'env', 'quota']
 
-    # rollout update
-    # api.service.update(project_key, service_name, update_spec) ?
+    cur_apps = cur_project_yaml['app']
+    update_apps = project['app']
+
+    # Get diff from project yaml
+    diff_schema = {}
+    for name, value in cur_apps.items():
+        diff_schema[name] = {}
+        update = update_apps[name]
+
+        diffs = list(diff(value, update))
+        for diff_type, key, value in diffs:
+            key = key.split('.')[0]
+
+            if diff_type == 'change':
+                diff_schema[name][key] = update[key]
+                if key not in update_key_store:
+                    raise InvalidUpdateOptionError(key)
+            elif diff_type == 'add':
+                for key, value in value:
+                    if key not in update_key_store:
+                        raise InvalidUpdateOptionError(key)
+                    diff_schema[name][key] = update[key]
+            elif diff_type == 'remove':
+                for key, value in value:
+                    if key not in update_key_store:
+                        raise InvalidUpdateOptionError(key)
+                    diff_schema[name][key] = None
+    
+    # Update services
+    update_specs = []
+    for name, value in diff_schema.items():
+        if len(value) > 0 :
+            yield f'Update {[_ for _ in value]} for app "{name}"...'
+        # else:
+        #     yield f'There is no element to update for app "{name}".'
+        update_spec = {key: update_apps[name].get(key, None) for key in update_key_store}
+        update_spec['name'] = name
+        update_specs.append(update_spec) 
+
+    API.project.update(project_key, project, update_specs)
+    yield 'Done.'

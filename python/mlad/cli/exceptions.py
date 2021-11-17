@@ -107,3 +107,12 @@ class InvalidProjectKindError(Exception):
 
     def __str__(self):
         return f'Only kind "{self.kind}" is valid for "{self.command}" command.'
+
+
+class InvalidUpdateOptionError(Exception):
+
+    def __init__(self, key: str):
+        self.key = key
+
+    def __str__(self):
+        return f'"{self.key}" cannot be updated. Check the schema for update.'

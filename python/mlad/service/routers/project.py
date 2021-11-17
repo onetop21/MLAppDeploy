@@ -29,10 +29,11 @@ def project_create(req: project.CreateRequest, allow_reuse: bool = Query(False),
     base_labels = req.base_labels
     extra_envs = req.extra_envs
     credential = req.credential
+    project_yaml = req.project_yaml
 
     try:
         res = ctlr.create_project_network(
-            base_labels, extra_envs, credential, allow_reuse=allow_reuse, stream=True)
+            base_labels, extra_envs, project_yaml, credential, allow_reuse=allow_reuse, stream=True)
 
         def create_project(gen):
             for _ in gen:
@@ -155,6 +156,19 @@ def project_log(project_key: str, tail: str = Query('all'),
 def project_resource(project_key: str, session: str = Header(None)):
     try:
         res = ctlr.get_project_resources(project_key)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=exception_detail(e))
+
+
+@router.post("/project/{project_key}")
+def update_project(project_key: str, req: project.UpdateRequest):
+    update_yaml = req.update_yaml
+    services = req.services
+    try:
+        network = ctlr.get_project_network(project_key=project_key)
+        ctlr.update_project_network(network, update_yaml)
+        res = ctlr.update_services(network, services)
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
