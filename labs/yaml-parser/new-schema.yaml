@@ -9,6 +9,7 @@ x-definitions:
       name: 
         type: string
         required: true
+        regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         empty: false
         order: 1
         description: Hello World
@@ -89,7 +90,7 @@ x-definitions:
   - definition: &ingress
       target:
         type: string
-        regex: "[A-Za-z0-9-_]+:[0-9]+"
+        regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9]):[0-9]+$"
         required: true
       rewritePath: 
         type: boolean
@@ -272,6 +273,9 @@ __root__:
         order: 10
       app:
         type: dict
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules:
           type: dict
           selector:
@@ -291,12 +295,18 @@ __root__:
       ingress:
         type: dict
         required: true
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules: 
           type: dict
           schema: *ingress
         order: 20
       app:
         type: dict
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules:
           type: dict
           selector:
@@ -314,6 +324,9 @@ __root__:
         order: 10
       app:
         type: dict
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules:
           type: dict
           selector:
