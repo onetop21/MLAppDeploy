@@ -1180,15 +1180,17 @@ def create_ingress(cli, namespace, service_name, ingress_name, port, base_path='
         metadata=client.V1ObjectMeta(name=ingress_name, annotations=annotations,
                                      labels={'MLAD.PROJECT.SERVICE':service_name}),
         spec=client.V1IngressSpec(
-            rules=[client.V1IngressRule(
-                http=client.V1HTTPIngressRuleValue(
-                    paths=[client.V1HTTPIngressPath(
-                        path=f"{base_path}(/|$)(.*)" if rewrite else base_path,
-                        backend=client.V1IngressBackend(
-                            service=client.V1IngressServiceBackend(
-                                name=service_name
-                                port=client.V1ServiceBackendPort(
-                                    number=port
+            rules=[
+                client.V1IngressRule(
+                    http=client.V1HTTPIngressRuleValue(
+                        paths=[client.V1HTTPIngressPath(
+                            path=f"{base_path}(/|$)(.*)" if rewrite else base_path,
+                            backend=client.V1IngressBackend(
+                                service=client.V1IngressServiceBackend(
+                                    name=service_name
+                                    port=client.V1ServiceBackendPort(
+                                        number=port
+                                    )
                                 )
                             )
                         )]
