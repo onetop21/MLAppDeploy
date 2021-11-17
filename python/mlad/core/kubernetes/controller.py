@@ -266,7 +266,6 @@ def update_project_network(network, update_yaml, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     name = network.metadata.name
     network.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
-    print(network.metadata.annotations['MLAD.PROJECT.YAML'])
     try:
         res = api.patch_namespace(name, network)
     except ApiException as e:
@@ -275,59 +274,6 @@ def update_project_network(network, update_yaml, cli=DEFAULT_CLI):
             raise exceptions.NotFound(f'Cannot find network {name}.')
         else:
             raise exceptions.APIError(msg, status)
-
-
-def update_services(network, services, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
-    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
-    api = client.AppsV1Api(cli)
-    namespace = network.metadata.name
-
-    instances = []
-    for service in services:
-        service = service.dict()
-        service_name = service['name']
-        deployment = _get_deployment(cli, service_name, namespace)
-
-        scale = service['scale']
-        command = service['command'] or []
-        args = service['args'] or []
-        quota = service['quota'] or {}
-
-        # parse
-        resources = _resources_to_V1Resource(resources=quota)
-
-        if isinstance(command, str):
-            command = command.split()
-        if isinstance(args, str):
-            args = args.split()
-        command += args
-        
-        # update
-        deployment.spec.replicas = scale
-
-        container_spec = deployment.spec.template.spec.containers[0]
-        container_spec.command = command
-        container_spec.resources = resources
-
-        if service['image'] is not None:
-            container_spec.image = service['image']
-
-        if service['env'] is not None:
-            current = {env.name : env.value for env in container_spec.env}
-            current.update(service['env'])
-            env = [client.V1EnvVar(name=k, value=v) for k, v in current.items()]
-            container_spec.env = env
-
-        try:
-            deployment.metadata.annotations['kubernetes.io/change-cause'] = f'MLAD/{service}'
-            res = api.patch_namespaced_deployment(service_name, namespace, deployment)
-            instances.append(res)
-        except ApiException as e:
-            msg, status = exceptions.handle_k8s_api_error(e)
-            err_msg = f'Failed to update services: {msg}'
-            raise exceptions.APIError(err_msg, status)
-    return instances
 
 
 # Manage services and tasks
@@ -899,6 +845,59 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
         except ApiException as e:
             msg, status = exceptions.handle_k8s_api_error(e)
             err_msg = f'Failed to create services: {msg}'
+            raise exceptions.APIError(err_msg, status)
+    return instances
+
+
+def update_services(network, services, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
+    api = client.AppsV1Api(cli)
+    namespace = network.metadata.name
+
+    instances = []
+    for service in services:
+        service = service.dict()
+        service_name = service['name']
+        deployment = _get_deployment(cli, service_name, namespace)
+
+        scale = service['scale']
+        command = service['command'] or []
+        args = service['args'] or []
+        quota = service['quota'] or {}
+
+        # parse
+        resources = _resources_to_V1Resource(resources=quota)
+
+        if isinstance(command, str):
+            command = command.split()
+        if isinstance(args, str):
+            args = args.split()
+        command += args
+        
+        # update
+        deployment.spec.replicas = scale
+
+        container_spec = deployment.spec.template.spec.containers[0]
+        container_spec.command = command
+        container_spec.resources = resources
+
+        if service['image'] is not None:
+            container_spec.image = service['image']
+
+        if service['env'] is not None:
+            current = {env.name : env.value for env in container_spec.env}
+            current.update(service['env'])
+            env = [client.V1EnvVar(name=k, value=v) for k, v in current.items()]
+            container_spec.env = env
+
+        try:
+            deployment.metadata.annotations['kubernetes.io/change-cause'] = f'MLAD:{service}'
+            res = api.patch_namespaced_deployment(service_name, namespace, deployment)
+            instances.append(res)
+        except ApiException as e:
+            msg, status = exceptions.handle_k8s_api_error(e)
+            err_msg = f'Failed to update services: {msg}'
             raise exceptions.APIError(err_msg, status)
     return instances
 

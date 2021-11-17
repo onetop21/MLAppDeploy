@@ -163,26 +163,37 @@ def update(project_key: str, file: Optional[str]):
                 if key not in update_key_store:
                     raise InvalidUpdateOptionError(key)
             elif diff_type == 'add':
-                for key, value in value:
+                if key:
                     if key not in update_key_store:
                         raise InvalidUpdateOptionError(key)
                     diff_schema[name][key] = update[key]
+                else:
+                    for key, value in value:
+                        if key not in update_key_store:
+                            raise InvalidUpdateOptionError(key)
+                        diff_schema[name][key] = update[key]
             elif diff_type == 'remove':
-                for key, value in value:
+                if key:
                     if key not in update_key_store:
                         raise InvalidUpdateOptionError(key)
-                    diff_schema[name][key] = None
-    
+                    diff_schema[name][key] = update[key]
+                else:
+                    for key, value in value:
+                        if key not in update_key_store:
+                            raise InvalidUpdateOptionError(key)
+                        diff_schema[name][key] = None
+
     # Update services
     update_specs = []
     for name, value in diff_schema.items():
         if len(value) > 0 :
             yield f'Update {[_ for _ in value]} for app "{name}"...'
-        # else:
-        #     yield f'There is no element to update for app "{name}".'
-        update_spec = {key: update_apps[name].get(key, None) for key in update_key_store}
-        update_spec['name'] = name
-        update_specs.append(update_spec) 
-
-    API.project.update(project_key, project, update_specs)
-    yield 'Done.'
+            update_spec = {key: update_apps[name].get(key, None) for key in update_key_store}
+            update_spec['name'] = name
+            update_specs.append(update_spec) 
+    
+    if len(update_specs) > 0:
+        res = API.project.update(project_key, project, update_specs)
+        yield 'Done.'
+    else:
+        yield 'No changes to update.'

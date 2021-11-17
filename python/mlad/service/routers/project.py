@@ -169,6 +169,6 @@ def update_project(project_key: str, req: project.UpdateRequest):
         network = ctlr.get_project_network(project_key=project_key)
         ctlr.update_project_network(network, update_yaml)
         res = ctlr.update_services(network, services)
-        return res
+        return [ctlr.inspect_service(_) for _ in res]
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
