@@ -75,7 +75,6 @@ def write_completion(shell='bash'):
             f.write(f". {COMPLETION_FILE}")
 
 
-#@lru_cache(maxsize=None)
 def check_podname_syntax(obj):
     if isinstance(obj, dict):
         for _ in obj.keys():
@@ -191,16 +190,16 @@ def parse_url(url):
     except Exception:
         raise InvalidURLError
     return {
-        'scheme':   parsed_url.scheme or 'http',
+        'scheme': parsed_url.scheme or 'http',
         'username': parsed_url.username,
         'password': parsed_url.password,
         'hostname': parsed_url.hostname,
-        'port':     parsed_url.port or (443 if parsed_url.scheme == 'https' else 80),
-        'path':     parsed_url.path,
-        'query':    parsed_url.query,
-        'params':   parsed_url.params,
-        'url':      url if parsed_url.scheme else f"http://{url}",
-        'address':  url.replace(f"{parsed_url.scheme}://","") if parsed_url.scheme else url
+        'port': parsed_url.port or (443 if parsed_url.scheme == 'https' else 80),
+        'path': parsed_url.path,
+        'query': parsed_url.query,
+        'params': parsed_url.params,
+        'url': url if parsed_url.scheme else f"http://{url}",
+        'address': url.replace(f"{parsed_url.scheme}://", "") if parsed_url.scheme else url
     }
 
 
@@ -227,8 +226,11 @@ def color_table():
     table = []
     for bg in range(40, 48):
         for fg in range(30, 38):
-            if fg % 10 == 1: continue # Remove Red Foreground
-            if fg % 10 == bg % 10: continue
+            if fg % 10 == 1:
+                # Remove Red Foreground
+                continue
+            if fg % 10 == bg % 10:
+                continue
             color = ';'.join(['1', str(fg), str(bg)])
             table.append(f'\x1b[{color}m')
     return table
@@ -236,7 +238,8 @@ def color_table():
 
 def color_index():
     global _color_counter
-    if not hasattr(sys.modules[__name__], '_color_counter'): _color_counter = itertools.count()
+    if not hasattr(sys.modules[__name__], '_color_counter'):
+        _color_counter = itertools.count()
     return next(_color_counter) % len(color_table())
 
 
@@ -253,7 +256,7 @@ def match(filepath, ignores):
         patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")]
                                 if '**/' in pattern else [])
         result = map(lambda _: fnmatch.fnmatch(normpath, _) or
-                               fnmatch.fnmatch(normpath, os.path.normpath(f"{_}/*")), patterns)
+                     fnmatch.fnmatch(normpath, os.path.normpath(f"{_}/*")), patterns)
         return sum(result) > 0
     for ignore in ignores:
         if ignore.startswith('#'):

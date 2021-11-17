@@ -924,7 +924,7 @@ def remove_services(services, disconnHandler=None, timeout=0xFFFF, stream=False,
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    network_api = client.NetworkingV1beta1Api(cli)
+    network_api = client.NetworkingV1Api(cli)
 
     def _get_service_info(service):
         inspect = inspect_service(service, cli)
@@ -1241,7 +1241,7 @@ def get_project_logs(project_key, tail='all', follow=False, timestamps=False,
 
 
 def create_ingress(cli, namespace, service_name, ingress_name, port, base_path='/', rewrite=False):
-    api = client.NetworkingV1beta1Api(cli)
+    api = client.NetworkingV1Api(cli)
     annotations = {
         "kubernetes.io/ingress.class": "nginx",
         "nginx.ingress.kubernetes.io/proxy-body-size": "0",
@@ -1252,21 +1252,26 @@ def create_ingress(cli, namespace, service_name, ingress_name, port, base_path='
         annotations.update({
             "nginx.ingress.kubernetes.io/rewrite-target": "/$2"
         })
-
-    body = client.NetworkingV1beta1Ingress(
-        api_version="networking.k8s.io/v1beta1",
+    body = client.V1Ingress(
+        api_version="networking.k8s.io/v1",
         kind="Ingress",
         metadata=client.V1ObjectMeta(name=ingress_name, annotations=annotations,
                                      labels={'MLAD.PROJECT.SERVICE':service_name}),
-        spec=client.NetworkingV1beta1IngressSpec(
-            rules=[client.NetworkingV1beta1IngressRule(
-                #host="example.com",
-                http=client.NetworkingV1beta1HTTPIngressRuleValue(
-                    paths=[client.NetworkingV1beta1HTTPIngressPath(
-                        path=f"{base_path}(/|$)(.*)" if rewrite else base_path,
-                        backend=client.NetworkingV1beta1IngressBackend(
-                            service_port=port,
-                            service_name=service_name)
+        spec=client.V1IngressSpec(
+            rules=[
+                client.V1IngressRule(
+                    http=client.V1HTTPIngressRuleValue(
+                        paths=[client.V1HTTPIngressPath(
+                            path=f"{base_path}(/|$)(.*)" if rewrite else base_path,
+                            path_type='ImplementationSpecific',
+                            backend=client.V1IngressBackend(
+                                service=client.V1IngressServiceBackend(
+                                    name=service_name,
+                                    port=client.V1ServiceBackendPort(
+                                        number=port
+                                    )
+                                )
+                            )
                         )]
                     )
                 )
@@ -1446,7 +1451,7 @@ if __name__ == '__main__':
     #if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
 
     project = {'name': 'test_project', 'author': 'onetop21', 'version': 'v0.0.1'}
-    labels = utils.base_labels("onetop21-linux@/home/onetop21/workspace/MLAppDeploy/example", 'onetop21', project, '172.20.41.118:5000')
+    labels = utils.base_labels("onetop21-linux@/home/onetop21/workspace/MLAppDeploy/example", 'onetop21', project, 'http://harbor.sailio.ncsoft.com', '172.20.41.118:5000')
     try:
         v1.create_namespaced_config_map(
             'hello-cluster', 

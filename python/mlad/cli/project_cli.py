@@ -15,6 +15,7 @@ from . import echo_exception
 @click.option('--name', '-n', help='Project name')
 @click.option('--version', '-v', default='0.0.1', help='Project version')
 @click.option('--maintainer', '-m', default=getpass.getuser(), help='Project maintainer')
+@echo_exception
 def init(name: str, version: str, maintainer: str):
     '''Initialize MLAppDeploy project'''
     project.init(name, version, maintainer)
@@ -22,6 +23,7 @@ def init(name: str, version: str, maintainer: str):
 
 @click.command()
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
+@echo_exception
 def ls(no_trunc: bool):
     '''Show projects deployed on cluster'''
     project.list(no_trunc)
@@ -37,6 +39,7 @@ def ls(no_trunc: bool):
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
 @click.option('--all', '-a', is_flag=True, help='Show included shutdown service')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
+@echo_exception
 def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool):
     '''Show project status deployed on cluster'''
     project.status(file, project_key, all, no_trunc)

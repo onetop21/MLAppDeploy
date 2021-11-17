@@ -196,6 +196,13 @@ def ls():
     utils.print_table(table, 'There are no contexts.', 0)
 
 
+def current():
+    config = _load()
+    if config['current-context'] is None:
+        raise ContextNotFoundError('Any Contexts')
+    return config['current-context']
+
+
 def _parse_datastore(kind: str, initializer: Callable[[], StrDict],
                      finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> omegaconf.Container:
     config = initializer()

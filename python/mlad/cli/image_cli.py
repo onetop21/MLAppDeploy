@@ -13,7 +13,6 @@ from . import echo_exception
 # mlad image build {From Project}
 
 
-
 @click.command()
 @click.option('--all', '-a', is_flag=True, help='Show all MLAD related images')
 @click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10")')
@@ -34,7 +33,8 @@ def ls(all, tail):
 @echo_exception
 def build(file, quiet, no_cache, pull):
     '''Build MLAppDeploy project or plguin'''
-    image.build(file, quiet, no_cache, pull)
+    for line in image.build(file, quiet, no_cache, pull):
+        click.echo(line)
     click.echo('Done.')
 
 
@@ -58,7 +58,7 @@ def prune(all):
 
 
 @click.group('image')
-def cli(file):
+def cli():
     '''Manage Docker Image'''
     pass
 

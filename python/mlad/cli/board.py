@@ -104,9 +104,7 @@ def install(file_path: str, no_build: bool) -> None:
             raise ComponentImageNotExistError
         image = built_images[0]
     else:
-        if file_path is not None:
-            os.environ['MLAD_PRJFILE'] = file_path
-        image = image_core.build(False, True, False)
+        image = image_core.build(file_path, False, True, False)
 
     host_ip = _obtain_host()
     component_specs = []
