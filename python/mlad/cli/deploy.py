@@ -138,6 +138,10 @@ def update(project_key: str, file: Optional[str]):
     cur_apps = cur_project_yaml['app']
     update_apps = project['app']
 
+    def _validate(key: str):
+        if key not in update_key_store:
+            raise InvalidUpdateOptionError(key)
+
     # Get diff from project yaml
     diff_schema = {}
     for name, value in cur_apps.items():
@@ -150,27 +154,22 @@ def update(project_key: str, file: Optional[str]):
 
             if diff_type == 'change':
                 diff_schema[name][key] = update[key]
-                if key not in update_key_store:
-                    raise InvalidUpdateOptionError(key)
+                _validate(key)
             elif diff_type == 'add':
                 if key:
-                    if key not in update_key_store:
-                        raise InvalidUpdateOptionError(key)
+                    _validate(key)
                     diff_schema[name][key] = update[key]
                 else:
                     for key, value in value:
-                        if key not in update_key_store:
-                            raise InvalidUpdateOptionError(key)
+                        _validate(key)
                         diff_schema[name][key] = update[key]
             elif diff_type == 'remove':
                 if key:
-                    if key not in update_key_store:
-                        raise InvalidUpdateOptionError(key)
+                    _validate(key)
                     diff_schema[name][key] = update[key]
                 else:
                     for key, value in value:
-                        if key not in update_key_store:
-                            raise InvalidUpdateOptionError(key)
+                        _validate(key)
                         diff_schema[name][key] = None
 
     # Update services
