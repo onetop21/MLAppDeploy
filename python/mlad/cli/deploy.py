@@ -147,33 +147,40 @@ def update(project_key: str, file: Optional[str]):
     diff_keys = {}
     for name, app in cur_apps.items():
         update_app = update_apps[name]
-        update_spec = {key: update_app.get(key, None) for key in update_key_store}
+
+        env = {
+            'current': app['env'] if 'env' in app else {},
+            'update':  update_app['env'] if 'env' in update_app else {}
+        }
+
+        update_spec = {key: (env if key == 'env' else update_app.get(key, None)) 
+                       for key in update_key_store}
         update_spec['name'] = name
 
-        diff_keys[name] = []
+        diff_keys[name] = set()
         diffs = list(diff(app, update_app))
         for diff_type, key, value in diffs:
             key = key.split('.')[0]
 
             if diff_type == 'change':
                 _validate(key)
-                diff_keys[name].append(key)
+                diff_keys[name].add(key)
             else:
                 if key != '':
                     _validate(key)
-                    diff_keys[name].append(key)
+                    diff_keys[name].add(key)
                 else:
                     for key, value in value:
                         _validate(key)
-                        diff_keys[name].append(key)
-                        
+                        diff_keys[name].add(key)
+
         if len(diff_keys[name]) > 0:
             update_specs.append(update_spec)
 
     for name, keys in diff_keys.items():
         if len(keys) > 0:
-            yield f'Update {keys} for app "{name}"...'
-    
+            yield f'Update {list(keys)} for app "{name}"...'
+
     if len(update_specs) > 0:
         res = API.project.update(project_key, project, update_specs)
         yield 'Done.'

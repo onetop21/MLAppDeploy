@@ -861,7 +861,6 @@ def update_services(network, services, cli=DEFAULT_CLI):
     for service in services:
         service = service.dict()
         service_name = service['name']
-        deployment = _get_deployment(cli, service_name, namespace)
 
         scale = service['scale']
         command = service['command'] or []
@@ -869,7 +868,7 @@ def update_services(network, services, cli=DEFAULT_CLI):
         quota = service['quota'] or {}
 
         # parse
-        resources = _resources_to_V1Resource(resources=quota)
+        resources = _resources_to_V1Resource(resources=quota).to_dict()
 
         if isinstance(command, str):
             command = command.split()
@@ -877,25 +876,38 @@ def update_services(network, services, cli=DEFAULT_CLI):
             args = args.split()
         command += args
         
-        # update
-        deployment.spec.replicas = scale
+        def _body(option: str, value: str, spec: str = "container"):
+            if spec == "container":
+                path = f"/spec/template/spec/containers/0/{option}"
+                return {"op": "replace", "path": path, "value": value}
+            elif spec == "deployment":
+                path = f"/spec/{option}"
+                return {"op": "replace", "path": path, "value": value}
 
-        container_spec = deployment.spec.template.spec.containers[0]
-        container_spec.command = command
-        container_spec.resources = resources
+        # update
+        body = []
+        body.append(_body("replicas", scale, "deployment"))
+        body.append(_body("command", command))
+
+        for resource in resources:
+            body.append(_body(f"resources/{resource}", resources[resource]))
 
         if service['image'] is not None:
-            container_spec.image = service['image']
+            body.append(_body("image", service['image']))
 
-        if service['env'] is not None:
-            current = {env.name : env.value for env in container_spec.env}
-            current.update(service['env'])
-            env = [client.V1EnvVar(name=k, value=v) for k, v in current.items()]
-            container_spec.env = env
+        # update env
+        deployment = _get_deployment(cli, service_name, namespace)
+        container_spec = deployment.spec.template.spec.containers[0]
+        current = {env.name : env.value for env in container_spec.env}
+        for key in list(service['env']['current'].keys()):
+            current.pop(key)
+        current.update(service['env']['update'])
+        env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
+        body.append(_body("env", env))
 
         try:
             deployment.metadata.annotations['kubernetes.io/change-cause'] = f'MLAD:{service}'
-            res = api.patch_namespaced_deployment(service_name, namespace, deployment)
+            res = api.patch_namespaced_deployment(service_name, namespace, body=body)
             instances.append(res)
         except ApiException as e:
             msg, status = exceptions.handle_k8s_api_error(e)

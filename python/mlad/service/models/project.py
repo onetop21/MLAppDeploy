@@ -11,13 +11,18 @@ class CreateRequest(BaseModel):
     credential: str
 
 
+class EnvUpdateSpec(BaseModel):
+    current: dict
+    update: dict
+
+
 class ServiceUpdateSpec(BaseModel):
     name: str
     image: str = None
     command: Union[list, str] = None
     args: Union[list, str] = None
     scale: int = 1
-    env: dict = None
+    env: EnvUpdateSpec = None
     quota: Quota = None
 
 
