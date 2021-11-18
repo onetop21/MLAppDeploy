@@ -148,7 +148,7 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
         'image': config_labels['MLAD.PROJECT.IMAGE'],
         'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
         'created': int(time.mktime(created.timetuple())),
-        'project_yaml': network.metadata.annotations.get('MLAD.PROJECT.YAML', None)
+        'project_yaml': network.metadata.annotations.get('MLAD.PROJECT.YAML', '{}')
     }
 
 
