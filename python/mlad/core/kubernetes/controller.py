@@ -25,6 +25,7 @@ def get_api_client(config_file='~/.kube/config', context=None):
         if context:
             return config.new_client_from_config(context=context)
         else:
+
             return config.new_client_from_config(config_file=config_file)
     except config.config_exception.ConfigException:
         pass
@@ -131,6 +132,7 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
     created = network.metadata.creation_timestamp
     config_labels = get_config_labels(network, 'project-labels', cli)
     hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
+
     return {
         'key': labels['MLAD.PROJECT'],
         'workspace': {
@@ -145,7 +147,8 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
         'base': config_labels['MLAD.PROJECT.BASE'],
         'image': config_labels['MLAD.PROJECT.IMAGE'],
         'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
-        'created': int(time.mktime(created.timetuple()))
+        'created': int(time.mktime(created.timetuple())),
+        'project_yaml': network.metadata.annotations.get('MLAD.PROJECT.YAML', '{}')
     }
 
 
@@ -156,7 +159,7 @@ def get_project_session(network, cli=DEFAULT_CLI):
     return config_labels['MLAD.PROJECT.SESSION']
 
 
-def create_project_network(base_labels, extra_envs, credential, allow_reuse=False, stream=False,
+def create_project_network(base_labels, extra_envs, project_yaml, credential, allow_reuse=False, stream=False,
                            cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
@@ -191,11 +194,15 @@ def create_project_network(base_labels, extra_envs, credential, allow_reuse=Fals
                 'MLAD.PROJECT.NAME': labels['MLAD.PROJECT.NAME'],
                 #'MLAD.PROJECT.TYPE': labels['MLAD.PROJECT.TYPE'],
             }
+            annotations = {
+                'MLAD.PROJECT.YAML': json.dumps(project_yaml) if project_yaml else None
+            }
             api.create_namespace(
                 client.V1Namespace(
                     metadata=client.V1ObjectMeta(
                         name=network_name,
-                        labels=keys
+                        labels=keys,
+                        annotations=annotations
                     )
                 )
             )
@@ -249,6 +256,24 @@ def remove_project_network(network, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
         return resp_stream()
     else:
         return (not get_project_network(cli, project_key=network_info['key']), (_ for _ in resp_stream()))
+
+
+def update_project_network(network, update_yaml, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace):
+        raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    name = network.metadata.name
+    network.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
+    try:
+        res = api.patch_namespace(name, network)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find network {name}.')
+        else:
+            raise exceptions.APIError(msg, status)
 
 
 # Manage services and tasks
@@ -820,6 +845,73 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
         except ApiException as e:
             msg, status = exceptions.handle_k8s_api_error(e)
             err_msg = f'Failed to create services: {msg}'
+            raise exceptions.APIError(err_msg, status)
+    return instances
+
+
+def update_services(network, services, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient): 
+        raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace): 
+        raise TypeError('Parameter is not valid type.')
+    api = client.AppsV1Api(cli)
+    namespace = network.metadata.name
+
+    instances = []
+    for service in services:
+        service = service.dict()
+        service_name = service['name']
+
+        scale = service['scale']
+        command = service['command'] or []
+        args = service['args'] or []
+        quota = service['quota'] or {}
+
+        # parse
+        resources = _resources_to_V1Resource(resources=quota).to_dict()
+
+        if isinstance(command, str):
+            command = command.split()
+        if isinstance(args, str):
+            args = args.split()
+        command += args
+        
+        def _body(option: str, value: str, spec: str = "container"):
+            if spec == "container":
+                path = f"/spec/template/spec/containers/0/{option}"
+                return {"op": "replace", "path": path, "value": value}
+            elif spec == "deployment":
+                path = f"/spec/{option}"
+                return {"op": "replace", "path": path, "value": value}
+
+        # update
+        body = []
+        body.append(_body("replicas", scale, "deployment"))
+        body.append(_body("command", command))
+
+        for resource in resources:
+            body.append(_body(f"resources/{resource}", resources[resource]))
+
+        if service['image'] is not None:
+            body.append(_body("image", service['image']))
+
+        # update env
+        deployment = _get_deployment(cli, service_name, namespace)
+        container_spec = deployment.spec.template.spec.containers[0]
+        current = {env.name : env.value for env in container_spec.env}
+        for key in list(service['env']['current'].keys()):
+            current.pop(key)
+        current.update(service['env']['update'])
+        env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
+        body.append(_body("env", env))
+
+        try:
+            deployment.metadata.annotations['kubernetes.io/change-cause'] = f'MLAD:{service}'
+            res = api.patch_namespaced_deployment(service_name, namespace, body=body)
+            instances.append(res)
+        except ApiException as e:
+            msg, status = exceptions.handle_k8s_api_error(e)
+            err_msg = f'Failed to update services: {msg}'
             raise exceptions.APIError(err_msg, status)
     return instances
 

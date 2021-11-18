@@ -39,7 +39,7 @@ def main():
         'PyJWT>=2.1.0,<3.0.0',
         'Cerberus>=1.3.0,<1.4.0',
         'cerberus-kind==0.0.4',
-        'shortuuid>=1.0.1,<1.1.0'
+        'dictdiffer==0.9.0'
       ],
       entry_points='''
         [console_scripts]

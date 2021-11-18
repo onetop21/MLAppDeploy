@@ -1,13 +1,16 @@
 import sys
+import json
 
 from typing import Optional, List, Tuple
+
+from dictdiffer import diff
 
 from mlad.cli import config as config_core
 from mlad.cli import train
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ImageNotFoundError, InvalidProjectKindError
+    ImageNotFoundError, InvalidProjectKindError, InvalidUpdateOptionError
 )
 
 from mlad.core.docker import controller2 as docker_ctlr
@@ -28,6 +31,7 @@ def serve(file: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
+    workspace = utils.get_workspace()
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
         config.session,
@@ -49,7 +53,7 @@ def serve(file: Optional[str]):
     yield 'Deploy applications to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, extra_envs, credential=credential, allow_reuse=False)
+    lines = API.project.create(base_labels, extra_envs, project_yaml=project, credential=credential, allow_reuse=False)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])
@@ -113,3 +117,72 @@ def ingress():
             path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
             rows.append((username, project_name, app_name, key, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
+
+
+def update(project_key: str, file: Optional[str]):
+
+    project = API.project.inspect(project_key=project_key)
+    cur_project_yaml = json.loads(project['project_yaml'])
+
+    utils.process_file(file)
+    config = config_core.get()
+    project = utils.get_project(default_project)
+    project = validators.validate(project)
+
+    kind = project['kind']
+    if not kind == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'deploy')
+
+    update_key_store = ['image', 'command', 'args', 'scale', 'env', 'quota']
+
+    cur_apps = cur_project_yaml['app']
+    update_apps = project['app']
+
+    def _validate(key: str):
+        if key not in update_key_store:
+            raise InvalidUpdateOptionError(key)
+
+    # Get diff from project yaml
+    update_specs = []
+    diff_keys = {}
+    for name, app in cur_apps.items():
+        update_app = update_apps[name]
+
+        env = {
+            'current': app['env'] if 'env' in app else {},
+            'update':  update_app['env'] if 'env' in update_app else {}
+        }
+
+        update_spec = {key: (env if key == 'env' else update_app.get(key, None)) 
+                       for key in update_key_store}
+        update_spec['name'] = name
+
+        diff_keys[name] = set()
+        diffs = list(diff(app, update_app))
+        for diff_type, key, value in diffs:
+            key = key.split('.')[0]
+
+            if diff_type == 'change':
+                _validate(key)
+                diff_keys[name].add(key)
+            else:
+                if key != '':
+                    _validate(key)
+                    diff_keys[name].add(key)
+                else:
+                    for key, value in value:
+                        _validate(key)
+                        diff_keys[name].add(key)
+
+        if len(diff_keys[name]) > 0:
+            update_specs.append(update_spec)
+
+    for name, keys in diff_keys.items():
+        if len(keys) > 0:
+            yield f'Update {list(keys)} for app "{name}"...'
+
+    if len(update_specs) > 0:
+        res = API.project.update(project_key, project, update_specs)
+        yield 'Done.'
+    else:
+        yield 'No changes to update.'

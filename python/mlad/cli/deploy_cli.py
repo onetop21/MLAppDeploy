@@ -25,6 +25,21 @@ def serve(file: Optional[str]):
 
 @click.command()
 @click.argument('project-key', required=True)
+@click.option('--file', '-f', default=None, help=(
+    'Specify an project file to be used for update.\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
+)
+@echo_exception
+def update(project_key: str, file: Optional[str]):
+    '''Update deployed service with updated project file.\n
+    Valid options for update : [image, command, args, scale, env, quota]'''
+
+    for line in deploy.update(project_key, file):
+        click.echo(line)
+
+
+@click.command()
+@click.argument('project-key', required=True)
 @click.option('--no-dump', is_flag=True,
               help='Save the log before shutting down the services')
 @echo_exception
@@ -65,6 +80,7 @@ def cli():
 
 
 cli.add_command(serve)
+cli.add_command(update)
 cli.add_command(kill)
 cli.add_command(scale)
 cli.add_command(ingress)

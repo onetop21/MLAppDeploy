@@ -81,6 +81,15 @@ class CannotBuildComponentError(Exception):
         return 'The component spec does not have `workspace` property to build an image.'
 
 
+class ImageNotFoundError(Exception):
+
+    def __init__(self, project_key: str):
+        self.project_key = project_key
+
+    def __str__(self):
+        return f'Cannot find built image of the project [{self._name}].'
+
+
 class ProjectAlreadyExistError(Exception):
 
     def __init__(self, project_key: str):
@@ -98,3 +107,12 @@ class InvalidProjectKindError(Exception):
 
     def __str__(self):
         return f'Only kind "{self.kind}" is valid for "{self.command}" command.'
+
+
+class InvalidUpdateOptionError(Exception):
+
+    def __init__(self, key: str):
+        self.key = key
+
+    def __str__(self):
+        return f'"{self.key}" cannot be updated. Check the schema for update.'
