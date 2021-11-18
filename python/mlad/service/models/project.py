@@ -1,4 +1,4 @@
-from typing import Any, List, Union, Optional
+from typing import List, Union, Optional
 from pydantic import BaseModel
 
 from mlad.service.models.service import Quota
