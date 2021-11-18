@@ -143,38 +143,36 @@ def update(project_key: str, file: Optional[str]):
             raise InvalidUpdateOptionError(key)
 
     # Get diff from project yaml
-    diff_schema = {}
-    for name, value in cur_apps.items():
-        diff_schema[name] = {}
-        update = update_apps[name]
+    update_specs = []
+    diff_keys = {}
+    for name, app in cur_apps.items():
+        update_app = update_apps[name]
+        update_spec = {key: update_app.get(key, None) for key in update_key_store}
+        update_spec['name'] = name
 
-        diffs = list(diff(value, update))
+        diff_keys[name] = []
+        diffs = list(diff(app, update_app))
         for diff_type, key, value in diffs:
             key = key.split('.')[0]
 
             if diff_type == 'change':
-                diff_schema[name][key] = update[key]
                 _validate(key)
+                diff_keys[name].append(key)
             else:
-                if key:
+                if key != '':
                     _validate(key)
-                    diff_schema[name][key] = update[key]
+                    diff_keys[name].append(key)
                 else:
                     for key, value in value:
                         _validate(key)
-                        if diff_type == 'add':
-                            diff_schema[name][key] = update[key]
-                        elif diff_type == 'remove':
-                            diff_schema[name][key] = None
+                        diff_keys[name].append(key)
+                        
+        if len(diff_keys[name]) > 0:
+            update_specs.append(update_spec)
 
-    # Update services
-    update_specs = []
-    for name, value in diff_schema.items():
-        if len(value) > 0 :
-            yield f'Update {[_ for _ in value]} for app "{name}"...'
-            update_spec = {key: update_apps[name].get(key, None) for key in update_key_store}
-            update_spec['name'] = name
-            update_specs.append(update_spec) 
+    for name, keys in diff_keys.items():
+        if len(keys) > 0:
+            yield f'Update {keys} for app "{name}"...'
     
     if len(update_specs) > 0:
         res = API.project.update(project_key, project, update_specs)

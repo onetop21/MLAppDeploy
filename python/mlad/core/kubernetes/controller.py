@@ -27,14 +27,14 @@ def get_api_client(config_file='~/.kube/config', context=None):
         else:
 
             return config.new_client_from_config(config_file=config_file)
-    except config.config_exception.ConfigException as e:
+    except config.config_exception.ConfigException:
         pass
     try:
         from kubernetes.client.api_client import ApiClient
         config.load_incluster_config()
         # If Need, set configuration parameter from client.Configuration
         return ApiClient()
-    except config.config_exception.ConfigException as e:
+    except config.config_exception.ConfigException:
         return None
 
 
@@ -850,8 +850,10 @@ def create_services(network, services, extra_labels={}, cli=DEFAULT_CLI):
 
 
 def update_services(network, services, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient): raise TypeError('Parameter is not valid type.')
-    if not isinstance(network, client.models.v1_namespace.V1Namespace): raise TypeError('Parameter is not valid type.')
+    if not isinstance(cli, client.api_client.ApiClient): 
+        raise TypeError('Parameter is not valid type.')
+    if not isinstance(network, client.models.v1_namespace.V1Namespace): 
+        raise TypeError('Parameter is not valid type.')
     api = client.AppsV1Api(cli)
     namespace = network.metadata.name
 
