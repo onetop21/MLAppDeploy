@@ -84,10 +84,10 @@ def serve(file: Optional[str]):
     yield utils.print_info(f'Project key : {project_key}')
 
     # Get ingress path for deployed service
-    address = config['apiserver']['address'].rsplit(':', 1)[0]
+    address = config['apiserver']['address'].rsplit('/beta')[0]
     for service in res:
         if service['ingress']:
-            path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
+            path = f'{address}{service["ingress"]}'
             yield utils.print_info(f'[{service["name"]}] Ingress Path : {path}')
 
 
@@ -101,7 +101,7 @@ def scale(scales: List[Tuple[str, int]], project_key: str):
 
 def ingress():
     config = config_core.get()
-    address = config['apiserver']['address'].rsplit(':', 1)[0]
+    address = config['apiserver']['address'].rsplit('/beta')[0]
     services = API.service.get()['inspects']
     rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
     for service in services:
@@ -110,6 +110,6 @@ def ingress():
             project_name = service['project']
             app_name = service['name']
             key = service['key']
-            path = f'{address}:{service["ingress_port"]}{service["ingress"]}'
+            path = f'{address}{service["ingress"]}'
             rows.append((username, project_name, app_name, key, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
