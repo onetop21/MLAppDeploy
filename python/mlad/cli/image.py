@@ -12,7 +12,7 @@ from mlad.cli.Format import (
     DOCKERFILE_REQ_ADD, DOCKERFILE_REQ_RUN, DOCKERFILE_REQ_APK, DOCKERFILE_REQ_YUM
 )
 
-from mlad.core.docker import controller2 as ctlr
+from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
 from mlad.core.default import project as default_project
 
