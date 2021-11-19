@@ -14,10 +14,10 @@ class InterruptHandler(object):
         self.original_handler = signal.getsignal(self.sig)
 
         def handler(signum, frame):
-            print(self.message, file=sys.stderr)
             if not self.blocked:
                 self.release(True)
             self.interrupted = True
+            print(self.message, file=sys.stderr)
         signal.signal(self.sig, handler)
         return self
 
