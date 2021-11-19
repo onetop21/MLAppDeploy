@@ -31,7 +31,6 @@ def serve(file: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
-    workspace = utils.get_workspace()
     base_labels = core_utils.base_labels(
         utils.get_workspace(),
         config.session,
@@ -79,10 +78,14 @@ def serve(file: Optional[str]):
         services.append(value)
 
     yield 'Start services...'
-    with interrupt_handler(message='Wait...', blocked=True) as h:
-        res = API.service.create(project_key, services)
-        if h.interrupted:
-            pass
+    try:
+        with interrupt_handler(message='Wait...', blocked=True) as h:
+            res = API.service.create(project_key, services)
+            if h.interrupted:
+                pass
+    except Exception as e:
+        next(API.project.delete(project_key))
+        raise e
 
     yield 'Done.'
     yield utils.print_info(f'Project key : {project_key}')
@@ -125,7 +128,6 @@ def update(project_key: str, file: Optional[str]):
     cur_project_yaml = json.loads(project['project_yaml'])
 
     utils.process_file(file)
-    config = config_core.get()
     project = utils.get_project(default_project)
     project = validators.validate(project)
 
@@ -150,7 +152,7 @@ def update(project_key: str, file: Optional[str]):
 
         env = {
             'current': app['env'] if 'env' in app else {},
-            'update':  update_app['env'] if 'env' in update_app else {}
+            'update': update_app['env'] if 'env' in update_app else {}
         }
 
         update_spec = {key: (env if key == 'env' else update_app.get(key, None)) 
@@ -182,7 +184,7 @@ def update(project_key: str, file: Optional[str]):
             yield f'Update {list(keys)} for app "{name}"...'
 
     if len(update_specs) > 0:
-        res = API.project.update(project_key, project, update_specs)
+        API.project.update(project_key, project, update_specs)
         yield 'Done.'
     else:
         yield 'No changes to update.'

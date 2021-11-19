@@ -73,11 +73,14 @@ def up(file: Optional[str]):
         services.append(value)
 
     yield 'Start services...'
-    with interrupt_handler(message='Wait...', blocked=True) as h:
-        API.service.create(project_key, services)
-        if h.interrupted:
-            pass
-
+    try:
+        with interrupt_handler(message='Wait...', blocked=True) as h:
+            API.service.create(project_key, services)
+            if h.interrupted:
+                pass
+    except Exception as e:
+        next(API.project.delete(project_key))
+        raise e
     yield 'Done.'
 
 
