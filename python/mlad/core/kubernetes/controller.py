@@ -4,16 +4,13 @@ import time
 import json
 import uuid
 from collections import defaultdict
-import docker
 from mlad.core import exceptions
 from mlad.core.exceptions import NetworkAlreadyExistError, DeprecatedError
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
-from mlad.core.default import project_service as service_default
 from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
-from mlad.core.docker import controller as docker_controller
 
 # https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
 
@@ -47,10 +44,6 @@ def get_current_context():
     except config.config_exception.ConfigException as e:
         raise exceptions.APIError(str(e), 404)
     return current_context['name']
-
-
-def get_auth_headers(cli, image_name=None, auth_configs=None):
-    return docker_controller.get_auth_headers(docker.from_env(), image_name, auth_configs)
 
 
 def get_project_networks(extra_labels=[], cli=DEFAULT_CLI):
@@ -276,11 +269,6 @@ def update_project_network(network, update_yaml, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-# Manage services and tasks
-def get_containers(cli, project_key=None, extra_filters={}):
-    return docker_controller.get_containers(docker.from_env(), project_key, extra_filters)
-
-
 def _get_job(cli, name, namespace):
     api = client.BatchV1Api(cli)
     return api.read_namespaced_job(name, namespace)
@@ -354,10 +342,6 @@ def get_service_from_kind(cli, service_name, namespace, kind):
         return service.items[0]
     else:
         raise exceptions.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
-
-
-def inspect_container(container):
-    return docker_controller.inspect_container(container)
 
 
 def get_pod_info(pod):
@@ -490,10 +474,6 @@ def inspect_service(service, cli=DEFAULT_CLI):
                     'published': published
                 }
     return inspect
-
-
-def create_containers(cli, network, services, extra_labels={}):
-    return docker_controller.create_containers(docker.from_env(), network, services, extra_labels)
 
 
 def _mounts_to_V1Volume(name, mounts):
@@ -906,10 +886,6 @@ def update_services(network, services, cli=DEFAULT_CLI):
     return instances
 
 
-def remove_containers(cli, containers):
-    return docker_controller.remove_containers(docker.from_env(), containers)
-
-
 def _delete_job(cli, name, namespace):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
@@ -994,42 +970,12 @@ def remove_services(services, disconnHandler=None, timeout=0xFFFF, stream=False,
         return (removed, (_ for _ in resp_stream()))
 
 
-# Image Control
-def get_images(cli, project_key=None):
-    return docker_controller.get_images(docker.from_env(), project_key)
-
-
-def get_image(cli, image_id):
-    return docker_controller.get_image(docker.from_env(), image_id)
-
-
-def inspect_image(image):
-    return docker_controller.inspect_image(image)
-
-
-def build_image(cli, base_labels, tar, dockerfile, stream=False):
-    return docker_controller.build_image(docker.from_env(), base_labels, tar, dockerfile, stream)
-
-
-def remove_image(cli, ids, force=False):
-    return docker_controller.remove_image(docker.from_env(), ids, force)
-
-
-def prune_images(cli, project_key=None):
-    return docker_controller.prune_images(docker.from_env(), project_key)
-
-
-def push_images(cli, project_key, stream=False):
-    return docker_controller.push_images(docker.from_env(), project_key, stream)
-
-
 def get_nodes(cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
     api = client.CoreV1Api(cli)
     return {node.metadata.name: node for node in api.list_node().items}
-
 
 
 def inspect_node(node):

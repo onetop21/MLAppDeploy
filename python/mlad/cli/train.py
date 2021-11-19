@@ -14,7 +14,7 @@ from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError
 )
 
-from mlad.core.docker import controller2 as docker_ctlr
+from mlad.core.docker import controller as docker_ctlr
 from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 
