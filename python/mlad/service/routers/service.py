@@ -145,32 +145,6 @@ def service_scale(project_key:str, service_name:str,
     return {'message':f'service {service_name} scale updated'}
 
 
-@router.delete("/project/{project_key}/service/{service_name}")
-def service_remove(project_key: str, service_name: str,
-                   stream: bool = Query(False),
-                   session: str = Header(None)):
-    try:
-        _check_session_key(project_key, session)
-        if _check_project_key(project_key, service):
-            res = ctlr.remove_services([service], stream=stream)
-
-        def remove_service(gen):
-            for _ in gen:
-                yield json.dumps(_)
-
-    except InvalidServiceError as e:
-        raise HTTPException(status_code=404, detail=exception_detail(e))
-    except InvalidSessionError as e:
-        raise HTTPException(status_code=401, detail=exception_detail(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=exception_detail(e))
-    if stream:
-        return StreamingResponse(remove_service(res))
-    else:
-        inspect = ctlr.inspect_service(service)
-        return {'message': f"service {service_name} removed"}
-
-
 @router.delete("/project/{project_key}/service")
 def remove_services(project_key: str, req: service.RemoveRequest,
                     stream: bool = Query(False),
@@ -178,24 +152,27 @@ def remove_services(project_key: str, req: service.RemoveRequest,
     try:
         _check_session_key(project_key, session)
         namespace = ctlr.get_project_network(project_key=project_key).metadata.name
-        services = [ctlr.get_service(name, namespace)
-                    for name in req.services]
-        for service in services:
-            _check_project_key(project_key, service)
+        target_services = [ctlr.get_service(name, namespace)
+                           for name in req.services]
+        for target_service in target_services:
+            _check_project_key(project_key, target_service)
 
-        class disconnectHandler:
+        class DisconnectHandler:
             def __init__(self):
                 self._callbacks = []
+
             def add_callback(self, callback):
                 self._callbacks.append(callback)
+
             async def __call__(self):
                 for cb in self._callbacks:
                     cb()
-        handler = disconnectHandler() if stream else None
 
-        res = ctlr.remove_services(services, handler, stream=stream)
+        handler = DisconnectHandler() if stream else None
+        res = ctlr.remove_services(target_services, namespace,
+                                   disconnect_handler=handler, stream=stream)
 
-        def remove_service(gen):
+        def stringify_response(gen):
             for _ in gen:
                 yield json.dumps(_)
 
@@ -206,6 +183,6 @@ def remove_services(project_key: str, req: service.RemoveRequest,
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
-        return StreamingResponse(remove_service(res), background=handler)
+        return StreamingResponse(stringify_response(res), background=handler)
     else:
         return {'message': "services removed"}

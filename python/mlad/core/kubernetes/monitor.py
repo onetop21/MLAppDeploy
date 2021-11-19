@@ -3,7 +3,8 @@ import socket
 import urllib3
 from threading import Thread
 from multiprocessing import Queue
-from kubernetes import client, config, watch
+from kubernetes import client, watch
+
 
 class DelMonitor(Thread):
     @staticmethod
@@ -14,61 +15,58 @@ class DelMonitor(Thread):
             return resp
         return inner
 
-    def __init__(self,cli, collector, services, namespace, timeout=0xFFFF):
-        Thread.__init__(self)
-        self.daemon=True
+    def __init__(self, cli, collector, service_specs, namespace, timeout=0xFFFF):
+        super().__init__(daemon=True)
         self.__stopped = False
         self.api = client.CoreV1Api(cli)
         self.collector = collector
-        self.service_to_check = services
+        self.service_specs = service_specs
         self.namespace = namespace
         self.timeout = timeout
 
-        self.stream_resp=None
+        self.stream_resp = None
 
     def run(self):
         def assign(x):
             self.stream_resp = x
 
-        all_targets=[]
-        services={}
-        for service in self.service_to_check:
-            name, namespace, _, targets = service
-            services[name] = targets
-            all_targets.extend(targets)
+        target_task_keys = []
+        service_name_to_task_keys = {}
+        for spec in self.service_specs:
+            name, _, task_keys = spec
+            service_name_to_task_keys[name] = task_keys
+            target_task_keys.extend(task_keys)
         w = watch.Watch()
-        service_removed = False
-        msg = "Wait for the services to be removed...\n"
-        self.collector.queue.put({'stream': msg})
+        completed = False
+        self.collector.queue.put({'stream': 'Wait for the services to be removed...'})
         try:
             wrapped_api = DelMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
             for ev in w.stream(wrapped_api, namespace=self.namespace,
                                _request_timeout=self.timeout):
                 event = ev['type']
-                pod = ev['object']['metadata']['name']
-                service = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
+                pod_name = ev['object']['metadata']['name']
+                service_name = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
                 if event == 'DELETED':
-                    if pod in services[service]:
-                        services[service].remove(pod)
-                        if not services[service]:
-                            msg = f'Service \'{service}\' was removed.'
+                    if pod_name in service_name_to_task_keys[service_name]:
+                        service_name_to_task_keys[service_name].remove(pod_name)
+                        if not service_name_to_task_keys[service_name]:
+                            msg = f'Service \'{service_name}\' was removed.'
                             self.collector.queue.put({'result': 'succeed', 'stream': msg})
-                        all_targets.remove(pod)
-                        if not all_targets:
-                            service_removed = True
-                            break
-        except urllib3.exceptions.ReadTimeoutError as e: #for timeout
+                        target_task_keys.remove(pod_name)
+                if not target_task_keys:
+                    completed = True
+                    break
+        except urllib3.exceptions.ReadTimeoutError:
             pass
-        if service_removed:
+        if completed:
             msg = "All Services were removed."
             self.collector.queue.put({'result': 'completed', 'stream': msg})
         else:
-            for svc, target in services.items():
-                if target:
+            for svc, task_keys in service_name_to_task_keys.items():
+                if len(task_keys) > 0:
                     msg = f"Failed to remove service {svc}."
                     self.collector.queue.put({'result': 'failed', 'stream': msg})
         self.collector.queue.put({'result': 'stopped'})
-
 
     def stop(self):
         self.__stopped = True
@@ -86,6 +84,7 @@ class DelMonitor(Thread):
             finally:
                 self.stream_resp = None
 
+
 class Collector:
     def __init__(self, maxbuffer=65535):
         self.queue = Queue(maxsize=maxbuffer)
@@ -97,7 +96,8 @@ class Collector:
         elif 'result' in msg:
             if msg['result'] == 'stopped':
                 raise StopIteration
-            else: return msg
+            else:
+                return msg
 
     def __iter__(self):
         return self
