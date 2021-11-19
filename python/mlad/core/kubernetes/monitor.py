@@ -37,27 +37,28 @@ class DelMonitor(Thread):
             service_name_to_task_keys[name] = task_keys
             target_task_keys.extend(task_keys)
         w = watch.Watch()
-        completed = False
-        self.collector.queue.put({'stream': 'Wait for the services to be removed...'})
-        try:
-            wrapped_api = DelMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
-            for ev in w.stream(wrapped_api, namespace=self.namespace,
-                               _request_timeout=self.timeout):
-                event = ev['type']
-                pod_name = ev['object']['metadata']['name']
-                service_name = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
-                if event == 'DELETED':
-                    if pod_name in service_name_to_task_keys[service_name]:
-                        service_name_to_task_keys[service_name].remove(pod_name)
-                        if not service_name_to_task_keys[service_name]:
-                            msg = f'Service \'{service_name}\' was removed.'
-                            self.collector.queue.put({'result': 'succeed', 'stream': msg})
-                        target_task_keys.remove(pod_name)
-                if not target_task_keys:
-                    completed = True
-                    break
-        except urllib3.exceptions.ReadTimeoutError:
-            pass
+        completed = len(target_task_keys) == 0
+        if not completed:
+            self.collector.queue.put({'stream': 'Wait for the services to be removed...'})
+            try:
+                wrapped_api = DelMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
+                for ev in w.stream(wrapped_api, namespace=self.namespace,
+                                   _request_timeout=self.timeout):
+                    event = ev['type']
+                    pod_name = ev['object']['metadata']['name']
+                    service_name = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
+                    if event == 'DELETED':
+                        if pod_name in service_name_to_task_keys[service_name]:
+                            service_name_to_task_keys[service_name].remove(pod_name)
+                            if not service_name_to_task_keys[service_name]:
+                                msg = f'Service \'{service_name}\' was removed.'
+                                self.collector.queue.put({'result': 'succeed', 'stream': msg})
+                            target_task_keys.remove(pod_name)
+                    if not target_task_keys:
+                        completed = True
+                        break
+            except urllib3.exceptions.ReadTimeoutError:
+                pass
         if completed:
             msg = "All Services were removed."
             self.collector.queue.put({'result': 'completed', 'stream': msg})
