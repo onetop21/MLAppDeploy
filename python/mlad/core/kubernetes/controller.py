@@ -148,7 +148,7 @@ def inspect_project_network(network, cli=DEFAULT_CLI):
         'image': config_labels['MLAD.PROJECT.IMAGE'],
         'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
         'created': int(time.mktime(created.timetuple())),
-        'project_yaml': network.metadata.annotations.get('MLAD.PROJECT.YAML', '{}')
+        'project_yaml': (network.metadata.annotations or dict()).get('MLAD.PROJECT.YAML', '{}')
     }
 
 
@@ -195,7 +195,7 @@ def create_project_network(base_labels, extra_envs, project_yaml, credential, al
                 #'MLAD.PROJECT.TYPE': labels['MLAD.PROJECT.TYPE'],
             }
             annotations = {
-                'MLAD.PROJECT.YAML': json.dumps(project_yaml) if project_yaml else None
+                'MLAD.PROJECT.YAML': json.dumps(project_yaml)
             }
             api.create_namespace(
                 client.V1Namespace(

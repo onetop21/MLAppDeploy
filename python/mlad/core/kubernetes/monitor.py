@@ -59,6 +59,9 @@ class DelMonitor(Thread):
                         break
             except urllib3.exceptions.ReadTimeoutError:
                 pass
+            except urllib3.exceptions.ProtocolError:
+                pass
+
         if completed:
             msg = "All Services were removed."
             self.collector.queue.put({'result': 'completed', 'stream': msg})

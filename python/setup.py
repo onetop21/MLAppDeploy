@@ -26,7 +26,7 @@ def main():
       python_requires='>3.6',
       install_requires=[
         'Click>=7.0,<8.0.0', 
-        'PyYAML>=3.10,<6.0', 
+        'PyYAML>=5.4.1,<6.0', 
         'docker>=4.0.2,<5.0.0',
         'requests>=2.22.0,<3.0.0',
         'requests-unixsocket>=0.2.0',
