@@ -54,7 +54,7 @@ class DelMonitor(Thread):
                                 msg = f'Service \'{service_name}\' was removed.'
                                 self.collector.queue.put({'result': 'succeed', 'stream': msg})
                             target_task_keys.remove(pod_name)
-                    if not target_task_keys:
+                    if len(target_task_keys) == 0:
                         completed = True
                         break
             except urllib3.exceptions.ReadTimeoutError:
