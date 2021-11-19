@@ -26,18 +26,6 @@ class Service(APIBase):
         return self._put(f'/{project_key}/service/{service_id}/scale',
                          body={'scale_spec': scale_spec})
 
-    # remove a service using path parameter
-    def remove_one(self, project_key, service_id, stream=False):
-        path = f'/{project_key}/service/{service_id}'
-        if stream:
-            resp = self._delete(path, params={'stream': stream}, stream=True, raw=True)
-            for _ in resp.iter_content(1024):
-                res = _.decode()
-                dict_res = json.loads(res)
-                yield dict_res
-        else:
-            return self._delete(path, params={'stream': stream})
-
     # remove multiple services using json body
     def remove(self, project_key, services, stream=False):
         path = f'/{project_key}/service'

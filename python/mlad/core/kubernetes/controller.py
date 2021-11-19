@@ -926,74 +926,66 @@ def _delete_deployment(cli, name, namespace):
     return api.delete_namespaced_deployment(name, namespace, propagation_policy='Foreground')
 
 
-def remove_services(services, disconnHandler=None, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
+def remove_services(services, namespace,
+                    disconnect_handler=None, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     network_api = client.NetworkingV1Api(cli)
 
-    def _get_service_info(service):
-        inspect = inspect_service(service, cli)
-        service_name = inspect['name']
-        namespace = service.metadata.namespace
-        targets = list(inspect['tasks'].keys())
+    def _get_service_spec(service):
+        spec = inspect_service(service, cli)
+        service_name = spec['name']
+        task_keys = list(spec['tasks'].keys())
 
         config_labels = get_config_labels(namespace, f'service-{service_name}-labels', cli)
         kind = config_labels['MLAD.PROJECT.SERVICE.KIND']
-        return service_name, namespace, kind, targets
+        return service_name, kind, task_keys
 
-    service_to_check = []
-    for service in services:
-        service_name, namespace, kind, _ = _get_service_info(service)
-        service_to_check.append((service_name, namespace, kind, _))
-
+    service_specs = [_get_service_spec(service) for service in services]
     # For check service deleted
     collector = Collector()
-    monitor = DelMonitor(cli, collector, service_to_check, namespace)
+    monitor = DelMonitor(cli, collector, service_specs, namespace)
     monitor.start()
 
-    if disconnHandler:
-        disconnHandler.add_callback(lambda: monitor.stop())
+    if disconnect_handler is not None:
+        disconnect_handler.add_callback(lambda: monitor.stop())
 
-    for service in service_to_check:
-        service_name, namespace, kind, _ = service
-        #print(f"Stop {service_name}...")
+    for spec in service_specs:
+        service_name, kind, _ = spec
         try:
             if kind == 'Job':
-                ret = _delete_job(cli, service_name, namespace)
+                _delete_job(cli, service_name, namespace)
             elif kind == 'Service':
-                ret = _delete_deployment(cli, service_name, namespace)
+                _delete_deployment(cli, service_name, namespace)
 
             if get_deployed_service(cli, namespace, service_name):
                 api.delete_namespaced_service(service_name, namespace)
 
-            ingress = network_api.list_namespaced_ingress(
+            ingress_list = network_api.list_namespaced_ingress(
                 namespace, label_selector=f'MLAD.PROJECT.SERVICE={service_name}').items
-            if len(ingress) > 0:
-                ingress_name = ingress[0].metadata.name
-                ingress_ret = network_api.delete_namespaced_ingress(ingress_name, namespace)
+            if len(ingress_list) > 0:
+                ingress_name = ingress_list[0].metadata.name
+                network_api.delete_namespaced_ingress(ingress_name, namespace)
         except ApiException as e:
             print("Exception when calling ExtensionsV1beta1Api->delete_namespaced_ingress: %s\n" % e)
 
     def resp_from_collector(collector):
         for _ in collector:
-            yield  _
+            yield _
 
     if stream:
         return resp_from_collector(collector)
     else:
-        #TBD
         removed = False
         for service in services:
             service_removed = False
-            name, namespace, kind = _get_service_info(service)
+            name, kind, _ = _get_service_spec(service)
             if not get_service_from_kind(cli, name, namespace, kind) and \
                     not get_service(name, namespace, cli):
                 service_removed = True
             else:
                 service_removed = False
                 removed &= service_removed
-        return (removed, (_ for _ in resp_stream()))
+        return (removed, (_ for _ in resp_from_collector(collector)))
 
 
 # Image Control
