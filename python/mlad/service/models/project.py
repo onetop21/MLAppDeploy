@@ -7,7 +7,7 @@ from mlad.service.models.service import Quota
 class CreateRequest(BaseModel):
     base_labels: dict
     extra_envs: list
-    project_yaml: Optional[dict] = None
+    project_yaml: dict
     credential: str
 
 
