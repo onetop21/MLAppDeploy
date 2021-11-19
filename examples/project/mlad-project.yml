@@ -1,6 +1,7 @@
 # MLAppDeploy Project v0.3
 apiVersion: v1                     # Describe api version. (*v1)
 maintainer: root                   # Describe maintainer. (*env.USER)
+kind: Train
 name: example                      # Describe project name.
 version: 0.0.1                     # Describe verison. (*1.0.0)
 workdir: .
@@ -15,11 +16,11 @@ workspace:
       - pip: requirements.txt      # [OPTIONAL] Describe prepare options for run.
 app:
     server:
-        kind: App                  # [OPTIONAL] Describe kind of app. (*App, Job, Service)
+        kind: Job                  # [OPTIONAL] Describe kind of app. (*App, Job, Service)
         command: python server.py  # [OPTIONAL] Describe command to need overwrite.
         ports: [5555]              # [OPTIONAL] Describe expose ports to other apps.
     client:
-        kind: App
+        kind: Job
         command: python client.py
         constraints:               # [OPTIONAL] Describe target node to run app.
             hostname: docker-desktop
