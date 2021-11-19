@@ -879,10 +879,11 @@ def update_services(network, services, cli=DEFAULT_CLI):
         def _body(option: str, value: str, spec: str = "container"):
             if spec == "container":
                 path = f"/spec/template/spec/containers/0/{option}"
-                return {"op": "replace", "path": path, "value": value}
             elif spec == "deployment":
                 path = f"/spec/{option}"
-                return {"op": "replace", "path": path, "value": value}
+            elif spec == "metadata":
+                path = f"/metadata/{option}"
+            return {"op": "replace", "path": path, "value": value}
 
         # update
         body = []
@@ -906,7 +907,8 @@ def update_services(network, services, cli=DEFAULT_CLI):
         body.append(_body("env", env))
 
         try:
-            deployment.metadata.annotations['kubernetes.io/change-cause'] = f'MLAD:{service}'
+            cause = {"kubernetes.io/change-cause": f"MLAD:{service}"}
+            body.append(_body("annotations", cause, "metadata"))
             res = api.patch_namespaced_deployment(service_name, namespace, body=body)
             instances.append(res)
         except ApiException as e:
