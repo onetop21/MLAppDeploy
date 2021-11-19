@@ -9,8 +9,11 @@ x-definitions:
       name:
         type: string
         required: true
+        regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         empty: false
         order: 1
+        description: Hello World
+        multiline: True
       version:
         type: string
         regex: "[0-9]+\\.[0-9]+\\.[0-9]+"
@@ -87,7 +90,7 @@ x-definitions:
   - definition: &ingress
       target:
         type: string
-        regex: "[A-Za-z0-9-_]+:[0-9]+"
+        regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9]):[0-9]+$"
         required: true
       rewritePath:
         type: boolean
@@ -143,14 +146,16 @@ x-definitions:
           mem:
             type: string
             regex: "[0-9]+[GMK]?[i]?"
-  - definition: &app_job
+  - definition: &job
       <<: *app
       restartPolicy:
         type: string
         allowed: [never, onFailure]
         default: never
         excludes: runSpec
-  - definition: &app_service
+        dependencies:
+          scale: 1
+  - definition: &service
       <<: *app
       restartPolicy:
         type: string
@@ -182,7 +187,7 @@ x-definitions:
               mem:
                 type: string
                 regex: "[0-9]+[GMK]?[i]?"
-  - definition: &job
+  - definition: &job_advanced
       <<: *_app_base
       <<: *_advanced_base
       runSpec:
@@ -203,7 +208,7 @@ x-definitions:
           completion:
             type: integer
             default: 1
-  - definition: &service
+  - definition: &_advanced
       <<: *_app_base
       <<: *_advanced_base
       runSpec:
@@ -268,11 +273,14 @@ __root__:
         order: 10
       app:
         type: dict
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules:
           type: dict
           selector:
-            job: *app_job
-            service: *app_service
+            job: *job
+            service: *service
         order: 30
     deployment:
       <<: *metadata
@@ -287,16 +295,22 @@ __root__:
       ingress:
         type: dict
         required: true
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules:
           type: dict
           schema: *ingress
         order: 20
       app:
         type: dict
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules:
           type: dict
           selector:
-            service: *app_service
+            service: *service
         order: 30
     component:
       <<: *metadata
@@ -310,6 +324,9 @@ __root__:
         order: 10
       app:
         type: dict
+        keysrules:
+          type: string
+          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         valuesrules:
           type: dict
           selector:
