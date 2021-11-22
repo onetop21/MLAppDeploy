@@ -94,11 +94,11 @@ def remove_project(project_key: str, session: str = Header(None)):
 
 
 @router.get("/project/{project_key}/logs")
-def project_log(project_key: str, tail: str = Query('all'),
-                follow: bool = Query(False),
-                timestamps: bool = Query(False),
-                names_or_ids: list = Query(None),
-                session: str = Header(None)):
+def send_project_log(project_key: str, tail: str = Query('all'),
+                     follow: bool = Query(False),
+                     timestamps: bool = Query(False),
+                     names_or_ids: list = Query(None),
+                     session: str = Header(None)):
 
     selected = True if names_or_ids else False
     try:
@@ -115,7 +115,7 @@ def project_log(project_key: str, tail: str = Query('all'),
                 apps = str(e).split(': ')[1]
                 raise InvalidAppError(project_key, apps)
 
-        class disconnectHandler:
+        class DisconnectHandler:
             def __init__(self):
                 self._callbacks = []
 
@@ -126,7 +126,7 @@ def project_log(project_key: str, tail: str = Query('all'),
                 for cb in self._callbacks:
                     cb()
 
-        handler = disconnectHandler()
+        handler = DisconnectHandler()
 
         logs = ctlr.get_project_logs(project_key, tail, follow, timestamps, selected, handler, targets)
 

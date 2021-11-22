@@ -1150,7 +1150,7 @@ def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
 
 
 def get_project_logs(project_key, tail='all', follow=False, timestamps=False,
-                     selected=False, disconnHandler=None, targets=[], cli=DEFAULT_CLI):
+                     selected=False, disconnect_handler=None, targets=[], cli=DEFAULT_CLI):
     get_apps(project_key, cli=cli)
     namespace = get_namespace(cli, project_key=project_key).metadata.name
 
@@ -1165,15 +1165,15 @@ def get_project_logs(project_key, tail='all', follow=False, timestamps=False,
             for name, log in logs:
                 collector.add_iterable(log, name=name, timestamps=timestamps)
             # Register Disconnect Callback
-            if disconnHandler:
-                disconnHandler.add_callback(lambda: handler.close())
+            if disconnect_handler:
+                disconnect_handler.add_callback(lambda: handler.close())
             if follow and not selected:
                 last_resource = None
                 monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
                                      follow=follow, tail=tail, timestamps=timestamps)
                 monitor.start()
-                if disconnHandler:
-                    disconnHandler.add_callback(lambda: monitor.stop())
+                if disconnect_handler:
+                    disconnect_handler.add_callback(lambda: monitor.stop())
             yield from collector
     else:
         print('Cannot find running containers.', file=sys.stderr)
