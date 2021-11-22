@@ -56,7 +56,7 @@ def up(file: Optional[str]):
         raise ImageNotFoundError(image_tag)
 
     # Create a project
-    yield 'Deploy applications to the cluster...'
+    yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
     lines = API.project.create(base_labels, project, extra_envs, credential=credential, allow_reuse=False)
@@ -66,16 +66,16 @@ def up(file: Optional[str]):
         if 'result' in line and line['result'] == 'succeed':
             break
 
-    # Create services
-    services = []
+    # Create apps
+    apps = []
     for name, value in project.get('app', dict()).items():
         value['name'] = name
-        services.append(value)
+        apps.append(value)
 
-    yield 'Start services...'
+    yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:
-            API.service.create(project_key, services)
+            API.app.create(project_key, apps)
             if h.interrupted:
                 pass
     except Exception as e:
@@ -99,24 +99,24 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         path.mkdir(exist_ok=True, parents=True)
         return path
 
-    def _dump_logs(service_name: str, dirpath: Path):
-        path = dirpath / f'{service_name}.log'
+    def _dump_logs(app_name: str, dirpath: Path):
+        path = dirpath / f'{app_name}.log'
         with open(path, 'w') as log_file:
             try:
-                logs = API.project.log(project_key, timestamps=True, names_or_ids=[service_name])
+                logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
                 for log in logs:
                     log = utils.parse_log(log)
                     log_file.write(log)
             except InvalidLogRequest:
-                return f'There is no log in [{service_name}].'
-        return f'The log file of service [{service_name}] saved.'
+                return f'There is no log in [{app_name}].'
+        return f'The log file of app [{app_name}] saved.'
 
     # Check the project already exists
     project = API.project.inspect(project_key=project_key)
 
     with interrupt_handler(message='Wait...', blocked=False):
-        services = API.service.get(project_key)['inspects']
-        service_names = [service['name'] for service in services]
+        apps = API.app.get(project_key)['specs']
+        app_names = [app['name'] for app in apps]
 
         # Dump logs
         if not no_dump:
@@ -127,11 +127,11 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 project['created'] = datetime.fromtimestamp(project['created'])
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
-            for service_name in service_names:
-                yield _dump_logs(service_name, dirpath)
+            for app_name in app_names:
+                yield _dump_logs(app_name, dirpath)
 
-        # Remove the services
-        lines = API.service.remove(project_key, services=service_names, stream=True)
+        # Remove the apps
+        lines = API.app.remove(project_key, apps=app_names, stream=True)
         for line in lines:
             if 'stream' in line:
                 yield line['stream']
@@ -144,7 +144,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             if 'stream' in line:
                 sys.stdout.write(line['stream'])
             if 'result' in line and line['result'] == 'succeed':
-                yield 'The project network was successfully removed.'
+                yield 'The namespace was successfully removed.'
                 break
     yield 'Done.'
 
@@ -156,9 +156,9 @@ def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optio
 
     API.project.inspect(project_key)
 
-    service_names = [service['name'] for service in API.service.get(project_key)['inspects']]
+    app_names = [app['name'] for app in API.app.get(project_key)['specs']]
 
     for target_name, value in scales:
-        if target_name in service_names:
-            API.service.scale(project_key, target_name, value)
+        if target_name in app_names:
+            API.app.scale(project_key, target_name, value)
             yield f'Scale updated [{target_name}] = {value}'

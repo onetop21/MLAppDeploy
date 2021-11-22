@@ -1,4 +1,3 @@
-import os
 from functools import lru_cache
 from mlad.core.kubernetes.controller import get_current_context
 from mlad.core.exceptions import APIError
@@ -8,6 +7,6 @@ from mlad.core.exceptions import APIError
 def auth_admin():
     try:
         get_current_context()
-    except APIError as e:
+    except APIError:
         return False
     return True

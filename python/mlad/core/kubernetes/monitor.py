@@ -15,12 +15,12 @@ class DelMonitor(Thread):
             return resp
         return inner
 
-    def __init__(self, cli, collector, service_specs, namespace, timeout=0xFFFF):
+    def __init__(self, cli, collector, app_specs, namespace, timeout=0xFFFF):
         super().__init__(daemon=True)
         self.__stopped = False
         self.api = client.CoreV1Api(cli)
         self.collector = collector
-        self.service_specs = service_specs
+        self.app_specs = app_specs
         self.namespace = namespace
         self.timeout = timeout
 
@@ -31,27 +31,27 @@ class DelMonitor(Thread):
             self.stream_resp = x
 
         target_task_keys = []
-        service_name_to_task_keys = {}
-        for spec in self.service_specs:
+        app_name_to_task_keys = {}
+        for spec in self.app_specs:
             name, _, task_keys = spec
-            service_name_to_task_keys[name] = task_keys
+            app_name_to_task_keys[name] = task_keys
             target_task_keys.extend(task_keys)
         w = watch.Watch()
         completed = len(target_task_keys) == 0
         if not completed:
-            self.collector.queue.put({'stream': 'Wait for the services to be removed...'})
+            self.collector.queue.put({'stream': 'Wait for the apps to be removed...'})
             try:
                 wrapped_api = DelMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
                 for ev in w.stream(wrapped_api, namespace=self.namespace,
                                    _request_timeout=self.timeout):
                     event = ev['type']
                     pod_name = ev['object']['metadata']['name']
-                    service_name = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
+                    app_name = ev['object']['metadata']['labels']['MLAD.PROJECT.APP']
                     if event == 'DELETED':
-                        if pod_name in service_name_to_task_keys[service_name]:
-                            service_name_to_task_keys[service_name].remove(pod_name)
-                            if not service_name_to_task_keys[service_name]:
-                                msg = f'Service \'{service_name}\' was removed.'
+                        if pod_name in app_name_to_task_keys[app_name]:
+                            app_name_to_task_keys[app_name].remove(pod_name)
+                            if not app_name_to_task_keys[app_name]:
+                                msg = f'App \'{app_name}\' has been removed.'
                                 self.collector.queue.put({'result': 'succeed', 'stream': msg})
                             target_task_keys.remove(pod_name)
                     if len(target_task_keys) == 0:
@@ -63,12 +63,12 @@ class DelMonitor(Thread):
                 pass
 
         if completed:
-            msg = "All Services were removed."
+            msg = "All apps were removed."
             self.collector.queue.put({'result': 'completed', 'stream': msg})
         else:
-            for svc, task_keys in service_name_to_task_keys.items():
+            for svc, task_keys in app_name_to_task_keys.items():
                 if len(task_keys) > 0:
-                    msg = f"Failed to remove service {svc}."
+                    msg = f"Failed to remove app {svc}."
                     self.collector.queue.put({'result': 'failed', 'stream': msg})
         self.collector.queue.put({'result': 'stopped'})
 

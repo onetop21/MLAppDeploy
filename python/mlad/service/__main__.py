@@ -5,7 +5,7 @@ from mlad.service.libs import utils
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mlad.service.routers import service, project, node
+from mlad.service.routers import app as app_router, project, node
 from mlad.core.default.config import service_config
 
 '''
@@ -74,10 +74,9 @@ def create_app():
     )
 
     app.include_router(node.router, prefix=APIV1)
-    app.include_router(service.router, prefix=APIV1)
+    app.include_router(app_router.router, prefix=APIV1)
     app.include_router(project.router, prefix=APIV1)
 
-    #print(f"Admin Token  : {generate_admin_token().decode()}")
     print("Orchestrator : 'Kubernetes'")
     print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}")
     print(f'Prefix       : {root_path}')

@@ -30,7 +30,7 @@ class ProjectNotFound(NotFound):
     pass
 
 
-class ServiceNotFound(NotFound):
+class AppNotFound(NotFound):
     pass
 
 
@@ -43,7 +43,7 @@ class InvalidSession(APIError):
 
 
 def error_from_http_errors(e):
-    # msg from mlad service http error
+    # msg from mlad api server http error
     try:
         detail = e.response.json()['detail']
         msg = detail['msg'] if 'msg' in detail else detail
@@ -53,15 +53,15 @@ def error_from_http_errors(e):
     if e.response.status_code == 404:
         if reason == 'ProjectNotFound':
             cls = ProjectNotFound
-        elif reason == 'ServiceNotFound':
-            cls = ServiceNotFound
+        elif reason == 'AppNotFound':
+            cls = AppNotFound
         else:
             cls = NotFound
             msg = 'Check the server address and paths.'
     elif e.response.status_code == 401:
         cls = InvalidSession
     elif e.response.status_code == 400:
-        if reason == 'ServiceNotRunning':
+        if reason == 'AppNotRunning':
             cls = InvalidLogRequest
         else:
             cls = APIError

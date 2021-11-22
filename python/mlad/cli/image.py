@@ -38,20 +38,20 @@ def list(all, tail):
         data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED', 'WORKSPACE')]
 
     untagged = 0
-    for inspect in [ctlr.inspect_image(image) for image in images[:tail]]:
-        if len(inspect['tags']) == 0:
+    for spec in [ctlr.inspect_image(image) for image in images[:tail]]:
+        if len(spec['tags']) == 0:
             untagged += 1
         else:
             row = [
-                inspect['short_id'],
-                inspect['username'],
-                inspect['project_name'],
-                inspect['tag'],
-                inspect['maintainer'],
-                inspect['created']
+                spec['short_id'],
+                spec['username'],
+                spec['project_name'],
+                spec['tag'],
+                spec['maintainer'],
+                spec['created']
             ]
             if all:
-                row.append(inspect['workspace'])
+                row.append(spec['workspace'])
             data.append(row)
     utils.print_table(data, 'There is no built image.', 0)
     if untagged:

@@ -31,7 +31,7 @@ def up(file: Optional[str]):
 @click.option('--project-key', '-k', help='Project Key', default=None,
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
 @click.option('--no-dump', is_flag=True,
-              help='Save the log before shutting down the services')
+              help='Save the log before shutting down the apps')
 @echo_exception
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     '''Stop and remove the train object on the cluster.'''

@@ -1,5 +1,3 @@
-import sys
-import os
 import json
 
 
@@ -24,7 +22,7 @@ class NotFound(Exception):
 
 
 class APIError(Exception):
-    #k8s api error
+    # k8s api error
     def __init__(self, msg, status_code):
         self.msg = msg
         self.status_code = status_code
@@ -45,14 +43,13 @@ def handle_k8s_api_error(e):
     return msg, status
 
 
+class NamespaceAlreadyExistError(Exception):
 
-class NetworkAlreadyExistError(Exception):
-    
     def __init__(self, key: str):
         self.key = key
 
     def __str__(self):
-        return f'Already exist the project network, key: [{self.key}]'
+        return f'Already exist the namespace, key: [{self.key}]'
 
 
 class DockerError(Exception):

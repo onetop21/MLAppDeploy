@@ -47,7 +47,7 @@ def update_obj(base, obj):
         if isinstance(item, dict):
             removal_keys = []
             for key in item.keys():
-                if key != 'services':
+                if key != 'apps':
                     if not item[key] is None:
                         que.append(item[key])
                     else:
@@ -98,7 +98,7 @@ def change_key_style(dct):
     return dict((k.title().replace('_', ''), v) for k, v in dct.items())
 
 
-# Manage Project and Network
+# Manage Project and Namespace
 def base_labels(workspace: str, session: str, project: Dict,
                 registry_address: str, build: bool = False):
     # workspace = f"{hostname}:{workspace}"

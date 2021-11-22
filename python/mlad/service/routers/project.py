@@ -1,13 +1,10 @@
 import json
-from typing import List
-from multiprocessing import Queue, Value
-from fastapi import APIRouter, Query, HTTPException, Depends, Header
+from fastapi import APIRouter, Query, HTTPException, Header
 from fastapi.responses import StreamingResponse
-from starlette.types import Receive
 from mlad.service.models import project
-from mlad.service.exception import InvalidProjectError, InvalidServiceError, \
-    InvalidLogRequest, InvalidSessionError, exception_detail
-from mlad.service.libs import utils
+from mlad.service.exceptions import (
+    InvalidProjectError, InvalidLogRequest, InvalidSessionError, exception_detail, InvalidAppError
+)
 from mlad.core.kubernetes import controller as ctlr
 from mlad.core import exceptions
 
@@ -24,15 +21,14 @@ def _check_session_key(project, session):
 
 
 @router.post("/project")
-def project_create(req: project.CreateRequest, allow_reuse: bool = Query(False),
-                   session: str = Header(None)):
+def create_project(req: project.CreateRequest, allow_reuse: bool = Query(False), session: str = Header(None)):
     base_labels = req.base_labels
     extra_envs = req.extra_envs
     credential = req.credential
     project_yaml = req.project_yaml
 
     try:
-        res = ctlr.create_project_network(
+        res = ctlr.create_namespace(
             base_labels, extra_envs, project_yaml, credential, allow_reuse=allow_reuse, stream=True)
 
         def create_project(gen):
@@ -49,12 +45,12 @@ def project_create(req: project.CreateRequest, allow_reuse: bool = Query(False),
 @router.get("/project")
 def projects(extra_labels: str = '', session: str = Header(None)):
     try:
-        networks = ctlr.get_project_networks(extra_labels.split(',') if extra_labels else [])
+        namespaces = ctlr.get_namespaces(extra_labels.split(',') if extra_labels else [])
         projects = []
-        for k, v in networks.items():
-            inspect = ctlr.inspect_project_network(v)
-            if not inspect.get('deleted', False):
-                projects.append(inspect)
+        for k, v in namespaces.items():
+            spec = ctlr.inspect_namespace(v)
+            if not spec.get('deleted', False):
+                projects.append(spec)
         return projects
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
@@ -63,10 +59,10 @@ def projects(extra_labels: str = '', session: str = Header(None)):
 @router.get("/project/{project_key}")
 def inspect_project(project_key: str, session: str = Header(None)):
     try:
-        network = ctlr.get_project_network(project_key=project_key)
-        if not network:
+        namespace = ctlr.get_namespace(project_key=project_key)
+        if namespace is None:
             raise InvalidProjectError(project_key)
-        inspect = ctlr.inspect_project_network(network)
+        inspect = ctlr.inspect_namespace(namespace)
         return inspect
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
@@ -77,12 +73,12 @@ def inspect_project(project_key: str, session: str = Header(None)):
 @router.delete("/project/{project_key}")
 def remove_project(project_key: str, session: str = Header(None)):
     try:
-        network = ctlr.get_project_network(project_key=project_key)
-        _check_session_key(network, session)
-        if not network:
-            raise InvalidProjectError(project_key)           
+        namespace = ctlr.get_namespace(project_key=project_key)
+        _check_session_key(namespace, session)
+        if namespace is None:
+            raise InvalidProjectError(project_key)
 
-        res = ctlr.remove_project_network(network, stream=True)
+        res = ctlr.remove_namespace(namespace, stream=True)
 
         def remove_project(gen):
             for _ in gen:
@@ -98,28 +94,28 @@ def remove_project(project_key: str, session: str = Header(None)):
 
 
 @router.get("/project/{project_key}/logs")
-def project_log(project_key: str, tail: str = Query('all'),
-                follow: bool = Query(False),
-                timestamps: bool = Query(False),
-                names_or_ids: list = Query(None),
-                session: str = Header(None)):
+def send_project_log(project_key: str, tail: str = Query('all'),
+                     follow: bool = Query(False),
+                     timestamps: bool = Query(False),
+                     names_or_ids: list = Query(None),
+                     session: str = Header(None)):
 
     selected = True if names_or_ids else False
     try:
-        network = ctlr.get_project_network(project_key=project_key)
-        if not network:
+        namespace = ctlr.get_namespace(project_key=project_key)
+        if namespace is None:
             raise InvalidProjectError(project_key)
 
         try:
-            targets = ctlr.get_service_with_names_or_ids(project_key, names_or_ids)
+            targets = ctlr.get_app_with_names_or_ids(project_key, names_or_ids)
         except exceptions.NotFound as e:
             if 'running' in str(e):
-                raise InvalidLogRequest("Cannot find running services.")
+                raise InvalidLogRequest("Cannot find running apps.")
             else:
-                services = str(e).split(': ')[1]
-                raise InvalidServiceError(project_key, services)
+                apps = str(e).split(': ')[1]
+                raise InvalidAppError(project_key, apps)
 
-        class disconnectHandler:
+        class DisconnectHandler:
             def __init__(self):
                 self._callbacks = []
 
@@ -130,13 +126,13 @@ def project_log(project_key: str, tail: str = Query('all'),
                 for cb in self._callbacks:
                     cb()
 
-        handler = disconnectHandler()
-    
+        handler = DisconnectHandler()
+
         logs = ctlr.get_project_logs(project_key, tail, follow, timestamps, selected, handler, targets)
 
         def get_logs(logs):
             for _ in logs:
-                _['stream'] =_['stream'].decode()
+                _['stream'] = _['stream'].decode()
                 if timestamps:
                     _['timestamp'] = str(_['timestamp'])
                 yield json.dumps(_)
@@ -144,7 +140,7 @@ def project_log(project_key: str, tail: str = Query('all'),
         return StreamingResponse(get_logs(logs), background=handler)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
-    except InvalidServiceError as e:
+    except InvalidAppError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidLogRequest as e:
         raise HTTPException(status_code=400, detail=exception_detail(e))
@@ -164,11 +160,11 @@ def project_resource(project_key: str, session: str = Header(None)):
 @router.post("/project/{project_key}")
 def update_project(project_key: str, req: project.UpdateRequest):
     update_yaml = req.update_yaml
-    services = req.services
+    apps = req.apps
     try:
-        network = ctlr.get_project_network(project_key=project_key)
-        ctlr.update_project_network(network, update_yaml)
-        res = ctlr.update_services(network, services)
-        return [ctlr.inspect_service(_) for _ in res]
+        namespace = ctlr.get_namespace(project_key=project_key)
+        ctlr.update_namespace(namespace, update_yaml)
+        res = ctlr.update_apps(namespace, apps)
+        return [ctlr.inspect_app(_) for _ in res]
     except Exception as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))

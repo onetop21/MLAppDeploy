@@ -4,9 +4,9 @@ from pydantic import BaseModel
 
 
 class Quota(BaseModel):
-    cpu: Optional[int]=None
-    gpu: Optional[int]=None
-    mem: Optional[str]=None
+    cpu: Optional[int] = None
+    gpu: Optional[int] = None
+    mem: Optional[str] = None
 
 
 class Ingress(BaseModel):
@@ -72,7 +72,8 @@ class Service(AdvancedBase):
 
 class AppJob(App):
     kind = 'Job'
-    restartPolicy: Optional[str] = 'never' # Never | onFailure
+    # Never | onFailure
+    restartPolicy: Optional[str] = 'never'
 
 
 class AppService(App):
@@ -81,12 +82,12 @@ class AppService(App):
 
 
 class CreateRequest(BaseModel):
-    services: List[dict]
+    apps: List[dict]
 
     @property
     def json(self):
         targets = dict()
-        for _ in self.services:
+        for _ in self.apps:
             kind = _['kind']
             if kind == 'App':
                 _ = App(**_)
@@ -95,7 +96,7 @@ class CreateRequest(BaseModel):
             elif kind == 'Service':
                 _ = AppService(**_)
             service = json.loads(_.json())
-            targets[_.name]=service
+            targets[_.name] = service
             del targets[_.name]['name']
         return targets
 
@@ -105,4 +106,4 @@ class ScaleRequest(BaseModel):
 
 
 class RemoveRequest(BaseModel):
-    services: List[str]
+    apps: List[str]
