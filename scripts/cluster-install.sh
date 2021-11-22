@@ -654,7 +654,7 @@ elif [ $DEPLOY ]; then
     GetPrivileged
 
     [ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` -ne 0 ] && INGRESS=1
-    MAX_STEP=$((3+INGRESS))
+    MAX_STEP=$((4+INGRESS))
     
     if [[ `kubectl get node >> /dev/null 2>&1; echo $?` != "0" ]]; then
         ColorEcho ERROR "Need to install MLAppDeploy environment as master first."
