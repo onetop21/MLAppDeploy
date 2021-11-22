@@ -32,7 +32,7 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
         if '\r' in msg:
             msg = msg.split('\r')[-1] + '\n'
         if not msg.endswith('\n'):
-            msg+='\n'
+            msg += '\n'
         if timestamp:
             sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, timestamp, msg))
         else:
@@ -209,10 +209,10 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
         sorted_events = sorted(events, key=lambda e: e['datetime'])
         colorkey = {}
         print('\nEVENTS:')
-        for _ in sorted_events:
-            _['timestamp'] = _.pop('datetime')
-            _['stream'] = _.pop('message')
-            _print_log(_, colorkey, 32, 20)
+        for event in sorted_events:
+            event['timestamp'] = event.pop('datetime')
+            event['stream'] = event.pop('message')
+            _print_log(event, colorkey, 32, 20)
 
 
 def logs(file: Optional[str], project_key: Optional[str],
@@ -226,7 +226,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
 
     colorkey = {}
-    for _ in logs:
-        if '[Ignored]' in _['stream']:
+    for log in logs:
+        if '[Ignored]' in log['stream']:
             continue
-        _print_log(_, colorkey, 32, 20)
+        _print_log(log, colorkey, 32, 20)

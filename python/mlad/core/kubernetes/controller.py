@@ -345,11 +345,6 @@ def get_service_from_kind(cli, service_name, namespace, kind):
 
 
 def get_pod_events(pod, cli=DEFAULT_CLI):
-    if not isinstance(pod, client.models.v1_pod.V1Pod):
-        raise TypeError('Parameter is not valid type.')
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-
     api = client.CoreV1Api(cli)
     name = pod.metadata.name
     namespace = pod.metadata.namespace
