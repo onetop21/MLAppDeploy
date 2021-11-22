@@ -51,7 +51,7 @@ class DelMonitor(Thread):
                         if pod_name in app_name_to_task_keys[app_name]:
                             app_name_to_task_keys[app_name].remove(pod_name)
                             if not app_name_to_task_keys[app_name]:
-                                msg = f'App \'{app_name}\' was removed.'
+                                msg = f'App \'{app_name}\' has been removed.'
                                 self.collector.queue.put({'result': 'succeed', 'stream': msg})
                             target_task_keys.remove(pod_name)
                     if len(target_task_keys) == 0:
