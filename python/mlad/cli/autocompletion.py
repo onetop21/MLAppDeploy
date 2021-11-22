@@ -3,7 +3,6 @@ import os
 import glob
 from omegaconf import OmegaConf
 from mlad.core.default import project as default_project
-from mlad.core.default.config import service_config
 from mlad.core.docker import controller as ctlr
 from mlad.cli.libs import utils
 from mlad.cli import config as config_core

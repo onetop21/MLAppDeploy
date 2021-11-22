@@ -6,19 +6,19 @@ class InvalidProjectError(Exception):
         return f'Cannot find project {self.project_id}'
 
 
-class InvalidServiceError(Exception):
-    def __init__(self, project_id, service_id):
+class InvalidAppError(Exception):
+    def __init__(self, project_id, app_id):
         self.project_id = project_id
-        self.service_id = service_id
-    
+        self.app_id = app_id
+
     def __str__(self):
-        return (f'Cannot find service {self.service_id} '
-               f'in project {self.project_id}')
+        return (f'Cannot find app {self.app_id} '
+                f'in project {self.project_id}')
 
 
 class InvalidSessionError(Exception):
-    def __init__(self, service=False):
-        self.target = 'Service' if service else 'Project'
+    def __init__(self, app=False):
+        self.target = 'App' if app else 'Project'
 
     def __str__(self):
         return f'{self.target} can only be removed by ' \
@@ -40,12 +40,12 @@ def exception_detail(e):
     if 'NotFound' in exception:
         exception = 'NotFound'
 
-    if exception == 'InvalidServiceError':
-        reason = 'ServiceNotFound'
+    if exception == 'InvalidAppError':
+        reason = 'AppNotFound'
     elif exception == 'InvalidProjectError':
         reason = 'ProjectNotFound'
     elif exception == 'InvalidLogRequest':
-        reason = 'ServiceNotRunning'
+        reason = 'AppNotRunning'
     elif exception == 'TokenError':
         reason = exception
     else:

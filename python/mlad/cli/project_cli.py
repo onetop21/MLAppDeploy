@@ -56,12 +56,12 @@ def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: boo
 @click.option('--tail', default='all', help='Number of lines to show from the end of logs (default "all")')
 @click.option('--timestamps', '-t', is_flag=True, help='Show timestamp with logs')
 @click.option('--follow', is_flag=True, help='Follow log output')
-@click.argument('SERVICES|TASKS', nargs=-1)
+@click.argument('APPS|TASKS', nargs=-1)
 @echo_exception
 def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, **kwargs):
     '''Show current project logs deployed on cluster'''
-    filters = kwargs.get('services|tasks')
+    filters = kwargs.get('apps|tasks')
     project.logs(file, project_key, tail, follow, timestamps, filters)
 
 

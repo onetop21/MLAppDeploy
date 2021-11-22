@@ -1,4 +1,4 @@
-from typing import List, Union, Optional
+from typing import List, Union
 from pydantic import BaseModel
 
 from mlad.service.models.service import Quota
@@ -16,7 +16,7 @@ class EnvUpdateSpec(BaseModel):
     update: dict
 
 
-class ServiceUpdateSpec(BaseModel):
+class AppUpdateSpec(BaseModel):
     name: str
     image: str = None
     command: Union[list, str] = None
@@ -28,8 +28,4 @@ class ServiceUpdateSpec(BaseModel):
 
 class UpdateRequest(BaseModel):
     update_yaml: dict
-    services: List[ServiceUpdateSpec]
-
-
-    
-    
+    apps: List[AppUpdateSpec]

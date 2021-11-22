@@ -69,32 +69,32 @@ def init(name, version, maintainer):
 
 def list(no_trunc: bool):
     projects = {}
-    networks = API.project.get()
+    project_specs = API.project.get()
 
     columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'IMAGE',
-                'SERVICES', 'TASKS', 'HOSTNAME', 'WORKSPACE',
+                'APPS', 'TASKS', 'HOSTNAME', 'WORKSPACE',
                 'MEM(Mi)', 'CPU', 'GPU')]
-    for network in networks:
-        project_key = network['key']
+    for spec in project_specs:
+        project_key = spec['key']
         default = {
-            'username': network['username'],
-            'project': network['project'],
-            'kind': network['kind'],
-            'key': network['key'],
-            'image': network['image'],
-            'services': 0, 'replicas': 0, 'tasks': 0,
-            'hostname': network['workspace']['hostname'],
-            'workspace': network['workspace']['path'],
+            'username': spec['username'],
+            'project': spec['project'],
+            'kind': spec['kind'],
+            'key': spec['key'],
+            'image': spec['image'],
+            'apps': 0, 'replicas': 0, 'tasks': 0,
+            'hostname': spec['workspace']['hostname'],
+            'workspace': spec['workspace']['path'],
         }
         projects[project_key] = projects[project_key] \
             if project_key in projects else default
-        services = API.service.get(project_key=project_key)
+        apps = API.app.get(project_key=project_key)
 
-        for inspect in services['inspects']:
-            tasks = inspect['tasks'].values()
+        for spec in apps['specs']:
+            tasks = spec['tasks'].values()
             tasks_state = [_['status']['state'] for _ in tasks]
-            projects[project_key]['services'] += 1
-            projects[project_key]['replicas'] += inspect['replicas']
+            projects[project_key]['apps'] += 1
+            projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
 
         used = {'cpu': 0, 'gpu': 0, 'mem': 0}
@@ -109,11 +109,11 @@ def list(no_trunc: bool):
         projects[project_key].update(used)
 
     for project in projects.values():
-        if project['services'] > 0:
+        if project['apps'] > 0:
             running_tasks = f"{project['tasks']}/{project['replicas']}"
             columns.append((project['username'], project['project'],
                             project['kind'], project['key'],
-                            project['image'], project['services'],
+                            project['image'], project['apps'],
                             f"{running_tasks:>5}", project['hostname'],
                             project['workspace'], project['mem'],
                             project['cpu'], project['gpu']))
@@ -133,20 +133,19 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
         project_key = utils.workspace_key()
     # Block not running.
     try:
-        inspect = API.project.inspect(project_key=project_key)
+        API.project.inspect(project_key=project_key)
         resources = API.project.resource(project_key)
     except NotFound:
         print('Cannot find running project.', file=sys.stderr)
         sys.exit(1)
 
-    res = API.service.get(project_key)
     columns = [
-        ('NAME', 'SERVICE', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
-    for inspect in res['inspects']:
+        ('NAME', 'APP', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
+    for spec in API.app.get(project_key)['specs']:
         task_info = []
         try:
-            ports = [*inspect['ports']][0] if inspect['ports'] else '-'
-            for pod_name, pod in API.service.get_tasks(project_key, inspect['name']).items():
+            ports = [*spec['ports']][0] if spec['ports'] else '-'
+            for pod_name, pod in API.service.get_tasks(project_key, spec['name']).items():
                 ready_cnt = 0
                 restart_cnt = 0
                 if pod['container_status']:
@@ -166,7 +165,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
                 else:
                     uptime = f"{uptime:.0f} seconds"
 
-                res = resources[inspect['name']].copy()
+                res = resources[spec['name']].copy()
                 if res['mem'] is None:
                     res['mem'], res['cpu'] = 'NotReady', 'NotReady'
                     res['gpu'] = round(res['gpu'], 1) \
@@ -180,7 +179,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
                 if all or pod['phase'] not in ['Failed']:
                     task_info.append((
                         pod_name,
-                        inspect['name'],
+                        spec['name'],
                         pod['node'] if pod['node'] else '-',
                         pod['phase'],
                         'Running' if pod['status']['state'] == 'Running' else
@@ -196,7 +195,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
             pass
         columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
     username = utils.get_username(config.session)
-    print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
+    print(f"USERNAME: [{username}] / PROJECT: [{spec['project']}]")
     utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
 
 

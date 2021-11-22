@@ -59,28 +59,28 @@ def serve(file: Optional[str]):
         if 'result' in line and line['result'] == 'succeed':
             break
 
-    # Apply ingress for service
+    # Apply ingress for app
     apps = project.get('app', dict())
     ingress = project['ingress']
     for name, value in ingress.items():
-        service_name, port = value['target'].split(':')
-        if service_name in apps.keys():
-            apps[service_name]['ingress'] = {
+        app_name, port = value['target'].split(':')
+        if app_name in apps.keys():
+            apps[app_name]['ingress'] = {
                 'name': name,
                 'rewritePath': value['rewritePath'],
                 'port': port
             }
 
-    # Create services
-    services = []
+    # Create apps
+    apps = []
     for name, value in apps.items():
         value['name'] = name
-        services.append(value)
+        apps.append(value)
 
-    yield 'Start services...'
+    yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:
-            res = API.service.create(project_key, services)
+            res = API.app.create(project_key, apps)
             if h.interrupted:
                 pass
     except Exception as e:
@@ -90,12 +90,12 @@ def serve(file: Optional[str]):
     yield 'Done.'
     yield utils.print_info(f'Project key : {project_key}')
 
-    # Get ingress path for deployed service
+    # Get ingress path for deployed app
     address = config['apiserver']['address'].rsplit('/beta')[0]
-    for service in res:
-        if service['ingress']:
-            path = f'{address}{service["ingress"]}'
-            yield utils.print_info(f'[{service["name"]}] Ingress Path : {path}')
+    for app in res:
+        if app['ingress']:
+            path = f'{address}{app["ingress"]}'
+            yield utils.print_info(f'[{app["name"]}] Ingress Path : {path}')
 
 
 def kill(project_key: str, no_dump: bool):
@@ -109,15 +109,15 @@ def scale(scales: List[Tuple[str, int]], project_key: str):
 def ingress():
     config = config_core.get()
     address = config['apiserver']['address'].rsplit('/beta')[0]
-    services = API.service.get()['inspects']
+    specs = API.app.get()['specs']
     rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
-    for service in services:
-        if service['ingress'] != '':
-            username = service['username']
-            project_name = service['project']
-            app_name = service['name']
-            key = service['key']
-            path = f'{address}{service["ingress"]}'
+    for spec in specs:
+        if spec['ingress'] != '':
+            username = spec['username']
+            project_name = spec['project']
+            app_name = spec['name']
+            key = spec['key']
+            path = f'{address}{spec["ingress"]}'
             rows.append((username, project_name, app_name, key, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 

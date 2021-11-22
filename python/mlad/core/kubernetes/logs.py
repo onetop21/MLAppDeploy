@@ -229,17 +229,7 @@ class LogMonitor(Thread):
                     event = ev['type']
                     pod = ev['object']['metadata']['name']
                     phase = ev['object']['status']['phase']
-                    service = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
 
-                    # For create pod by CrashLoopBackOff(RestartPolicy: Always)
-                    #if event == 'ADDED':
-                    #    added.append(pod)
-                    #elif event == 'MODIFIED' and phase == 'Running':
-                    #    if pod in added:
-                    #        log = self.handler.logs(namespace, pod, details=True, follow=follow,
-                    #                                tail=tail, timestamps=timestamps, stdout=True, stderr=True)
-                    #        self.collector.add_iterable(log, name=service, timestamps=timestamps)
-                    #        added.remove(pod)
                     if event == 'MODIFIED' and phase == 'Running':
                         container_status = ev['object']['status']['containerStatuses'][0]
                         restart = container_status['restartCount']

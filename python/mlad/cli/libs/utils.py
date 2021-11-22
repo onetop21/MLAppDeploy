@@ -124,7 +124,7 @@ def get_project(default_project):
             )
         )
     if not check_podname_syntax(project['name']):
-        print('Syntax Error: Project and service require a name to '
+        print('Syntax Error: Project and app require a name to '
               'follow standard as defined in RFC1123.', file=sys.stderr)
         sys.exit(1)
 

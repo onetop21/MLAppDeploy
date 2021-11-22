@@ -1,8 +1,8 @@
 import os
 import sys
 from .node import Node
-from .service import Service
 from .project import Project
+from .app import App
 
 from mlad.cli import config as config_core
 from functools import lru_cache
@@ -57,5 +57,5 @@ class API:
 
     @classproperty
     @lru_cache(maxsize=None)
-    def service(cls):
-        return Service(cls.config)
+    def app(cls):
+        return App(cls.config)
