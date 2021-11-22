@@ -61,10 +61,10 @@ def resource(names=None, no_trunc=False):
             columns.append([name if not i else '', type, capacity, used,
                             f'{free} ({percentage}%)'])
         max_print_length = max([len(column[-1]) for column in columns])
-        for column in columns[1:]:
-            free_text, percentage_text = column[-1].split(' ')
-            space_size = max_print_length - len(free_text) - len(percentage_text)
-            column[-1] = f'{free_text}{" " * space_size}{percentage_text}'
+    for column in columns[1:]:
+        free_text, percentage_text = column[-1].split(' ')
+        space_size = max_print_length - len(free_text) - len(percentage_text)
+        column[-1] = f'{free_text}{" " * space_size}{percentage_text}'
     utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)
 
 
