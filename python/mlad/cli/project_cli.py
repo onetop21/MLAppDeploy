@@ -39,10 +39,11 @@ def ls(no_trunc: bool):
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
 @click.option('--all', '-a', is_flag=True, help='Show included shutdown service')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
+@click.option('--event', '-e', is_flag=True, help='Show warning events of apps')
 @echo_exception
-def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool):
+def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool, event: bool):
     '''Show project status deployed on cluster'''
-    project.status(file, project_key, all, no_trunc)
+    project.status(file, project_key, all, no_trunc, event)
 
 
 @click.command()

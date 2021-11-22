@@ -344,6 +344,16 @@ def get_service_from_kind(cli, service_name, namespace, kind):
         raise exceptions.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
 
 
+def get_pod_events(pod, cli=DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    name = pod.metadata.name
+    namespace = pod.metadata.namespace
+
+    events = api.list_namespaced_event(namespace, field_selector=f'type=Warning').items
+    return [{'name': name, 'message': e.message, 'datetime': e.event_time}
+            for e in events if e.involved_object.name == name]
+
+
 def get_pod_info(pod):
     if not isinstance(pod, client.models.v1_pod.V1Pod):
         raise TypeError('Parameter is not valid type.')
@@ -355,7 +365,8 @@ def get_pod_info(pod):
         'container_status': list(),
         'status': dict(),  
         'node': pod.spec.node_name,
-        'phase': pod.status.phase
+        'phase': pod.status.phase,
+        'events': get_pod_events(pod)
     }
 
     def get_status(container_state):

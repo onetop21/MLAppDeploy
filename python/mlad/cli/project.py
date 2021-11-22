@@ -14,7 +14,7 @@ from mlad.api.exceptions import NotFound
 
 def _parse_log(log, max_name_width=32, len_short_id=10):
     name = log['name']
-    namewidth = min(max_name_width, log['name_width'])
+    namewidth = min(max_name_width, log['name_width'])if 'name_width' in log else max_name_width
     if 'task_id' in log:
         name = f"{name}.{log['task_id'][:len_short_id]}"
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
@@ -31,6 +31,8 @@ def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
         colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
         if '\r' in msg:
             msg = msg.split('\r')[-1] + '\n'
+        if not msg.endswith('\n'):
+            msg += '\n'
         if timestamp:
             sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, timestamp, msg))
         else:
@@ -126,7 +128,7 @@ def list(no_trunc: bool):
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
-def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool):
+def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool, event: bool):
     utils.process_file(file)
     config = config_core.get()
     if project_key is None:
@@ -140,6 +142,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
         sys.exit(1)
 
     res = API.service.get(project_key)
+    events = []
     columns = [
         ('NAME', 'SERVICE', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
     for inspect in res['inspects']:
@@ -192,12 +195,24 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
                         res['cpu'],
                         res['gpu']
                     ))
+
+                if event and len(pod['events']) > 0:
+                    events += pod['events']
         except NotFound:
             pass
         columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
     username = utils.get_username(config.session)
     print(f"USERNAME: [{username}] / PROJECT: [{inspect['project']}]")
     utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
+
+    if event:
+        sorted_events = sorted(events, key=lambda e: e['datetime'])
+        colorkey = {}
+        print('\nEVENTS:')
+        for event in sorted_events:
+            event['timestamp'] = event.pop('datetime')
+            event['stream'] = event.pop('message')
+            _print_log(event, colorkey, 32, 20)
 
 
 def logs(file: Optional[str], project_key: Optional[str],
@@ -211,7 +226,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
 
     colorkey = {}
-    for _ in logs:
-        if '[Ignored]' in _['stream']:
+    for log in logs:
+        if '[Ignored]' in log['stream']:
             continue
-        _print_log(_, colorkey, 32, 20)
+        _print_log(log, colorkey, 32, 20)
