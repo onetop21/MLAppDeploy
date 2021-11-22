@@ -123,7 +123,6 @@ def inspect_namespace(namespace, cli=DEFAULT_CLI):
     labels = get_labels(namespace)
     if namespace.metadata.deletion_timestamp:
         return {'deleted': True, 'key': labels['MLAD.PROJECT']}
-    created = namespace.metadata.creation_timestamp
     config_labels = get_config_labels(namespace, 'project-labels', cli)
     hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
 
@@ -141,7 +140,7 @@ def inspect_namespace(namespace, cli=DEFAULT_CLI):
         'base': config_labels['MLAD.PROJECT.BASE'],
         'image': config_labels['MLAD.PROJECT.IMAGE'],
         'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
-        'created': int(time.mktime(created.timetuple())),
+        'created': namespace.metadata.creation_timestamp,
         'project_yaml': (namespace.metadata.annotations or dict()).get('MLAD.PROJECT.YAML', '{}')
     }
 

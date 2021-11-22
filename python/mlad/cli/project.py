@@ -73,8 +73,8 @@ def list(no_trunc: bool):
     projects = {}
     project_specs = API.project.get()
 
-    columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'IMAGE',
-                'APPS', 'TASKS', 'HOSTNAME', 'WORKSPACE',
+    columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'APPS',
+                'TASKS', 'HOSTNAME', 'WORKSPACE', 'AGE',
                 'MEM(Mi)', 'CPU', 'GPU')]
     for spec in project_specs:
         project_key = spec['key']
@@ -87,6 +87,7 @@ def list(no_trunc: bool):
             'apps': 0, 'replicas': 0, 'tasks': 0,
             'hostname': spec['workspace']['hostname'],
             'workspace': spec['workspace']['path'],
+            'uptime': utils.created_to_age(spec['created'])
         }
         projects[project_key] = projects[project_key] \
             if project_key in projects else default
@@ -115,16 +116,15 @@ def list(no_trunc: bool):
             running_tasks = f"{project['tasks']}/{project['replicas']}"
             columns.append((project['username'], project['project'],
                             project['kind'], project['key'],
-                            project['image'], project['apps'],
-                            f"{running_tasks:>5}", project['hostname'],
-                            project['workspace'], project['mem'],
-                            project['cpu'], project['gpu']))
+                            project['apps'], f"{running_tasks:>5}", project['hostname'],
+                            project['workspace'], project['uptime'],
+                            project['mem'], project['cpu'], project['gpu']))
         else:
             columns.append((project['username'], project['project'],
                             project['kind'], project['key'],
-                            project['image'], '-', '-', project['hostname'],
-                            project['workspace'], project['mem'],
-                            project['cpu'], project['gpu']))
+                            '-', '-', project['hostname'],
+                            project['workspace'], project['uptime'],
+                            project['mem'], project['cpu'], project['gpu']))
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
@@ -157,16 +157,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
                         if _['ready']:
                             ready_cnt += 1
 
-                uptime = (datetime.utcnow() - parser.parse(pod['created']).
-                          replace(tzinfo=None)).total_seconds()
-                if uptime > 24 * 60 * 60:
-                    uptime = f"{uptime // (24 * 60 * 60):.0f} days"
-                elif uptime > 60 * 60:
-                    uptime = f"{uptime // (60 * 60):.0f} hours"
-                elif uptime > 60:
-                    uptime = f"{uptime // 60:.0f} minutes"
-                else:
-                    uptime = f"{uptime:.0f} seconds"
+                uptime = utils.created_to_age(pod['created'])
 
                 res = resources[spec['name']].copy()
                 if res['mem'] is None:
