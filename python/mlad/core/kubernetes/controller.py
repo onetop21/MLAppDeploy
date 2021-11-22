@@ -1229,9 +1229,13 @@ def parse_mem(str_mem):
     # Ki to Mi
     if str_mem.endswith('Ki'):
         mem = float(str_mem[:-2]) / 1024
+    elif str_mem.endswith('Mi'):
+        mem = float(str_mem[:-2])
+    elif str_mem.endswith('Gi'):
+        mem = float(str_mem[:-2]) * 1024
     else:
         # TODO Other units may need to be considered
-        mem = float(str_mem)
+        mem = float(str_mem[:-2])
     return mem
 
 
