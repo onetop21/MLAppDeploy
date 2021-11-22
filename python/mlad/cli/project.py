@@ -1,9 +1,6 @@
 import sys
 
 from typing import Optional, List
-from datetime import datetime
-from dateutil import parser
-
 
 from mlad.cli.libs import utils
 from mlad.cli.Format import PROJECT
