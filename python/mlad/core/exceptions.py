@@ -43,7 +43,7 @@ def handle_k8s_api_error(e):
     return msg, status
 
 
-class NamespacelreadyExistError(Exception):
+class NamespaceAlreadyExistError(Exception):
 
     def __init__(self, key: str):
         self.key = key

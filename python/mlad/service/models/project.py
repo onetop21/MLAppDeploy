@@ -1,7 +1,7 @@
 from typing import List, Union
 from pydantic import BaseModel
 
-from mlad.service.models.service import Quota
+from mlad.service.models.app import Quota
 
 
 class CreateRequest(BaseModel):

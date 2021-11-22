@@ -707,7 +707,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
-    namespace = namespace.metadata.name
+    namespace_name = namespace.metadata.name
     namespace_spec = inspect_namespace(namespace, cli)
     config_labels = get_config_labels(namespace, 'project-labels', cli)
     namespace_labels = get_labels(namespace)
@@ -773,17 +773,17 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
         try:
             if kind == 'Job':
-                ret = _create_job(name, image, command, namespace, restart_policy, envs, mounts,
+                ret = _create_job(name, image, command, namespace_name, restart_policy, envs, mounts,
                                   scale, None, quota, None, labels, constraints, secrets, cli)
             elif kind == 'Service':
-                ret = _create_deployment(name, image, command, namespace, envs, mounts, scale,
+                ret = _create_deployment(name, image, command, namespace_name, envs, mounts, scale,
                                          quota, None, labels, constraints, secrets, cli)
             else:
                 raise DeprecatedError
             instances.append(ret)
 
             if app['ports']:
-                ret = api.create_namespaced_service(namespace, client.V1Service(
+                ret = api.create_namespaced_service(namespace_name, client.V1Service(
                     metadata=client.V1ObjectMeta(
                         name=name,
                         labels=labels
@@ -801,11 +801,11 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                 ingress_path = f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
                 envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
                 config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
-                create_ingress(cli, namespace, name, ingress_name, port, ingress_path, rewritePath)
+                create_ingress(cli, namespace_name, name, ingress_name, port, ingress_path, rewritePath)
             else:
                 config_labels['MLAD.PROJECT.INGRESS'] = None
 
-            create_config_labels(cli, f'app-{name}-labels', namespace, config_labels)
+            create_config_labels(cli, f'app-{name}-labels', namespace_name, config_labels)
         except ApiException as e:
             msg, status = exceptions.handle_k8s_api_error(e)
             err_msg = f'Failed to create apps: {msg}'

@@ -99,7 +99,7 @@ def list(no_trunc: bool):
 
         used = {'cpu': 0, 'gpu': 0, 'mem': 0}
         resources = API.project.resource(project_key)
-        for service, resource in resources.items():
+        for _, resource in resources.items():
             used['mem'] += resource['mem'] if resource['mem'] is not None else 0
             used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
             used['gpu'] += resource['gpu']
@@ -145,7 +145,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
         task_info = []
         try:
             ports = [*spec['ports']][0] if spec['ports'] else '-'
-            for pod_name, pod in API.service.get_tasks(project_key, spec['name']).items():
+            for pod_name, pod in API.app.get_tasks(project_key, spec['name']).items():
                 ready_cnt = 0
                 restart_cnt = 0
                 if pod['container_status']:
@@ -196,7 +196,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
         columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
     username = utils.get_username(config.session)
     print(f"USERNAME: [{username}] / PROJECT: [{spec['project']}]")
-    utils.print_table(columns, 'Cannot find running services.', 0 if no_trunc else 32, False)
+    utils.print_table(columns, 'Cannot find running apps.', 0 if no_trunc else 32, False)
 
 
 def logs(file: Optional[str], project_key: Optional[str],

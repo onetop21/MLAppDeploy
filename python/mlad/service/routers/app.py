@@ -23,7 +23,7 @@ def _check_project_key(project_key, app):
 
 
 def _check_session_key(project_key, session):
-    project = ctlr.get_project_network(project_key=project_key)
+    project = ctlr.get_namespace(project_key=project_key)
     project_session = ctlr.get_project_session(project)
     if project_session == session:
         return True

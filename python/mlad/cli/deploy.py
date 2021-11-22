@@ -72,15 +72,15 @@ def serve(file: Optional[str]):
             }
 
     # Create apps
-    apps = []
+    requests = []
     for name, value in apps.items():
         value['name'] = name
-        apps.append(value)
+        requests.append(value)
 
     yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:
-            res = API.app.create(project_key, apps)
+            res = API.app.create(project_key, requests)
             if h.interrupted:
                 pass
     except Exception as e:
