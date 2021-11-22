@@ -144,7 +144,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             if 'stream' in line:
                 sys.stdout.write(line['stream'])
             if 'result' in line and line['result'] == 'succeed':
-                yield 'The project network was successfully removed.'
+                yield 'The namespace was successfully removed.'
                 break
     yield 'Done.'
 
