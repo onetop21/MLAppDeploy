@@ -664,21 +664,28 @@ elif [ $DEPLOY ]; then
 
     PrintStep "Install NVIDIA Device Plguin."
     if [[ `kubectl -n kube-system get ds/nvidia-device-plugin-daemonset >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        ColorEcho 'Already installed NVIDIA device plugin.'
+        ColorEcho 'NVIDIA device plugin is already installed.'
     else
         kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml
     fi
 
     PrintStep "Install Node Feature Discovery."
-    if [[ `kubect -n node-feature-discovery get ds/nfd >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        ColorEcho 'Already installed node feature discovery.'
+    if [[ `kubectl -n node-feature-discovery get ds/nfd >> /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho 'Node feature discovery is already installed.'
     else
         kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml
     fi
-    if [[ `kubect -n node-feature-discovery get ds/gpu-feature-discovery >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        ColorEcho 'Already installed GPU feature discovery.'
+    if [[ `kubectl -n node-feature-discovery get ds/gpu-feature-discovery >> /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho 'GPU feature discovery is already installed.'
     else
         kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/gpu-feature-discovery-daemonset.yaml -n node-feature-discovery
+    fi
+
+    PrintStep "Install Metrics Server."
+    if [[ `kubectl -n kube-system get deploy metrics-server > /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho `Metrics Server is already installed`
+    else
+        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
     fi
 
     if [ $INGRESS ]; then
