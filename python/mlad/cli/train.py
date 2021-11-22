@@ -56,7 +56,7 @@ def up(file: Optional[str]):
         raise ImageNotFoundError(image_tag)
 
     # Create a project
-    yield 'Deploy applications to the cluster...'
+    yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
     lines = API.project.create(base_labels, project, extra_envs, credential=credential, allow_reuse=False)
