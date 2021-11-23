@@ -10,8 +10,8 @@ def echo_exception(func):
         try:
             func(*args, **kwargs)
         except MLADException as e:
-            click.echo(traceback.format_exc())
             click.echo(f'{e.__class__.__name__}: {e}')
         except Exception as e:
+            click.echo(traceback.format_exc())
             click.echo(f'{e.__class__.__name__}: {e}')
     return decorated
