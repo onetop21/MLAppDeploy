@@ -720,7 +720,18 @@ elif [ $DEPLOY ]; then
             kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.44.0/deploy/static/provider/baremetal/deploy.yaml
         fi
         ColorEcho INFO "Wait to activate ingress controller...(up to 2mins)"
-        kubectl wait --for=condition=available --timeout=120s -n ingress-nginx deployment.apps/ingress-nginx-controller
+        if [[ `kubectl wait --for=condition=available --timeout=120s -n ingress-nginx deployment.apps/ingress-nginx-controller >> /dev/null 2>&1; echo $?` == "0" ]]; then
+            ColorEcho INFO 'Ingress controller has been activated successfully.'
+        else
+            ColorEcho INFO 'Try activate ingress controller again with mlad image...(up to 1mins)'
+            kubectl patch deploy ingress-nginx-controller -n ingress-nginx -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"regcreds"}]}}}}'
+            kubectl set image deployment/ingress-nginx-controller -n ingress-nginx controller=harbor.sailio.ncsoft.com/mlappdeploy/ingress-nginx-controller:v0.44.0
+            if [[ `kubectl wait --for=condition=available --timeout=60s -n ingress-nginx deployment.apps/ingress-nginx-controller >> /dev/null 2>&1; echo $?` == "0" ]]; then
+                ColorEcho INFO 'Ingress controller has been activated successfully.'
+            else
+                ColorEcho ERROR 'Failed to install ingress controller. This may interrupt deploying mlad ingress.'
+            fi
+        fi
     fi
 
     PrintStep "Deploy MLAppDeploy Service."
