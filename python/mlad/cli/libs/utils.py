@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from getpass import getuser
 
-from mlad.cli.libs.exceptions import InvalidURLError
+from mlad.cli.exceptions import InvalidURLError
 
 if TYPE_CHECKING:
     from mlad.cli.context import Context

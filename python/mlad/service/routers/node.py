@@ -1,3 +1,5 @@
+import traceback
+
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
 from mlad.core import exceptions
@@ -17,6 +19,7 @@ def node_list(session: str = Header(None)):
         return [ctlr.inspect_node(node) for node in nodes.values()]
     except Exception as e:
         logger.error(e)
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -36,4 +39,5 @@ def node_resource(names: List[str] = Query(None)):
         raise HTTPException(status_code=400, detail=exception_detail(e))
     except Exception as e:
         logger.error(e)
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))

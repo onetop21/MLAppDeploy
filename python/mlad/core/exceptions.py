@@ -1,15 +1,15 @@
 import json
 
 
+class MLADException(Exception):
+    pass
+
+
 class AlreadyExist(Exception):
     pass
 
 
-class Duplicated(Exception):
-    pass
-
-
-class TokenError(Exception):
+class Duplicated(MLADException):
     pass
 
 
@@ -21,7 +21,7 @@ class NotFound(Exception):
     pass
 
 
-class APIError(Exception):
+class APIError(MLADException):
     # k8s api error
     def __init__(self, msg, status_code):
         self.msg = msg
@@ -43,7 +43,7 @@ def handle_k8s_api_error(e):
     return msg, status
 
 
-class NamespaceAlreadyExistError(Exception):
+class NamespaceAlreadyExistError(MLADException):
 
     def __init__(self, key: str):
         self.key = key
@@ -52,13 +52,7 @@ class NamespaceAlreadyExistError(Exception):
         return f'Already exist the namespace, key: [{self.key}]'
 
 
-class DockerError(Exception):
-
-    def __str__(self):
-        return 'Invalid docker environment, please install a docker daemon.'
-
-
-class DeprecatedError(Exception):
+class DeprecatedError(MLADException):
 
     def __init__(self, option: str):
         self.option = option
@@ -67,7 +61,7 @@ class DeprecatedError(Exception):
         return f'Cannot deploy app for deprecated kind \'{self.option}\'.'
 
 
-class DockerNotFoundError(Exception):
+class DockerNotFoundError(MLADException):
 
     def __str__(self):
         return 'Need to install the docker daemon.'
