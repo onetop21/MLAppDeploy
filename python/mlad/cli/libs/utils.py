@@ -16,6 +16,9 @@ from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from getpass import getuser
 
+from datetime import datetime
+from dateutil import parser
+
 from mlad.cli.libs.exceptions import InvalidURLError
 
 if TYPE_CHECKING:
@@ -332,3 +335,19 @@ def get_registry_address(config: Context):
     if namespace is not None:
         registry_address += f'/{namespace}'
     return registry_address
+
+
+def created_to_age(created: str):
+    # param created: str of datetime
+
+    uptime = (datetime.utcnow() - parser.parse(created).
+            replace(tzinfo=None)).total_seconds()
+    if uptime > 24 * 60 * 60:
+        uptime = f"{uptime // (24 * 60 * 60):.0f} days"
+    elif uptime > 60 * 60:
+        uptime = f"{uptime // (60 * 60):.0f} hours"
+    elif uptime > 60:
+        uptime = f"{uptime // 60:.0f} minutes"
+    else:
+        uptime = f"{uptime:.0f} seconds"
+    return uptime
