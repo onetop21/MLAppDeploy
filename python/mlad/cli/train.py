@@ -1,8 +1,6 @@
 import os
 import sys
-import json
 
-from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 
@@ -214,7 +212,6 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
         handler = DisconnectHandler()
         lines = k8s_ctlr.remove_apps(targets, namespace_name, disconnect_handler=handler, stream=True)
         for line in lines:
-            line = json.dumps(line)
             if 'stream' in line:
                 yield line['stream']
             if 'result' in line and line['result'] == 'stopped':
@@ -224,7 +221,6 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
         # Remove the project
         lines = k8s_ctlr.remove_namespace(namespace, stream=True)
         for line in lines:
-            line = json.dumps(line)
             if 'stream' in line:
                 sys.stdout.write(line['stream'])
             if 'result' in line and line['result'] == 'succeed':
