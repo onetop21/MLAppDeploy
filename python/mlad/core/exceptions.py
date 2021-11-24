@@ -5,19 +5,15 @@ class MLADException(Exception):
     pass
 
 
-class AlreadyExist(Exception):
-    pass
-
-
 class Duplicated(MLADException):
     pass
 
 
-class NotSupportURL(Exception):
+class NotSupportURL(MLADException):
     pass
 
 
-class NotFound(Exception):
+class NotFound(MLADException):
     pass
 
 
