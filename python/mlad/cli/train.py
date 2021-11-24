@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
@@ -15,6 +16,7 @@ from mlad.cli.exceptions import (
 )
 
 from mlad.core.docker import controller as docker_ctlr
+from mlad.core.kubernetes import controller as k8s_ctlr
 from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 
@@ -141,6 +143,94 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         # Remove the project
         lines = API.project.delete(project_key)
         for line in lines:
+            if 'stream' in line:
+                sys.stdout.write(line['stream'])
+            if 'result' in line and line['result'] == 'succeed':
+                yield 'The namespace was successfully removed.'
+                break
+    yield 'Done.'
+
+
+def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
+    utils.process_file(file)
+    project_key_assigned = project_key is not None
+    if project_key is None:
+        project_key = utils.workspace_key()
+
+    def _get_log_dirpath(project: Dict) -> Path:
+        workdir = utils.get_project(default_project)['workdir'] \
+            if not project_key_assigned else str(Path().absolute())
+        timestamp = str(project['created'])
+        time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
+        path = Path(f'{workdir}/.logs/{time}')
+        path.mkdir(exist_ok=True, parents=True)
+        return path
+
+    def _dump_logs(app_name: str, dirpath: Path):
+        path = dirpath / f'{app_name}.log'
+        with open(path, 'w') as log_file:
+            try:
+                logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
+                for log in logs:
+                    log = utils.parse_log(log)
+                    log_file.write(log)
+            except InvalidLogRequest:
+                return f'There is no log in [{app_name}].'
+        return f'The log file of app [{app_name}] saved.'
+
+    # Check the project already exists
+    project = API.project.inspect(project_key=project_key)
+
+    with interrupt_handler(message='Wait...', blocked=False):
+        apps = API.app.get(project_key)['specs']
+        app_names = [app['name'] for app in apps]
+
+        # Dump logs
+        if not no_dump:
+            dirpath = _get_log_dirpath(project)
+            filepath = dirpath / 'description.yml'
+            yield utils.print_info(f'Project Log Storage: {dirpath}')
+            if not os.path.isfile(filepath):
+                project['created'] = datetime.fromtimestamp(project['created'])
+                with open(filepath, 'w') as log_file:
+                    yaml.dump(project, log_file)
+            for app_name in app_names:
+                yield _dump_logs(app_name, dirpath)
+
+        # Remove the apps
+        namespace = k8s_ctlr.get_namespace(project_key=project_key)
+        if namespace is None:
+            raise ProjectNotFound(f'Cannot find project {project_key}')
+        namespace_name = namespace.metadata.name
+        targets = [k8s_ctlr.get_app(name, namespace_name) for name in app_names]
+        for target in targets:
+            k8s_ctlr.check_project_key(project_key, target)
+
+        class DisconnectHandler:
+            def __init__(self):
+                self._callbacks = []
+
+            def add_callback(self, callback):
+                self._callbacks.append(callback)
+
+            def __call__(self):
+                for cb in self._callbacks:
+                    cb()
+
+        handler = DisconnectHandler()
+        lines = k8s_ctlr.remove_apps(targets, namespace_name, disconnect_handler=handler, stream=True)
+        for line in lines:
+            line = json.dumps(line)
+            if 'stream' in line:
+                yield line['stream']
+            if 'result' in line and line['result'] == 'stopped':
+                break
+        handler()
+
+        # Remove the project
+        lines = k8s_ctlr.remove_namespace(namespace, stream=True)
+        for line in lines:
+            line = json.dumps(line)
             if 'stream' in line:
                 sys.stdout.write(line['stream'])
             if 'result' in line and line['result'] == 'succeed':
