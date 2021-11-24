@@ -95,9 +95,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     def _get_log_dirpath(project: Dict) -> Path:
         workdir = utils.get_project(default_project)['workdir'] \
             if not project_key_assigned else str(Path().absolute())
-        timestamp = str(project['created'])
-        time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
-        path = Path(f'{workdir}/.logs/{time}')
+        path = Path(f'{workdir}/.logs/{project["created"].replace(":", "-")}')
         path.mkdir(exist_ok=True, parents=True)
         return path
 
@@ -160,9 +158,7 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
     def _get_log_dirpath(project: Dict) -> Path:
         workdir = utils.get_project(default_project)['workdir'] \
             if not project_key_assigned else str(Path().absolute())
-        timestamp = str(project['created'])
-        time = str(datetime.fromtimestamp(int(timestamp))).replace(':', '-')
-        path = Path(f'{workdir}/.logs/{time}')
+        path = Path(f'{workdir}/.logs/{project["created"].replace(":", "-")}')
         path.mkdir(exist_ok=True, parents=True)
         return path
 
