@@ -36,8 +36,8 @@ def up(file: Optional[str]):
 @echo_exception
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     '''Stop and remove the train object on the cluster.'''
-    lines = train.down(file, project_key, no_dump) if auth_admin() \
-        else train.down_force(file, project_key, no_dump)
+    lines = train.down_force(file, project_key, no_dump) if auth_admin() \
+        else train.down(file, project_key, no_dump)
     for line in lines:
         click.echo(line)
 

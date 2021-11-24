@@ -46,8 +46,8 @@ def update(project_key: str, file: Optional[str]):
 @echo_exception
 def kill(project_key: str, no_dump: bool):
     '''Stop and remove the train object on the cluster.'''
-    lines = deploy.kill(project_key, no_dump) if auth_admin() \
-        else deploy.kill_force(project_key, no_dump)
+    lines = deploy.kill_force(project_key, no_dump) if auth_admin() \
+        else deploy.kill(project_key, no_dump)
     for line in lines:
         click.echo(line)
 
