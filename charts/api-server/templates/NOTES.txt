@@ -7,15 +7,15 @@
     {{- end }}
   {{- else }}
     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-            You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "mlappdeploy.fullname" . }}'
-    export SERVICE_IP=$(kubectl get ing --namespace {{ .Release.Namespace }} {{ include "mlappdeploy.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
-    echo http://$SERVICE_IP:{{ .Values.service.port }}
+            You can watch the status of by running 'kubectl get --namespace {{ $.Release.Namespace }} svc -w {{ include "mlappdeploy.fullname"$. }}'
+    export SERVICE_IP=$(kubectl get ing --namespace {{ $.Release.Namespace }} {{ include "mlappdeploy.fullname" $ }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+    echo http://$SERVICE_IP:{{ $.Values.service.port }}
     {{- range .paths }}
     http{{ if $.Values.ingress.tls }}s{{ end }}://$SERVICE_IP{{ .path }}
     {{- end }}
     {{- /*
-    export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "mlappdeploy.fullname" . }})
-    export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+    export NODE_PORT=$(kubectl get --namespace {{ $.Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "mlappdeploy.fullname" $ }})
+    export NODE_IP=$(kubectl get nodes --namespace {{ $.Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
     echo http://$NODE_IP:$NODE_PORT
     */ -}}
   {{- end }}

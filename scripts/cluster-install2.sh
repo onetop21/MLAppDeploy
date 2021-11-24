@@ -892,9 +892,9 @@ then
     ColorEcho "Deploy MLAppDeploy service."
     if [ $ROLLOUT ]
     then
-        helm update $INSTANCE mlappdeploy/$SERVICE_NAME -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+        helm update $INSTANCE mlappdeploy/api-server -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
     else
-        helm install $INSTANCE mlappdeploy/$SERVICE_NAME --create-namespace -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+        helm install $INSTANCE mlappdeploy/api-server --create-namespace -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
     fi
     kubectl create secret -n $NAMESPACE generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson \
         --save-config --dry-run=client -o yaml | kubectl apply -f -
