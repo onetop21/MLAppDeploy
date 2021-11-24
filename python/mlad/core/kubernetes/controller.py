@@ -5,7 +5,7 @@ import json
 import uuid
 from collections import defaultdict
 from mlad.core import exceptions
-from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError
+from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
@@ -38,7 +38,7 @@ def get_api_client(config_file='~/.kube/config', context=None):
 DEFAULT_CLI = get_api_client()
 
 
-def _check_project_key(project_key, app):
+def check_project_key(project_key, app):
     inspect_key = str(inspect_app(app)['key'])
     if project_key == inspect_key:
         return True
@@ -358,7 +358,7 @@ def get_pod_events(pod, cli=DEFAULT_CLI):
     name = pod.metadata.name
     namespace = pod.metadata.namespace
 
-    events = api.list_namespaced_event(namespace, field_selector=f'type=Warning').items
+    events = api.list_namespaced_event(namespace, field_selector='type=Warning').items
     return [{'name': name, 'message': e.message, 'datetime': e.event_time}
             for e in events if e.involved_object.name == name]
 
