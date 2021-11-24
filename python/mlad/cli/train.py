@@ -124,7 +124,6 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             filepath = dirpath / 'description.yml'
             yield utils.print_info(f'Project Log Storage: {dirpath}')
             if not os.path.isfile(filepath):
-                project['created'] = datetime.fromtimestamp(project['created'])
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
             for app_name in app_names:
@@ -187,7 +186,6 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
             filepath = dirpath / 'description.yml'
             yield utils.print_info(f'Project Log Storage: {dirpath}')
             if not os.path.isfile(filepath):
-                project['created'] = datetime.fromtimestamp(project['created'])
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
             for app_name in app_names:
