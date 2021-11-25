@@ -90,6 +90,12 @@ def check_podname_syntax(obj):
     return True
 
 
+def convert_tag_only_image_prop(app_spec, image_tag):
+    if app_spec['image'].startswith(':'):
+        app_spec['image'] = image_tag.split(':')[0] + app_spec['image']
+    return app_spec
+
+
 @lru_cache(maxsize=None)
 def get_project_file():
     # Patch for WSL2 (/home/... -> /mnt/c/Users...)
