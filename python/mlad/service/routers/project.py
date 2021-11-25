@@ -4,9 +4,10 @@ from fastapi import APIRouter, Query, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from mlad.service.models import project
 from mlad.service.exceptions import (
-    InvalidProjectError, InvalidLogRequest, InvalidSessionError, exception_detail, InvalidAppError
+    InvalidLogRequest, InvalidSessionError, exception_detail
 )
 from mlad.core.kubernetes import controller as ctlr
+from mlad.core.exceptions import InvalidProjectError, InvalidAppError
 from mlad.core import exceptions
 
 
