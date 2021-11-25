@@ -70,7 +70,7 @@ def up(file: Optional[str]):
     app_specs = []
     for name, app_spec in project.get('app', dict()).items():
         app_spec['name'] = name
-        app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag) 
+        app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
         app_specs.append(app_spec)
 
     yield 'Start apps...'
