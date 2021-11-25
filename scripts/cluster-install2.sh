@@ -850,6 +850,8 @@ then
         [ ${NAMES_COUNT:-0} -gt 0 ] && {
             HELM_ARGS[dcgm-exporter.serviceMonitor.namespace]=$(echo $JSON_NAMES | jq .[0] -r)
         }
+    } || {
+        HELM_ARGS[dcgm-exporter.serviceMonitor.enabled]=false
     }
 
     PrintStep "Deploy MLAppDeploy Service."
