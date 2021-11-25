@@ -456,7 +456,7 @@ elif [ $DEPLOY ]; then
     declare -A HELM_ARGS_OVERRIDE
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
     SERVICE_NAME=service
-    OPTIONS=$(getopt -o brh --long registry:,name,ingress:,monitoring,set:,beta,config:,reset,help -- "$@")
+    OPTIONS=$(getopt -o brh --long registry:,name:,ingress:,monitoring,set:,beta,config:,reset,help -- "$@")
     [ $? -eq 0 ] || DeployUsage
     eval set -- "$OPTIONS"
     while true; do
@@ -858,7 +858,7 @@ then
     ! HasHelmRepo mlappdeploy && helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
     helm repo update
 
-    SELECTOR=app.kubernetes.io/instance=$INSTANCE,app.kubernetes.io/name=$SERVICE_NAME
+    SELECTOR=app.kubernetes.io/instance=$INSTANCE,app.kubernetes.io/name=api-server
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
     VERSION=$(sudo docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
     HELM_ARGS[image.repository]=$IMAGE_NAME
@@ -894,7 +894,7 @@ then
     ColorEcho "Deploy MLAppDeploy service."
     if [ $ROLLOUT ]
     then
-        helm update $INSTANCE mlappdeploy/api-server -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+        helm upgrade $INSTANCE mlappdeploy/api-server -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
     else
         helm install $INSTANCE mlappdeploy/api-server --create-namespace -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
     fi
