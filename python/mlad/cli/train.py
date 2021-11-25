@@ -90,25 +90,6 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     if project_key is None:
         project_key = utils.workspace_key()
 
-    def _get_log_dirpath(project: Dict) -> Path:
-        workdir = utils.get_project(default_project)['workdir'] \
-            if not project_key_assigned else str(Path().absolute())
-        path = Path(f'{workdir}/.logs/{project["created"].replace(":", "-")}')
-        path.mkdir(exist_ok=True, parents=True)
-        return path
-
-    def _dump_logs(app_name: str, dirpath: Path):
-        path = dirpath / f'{app_name}.log'
-        with open(path, 'w') as log_file:
-            try:
-                logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
-                for log in logs:
-                    log = utils.parse_log(log)
-                    log_file.write(log)
-            except InvalidLogRequest:
-                return f'There is no log in [{app_name}].'
-        return f'The log file of app [{app_name}] saved.'
-
     # Check the project already exists
     project = API.project.inspect(project_key=project_key)
 
@@ -118,14 +99,14 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
         # Dump logs
         if not no_dump:
-            dirpath = _get_log_dirpath(project)
+            dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
             yield utils.print_info(f'Project Log Storage: {dirpath}')
             if not os.path.isfile(filepath):
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
             for app_name in app_names:
-                yield _dump_logs(app_name, dirpath)
+                yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove the apps
         lines = API.app.remove(project_key, apps=app_names, stream=True)
@@ -152,25 +133,6 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
     if project_key is None:
         project_key = utils.workspace_key()
 
-    def _get_log_dirpath(project: Dict) -> Path:
-        workdir = utils.get_project(default_project)['workdir'] \
-            if not project_key_assigned else str(Path().absolute())
-        path = Path(f'{workdir}/.logs/{project["created"].replace(":", "-")}')
-        path.mkdir(exist_ok=True, parents=True)
-        return path
-
-    def _dump_logs(app_name: str, dirpath: Path):
-        path = dirpath / f'{app_name}.log'
-        with open(path, 'w') as log_file:
-            try:
-                logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
-                for log in logs:
-                    log = utils.parse_log(log)
-                    log_file.write(log)
-            except InvalidLogRequest:
-                return f'There is no log in [{app_name}].'
-        return f'The log file of app [{app_name}] saved.'
-
     # Check the project already exists
     project = API.project.inspect(project_key=project_key)
 
@@ -180,14 +142,14 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
         # Dump logs
         if not no_dump:
-            dirpath = _get_log_dirpath(project)
+            dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
             yield utils.print_info(f'Project Log Storage: {dirpath}')
             if not os.path.isfile(filepath):
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
             for app_name in app_names:
-                yield _dump_logs(app_name, dirpath)
+                yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove the apps
         namespace = k8s_ctlr.get_namespace(project_key=project_key)
@@ -242,3 +204,24 @@ def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optio
         if target_name in app_names:
             API.app.scale(project_key, target_name, value)
             yield f'Scale updated [{target_name}] = {value}'
+
+
+def _get_log_dirpath(project: Dict, project_key_assigned: bool) -> Path:
+    workdir = utils.get_project(default_project)['workdir'] \
+        if not project_key_assigned else str(Path().absolute())
+    path = Path(f'{workdir}/.logs/{project["created"].replace(":", "-")}')
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
+def _dump_logs(app_name: str, project_key: str, dirpath: Path):
+    path = dirpath / f'{app_name}.log'
+    with open(path, 'w') as log_file:
+        try:
+            logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
+            for log in logs:
+                log = utils.parse_log(log)
+                log_file.write(log)
+        except InvalidLogRequest:
+            return f'There is no log in [{app_name}].'
+    return f'The log file of app [{app_name}] saved.'
