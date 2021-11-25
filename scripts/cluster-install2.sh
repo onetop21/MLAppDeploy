@@ -870,7 +870,7 @@ then
         INSTANCE+='-beta'
         HELM_ARGS[additionalLabels.app\.kubernetes\.io/beta]=true
         HELM_ARGS[ingress.annotations.'nginx\.ingress\.kubernetes\.io/rewrite-target']='/$2'
-        HELM_ARGS[ingress.host[0].path[0].path]='/beta(/|$)(.*)'
+        HELM_ARGS[ingress.hosts[0].paths[0].path]='/beta(/|$)(.*)'
         HELM_ARGS[env.ROOT_PATH]='/beta'
         HELM_ARGS[image.tag]=latest
     fi
