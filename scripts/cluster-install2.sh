@@ -456,7 +456,7 @@ elif [ $DEPLOY ]; then
     declare -A HELM_ARGS_OVERRIDE
     REGISTRY_ADDR=ghcr.io/onetop21 # ref, https://github.com/onetop21/MLAppDeploy
     SERVICE_NAME=service
-    OPTIONS=$(getopt -o brh --long registry:,name:,ingress:,monitoring,set:,beta,config:,reset,help -- "$@")
+    OPTIONS=$(getopt -o brh --long registry:,name,ingress:,monitoring,set:,beta,config:,reset,help -- "$@")
     [ $? -eq 0 ] || DeployUsage
     eval set -- "$OPTIONS"
     while true; do
@@ -850,15 +850,13 @@ then
         [ ${NAMES_COUNT:-0} -gt 0 ] && {
             HELM_ARGS[dcgm-exporter.serviceMonitor.namespace]=$(echo $JSON_NAMES | jq .[0] -r)
         }
-    } || {
-        HELM_ARGS[dcgm-exporter.serviceMonitor.enabled]=false
     }
 
     PrintStep "Deploy MLAppDeploy Service."
     ! HasHelmRepo mlappdeploy && helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
     helm repo update
 
-    SELECTOR=app.kubernetes.io/instance=$INSTANCE,app.kubernetes.io/name=api-server
+    SELECTOR=app.kubernetes.io/instance=$INSTANCE,app.kubernetes.io/name=$SERVICE_NAME
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
     VERSION=$(sudo docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
     HELM_ARGS[image.repository]=$IMAGE_NAME
@@ -869,7 +867,7 @@ then
         SELECTOR+=',app.kubernetes.io/beta'
         INSTANCE+='-beta'
         HELM_ARGS[additionalLabels.app\.kubernetes\.io/beta]=true
-        HELM_ARGS[ingress.annotations.nginx\.ingress\.kubernetes\.io/rewrite-target]='/$2'
+        HELM_ARGS[ingress.annotations.'nginx\.ingress\.kubernetes\.io/rewrite-target']='/$2'
         HELM_ARGS[ingress.host[0].path[0].path]='/beta(/|$)(.*)'
         HELM_ARGS[env.ROOT_PATH]='/beta'
         HELM_ARGS[image.tag]=latest
@@ -894,7 +892,7 @@ then
     ColorEcho "Deploy MLAppDeploy service."
     if [ $ROLLOUT ]
     then
-        helm upgrade $INSTANCE mlappdeploy/api-server -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+        helm update $INSTANCE mlappdeploy/api-server -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
     else
         helm install $INSTANCE mlappdeploy/api-server --create-namespace -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
     fi
