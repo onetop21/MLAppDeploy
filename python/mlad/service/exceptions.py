@@ -1,4 +1,7 @@
-class InvalidSessionError(Exception):
+from mlad.core.exceptions import MLADException
+
+
+class InvalidSessionError(MLADException):
     def __init__(self, app=False):
         self.target = 'App' if app else 'Project'
 
@@ -7,11 +10,7 @@ class InvalidSessionError(Exception):
                f'the project creator'
 
 
-class InvalidLogRequest(Exception):
-    pass
-
-
-class TokenError(Exception):
+class InvalidLogRequest(MLADException):
     pass
 
 
@@ -28,8 +27,6 @@ def exception_detail(e):
         reason = 'ProjectNotFound'
     elif exception == 'InvalidLogRequest':
         reason = 'AppNotRunning'
-    elif exception == 'TokenError':
-        reason = exception
     else:
         reason = 'InternalError'
         # reason = exception
