@@ -1,12 +1,11 @@
-class Duplicated(Exception):
+from mlad.core.exceptions import MLADException
+
+
+class InvalidURLError(MLADException):
     pass
 
 
-class TokenError(Exception):
-    pass
-
-
-class ImageNotFoundError(Exception):
+class ImageNotFoundError(MLADException):
 
     def __init__(self, name: str):
         self._name = name
@@ -15,7 +14,7 @@ class ImageNotFoundError(Exception):
         return f'Cannot find built image of the project [{self._name}].'
 
 
-class ContextAlreadyExistError(Exception):
+class ContextAlreadyExistError(MLADException):
 
     def __init__(self, name: str):
         self._name = name
@@ -24,7 +23,7 @@ class ContextAlreadyExistError(Exception):
         return f'The context [{self._name}] already exists.'
 
 
-class ContextNotFoundError(Exception):
+class ContextNotFoundError(MLADException):
 
     def __init__(self, name: str):
         self._name = name
@@ -33,13 +32,13 @@ class ContextNotFoundError(Exception):
         return f'There is no context [{self._name}] in contexts.'
 
 
-class CannotDeleteContextError(Exception):
+class CannotDeleteContextError(MLADException):
 
     def __str__(self):
         return 'The current context cannot be delete, please change the context.'
 
 
-class InvalidPropertyError(Exception):
+class InvalidPropertyError(MLADException):
 
     def __init__(self, arg: str):
         self._arg = arg
@@ -48,25 +47,25 @@ class InvalidPropertyError(Exception):
         return f'There is no matched key in "{self._arg}".'
 
 
-class MLADBoardNotActivatedError(Exception):
+class MLADBoardNotActivatedError(MLADException):
 
     def __str__(self):
         return 'The MLAD dashboard is not activated.'
 
 
-class MLADBoardAlreadyActivatedError(Exception):
+class MLADBoardAlreadyActivatedError(MLADException):
 
     def __str__(self):
         return 'The MLAD dashboard is already activated at localhost:2021.'
 
 
-class BoardImageNotExistError(Exception):
+class BoardImageNotExistError(MLADException):
 
     def __str__(self):
         return 'The MLAD dashboard image does not exist.'
 
 
-class ComponentImageNotExistError(Exception):
+class ComponentImageNotExistError(MLADException):
 
     def __init__(self, name):
         self.name = name
@@ -75,13 +74,13 @@ class ComponentImageNotExistError(Exception):
         return f'The component [{self.name}] image does not exist.'
 
 
-class CannotBuildComponentError(Exception):
+class CannotBuildComponentError(MLADException):
 
     def __str__(self):
         return 'The component spec does not have `workspace` property to build an image.'
 
 
-class ProjectAlreadyExistError(Exception):
+class ProjectAlreadyExistError(MLADException):
 
     def __init__(self, project_key: str):
         self.project_key = project_key
@@ -90,7 +89,7 @@ class ProjectAlreadyExistError(Exception):
         return f'Failed to create a project: [{self.project_key}] already exists.'
 
 
-class InvalidProjectKindError(Exception):
+class InvalidProjectKindError(MLADException):
 
     def __init__(self, kind: str, command: str = 'train'):
         self.kind = kind
@@ -100,7 +99,7 @@ class InvalidProjectKindError(Exception):
         return f'Only kind "{self.kind}" is valid for "{self.command}" command.'
 
 
-class InvalidUpdateOptionError(Exception):
+class InvalidUpdateOptionError(MLADException):
 
     def __init__(self, key: str):
         self.key = key

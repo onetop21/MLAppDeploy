@@ -5,7 +5,7 @@ import pytest
 from omegaconf import OmegaConf
 from mlad.cli import context
 from mlad.cli.exceptions import ContextAlreadyExistError
-from mlad.cli.libs.exceptions import InvalidURLError
+from mlad.cli.exceptions import InvalidURLError
 
 from . import mock
 

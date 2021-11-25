@@ -1,2 +1,0 @@
-class InvalidURLError(Exception):
-    pass

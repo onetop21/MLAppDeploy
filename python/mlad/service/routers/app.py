@@ -1,4 +1,5 @@
 import json
+import traceback
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
 from fastapi.responses import StreamingResponse
@@ -48,6 +49,7 @@ def send_apps_list(labels: List[str] = Query(None), session: str = Header(None))
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -71,6 +73,7 @@ def send_apps(project_key: str, labels: List[str] = Query(None), session: str = 
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -89,6 +92,7 @@ def create_app(project_key: str, req: app_models.CreateRequest,
     except APIError as e:
         raise HTTPException(status_code=e.status_code, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -102,6 +106,7 @@ def inspect_app(project_key: str, app_name: str, session: str = Header(None)):
     except InvalidAppError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -115,6 +120,7 @@ def inspect_tasks(project_key: str, app_name: str, session: str = Header(None)):
     except InvalidAppError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -128,6 +134,7 @@ def scale_app(project_key: str, app_name: str, req: app_models.ScaleRequest, ses
     except InvalidAppError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return {'message': f'App {app_name} scale updated'}
 
@@ -166,6 +173,7 @@ def remove_apps(project_key: str, req: app_models.RemoveRequest,
     except InvalidSessionError as e:
         raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
     if stream:
         return StreamingResponse(stringify_response(res), background=handler)

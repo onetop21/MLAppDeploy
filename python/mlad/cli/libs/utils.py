@@ -16,10 +16,9 @@ from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from getpass import getuser
 
+from mlad.cli.exceptions import InvalidURLError
 from datetime import datetime
 from dateutil import parser
-
-from mlad.cli.libs.exceptions import InvalidURLError
 
 if TYPE_CHECKING:
     from mlad.cli.context import Context
@@ -254,7 +253,7 @@ def print_info(line):
 def match(filepath, ignores):
     result = False
     normpath = os.path.normpath(filepath)
-    
+
     def matcher(path, pattern):
         patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")]
                                 if '**/' in pattern else [])
@@ -340,8 +339,7 @@ def get_registry_address(config: Context):
 def created_to_age(created: str):
     # param created: str of datetime
 
-    uptime = (datetime.utcnow() - parser.parse(created).
-            replace(tzinfo=None)).total_seconds()
+    uptime = (datetime.utcnow() - parser.parse(created).replace(tzinfo=None)).total_seconds()
     if uptime > 24 * 60 * 60:
         uptime = f"{uptime // (24 * 60 * 60):.0f} days"
     elif uptime > 60 * 60:
