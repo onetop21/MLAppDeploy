@@ -687,8 +687,9 @@ elif [ $DEPLOY ]; then
         ColorEcho 'Metrics Server is already installed.'
     else
         # Install Helm
-        [ ! IsInstalled helm ] && (
-            PrintStep "Install Helm."
+        (IsInstalled helm == '0' > /dev/null) && INSTALL_HELM=1
+        [ $INSTALL_HELM ] && (
+            ColorEcho "Install Helm."
             curl -s https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
         )
         helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
