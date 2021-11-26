@@ -10,6 +10,12 @@ from mlad.api import API
 from mlad.api.exceptions import APIError
 
 
+def list_project_key(ctx, args, incomplete):
+    project_specs = API.project.get()
+    keys = [spec['key'] for spec in project_specs]
+    return [key for key in keys if key.startswith(incomplete)]
+
+
 def get_project_file_completion(ctx, args, incomplete):
     files = glob.glob(f"{incomplete}*" or '*')
     subcommands = [f"{_}/" for _ in files if os.path.isdir(_)]

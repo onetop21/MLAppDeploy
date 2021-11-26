@@ -4,12 +4,9 @@ from typing import Optional, List
 from mlad.cli import deploy
 from mlad.cli.libs import utils
 from mlad.cli.libs.auth import auth_admin
+from mlad.cli.autocompletion import list_project_key
 
 from . import echo_exception
-
-
-# mlad deploy serve
-# mlad deploy kill
 
 
 @click.command()
@@ -25,7 +22,7 @@ def serve(file: Optional[str]):
 
 
 @click.command()
-@click.argument('project-key', required=True)
+@click.argument('project-key', required=True, autocompletion=list_project_key)
 @click.option('--file', '-f', default=None, help=(
     'Specify an project file to be used for update.\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
@@ -40,7 +37,7 @@ def update(project_key: str, file: Optional[str]):
 
 
 @click.command()
-@click.argument('project-key', required=True)
+@click.argument('project-key', required=True, autocompletion=list_project_key)
 @click.option('--no-dump', is_flag=True,
               help='Save the log before shutting down the services')
 @echo_exception
@@ -53,7 +50,7 @@ def kill(project_key: str, no_dump: bool):
 
 
 @click.command()
-@click.argument('project-key', required=True)
+@click.argument('project-key', required=True, autocompletion=list_project_key)
 @click.argument('scales', required=True, nargs=-1)
 @echo_exception
 def scale(project_key: str, scales: List[str]):
