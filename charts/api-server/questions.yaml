@@ -1,0 +1,81 @@
+questions:
+- variable: fromDockerhub
+  default: false
+  description:  "API Server image location to pull."
+  type: boolean
+  required: true
+  label: API Server Image from DockerHub
+  group: "API Server Settings"
+
+- variable: nvidia-device-plugin.enabled
+  group: "NVIDIA GPU Settings: NVIDIA Device Plguin"
+  label: NVIDIA Device Plugin
+  description: "Deploy NVIDIA device plugin for discovery GPU devices on nodes."
+  default: true
+  type: boolean
+  show_subquestion_if: true
+  subquestions:
+  - variable: nvidia-device-plugin.image.repository
+    label: NVIDIA Device Plugin Image Repository
+    description: Select NVIDIA Device plugin image repository
+    type: enum
+    default: docker.io/nvidia/k8s-device-plugin
+    options:
+    - nvcr.io/nvidia/k8s-device-plugin
+    - docker.io/nvidia/k8s-device-plugin
+
+- variable: gpu-feature-discovery.enabled
+  group: "NVIDIA GPU Settings: GPU Feature Discovery"
+  label: GPU Feature Discovery
+  description:  "Deploy GPU Feature Discovery for attaching label about GPU-stats to nodes."
+  default: true
+  type: boolean
+  show_subquestion_if: true
+  subquestions:
+  - variable: gpu-feature-discovery.image.repository
+    label: NVIDIA GPU Feature Discovery Image Repository
+    description: Select GPU feature discovery image repository
+    type: enum
+    default: docker.io/nvidia/gpu-feature-discovery
+    options:
+    - nvcr.io/nvidia/gpu-feature-discovery
+    - docker.io/nvidia/gpu-feature-discovery
+  - variable: gpu-feature-discovery.nfd.deploy
+    label: Node Feature Discoveryfor GPU Feature Discovery
+    description:  "Deploy Node Feature Discovery plugin for attaching label to nodes (Set FALSE if already installed)."
+    default: true
+    type: boolean
+
+- variable: dcgm-exporter.enabled
+  group: "NVIDIA GPU Settiongs: DCGM Exporter"
+  default: true
+  description:  "Deploy DCGM Exporter as a container on the system for monitoring GPU status."
+  type: boolean
+  label: DCGM Exporter
+  show_subquestion_if: true
+  subquestions:
+  - variable: dcgm-exporter.image.repository
+    label: DCGM Exporter Image Repository
+    description: Select DCGM Exporter image repository
+    type: enum
+    default: docker.io/nvidia/dcgm-exporter
+    options:
+    - nvcr.io/nvidia/k8s/dcgm-exporter
+    - docker.io/nvidia/dcgm-exporter
+  - variable: dcgm-exporter.serviceMonitor.enabled
+    default: true
+    label: Service Monitor
+    description:  "Enabled to deploy service monitor for DCGM exporter."
+    type: boolean
+  - variable: dcgm-exporter.serviceMonitor.additionalLabels
+    show_if: dcgm-exporter.serviceMonitor.enabled=true
+    default: "release: prometheus-stack"
+    label: Labels for Service Monitor
+    description:  "Labels to deploy service monitor."
+    type: multiline
+  - variable: dcgm-exporter.serviceMonitor.namespace
+    show_if: dcgm-exporter.serviceMonitor.enabled=true
+    default: cattle-prometheus
+    label: Namespace for Service Monitor
+    description:  "Namespace to deploy service monitor (recommend: a namespace deployed prometheus operator)."
+    type: string
