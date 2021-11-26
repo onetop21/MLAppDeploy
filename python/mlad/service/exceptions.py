@@ -1,22 +1,7 @@
-class InvalidProjectError(Exception):
-    def __init__(self, project_id):
-        self.project_id = project_id
-
-    def __str__(self):
-        return f'Cannot find project {self.project_id}'
+from mlad.core.exceptions import MLADException
 
 
-class InvalidAppError(Exception):
-    def __init__(self, project_id, app_id):
-        self.project_id = project_id
-        self.app_id = app_id
-
-    def __str__(self):
-        return (f'Cannot find app {self.app_id} '
-                f'in project {self.project_id}')
-
-
-class InvalidSessionError(Exception):
+class InvalidSessionError(MLADException):
     def __init__(self, app=False):
         self.target = 'App' if app else 'Project'
 
@@ -25,11 +10,7 @@ class InvalidSessionError(Exception):
                f'the project creator'
 
 
-class InvalidLogRequest(Exception):
-    pass
-
-
-class TokenError(Exception):
+class InvalidLogRequest(MLADException):
     pass
 
 
@@ -46,8 +27,6 @@ def exception_detail(e):
         reason = 'ProjectNotFound'
     elif exception == 'InvalidLogRequest':
         reason = 'AppNotRunning'
-    elif exception == 'TokenError':
-        reason = exception
     else:
         reason = 'InternalError'
         # reason = exception

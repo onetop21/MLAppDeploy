@@ -1,8 +1,9 @@
 import json
 from requests.exceptions import HTTPError
+from mlad.core.exceptions import MLADException
 
 
-class APIError(Exception):
+class APIError(MLADException):
     def __init__(self, msg, response=None):
         if isinstance(msg, list):
             msg = str(msg)

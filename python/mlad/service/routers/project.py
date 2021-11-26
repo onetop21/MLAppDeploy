@@ -1,11 +1,13 @@
 import json
+import traceback
 from fastapi import APIRouter, Query, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from mlad.service.models import project
 from mlad.service.exceptions import (
-    InvalidProjectError, InvalidLogRequest, InvalidSessionError, exception_detail, InvalidAppError
+    InvalidLogRequest, InvalidSessionError, exception_detail
 )
 from mlad.core.kubernetes import controller as ctlr
+from mlad.core.exceptions import InvalidProjectError, InvalidAppError
 from mlad.core import exceptions
 
 
@@ -39,6 +41,7 @@ def create_project(req: project.CreateRequest, allow_reuse: bool = Query(False),
     except TypeError as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=400, detail=exception_detail(e))
 
 
@@ -53,6 +56,7 @@ def projects(extra_labels: str = '', session: str = Header(None)):
                 projects.append(spec)
         return projects
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -67,6 +71,7 @@ def inspect_project(project_key: str, session: str = Header(None)):
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -90,6 +95,7 @@ def remove_project(project_key: str, session: str = Header(None)):
     except InvalidSessionError as e:
         raise HTTPException(status_code=401, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -145,6 +151,7 @@ def send_project_log(project_key: str, tail: str = Query('all'),
     except InvalidLogRequest as e:
         raise HTTPException(status_code=400, detail=exception_detail(e))
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -154,6 +161,7 @@ def project_resource(project_key: str, session: str = Header(None)):
         res = ctlr.get_project_resources(project_key)
         return res
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
 
 
@@ -167,4 +175,5 @@ def update_project(project_key: str, req: project.UpdateRequest):
         res = ctlr.update_apps(namespace, apps)
         return [ctlr.inspect_app(_) for _ in res]
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
