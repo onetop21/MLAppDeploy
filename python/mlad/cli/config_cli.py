@@ -1,5 +1,3 @@
-import subprocess
-
 import click
 from omegaconf import OmegaConf
 from mlad.cli import config
@@ -49,10 +47,10 @@ def env(unset):
 
 @click.command()
 @echo_exception
-def autocompletion(install):
+def autocompletion():
     '''Activate auto completion (Linux bash shell only)'''
-    subprocess.call(['eval', '"$(_MLAD_COMPLETE=source_bash mlad)"'])
-    click.echo('Completion is successfully activated.')
+    click.echo('Run the following command to activate autocompletion')
+    click.echo('eval "$(_MLAD_COMPLETE=source_bash mlad)"')
 
 
 @click.group('config')
