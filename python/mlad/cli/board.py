@@ -188,6 +188,7 @@ def list():
                 port
             ))
     utils.print_table(columns, 'No components installed', 0)
+    return containers
 
 
 def _obtain_host():

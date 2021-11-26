@@ -49,7 +49,7 @@ def env(unset):
 @echo_exception
 def autocompletion():
     '''Activate auto completion (Linux bash shell only)'''
-    click.echo('Run the following command to activate autocompletion')
+    click.echo('Run the following command to activate autocompletion:')
     click.echo('eval "$(_MLAD_COMPLETE=source_bash mlad)"')
 
 
