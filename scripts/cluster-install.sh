@@ -682,9 +682,15 @@ elif [ $DEPLOY ]; then
     fi
 
     PrintStep "Install Metrics Server."
+
     if [[ `kubectl -n kube-system get deploy metrics-server > /dev/null 2>&1; echo $?` == "0" ]]; then
         ColorEcho 'Metrics Server is already installed.'
     else
+        # Install Helm
+        [ ! IsInstalled helm ] && (
+            PrintStep "Install Helm."
+            curl -s https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+        )
         helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
         helm install --set 'args={--kubelet-insecure-tls}' -n kube-system metrics-server metrics-server/metrics-server
     fi
