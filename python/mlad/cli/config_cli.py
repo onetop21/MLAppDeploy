@@ -1,7 +1,6 @@
 import click
 from omegaconf import OmegaConf
 from mlad.cli import config
-from mlad.cli.autocompletion import get_config_key_completion
 from . import echo_exception
 
 
@@ -17,7 +16,7 @@ def init(address):
 
 
 @click.command()
-@click.argument('ARGS', required=True, nargs=-1, autocompletion=get_config_key_completion)
+@click.argument('ARGS', required=True, nargs=-1)
 @echo_exception
 def set(args):
     '''Set configurations. [KEY=VALUE]...'''
