@@ -171,7 +171,7 @@ def uninstall(name: str) -> None:
         container.stop()
 
 
-def list():
+def list(no_print: bool = False):
     cli = get_cli()
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
@@ -187,7 +187,8 @@ def list():
                 container.labels['APP_NAME'],
                 port
             ))
-    utils.print_table(columns, 'No components installed', 0)
+    if not no_print:
+        utils.print_table(columns, 'No components installed', 0)
     return containers
 
 

@@ -10,7 +10,7 @@ def list_project_keys(ctx, args, incomplete):
 
 
 def list_component_names(ctx, args, incomplete):
-    containers = board.list()
+    containers = board.list(no_print=True)
     component_names = set([container.labels['COMPONENT_NAME']
                           for container in containers])
     return [name for name in component_names if name.startswith(incomplete)]
