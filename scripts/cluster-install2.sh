@@ -858,7 +858,7 @@ then
     ! HasHelmRepo mlappdeploy && helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
     helm repo update
 
-    SELECTOR=app.kubernetes.io/instance=$INSTANCE,app.kubernetes.io/name=api-server
+    SELECTOR=app.kubernetes.io/name=api-server
     IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
     VERSION=$(sudo docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
     HELM_ARGS[image.repository]=$IMAGE_NAME
@@ -866,7 +866,6 @@ then
 
     if [ $BETA ]
     then
-        SELECTOR+=',app.kubernetes.io/beta'
         INSTANCE+='-beta'
         HELM_ARGS[additionalLabels.app\.kubernetes\.io/beta]=true
         HELM_ARGS[ingress.annotations.'nginx\.ingress\.kubernetes\.io/rewrite-target']='/$2'
@@ -874,6 +873,7 @@ then
         HELM_ARGS[env.ROOT_PATH]='/beta'
         HELM_ARGS[image.tag]=latest
     fi
+    SELECTOR+=",app.kubernetes.io/instance=$INSTANCE"
     (IsDeployed deploy $SELECTOR) && ROLLOUT=1
 
     # Generate Options
