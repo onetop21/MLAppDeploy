@@ -1,7 +1,7 @@
 import click
 from mlad.cli import image
 from mlad.cli.libs import utils
-from mlad.cli.autocompletion import list_iamge_ids
+from mlad.cli.autocompletion import list_image_ids
 
 from . import echo_exception
 
@@ -41,7 +41,7 @@ def build(file, quiet, no_cache, pull):
 
 @click.command()
 @click.option('--force', '-f', is_flag=True, help='Remove forcely')
-@click.argument('ID', nargs=-1, required=True, autocompletion=list_iamge_ids)
+@click.argument('ID', nargs=-1, required=True, autocompletion=list_image_ids)
 @echo_exception
 def rm(force, id):
     '''Remove built image'''
