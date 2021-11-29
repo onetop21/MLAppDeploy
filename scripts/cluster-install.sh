@@ -654,7 +654,7 @@ elif [ $DEPLOY ]; then
     GetPrivileged
 
     [ `kubectl -n ingress-nginx get svc/ingress-nginx-controller >> /dev/null 2>&1; echo $?` -ne 0 ] && INGRESS=1
-    MAX_STEP=$((3+INGRESS))
+    MAX_STEP=$((4+INGRESS))
     
     if [[ `kubectl get node >> /dev/null 2>&1; echo $?` != "0" ]]; then
         ColorEcho ERROR "Need to install MLAppDeploy environment as master first."
@@ -664,21 +664,36 @@ elif [ $DEPLOY ]; then
 
     PrintStep "Install NVIDIA Device Plguin."
     if [[ `kubectl -n kube-system get ds/nvidia-device-plugin-daemonset >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        ColorEcho 'Already installed NVIDIA device plugin.'
+        ColorEcho 'NVIDIA device plugin is already installed.'
     else
         kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml
     fi
 
     PrintStep "Install Node Feature Discovery."
-    if [[ `kubect -n node-feature-discovery get ds/nfd >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        ColorEcho 'Already installed node feature discovery.'
+    if [[ `kubectl -n node-feature-discovery get ds/nfd >> /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho 'Node feature discovery is already installed.'
     else
         kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml
     fi
-    if [[ `kubect -n node-feature-discovery get ds/gpu-feature-discovery >> /dev/null 2>&1; echo $?` == "0" ]]; then
-        ColorEcho 'Already installed GPU feature discovery.'
+    if [[ `kubectl -n node-feature-discovery get ds/gpu-feature-discovery >> /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho 'GPU feature discovery is already installed.'
     else
         kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/gpu-feature-discovery-daemonset.yaml -n node-feature-discovery
+    fi
+
+    PrintStep "Install Metrics Server."
+
+    if [[ `kubectl -n kube-system get deploy metrics-server > /dev/null 2>&1; echo $?` == "0" ]]; then
+        ColorEcho 'Metrics Server is already installed.'
+    else
+        # Install Helm
+        (IsInstalled helm == '0' > /dev/null) && INSTALL_HELM=1
+        [ $INSTALL_HELM ] && (
+            ColorEcho "Install Helm."
+            curl -s https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+        )
+        helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+        helm install --set 'args={--kubelet-insecure-tls}' -n kube-system metrics-server metrics-server/metrics-server
     fi
 
     if [ $INGRESS ]; then
