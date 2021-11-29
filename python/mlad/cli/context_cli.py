@@ -4,6 +4,8 @@ from typing import Optional
 from omegaconf import OmegaConf
 
 from mlad.cli import context
+from mlad.cli.autocompletion import list_context_names
+
 from . import echo_exception
 
 
@@ -20,7 +22,7 @@ def add(name, address):
 
 
 @click.command()
-@click.argument('NAME', required=True)
+@click.argument('NAME', required=True, autocompletion=list_context_names)
 @echo_exception
 def use(name: str):
     """Change to the context."""

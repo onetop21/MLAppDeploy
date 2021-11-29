@@ -1,7 +1,6 @@
 import click
 from omegaconf import OmegaConf
 from mlad.cli import config
-from mlad.cli.autocompletion import get_config_key_completion
 from . import echo_exception
 
 
@@ -17,7 +16,7 @@ def init(address):
 
 
 @click.command()
-@click.argument('ARGS', required=True, nargs=-1, autocompletion=get_config_key_completion)
+@click.argument('ARGS', required=True, nargs=-1)
 @echo_exception
 def set(args):
     '''Set configurations. [KEY=VALUE]...'''
@@ -45,22 +44,12 @@ def env(unset):
     click.echo(msg)
 
 
-# @click.command()
-# @click.option('--install', is_flag=True, help='Install shell-completion to shell(Linux Only)')
-# @echo_exception
-# def completion(install):
-#     '''Activate auto completion (Linux Only)'''
-#     shell = os.path.basename(os.environ.get('SHELL'))
-#     if shell in ['bash', 'zsh']:
-#         if install:
-#             utils.write_completion(shell)
-#             click.echo(f"Register \"source {utils.COMPLETION_FILE}\" to rc file.")
-#         else:
-#             completion_script = utils.get_completion(shell)
-#             click.echo(completion_script)
-#             click.echo("# To set environment variables, run \"eval \"$(mlad config completion)\"\"")
-#     else:
-#         click.echo(f'Cannot support shell [{shell}].\nSupported Shell: bash, zsh')
+@click.command()
+@echo_exception
+def autocompletion():
+    '''Activate auto completion (Linux bash shell only)'''
+    click.echo('Run the following command to activate autocompletion:')
+    click.echo('eval "$(_MLAD_COMPLETE=source_bash mlad)"')
 
 
 @click.group('config')
@@ -72,3 +61,4 @@ cli.add_command(init)
 cli.add_command(set)
 cli.add_command(get)
 cli.add_command(env)
+cli.add_command(autocompletion)

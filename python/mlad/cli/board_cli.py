@@ -1,6 +1,8 @@
 import click
 
 from mlad.cli import board
+from mlad.cli.autocompletion import list_component_names
+
 from . import echo_exception
 
 
@@ -34,7 +36,7 @@ def install(file_path: str, no_build: bool):
 
 
 @click.command()
-@click.argument('name', required=True)
+@click.argument('name', required=True, autocompletion=list_component_names)
 @echo_exception
 def uninstall(name: str):
     """Uninstall the component and remove it from MLAD board."""

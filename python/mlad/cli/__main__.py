@@ -10,7 +10,6 @@ from mlad.cli import context_cli as context
 from mlad.cli import board_cli as board
 from mlad.cli import train_cli as train
 from mlad.cli import deploy_cli as deploy
-from mlad.cli.autocompletion import get_project_file_completion
 from mlad.cli.libs.auth import auth_admin
 from mlad.cli.exceptions import ContextNotFoundError
 from mlad.cli.context import get as check_context

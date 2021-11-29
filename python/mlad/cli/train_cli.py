@@ -4,6 +4,7 @@ from typing import Optional, List
 from mlad.cli import train
 from mlad.cli.libs import utils, MutuallyExclusiveOption
 from mlad.cli.libs.auth import auth_admin
+from mlad.cli.autocompletion import list_project_keys
 
 from . import echo_exception
 
@@ -30,7 +31,8 @@ def up(file: Optional[str]):
     cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
 )
 @click.option('--project-key', '-k', help='Project Key', default=None,
-              cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
+              autocompletion=list_project_keys)
 @click.option('--no-dump', is_flag=True,
               help='Save the log before shutting down the apps')
 @echo_exception
@@ -50,7 +52,8 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
 )
 @click.option('--project-key', '-k', help='Project Key', default=None,
-              cls=MutuallyExclusiveOption, mutually_exclusive=['file'])
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
+              autocompletion=list_project_keys)
 @echo_exception
 def scale(scales: List[str], file: Optional[str], project_key: Optional[str]):
     '''Change the scale of one of the running apps.
