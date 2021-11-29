@@ -72,15 +72,16 @@ def serve(file: Optional[str]):
             }
 
     # Create apps
-    requests = []
-    for name, value in apps.items():
+    app_specs = []
+    for name, app_spec in apps.items():
         value['name'] = name
-        requests.append(value)
+        app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
+        app_specs.append(app_spec)
 
     yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:
-            res = API.app.create(project_key, requests)
+            res = API.app.create(project_key, app_specs)
             if h.interrupted:
                 pass
     except Exception as e:

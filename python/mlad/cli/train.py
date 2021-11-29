@@ -67,15 +67,16 @@ def up(file: Optional[str]):
             break
 
     # Create apps
-    apps = []
-    for name, value in project.get('app', dict()).items():
-        value['name'] = name
-        apps.append(value)
+    app_specs = []
+    for name, app_spec in project.get('app', dict()).items():
+        app_spec['name'] = name
+        app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
+        app_specs.append(app_spec)
 
     yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:
-            API.app.create(project_key, apps)
+            API.app.create(project_key, app_specs)
             if h.interrupted:
                 pass
     except Exception as e:
