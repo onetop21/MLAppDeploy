@@ -53,6 +53,7 @@ buildscript_default = {
     'app': {}
 }
 
+
 def update(x):
     kind = x['workspace'].get('kind', 'Workspace')
     return utils.update_obj(workspace_default if kind == 'Workspace' else

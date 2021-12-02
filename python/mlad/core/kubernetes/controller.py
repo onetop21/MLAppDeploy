@@ -372,7 +372,7 @@ def get_pod_info(pod):
         'namespace': pod.metadata.namespace,
         'created': pod.metadata.creation_timestamp,
         'container_status': list(),
-        'status': dict(),  
+        'status': dict(),
         'node': pod.spec.node_name,
         'phase': pod.status.phase,
         'events': get_pod_events(pod)
@@ -832,9 +832,9 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
 
 def update_apps(namespace, apps, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient): 
+    if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
-    if not isinstance(namespace, client.models.v1_namespace.V1Namespace): 
+    if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
     api = client.AppsV1Api(cli)
     namespace = namespace.metadata.name
@@ -989,7 +989,7 @@ def inspect_node(node):
         raise TypeError('Parameter is not valid type.')
     hostname = node.metadata.labels['kubernetes.io/hostname']
     availability = 'active' if node.spec.taints is None else 'pause'
-    platform = node.metadata.labels['kubernetes.io/os']    
+    platform = node.metadata.labels['kubernetes.io/os']
     arch = node.metadata.labels['kubernetes.io/arch']
     resources = node.status.capacity
     engine_version = node.status.node_info.kubelet_version

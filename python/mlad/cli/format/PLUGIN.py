@@ -1,6 +1,6 @@
 import sys
 
-FORMAT='''# MLAppDeploy Plugin v0.2
+FORMAT = '''# MLAppDeploy Plugin v0.2
 plugin:
     name: {NAME}
     version: {VERSION}
@@ -11,7 +11,7 @@ workspace:
     #requires:              # Describe package manager and dependency list to install pre-required.
     #    pip: requirements.txt
     #env:                   # Describe environment variables.
-    #    PYTHONUNBUFFERED: 1    
+    #    PYTHONUNBUFFERED: 1
     #ignore:                # Describe exclude files from plugin application.
     #   - "**/.*"
     #prescripts: []         # Describe Pre-scripts for preparing.
@@ -39,4 +39,3 @@ service:
 '''
 
 sys.modules[__name__] = FORMAT
-

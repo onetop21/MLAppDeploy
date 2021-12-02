@@ -7,7 +7,7 @@ from typing import Optional
 from mlad.cli import config as config_core
 from mlad.cli.validator import validators
 from mlad.cli.libs import utils
-from mlad.cli.Format import (
+from mlad.cli.format import (
     DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT,
     DOCKERFILE_REQ_ADD, DOCKERFILE_REQ_RUN, DOCKERFILE_REQ_APK, DOCKERFILE_REQ_YUM
 )

@@ -1,9 +1,5 @@
-import sys
 import os
-import uuid
 from distutils.util import strtobool
-from omegaconf import OmegaConf
-
 
 service_config = {
     'docker': {

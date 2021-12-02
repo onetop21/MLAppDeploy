@@ -2,7 +2,7 @@
 datastores = {}
 
 
-def add_datastore(kind, initializer=lambda: {}, finalizer=lambda x: x, 
+def add_datastore(kind, initializer=lambda: {}, finalizer=lambda x: x,
                   translator=lambda n, k, v: f"{n.upper()}_{k.upper()}={v or ''}", **prompt):
     datastores[kind] = {
         'prompt': prompt,
