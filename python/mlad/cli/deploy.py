@@ -131,6 +131,7 @@ def update(project_key: str, file: Optional[str]):
 
     project = API.project.inspect(project_key=project_key)
     cur_project_yaml = json.loads(project['project_yaml'])
+    image_tag = project['image']
 
     utils.process_file(file)
     project = utils.get_project(default_project)
@@ -154,6 +155,7 @@ def update(project_key: str, file: Optional[str]):
     diff_keys = {}
     for name, app in cur_apps.items():
         update_app = update_apps[name]
+        update_app = utils.convert_tag_only_image_prop(update_app, image_tag)
 
         env = {
             'current': app['env'] if 'env' in app else {},
