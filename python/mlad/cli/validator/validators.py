@@ -2,8 +2,8 @@
 from cerberus.validator import DocumentError
 
 from mlad.cli.validator.yaml_validator import Validator
-from mlad.cli.validator.yaml_parser import load, dump, SCHEMA_PATH
-from mlad.cli.validator.exceptions import InvalidProjectYaml, InvalidComponentYaml
+from mlad.cli.validator.yaml_parser import load, SCHEMA_PATH
+from mlad.cli.validator.exceptions import InvalidProjectYaml
 
 
 def validate(target):
@@ -18,4 +18,3 @@ def validate(target):
         return v.normalized_by_order(target)
     else:
         raise InvalidProjectYaml(v.errors)
-

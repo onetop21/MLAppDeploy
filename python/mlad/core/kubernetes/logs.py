@@ -1,24 +1,19 @@
 import sys
-import os
 import time
 import math
 from datetime import datetime
-import struct
-import itertools
 import socket
 import ssl
 import urllib3
 import traceback
 import docker
 import kubernetes
-import requests_unixsocket
 from dateutil import parser
 from threading import Thread
 from multiprocessing import Queue, Value
-from urllib3.util import response as response_util
-from mlad.core.libs import utils
 from mlad.core.kubernetes import controller as ctrl
 from kubernetes import client, watch
+
 
 class LogHandler:
     def __init__(self, cli):
@@ -37,7 +32,6 @@ class LogHandler:
             if _ and _._fp and _._fp.fp:
                 try:
                     sock = _._fp.fp.raw._sock
-                    #sock = _.raw._fp.fp.raw._sock
                     if isinstance(sock, ssl.SSLSocket):
                         sock.shutdown(socket.SHUT_RDWR)
                     else:
@@ -49,8 +43,7 @@ class LogHandler:
     def logs(self, namespace, target, **params):
         follow = params['follow']
         timestamps = params['timestamps']
-        tail = None if params['tail']=='all' else params['tail']
-        timeout = None if params['follow'] else 3
+        tail = None if params['tail'] == 'all' else params['tail']
         since_seconds = None
         if 'since_seconds' in params.keys():
             since_seconds = params['since_seconds']
@@ -60,7 +53,6 @@ class LogHandler:
             resp = api.read_namespaced_pod_log(name=target, namespace=namespace, tail_lines=tail, timestamps=timestamps,
                                                follow=follow, since_seconds=since_seconds, _preload_content=False)
             self.responses[target] = resp
-            #Thread(target=LogHandler._monitor, args=(self.monitoring, host, target, lambda: self.close(resp)), daemon=True).start()
             for line in resp:
                 try:
                     line = line.decode()
@@ -68,31 +60,20 @@ class LogHandler:
                     print(f"[Ignored] Log Decode Error : {e}")
                     continue
                 line = f"{target} {line}"
-                if not (line.endswith('\n') or line.endswith('\r')): line += '\n'
-                line= line.encode()
+                if not (line.endswith('\n') or line.endswith('\r')):
+                    line += '\n'
+                line = line.encode()
                 if params.get('timestamps'):
                     separated = line.split(b' ')
                     line = b' '.join([separated[0], separated[1], *separated[2:]])
-                    #line = b' '.join([separated[1], separated[0], *separated[2:]])
                 yield line
         except urllib3.exceptions.ProtocolError:
             pass
         except urllib3.exceptions.ReadTimeoutError:
             pass
-        if target in self.responses: del self.responses[target]
+        if target in self.responses:
+            del self.responses[target]
 
-    @classmethod
-    def _monitor(cls, should_run, host, target, callback):
-        params = {'stderr': True, 'tail': 1}
-        cli = ctrl.get_api_client()
-        api = client.CoreV1Api(cli)
-        while should_run.value:
-            ret = api.read_namespaced_pod_log(name=target, namespace=namespace, follow=True, _preload_content=False)
-           # status = requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, timeout=1).status_code
-            if ret.status != 200:
-                callback()
-                break
-            time.sleep(1)
 
 class LogCollector():
     def __init__(self, maxbuffer=65535, release_callback=None):
@@ -112,21 +93,27 @@ class LogCollector():
             if not self.threads[object_id]['from_dockerpy']:
                 if self.threads[object_id]['timestamps']:
                     separated = stream.split(' ', 2)
-                    if len(separated) < 3: _, timestamp, body = (*separated, '')
-                    else: _, timestamp, body = separated
+                    if len(separated) < 3:
+                        _, timestamp, body = (*separated, '')
+                    else:
+                        _, timestamp, body = separated
                     output['timestamp'] = parser.parse(timestamp).astimezone()
                     output['stream'] = body.encode()
                 else:
                     separated = stream.split(' ', 1)
-                    if len(separated) < 2: _, body = (*separated, '')
-                    else: _, body = separated
+                    if len(separated) < 2:
+                        _, body = (*separated, '')
+                    else:
+                        _, body = separated
                     output['stream'] = body.encode()
                 output['name'] = f"{_[_.rfind('=')+1:]}"
             else:
                 if self.threads[object_id]['timestamps']:
                     separated = stream.split(' ', 1)
-                    if len(separated) < 2: timestamp, body = (*separated, '')
-                    else: timestamp, body = separated
+                    if len(separated) < 2:
+                        timestamp, body = (*separated, '')
+                    else:
+                        timestamp, body = separated
                     output['timestamp'] = parser.parse(timestamp).astimezone()
                     output['stream'] = body.encode()
                 else:
@@ -134,9 +121,11 @@ class LogCollector():
             return output
         elif 'status' in msg and msg['status'] == 'stopped':
             del self.threads[object_id]
-            if len(self.threads) == 0: raise StopIteration
+            if len(self.threads) == 0:
+                raise StopIteration
             return self.__next__()
-        else: raise RuntimeError('Invalid stream type.')
+        else:
+            raise RuntimeError('Invalid stream type.')
 
     def __iter__(self):
         return self
@@ -147,7 +136,7 @@ class LogCollector():
 
     def __exit__(self, ty, val, tb):
         self.release()
-        if not ty in [None, KeyboardInterrupt]:
+        if ty not in [None, KeyboardInterrupt]:
             traceback.print_exception(ty, val, tb)
         return True
 
@@ -156,7 +145,7 @@ class LogCollector():
 
     def add_iterable(self, iterable, name=None, timestamps=False):
         self.name_width = max(self.name_width, len(name))
-        if not name in [_['name'] for _ in self.threads.values()]:
+        if name not in [_['name'] for _ in self.threads.values()]:
             self.threads[id(iterable)] = {
                 'name': name,
                 'timestamps': timestamps,
@@ -173,15 +162,17 @@ class LogCollector():
             self.release_callback()
         for _ in self.threads.values():
             _['thread'].join()
-        #self.threads.clear()
 
     thread_count = 0
+
     @classmethod
     def _read_stream(cls, iterable, queue, should_run):
         LogCollector.thread_count += 1
         for _ in iterable:
-            if not should_run.value: break
-            if _: queue.put({'stream': _, 'object_id': id(iterable)})
+            if not should_run.value:
+                break
+            if _:
+                queue.put({'stream': _, 'object_id': id(iterable)})
             time.sleep(.001)
         queue.put({'status': 'stopped', 'object_id': id(iterable)})
         LogCollector.thread_count -= 1
@@ -210,12 +201,9 @@ class LogMonitor(Thread):
         self.stream_resp = None
 
     def run(self):
-        api = self.api
         namespace = self.namespace
         follow = self.params['follow']
-        tail = self.params['tail']
         timestamps = self.params['timestamps']
-        #added = [] #pending pods of svc
 
         def assign(x):
             self.stream_resp = x
@@ -242,7 +230,7 @@ class LogMonitor(Thread):
                         else:
                             created = ev['object']['metadata']['creationTimestamp']
                         ts = time.mktime(datetime.strptime(created, '%Y-%m-%dT%H:%M:%SZ').timetuple())
-                        since_seconds = math.ceil(datetime.utcnow().timestamp()-ts)
+                        since_seconds = math.ceil(datetime.utcnow().timestamp() - ts)
 
                         log = self.handler.logs(namespace, pod, details=True, follow=follow,
                                                 tail='all', since_seconds=since_seconds, timestamps=timestamps, stdout=True, stderr=True)
@@ -251,13 +239,12 @@ class LogMonitor(Thread):
                         for oid in [k for k, v in self.collector.threads.items() if v['name'] == pod]:
                             print(f'Register stopped [{oid}]')
                             self.handler.close(pod)
-                            #self.collector.queue.put({'status': 'stopped', 'object_id': oid})
                 self.__stopped = True
-            except urllib3.exceptions.ProtocolError as e:
+            except urllib3.exceptions.ProtocolError:
                 print(f'Watch Stop [{namespace}]')
                 self.__stopped = True
             except kubernetes.client.exceptions.ApiException as e:
-                if e.status == 410: # Gone Error
+                if e.status == 410:
                     print(f"[Re-stream] {e}", file=sys.stderr)
                     continue
                 else:
@@ -278,4 +265,3 @@ class LogMonitor(Thread):
                 print(f'Error on LogMonitor::Stop [{e}]')
             finally:
                 self.stream_resp = None
-

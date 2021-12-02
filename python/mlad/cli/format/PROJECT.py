@@ -1,7 +1,7 @@
 import sys
 
 
-FORMAT='''# MLAppDeploy Project v0.3
+FORMAT = '''# MLAppDeploy Project v0.3
 apiVersion: v1                      # [OPTIONAL] Describe api version. (*v1)
 maintainer: {MAINTAINER}            # [OPTIONAL] Describe maintainer. (*env.USER)
 name: {NAME}                        # Describe project name.
@@ -10,16 +10,16 @@ workdir: .                          # [OPTIONAL] Describe working directory. (*.
 ingress:                            # [OPTIONAL] Describe ingress to expose.
     #[NAME]:
     #    rewritePath: true
-    #    target: SERVICENAME:8080  
+    #    target: SERVICENAME:8080
 workspace:
     #kind: Workspace                # Describe kind of workspace. (*Workspace, Dockerfile)
     #base: python:latest            # Describe base docker image tag.
     #command: python test.py        # [OPTIONAL] Describe application to execute.
     #args: temp                     # [OPTIONAL] Describe arguments for execute application.
     #preps:                         # [OPTIONAL] Describe prepare options for run.
-    #   - pip: requirements.txt       
+    #   - pip: requirements.txt
     #env:                           # [OPTIONAL] Describe environment variables.
-    #    PYTHONUNBUFFERED: 1   
+    #    PYTHONUNBUFFERED: 1
     #ignore:                        # [OPTIONAL] Describe exclude files from project.
     #   - "**/.*"
     #script: python script.py       # [OPTIONAL] Describe script for run.
@@ -56,9 +56,9 @@ app:
     #    restartPolicy: never       # [OPTIONAL] Describe restart policy. (*never, onFailure, always)
     ### Describe 'Job' to run.
     #[NAME]:
-    ## Available fields from app - image, env, ports, command, args, mounts, constraints 
+    ## Available fields from app - image, env, ports, command, args, mounts, constraints
     #    kind: Job                  # [OPTIONAL] Describe kind of app. (*App, Job, Service)
-    #    runSpec:                   # [OPTIONAL] Describe spec for running Job. 
+    #    runSpec:                   # [OPTIONAL] Describe spec for running Job.
     #        restartPolicy: never   # [OPTIONAL] Describe restart policy. (*never, onFailure)
     #        parallelism: 1         # [OPTIONAL] (*1)
     #        completion: 1          # [OPTIONAL] (*1)
@@ -73,9 +73,9 @@ app:
     #            mem: 8G
     ### Describe 'Service' to run.
     #[NAME]:
-    ## Available fields from app - image, env, ports, command, args, mounts, constraints 
+    ## Available fields from app - image, env, ports, command, args, mounts, constraints
     #    kind: Service              # [OPTIONAL] Describe kind of app. (*App, Job, Service)
-    #    runSpec:                   # [OPTIONAL] Describe spec for running Service. 
+    #    runSpec:                   # [OPTIONAL] Describe spec for running Service.
     #        replicas: 1
     #    resources:                 # [OPTIONAL] Describe resource for the Job
     #        limits:
@@ -85,7 +85,7 @@ app:
     #        requests:
     #            cpu: 1
     #            gpu: 0
-    #            mem: 8G   
+    #            mem: 8G
 '''
 
 sys.modules[__name__] = FORMAT

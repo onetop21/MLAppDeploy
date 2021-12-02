@@ -17,6 +17,7 @@ class Loader(BaseLoader):
         super(Loader, self).__init__(stream)
 
     interpolation_matcher = re.compile(r'\$\{([\w.-]+)(|:-([^}^{]+))\}')
+
     def interpolation(self, node):
         ''' Extract the matched value, expand env variable, and replace the match '''
         value = node.value
@@ -28,8 +29,10 @@ class Loader(BaseLoader):
         else:
             return os.environ.get(env_var, default) + value[match.end():]
 
+
 Loader.add_implicit_resolver('!interp', Loader.interpolation_matcher, None)
 Loader.add_constructor('!interp', Loader.interpolation)
+
 
 @lru_cache(maxsize=None)
 def load(file):
@@ -44,6 +47,7 @@ def load(file):
         for _ in re.finditer(r'!include\s+([\w.-]+)', stream):
             stream = stream.replace(_.group(0), sub_load(os.path.join(SCHEMA_PATH, _.group(1))))
         return stream
+
     def drop_recursive(data):
         _data = {}
         for k, v in data.items():
@@ -53,6 +57,7 @@ def load(file):
                 _data[k] = v
         return _data
     return drop_recursive(yaml.load(sub_load(file), Loader=Loader))
+
 
 def dump(doc):
     return yaml.dump(doc, Dumper=Dumper, default_flow_style=False)

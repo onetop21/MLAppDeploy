@@ -80,10 +80,10 @@ def write_completion(shell='bash'):
 def check_podname_syntax(obj):
     if isinstance(obj, dict):
         for _ in obj.keys():
-            if not re.match('^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', _):
+            if not re.match(r'^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', _):
                 return False
     elif isinstance(obj, str):
-        if not re.match('^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', obj):
+        if not re.match(r'^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', obj):
             return False
     else:
         return False
@@ -263,8 +263,8 @@ def match(filepath, ignores):
     def matcher(path, pattern):
         patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")]
                                 if '**/' in pattern else [])
-        result = map(lambda _: fnmatch.fnmatch(normpath, _) or
-                     fnmatch.fnmatch(normpath, os.path.normpath(f"{_}/*")), patterns)
+        result = map(lambda _: fnmatch.fnmatch(normpath, _) or fnmatch.fnmatch(
+            normpath, os.path.normpath(f"{_}/*")), patterns)
         return sum(result) > 0
     for ignore in ignores:
         if ignore.startswith('#'):

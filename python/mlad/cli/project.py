@@ -3,7 +3,7 @@ import sys
 from typing import Optional, List
 
 from mlad.cli.libs import utils
-from mlad.cli.Format import PROJECT
+from mlad.cli.format import PROJECT
 from mlad.cli import config as config_core
 from mlad.api import API
 from mlad.api.exceptions import NotFound

@@ -160,7 +160,7 @@ def update(project_key: str, file: Optional[str]):
             'update': update_app['env'] if 'env' in update_app else {}
         }
 
-        update_spec = {key: (env if key == 'env' else update_app.get(key, None)) 
+        update_spec = {key: (env if key == 'env' else update_app.get(key, None))
                        for key in update_key_store}
         update_spec['name'] = name
 
