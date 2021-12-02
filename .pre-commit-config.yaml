@@ -1,5 +1,5 @@
 repos:
-- repo: git@gitlab.com/pycpa/flake8
+- repo: https://gitlab.com/pycpa/flake8
   rev: 3.8.4
   hooks:
   - id: flake8
