@@ -320,7 +320,7 @@ def get_apps(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
                      for _ in apps])
 
 
-def get_deployed_app(cli, namespace, name):
+def get_service(cli, namespace, name):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -456,7 +456,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
-    deployed_app = get_deployed_app(cli, namespace, name)
+    service = get_service(cli, namespace, name)
     spec = {
         'key': config_labels['MLAD.PROJECT'] if config_labels.get(
             'MLAD.VERSION') else '',
@@ -478,8 +478,8 @@ def inspect_app(app, cli=DEFAULT_CLI):
         'name': config_labels.get('MLAD.PROJECT.APP'),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
-        'ports': [port_spec.port for port_spec in deployed_app.spec.ports] 
-                  if deployed_app is not None else [],
+        'ports': [port_spec.port for port_spec in service.spec.ports] 
+                  if service is not None else [],
         'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
@@ -939,7 +939,7 @@ def remove_apps(apps, namespace,
             elif kind == 'Service':
                 _delete_deployment(cli, app_name, namespace)
 
-            if get_deployed_app(cli, namespace, app_name):
+            if get_service(cli, namespace, app_name):
                 api.delete_namespaced_service(app_name, namespace)
 
             ingress_list = network_api.list_namespaced_ingress(
