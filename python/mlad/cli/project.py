@@ -144,7 +144,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
     for spec in API.app.get(project_key)['specs']:
         task_info = []
         try:
-            ports = [*spec['ports']][0] if spec['ports'] else '-'
+            ports = ','.join(map(str, spec['ports']))
             for pod_name, pod in API.app.get_tasks(project_key, spec['name']).items():
                 ready_cnt = 0
                 restart_cnt = 0

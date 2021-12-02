@@ -456,6 +456,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
+    deployed_app = get_deployed_app(cli, namespace, name)
     spec = {
         'key': config_labels['MLAD.PROJECT'] if config_labels.get(
             'MLAD.VERSION') else '',
@@ -477,22 +478,13 @@ def inspect_app(app, cli=DEFAULT_CLI):
         'name': config_labels.get('MLAD.PROJECT.APP'),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
-        'ports': {},
+        'ports': [port_spec.port for port_spec in deployed_app.spec.ports] 
+                  if deployed_app is not None else [],
         'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
     }
 
-    deployed_app = get_deployed_app(cli, namespace, name)
-    if deployed_app is not None:
-        if deployed_app.spec.ports:
-            for _ in deployed_app.spec.ports:
-                target = _.target_port
-                published = _.port
-                spec['ports'][f"{target}->{published}"] = {
-                    'target': target,
-                    'published': published
-                }
     return spec
 
 
@@ -801,6 +793,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
             instances.append(ret)
 
             if app['ports']:
+                ports = list(set(app['ports']))
                 ret = api.create_namespaced_service(namespace_name, client.V1Service(
                     metadata=client.V1ObjectMeta(
                         name=name,
@@ -808,7 +801,8 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                     ),
                     spec=client.V1ServiceSpec(
                         selector={'MLAD.PROJECT.APP': name},
-                        ports=[client.V1ServicePort(port=_) for _ in app['ports']]
+                        ports=[client.V1ServicePort(port=port, name=f'port{port}')
+                               for port in ports]
                     )
                 ))
 
