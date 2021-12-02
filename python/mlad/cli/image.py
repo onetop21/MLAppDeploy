@@ -118,6 +118,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
         for im in images
         for tag in im.tags if tag.endswith(version)
     ]
+
     # Remove the previous images with different ids
     for prev_image in prev_images:
         if prev_image != image:
@@ -126,9 +127,10 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
     yield f'Built Image: {repository}'
 
     # Push image
-    yield f'Upload the image to the registry [{registry_address}]...'
-    for line in ctlr.push_image(repository):
-        yield line
+    if project['kind'] != 'Component':
+        yield f'Upload the image to the registry [{registry_address}]...'
+        for line in ctlr.push_image(repository):
+            yield line
 
     return image
 
