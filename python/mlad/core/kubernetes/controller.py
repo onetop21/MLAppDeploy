@@ -939,7 +939,7 @@ def remove_apps(apps, namespace,
             elif kind == 'Service':
                 _delete_deployment(cli, app_name, namespace)
 
-            if get_service(cli, namespace, app_name):
+            if get_service(cli, namespace, app_name) is not None:
                 api.delete_namespaced_service(app_name, namespace)
 
             ingress_list = network_api.list_namespaced_ingress(
