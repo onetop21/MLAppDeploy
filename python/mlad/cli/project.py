@@ -47,7 +47,6 @@ def _get_default_logs(log):
             return f'{name}: {msg}'
 
 
-# Main CLI Functions
 def init(name, version, maintainer):
     if utils.read_project():
         print('Already generated project file.', file=sys.stderr)
@@ -55,9 +54,6 @@ def init(name, version, maintainer):
 
     if not name:
         name = input('Project Name : ')
-    # if not version: version = input('Project Version : ')
-    # if not author: author = input('Project Author : ')
-
     with open(utils.DEFAULT_PROJECT_FILE, 'w') as f:
         f.write(PROJECT.format(
             NAME=name,
@@ -128,15 +124,18 @@ def list(no_trunc: bool):
 def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     utils.process_file(file)
     config = config_core.get()
+    target_kind = 'Deployment'
     if project_key is None:
+        target_kind = 'Train'
         project_key = utils.workspace_key()
-    # Block not running.
+
+    # Raise exception if the target project is not found.
     try:
         API.project.inspect(project_key=project_key)
         resources = API.project.resource(project_key)
-    except NotFound:
-        print('Cannot find running project.', file=sys.stderr)
-        sys.exit(1)
+    except NotFound as e:
+        yield f'Error occured while getting status from a [{target_kind}] project.'
+        raise e
 
     events = []
     columns = [
@@ -203,10 +202,17 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
     utils.process_file(file)
+    target_kind = 'Deployment'
     if project_key is None:
+        target_kind = 'Train'
         project_key = utils.workspace_key()
-    # Block not running.
-    API.project.inspect(project_key)
+
+    # Raise exception if the target project is not found.
+    try:
+        API.project.inspect(project_key=project_key)
+    except NotFound as e:
+        yield f'Error occured while getting logs from a [{target_kind}] project.'
+        raise e
 
     logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
 
