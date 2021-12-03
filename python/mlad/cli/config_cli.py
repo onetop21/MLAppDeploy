@@ -45,7 +45,7 @@ def env(unset):
 
 
 @click.command()
-@click.option('--install', '-i', is_flag=True)
+@click.option('--install', '-i', is_flag=True, help='Install the completion using bash-completion.')
 @echo_exception
 def completion(install: bool):
     '''Activate auto completion (Linux bash shell only)'''
