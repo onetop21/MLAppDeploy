@@ -124,7 +124,7 @@ def list(no_trunc: bool):
 def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     utils.process_file(file)
     config = config_core.get()
-    target_kind = 'Deployment'
+    target_kind = None
     if project_key is None:
         target_kind = 'Train'
         project_key = utils.workspace_key()
@@ -134,7 +134,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         API.project.inspect(project_key=project_key)
         resources = API.project.resource(project_key)
     except NotFound as e:
-        yield f'Error occured while getting status from a [{target_kind}] project.'
+        if target_kind is not None:
+            yield f'Error occured while getting status from a [{target_kind}] project.'
         raise e
 
     events = []
@@ -202,7 +203,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
     utils.process_file(file)
-    target_kind = 'Deployment'
+    target_kind = None
     if project_key is None:
         target_kind = 'Train'
         project_key = utils.workspace_key()
@@ -211,7 +212,8 @@ def logs(file: Optional[str], project_key: Optional[str],
     try:
         API.project.inspect(project_key=project_key)
     except NotFound as e:
-        yield f'Error occured while getting logs from a [{target_kind}] project.'
+        if target_kind is not None:
+            yield f'Error occured while getting logs from a [{target_kind}] project.'
         raise e
 
     logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
