@@ -161,11 +161,10 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                     res['mem'], res['cpu'] = 'NotReady', 'NotReady'
                     res['gpu'] = round(res['gpu'], 1) \
                         if not no_trunc else res['gpu']
-                else:
-                    if not no_trunc:
-                        res['mem'] = round(res['mem'], 1)
-                        res['cpu'] = round(res['cpu'], 1)
-                        res['gpu'] = round(res['gpu'], 1)
+                elif not no_trunc:
+                    res['mem'] = round(res['mem'], 1)
+                    res['cpu'] = round(res['cpu'], 1)
+                    res['gpu'] = round(res['gpu'], 1)
 
                 task_info.append((
                     pod_name,
