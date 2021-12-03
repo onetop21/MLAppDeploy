@@ -45,7 +45,8 @@ def ls(no_trunc: bool):
 @echo_exception
 def ps(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     '''Show project status deployed on cluster'''
-    project.status(file, project_key, no_trunc, event)
+    for line in project.status(file, project_key, no_trunc, event):
+        click.echo(line)
 
 
 @click.command()
@@ -66,7 +67,8 @@ def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, **kwargs):
     '''Show current project logs deployed on cluster'''
     filters = kwargs.get('apps|tasks')
-    project.logs(file, project_key, tail, follow, timestamps, filters)
+    for line in project.logs(file, project_key, tail, follow, timestamps, filters):
+        click.echo(line)
 
 
 @click.group('project')
