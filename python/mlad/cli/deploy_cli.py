@@ -71,16 +71,3 @@ def scale(project_key: str, scales: List[str]):
 def ingress():
     '''Show the ingress information of running services.'''
     deploy.ingress()
-
-
-@click.group('deploy')
-def cli():
-    '''Related to the deploy objects'''
-    pass
-
-
-cli.add_command(serve)
-cli.add_command(update)
-cli.add_command(kill)
-cli.add_command(scale)
-cli.add_command(ingress)

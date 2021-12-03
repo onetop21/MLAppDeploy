@@ -2,8 +2,10 @@ import getpass
 import click
 from typing import Optional
 from mlad.cli import project
+from mlad.cli import train_cli, deploy_cli
 from mlad.cli.libs import utils, MutuallyExclusiveOption
 from mlad.cli.autocompletion import list_project_keys
+
 
 from . import echo_exception
 
@@ -70,6 +72,31 @@ def logs(file: Optional[str], project_key: Optional[str],
     project.logs(file, project_key, tail, follow, timestamps, filters)
 
 
+@click.group()
+@echo_exception
+def train():
+    '''Create and manage project for training'''
+    pass
+
+
+train.add_command(train_cli.up)
+train.add_command(train_cli.down)
+
+
+@click.group()
+@echo_exception
+def deploy():
+    '''Create and manage project for deployment'''
+    pass
+
+
+deploy.add_command(deploy_cli.serve)
+deploy.add_command(deploy_cli.update)
+deploy.add_command(deploy_cli.kill)
+deploy.add_command(deploy_cli.scale)
+deploy.add_command(deploy_cli.ingress)
+
+
 @click.group('project')
 def cli():
     '''Commands for inspecting and initializing project objects.'''
@@ -80,3 +107,5 @@ cli.add_command(init)
 cli.add_command(ls)
 cli.add_command(ps)
 cli.add_command(logs)
+cli.add_command(train)
+cli.add_command(deploy)

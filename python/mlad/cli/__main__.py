@@ -58,8 +58,6 @@ except ContextNotFoundError:
 else:
     main.add_command(image.cli, 'image')
     main.add_command(project.cli, 'project')
-    main.add_command(train.cli, 'train')
-    main.add_command(deploy.cli, 'deploy')
     main.add_command(board.cli, 'board')
     main.add_command(node.admin_cli if auth_admin() else node.cli, 'node')
 
