@@ -125,7 +125,7 @@ def list(no_trunc: bool):
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
-def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool, event: bool):
+def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     utils.process_file(file)
     config = config_core.get()
     if project_key is None:
@@ -140,7 +140,7 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
 
     events = []
     columns = [
-        ('NAME', 'APP', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
+        ('NAME', 'APP NAME', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
     for spec in API.app.get(project_key)['specs']:
         task_info = []
         try:
@@ -167,21 +167,20 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
                         res['cpu'] = round(res['cpu'], 1)
                         res['gpu'] = round(res['gpu'], 1)
 
-                if all or pod['phase'] not in ['Failed']:
-                    task_info.append((
-                        pod_name,
-                        spec['name'],
-                        pod['node'] if pod['node'] else '-',
-                        pod['phase'],
-                        'Running' if pod['status']['state'] == 'Running' else
-                        pod['status']['detail']['reason'],
-                        restart_cnt,
-                        age,
-                        ports,
-                        res['mem'],
-                        res['cpu'],
-                        res['gpu']
-                    ))
+                task_info.append((
+                    pod_name,
+                    spec['name'],
+                    pod['node'] if pod['node'] else '-',
+                    pod['phase'],
+                    'Running' if pod['status']['state'] == 'Running' else
+                    pod['status']['detail']['reason'],
+                    restart_cnt,
+                    age,
+                    ports,
+                    res['mem'],
+                    res['cpu'],
+                    res['gpu']
+                ))
 
                 if event and len(pod['events']) > 0:
                     events += pod['events']
