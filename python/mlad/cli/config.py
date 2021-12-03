@@ -1,4 +1,7 @@
+import os
+
 from typing import Tuple, List
+from pathlib import Path
 
 from mlad.cli import context
 
@@ -35,3 +38,11 @@ def get_env(dict=False):
     ctx = get()
     env = context.get_env(ctx)
     return {e.split('=')[0]: e.split('=')[1] for e in env} if dict else env
+
+
+def install_completion():
+    completion_path = f'{context.MLAD_HOME_PATH}/completion.sh'
+    with open(completion_path, 'w') as f:
+        f.write(os.popen('_MLAD_COMPLETE=source_bash mlad').read())
+    with open(f'{str(Path.home())}/.bash_completion', 'wt') as f:
+        f.write(f'. {completion_path}')
