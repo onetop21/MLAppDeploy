@@ -38,7 +38,7 @@ def list(all, tail):
         data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED', 'WORKSPACE')]
 
     untagged = 0
-    for spec in [ctlr.inspect_image(image) for image in images[:tail]]:
+    for spec in [ctlr.inspect_image(image) for image in images]:
         if len(spec['tags']) == 0:
             untagged += 1
         else:
@@ -53,7 +53,7 @@ def list(all, tail):
             if all:
                 row.append(spec['workspace'])
             data.append(row)
-    utils.print_table(data, 'There is no built image.', 0)
+    utils.print_table(data[:tail + 1], 'There is no built image.', 0)
     if untagged:
         print(f'This project has {untagged} untagged images. '
               'Delete untagged images to free the disk space. '
