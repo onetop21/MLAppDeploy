@@ -192,21 +192,6 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
     yield 'Done.'
 
 
-def scale(scales: List[Tuple[str, int]], file: Optional[str], project_key: Optional[str]):
-    utils.process_file(file)
-    if project_key is None:
-        project_key = utils.workspace_key()
-
-    API.project.inspect(project_key)
-
-    app_names = [app['name'] for app in API.app.get(project_key)['specs']]
-
-    for target_name, value in scales:
-        if target_name in app_names:
-            API.app.scale(project_key, target_name, value)
-            yield f'Scale updated [{target_name}] = {value}'
-
-
 def _get_log_dirpath(project: Dict, project_key_assigned: bool) -> Path:
     workdir = utils.get_project(default_project)['workdir'] \
         if not project_key_assigned else str(Path().absolute())
