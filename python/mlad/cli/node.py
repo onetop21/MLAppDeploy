@@ -68,28 +68,28 @@ def resource(names=None, no_trunc=False):
     utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)
 
 
-def enable(ID):
+def enable(name: str):
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
-        ctlr.enable_node(ID, cli)
+        ctlr.enable_node(name, cli)
     except CoreException.NotFound as e:
         print(e)
         sys.exit(1)
     except CoreException.APIError as e:
-        print(f'Cannot enable node {ID} : {e}')
+        print(f'Cannot enable node {name} : {e}')
         sys.exit(1)
     print('Updated.')
 
 
-def disable(ID):
+def disable(name: str):
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     try:
-        ctlr.disable_node(ID, cli)
+        ctlr.disable_node(name, cli)
     except CoreException.NotFound as e:
         print(e)
         sys.exit(1)
     except CoreException.APIError as e:
-        print(f'Cannot disable node {ID} : {e}')
+        print(f'Cannot disable node {name} : {e}')
         sys.exit(1)
     print('Updated.')
 

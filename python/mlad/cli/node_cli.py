@@ -13,19 +13,19 @@ def ls(no_trunc):
 
 
 @click.command()
-@click.argument('ID')
+@click.argument('node-name', autocompletion=list_node_names)
 @echo_exception
-def enable(id):
+def enable(node_name):
     '''Enable to use node'''
-    node.enable(id)
+    node.enable(node_name)
 
 
 @click.command()
-@click.argument('ID')
+@click.argument('node-name', autocompletion=list_node_names)
 @echo_exception
-def disable(id):
+def disable(node_name):
     '''Disable to unuse node'''
-    node.disable(id)
+    node.disable(node_name)
 
 
 @click.command()
@@ -52,7 +52,7 @@ def rm(id, key):
 
 
 @click.command()
-@click.argument('NAMES', nargs=-1, required=False)
+@click.argument('NAMES', nargs=-1, required=False, autocompletion=list_node_names)
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
 @echo_exception
 def resource(names, no_trunc):
