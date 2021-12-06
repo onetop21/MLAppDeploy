@@ -1254,7 +1254,9 @@ def parse_mem(str_mem):
 def parse_cpu(str_cpu):
     # nano to core
     if str_cpu.endswith('n'):
-        cpu = float(str_cpu[:-1]) / 10 ** 9
+        cpu = float(str_cpu[:-1]) / 1e9
+    elif str_cpu.endswith('m'):
+        cpu = float(str_cpu[:-1]) / 1e3
     else:
         # TODO Other units may need to be considered
         cpu = float(str_cpu)
