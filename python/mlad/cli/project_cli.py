@@ -40,13 +40,13 @@ def ls(no_trunc: bool):
 @click.option('--project-key', '-k', help='Project Key', default=None,
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
               autocompletion=list_project_keys)
-@click.option('--all', '-a', is_flag=True, help='Show included shutdown service')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
 @click.option('--event', '-e', is_flag=True, help='Show warning events of apps')
 @echo_exception
-def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool, event: bool):
+def ps(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     '''Show project status deployed on cluster'''
-    project.status(file, project_key, all, no_trunc, event)
+    for line in project.status(file, project_key, no_trunc, event):
+        click.echo(line)
 
 
 @click.command()
@@ -67,7 +67,8 @@ def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, **kwargs):
     '''Show current project logs deployed on cluster'''
     filters = kwargs.get('apps|tasks')
-    project.logs(file, project_key, tail, follow, timestamps, filters)
+    for line in project.logs(file, project_key, tail, follow, timestamps, filters):
+        click.echo(line)
 
 
 @click.group('project')

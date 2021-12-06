@@ -5,6 +5,7 @@ from typing import Optional, List
 from mlad.cli.libs import utils
 from mlad.cli.format import PROJECT
 from mlad.cli import config as config_core
+from mlad.cli.exceptions import NotRunningTrainError
 from mlad.api import API
 from mlad.api.exceptions import NotFound
 
@@ -47,7 +48,6 @@ def _get_default_logs(log):
             return f'{name}: {msg}'
 
 
-# Main CLI Functions
 def init(name, version, maintainer):
     if utils.read_project():
         print('Already generated project file.', file=sys.stderr)
@@ -55,9 +55,6 @@ def init(name, version, maintainer):
 
     if not name:
         name = input('Project Name : ')
-    # if not version: version = input('Project Version : ')
-    # if not author: author = input('Project Author : ')
-
     with open(utils.DEFAULT_PROJECT_FILE, 'w') as f:
         f.write(PROJECT.format(
             NAME=name,
@@ -125,22 +122,27 @@ def list(no_trunc: bool):
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
-def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool, event: bool):
+def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     utils.process_file(file)
     config = config_core.get()
+    target_kind = None
     if project_key is None:
+        target_kind = 'Train'
         project_key = utils.workspace_key()
-    # Block not running.
+
+    # Raise exception if the target project is not found.
     try:
         API.project.inspect(project_key=project_key)
         resources = API.project.resource(project_key)
-    except NotFound:
-        print('Cannot find running project.', file=sys.stderr)
-        sys.exit(1)
+    except NotFound as e:
+        if target_kind == 'Train':
+            raise NotRunningTrainError(project_key)
+        else:
+            raise e
 
     events = []
     columns = [
-        ('NAME', 'APP', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
+        ('NAME', 'APP NAME', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
     for spec in API.app.get(project_key)['specs']:
         task_info = []
         try:
@@ -161,27 +163,25 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
                     res['mem'], res['cpu'] = 'NotReady', 'NotReady'
                     res['gpu'] = round(res['gpu'], 1) \
                         if not no_trunc else res['gpu']
-                else:
-                    if not no_trunc:
-                        res['mem'] = round(res['mem'], 1)
-                        res['cpu'] = round(res['cpu'], 1)
-                        res['gpu'] = round(res['gpu'], 1)
+                elif not no_trunc:
+                    res['mem'] = round(res['mem'], 1)
+                    res['cpu'] = round(res['cpu'], 1)
+                    res['gpu'] = round(res['gpu'], 1)
 
-                if all or pod['phase'] not in ['Failed']:
-                    task_info.append((
-                        pod_name,
-                        spec['name'],
-                        pod['node'] if pod['node'] else '-',
-                        pod['phase'],
-                        'Running' if pod['status']['state'] == 'Running' else
-                        pod['status']['detail']['reason'],
-                        restart_cnt,
-                        age,
-                        ports,
-                        res['mem'],
-                        res['cpu'],
-                        res['gpu']
-                    ))
+                task_info.append((
+                    pod_name,
+                    spec['name'],
+                    pod['node'] if pod['node'] else '-',
+                    pod['phase'],
+                    'Running' if pod['status']['state'] == 'Running' else
+                    pod['status']['detail']['reason'],
+                    restart_cnt,
+                    age,
+                    ports,
+                    res['mem'],
+                    res['cpu'],
+                    res['gpu']
+                ))
 
                 if event and len(pod['events']) > 0:
                     events += pod['events']
@@ -205,10 +205,19 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
 def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
     utils.process_file(file)
+    target_kind = None
     if project_key is None:
+        target_kind = 'Train'
         project_key = utils.workspace_key()
-    # Block not running.
-    API.project.inspect(project_key)
+
+    # Raise exception if the target project is not found.
+    try:
+        API.project.inspect(project_key=project_key)
+    except NotFound as e:
+        if target_kind == 'Train':
+            raise NotRunningTrainError(project_key)
+        else:
+            raise e
 
     logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
 
