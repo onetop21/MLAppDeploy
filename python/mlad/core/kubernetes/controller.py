@@ -3,7 +3,6 @@ import copy
 import time
 import json
 import uuid
-from typing import Optional
 from collections import defaultdict
 from mlad.core import exceptions
 from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError
@@ -1307,7 +1306,7 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
     res = {}
     apps = get_apps(project_key, cli=cli)
 
-    def parse_gpu(pod) -> Optional[None, int]:
+    def parse_gpu(pod):
         used = None
         for container in pod.spec.containers:
             requests = defaultdict(lambda: None, container.resources.requests or {})
