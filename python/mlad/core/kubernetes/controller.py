@@ -512,9 +512,9 @@ def _mounts_to_V1Volume(name, mounts):
 
 
 def _resources_to_V1Resource(type='Quota', resources=None):
-    limits = {}
-    requests = {}
-    if type == 'Quota':
+    limits = {'nvidia.com/gpu': 0}
+    requests = {'nvidia.com/gpu': 0}
+    if type == 'Quota' and resources is not None:
         for type in resources:
             if type == 'cpu':
                 requests['cpu'] = str(resources['cpu']) if resources[type] else None
@@ -560,9 +560,8 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
                 envs=None, mounts=None, parallelism=None, completions=None, quota=None,
                 resources=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
-    _resources = _resources_to_V1Resource(resources=quota) if quota \
-        else _resources_to_V1Resource(type='Resources', resources=resources) if resources \
-        else None
+    _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
+        else _resources_to_V1Resource(resources=quota)
 
     _constraints = _constraints_to_labels(constraints)
 
@@ -608,9 +607,8 @@ def _create_deployment(name, image, command, namespace='default',
                        envs=None, mounts=None, replicas=1, quota=None, resources=None,
                        labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
-    _resources = _resources_to_V1Resource(resources=quota) if quota \
-        else _resources_to_V1Resource(type='Resources', resources=resources) if resources \
-        else None
+    _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
+        else _resources_to_V1Resource(resources=quota)
 
     _constraints = _constraints_to_labels(constraints)
 
