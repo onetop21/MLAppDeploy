@@ -39,7 +39,7 @@ def update(project_key: str, file: Optional[str]):
 @click.command()
 @click.argument('project-key', required=True, autocompletion=list_project_keys)
 @click.option('--no-dump', is_flag=True,
-              help='Save the log before shutting down the services')
+              help='Don\'t save the log before shutting down the services')
 @echo_exception
 def kill(project_key: str, no_dump: bool):
     '''Stop and remove the train object on the cluster.'''
@@ -64,23 +64,3 @@ def scale(project_key: str, scales: List[str]):
         parsed_scales.append((app_name, value))
     for line in deploy.scale(parsed_scales, project_key):
         click.echo(line)
-
-
-@click.command()
-@echo_exception
-def ingress():
-    '''Show the ingress information of running services.'''
-    deploy.ingress()
-
-
-@click.group('deploy')
-def cli():
-    '''Related to the deploy objects'''
-    pass
-
-
-cli.add_command(serve)
-cli.add_command(update)
-cli.add_command(kill)
-cli.add_command(scale)
-cli.add_command(ingress)

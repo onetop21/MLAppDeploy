@@ -1,5 +1,5 @@
 import click
-from typing import Optional, List
+from typing import Optional
 
 from mlad.cli import train
 from mlad.cli.libs import utils, MutuallyExclusiveOption
@@ -34,7 +34,7 @@ def up(file: Optional[str]):
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
               autocompletion=list_project_keys)
 @click.option('--no-dump', is_flag=True,
-              help='Save the log before shutting down the apps')
+              help='Don\'t save the log before shutting down the apps')
 @echo_exception
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     '''Stop and remove the train object on the cluster.'''
@@ -42,38 +42,3 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         else train.down(file, project_key, no_dump)
     for line in lines:
         click.echo(line)
-
-
-@click.command()
-@click.argument('scales', required=True, nargs=-1)
-@click.option('--file', '-f', default=None, help=(
-    'Specify an alternate project file\t\t\t\n'
-    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable'),
-    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
-)
-@click.option('--project-key', '-k', help='Project Key', default=None,
-              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
-              autocompletion=list_project_keys)
-@echo_exception
-def scale(scales: List[str], file: Optional[str], project_key: Optional[str]):
-    '''Change the scale of one of the running apps.
-    Format: mlad train scale [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
-    '''
-    parsed_scales = []
-    for scale in scales:
-        app_name, value = scale.split('=')
-        value = int(value)
-        parsed_scales.append((app_name, value))
-    for line in train.scale(parsed_scales, file, project_key):
-        click.echo(line)
-
-
-@click.group('train')
-def cli():
-    '''Related to the train objects'''
-    pass
-
-
-cli.add_command(up)
-cli.add_command(down)
-cli.add_command(scale)

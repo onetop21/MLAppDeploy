@@ -108,23 +108,21 @@ def kill_force(project_key: str, no_dump: bool):
 
 
 def scale(scales: List[Tuple[str, int]], project_key: str):
-    return train.scale(scales, None, project_key)
+    if project_key is None:
+        project_key = utils.workspace_key()
 
+    project = API.project.inspect(project_key)
+    if not project['kind'] == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'scale')
 
-def ingress():
-    config = config_core.get()
-    address = config['apiserver']['address'].rsplit('/beta')[0]
-    specs = API.app.get()['specs']
-    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
-    for spec in specs:
-        if spec['ingress'] != '':
-            username = spec['username']
-            project_name = spec['project']
-            app_name = spec['name']
-            key = spec['key']
-            path = f'{address}{spec["ingress"]}'
-            rows.append((username, project_name, app_name, key, path))
-    utils.print_table(rows, 'Cannot find running deployments', 0, False)
+    app_names = [app['name'] for app in API.app.get(project_key)['specs']]
+
+    for target_name, value in scales:
+        if target_name in app_names:
+            API.app.scale(project_key, target_name, value)
+            yield f'Scale updated [{target_name}] = {value}'
+        else:
+            yield f'Cannot find app [{target_name}] in project [{project_key}].'
 
 
 def update(project_key: str, file: Optional[str]):

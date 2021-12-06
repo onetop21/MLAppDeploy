@@ -2,8 +2,10 @@ import getpass
 import click
 from typing import Optional
 from mlad.cli import project
+from mlad.cli import train_cli, deploy_cli
 from mlad.cli.libs import utils, MutuallyExclusiveOption
 from mlad.cli.autocompletion import list_project_keys
+
 
 from . import echo_exception
 
@@ -40,13 +42,13 @@ def ls(no_trunc: bool):
 @click.option('--project-key', '-k', help='Project Key', default=None,
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
               autocompletion=list_project_keys)
-@click.option('--all', '-a', is_flag=True, help='Show included shutdown service')
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
 @click.option('--event', '-e', is_flag=True, help='Show warning events of apps')
 @echo_exception
-def ps(file: Optional[str], project_key: Optional[str], all: bool, no_trunc: bool, event: bool):
+def ps(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     '''Show project status deployed on cluster'''
-    project.status(file, project_key, all, no_trunc, event)
+    for line in project.status(file, project_key, no_trunc, event):
+        click.echo(line)
 
 
 @click.command()
@@ -67,7 +69,39 @@ def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, **kwargs):
     '''Show current project logs deployed on cluster'''
     filters = kwargs.get('apps|tasks')
-    project.logs(file, project_key, tail, follow, timestamps, filters)
+    for line in project.logs(file, project_key, tail, follow, timestamps, filters):
+        click.echo(line)
+
+
+@click.command()
+@echo_exception
+def ingress():
+    '''Show the ingress information of running services.'''
+    project.ingress()
+
+
+@click.group()
+@echo_exception
+def train():
+    '''Create and manage project for training'''
+    pass
+
+
+train.add_command(train_cli.up)
+train.add_command(train_cli.down)
+
+
+@click.group()
+@echo_exception
+def deploy():
+    '''Create and manage project for deployment'''
+    pass
+
+
+deploy.add_command(deploy_cli.serve)
+deploy.add_command(deploy_cli.update)
+deploy.add_command(deploy_cli.kill)
+deploy.add_command(deploy_cli.scale)
 
 
 @click.group('project')
@@ -80,3 +114,6 @@ cli.add_command(init)
 cli.add_command(ls)
 cli.add_command(ps)
 cli.add_command(logs)
+cli.add_command(ingress)
+cli.add_command(train)
+cli.add_command(deploy)
