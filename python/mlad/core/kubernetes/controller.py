@@ -519,7 +519,7 @@ def _resources_to_V1Resource(type='Quota', resources=None):
             if type == 'cpu':
                 requests['cpu'] = str(resources['cpu']) if resources[type] else None
             elif type == 'gpu':
-                requests['nvidia.com/gpu'] = str(resources['gpu']) if resources[type] else None
+                requests['nvidia.com/gpu'] = str(resources['gpu']) if resources[type] else '0'
             elif type == 'mem':
                 requests['memory'] = str(resources['mem']) if resources[type] else None
         limits = requests
