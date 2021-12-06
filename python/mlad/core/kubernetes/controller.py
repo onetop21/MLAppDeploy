@@ -1343,13 +1343,11 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                 break
 
             for _ in metric['containers']:
-                resource['cpu'] += parse_cpu(_['usage']['cpu'])
-                resource['mem'] += parse_mem(_['usage']['memory'])
+                resource['cpu'] = (resource['cpu'] or 0) + parse_cpu(_['usage']['cpu'])
+                resource['mem'] = (resource['mem'] or 0) + parse_mem(_['usage']['memory'])
             pod_gpu_usage = parse_gpu(pod)
-            if pod_gpu_usage is not None and resource['gpu'] is None:
-                resource['gpu'] = 0
             if pod_gpu_usage is not None:
-                resource['gpu'] += pod_gpu_usage
+                resource['gpu'] = (resource['gpu'] or 0) + pod_gpu_usage
 
         res[name] = {
             'mem': resource['mem'],
