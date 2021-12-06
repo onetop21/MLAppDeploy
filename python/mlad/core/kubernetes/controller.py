@@ -1321,7 +1321,7 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
         return used
 
     for name, app in apps.items():
-        resource = defaultdict(lambda: 0)
+        res[name] = {}
         namespace = app.metadata.namespace
 
         field_selector = ('status.phase!=Succeeded,status.phase!=Failed')
@@ -1329,6 +1329,7 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                                           label_selector=f'MLAD.PROJECT.APP={name}',
                                           field_selector=field_selector)
         for pod in pods.items:
+            resource = defaultdict(lambda: 0)
             pod_name = pod.metadata.name
             try:
                 metric = api.get_namespaced_custom_object("metrics.k8s.io", "v1beta1", namespace,
@@ -1341,12 +1342,15 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                 resource['cpu'] = None
                 resource['mem'] = None
                 resource['gpu'] += gpu_usage(pod)
+                res[name][pod_name] = {'mem': resource['mem'], 'cpu': resource['cpu'], 
+                                       'gpu': resource['gpu']}
                 break
 
             for _ in metric['containers']:
                 resource['cpu'] += parse_cpu(_['usage']['cpu'])
                 resource['mem'] += parse_mem(_['usage']['memory'])
             resource['gpu'] += gpu_usage(pod)
+            res[name][pod_name] = {'mem': resource['mem'], 'cpu': resource['cpu'], 
+                                   'gpu': resource['gpu']}
 
-        res[name] = {'mem': resource['mem'], 'cpu': resource['cpu'], 'gpu': resource['gpu']}
     return res
