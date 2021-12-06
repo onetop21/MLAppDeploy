@@ -108,7 +108,21 @@ def kill_force(project_key: str, no_dump: bool):
 
 
 def scale(scales: List[Tuple[str, int]], project_key: str):
-    return train.scale(scales, None, project_key)
+    if project_key is None:
+        project_key = utils.workspace_key()
+
+    project = API.project.inspect(project_key)
+    if not project['kind'] == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'scale')
+
+    app_names = [app['name'] for app in API.app.get(project_key)['specs']]
+
+    for target_name, value in scales:
+        if target_name in app_names:
+            API.app.scale(project_key, target_name, value)
+            yield f'Scale updated [{target_name}] = {value}'
+        else:
+            yield f'Cannot find app [{target_name}] in project [{project_key}].'
 
 
 def ingress():
