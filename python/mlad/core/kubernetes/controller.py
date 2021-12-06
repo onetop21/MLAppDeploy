@@ -359,7 +359,7 @@ def get_pod_events(pod, cli=DEFAULT_CLI):
     namespace = pod.metadata.namespace
 
     events = api.list_namespaced_event(namespace, field_selector='type=Warning').items
-    return [{'name': name, 'message': e.message, 'datetime': e.event_time}
+    return [{'name': name, 'message': e.message, 'datetime': e.metadata.creation_timestamp}
             for e in events if e.involved_object.name == name]
 
 
