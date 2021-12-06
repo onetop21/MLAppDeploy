@@ -3,7 +3,6 @@ import errno
 import socket
 import docker
 import requests
-import click
 
 from typing import List
 from omegaconf import OmegaConf
@@ -33,7 +32,7 @@ def get_lo_cli():
         raise DockerNotFoundError
 
 
-def activate() -> None:
+def activate():
     cli = get_cli()
     config = config_core.get()
     image_tag = _obtain_board_image_tag()
@@ -47,6 +46,8 @@ def activate() -> None:
     else:
         raise MLADBoardAlreadyActivatedError
 
+    yield 'Activating MLAD board.'
+
     cli.containers.run(
         image_tag,
         environment=[
@@ -59,13 +60,19 @@ def activate() -> None:
         labels=['MLAD_BOARD'],
         detach=True)
 
+    host_ip = _obtain_host()
+    yield 'Successfully activate MLAD board.'
+    yield f'MLAD board is running at {host_ip}:2021.'
 
-def deactivate() -> None:
+
+def deactivate():
     cli = get_cli()
     try:
         cli.containers.get('mlad-board')
     except docker.errors.NotFound:
         raise MLADBoardNotActivatedError
+
+    yield 'Deactivating MLAD board.'
 
     host_ip = _obtain_host()
     requests.delete(f'{host_ip}:2021/mlad/component', json={
@@ -78,13 +85,17 @@ def deactivate() -> None:
     for container in containers:
         container.stop()
 
+    yield 'Successfully deactivate MLAD board.'
 
-def install(file_path: str, no_build: bool) -> None:
+
+def install(file_path: str, no_build: bool):
     cli = get_cli()
     try:
         cli.containers.get('mlad-board')
     except docker.errors.NotFound:
         raise MLADBoardNotActivatedError
+
+    yield f'Read the component spec from {file_path or "./mlad-project.yml"}.'
 
     try:
         spec = OmegaConf.load(file_path)
@@ -127,7 +138,7 @@ def install(file_path: str, no_build: bool) -> None:
             'COMPONENT_NAME': spec['name'],
             'APP_NAME': app_name
         }
-        click.echo(f'Run the container [{app_name}]')
+        yield f'Run the container [{app_name}]'
         cli.containers.run(
             image.tags[-1],
             environment=env,
@@ -150,6 +161,8 @@ def install(file_path: str, no_build: bool) -> None:
         })
         res.raise_for_status()
 
+    yield 'The component installation is complete.'
+
 
 def uninstall(name: str) -> None:
     cli = get_cli()
@@ -170,9 +183,20 @@ def uninstall(name: str) -> None:
     for container in containers:
         container.stop()
 
+    yield f'The component [{name}] is uninstalled'
 
-def list(no_print: bool = False):
+
+def status(no_print: bool = False):
     cli = get_cli()
+    is_board_active = True
+
+    try:
+        cli.containers.get('mlad-board')
+    except docker.errors.NotFound:
+        is_board_active = False
+
+    yield f'MLAD board is [{"active" if is_board_active else "inactive"}].'
+
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
     })

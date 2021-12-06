@@ -10,18 +10,16 @@ from . import echo_exception
 @echo_exception
 def activate():
     """Activate MLAD board."""
-    click.echo('Start running MLAD board.')
-    board.activate()
-    click.echo('Successfully activate MLAD board.')
+    for line in board.activate():
+        click.echo(line)
 
 
 @click.command()
 @echo_exception
 def deactivate():
     """Deactivate MLAD board and remove components."""
-    click.echo('Start deactivating MLAD board.')
-    board.deactivate()
-    click.echo('Successfully deactivate MLAD board.')
+    for line in board.deactivate():
+        click.echo(line)
 
 
 @click.command()
@@ -30,9 +28,8 @@ def deactivate():
 @echo_exception
 def install(file_path: str, no_build: bool):
     """Install a component and attach it to MLAD board."""
-    click.echo(f'Read the component spec from {file_path or "./mlad-project.yml"}.')
-    board.install(file_path, no_build)
-    click.echo('The component installation is complete.')
+    for line in board.install(file_path, no_build):
+        click.echo(line)
 
 
 @click.command()
@@ -40,15 +37,16 @@ def install(file_path: str, no_build: bool):
 @echo_exception
 def uninstall(name: str):
     """Uninstall the component and remove it from MLAD board."""
-    board.uninstall(name)
-    click.echo(f'The component [{name}] is uninstalled')
+    for line in board.uninstall(name):
+        click.echo(line)
 
 
 @click.command()
 @echo_exception
-def ls():
-    """List installed components"""
-    board.list()
+def status():
+    """Show a status of the MLAD board and list installed components"""
+    for line in board.status():
+        click.echo(line)
 
 
 @click.group('context')
@@ -60,4 +58,4 @@ cli.add_command(activate)
 cli.add_command(deactivate)
 cli.add_command(install)
 cli.add_command(uninstall)
-cli.add_command(ls)
+cli.add_command(status)

@@ -45,9 +45,12 @@ def env(unset):
 
 
 @click.command()
+@click.option('--install', '-i', is_flag=True, help='Install the completion using bash-completion.')
 @echo_exception
-def autocompletion():
+def completion(install: bool):
     '''Activate auto completion (Linux bash shell only)'''
+    if install:
+        config.install_completion()
     click.echo('Run the following command to activate autocompletion:')
     click.echo('eval "$(_MLAD_COMPLETE=source_bash mlad)"')
 
@@ -61,4 +64,4 @@ cli.add_command(init)
 cli.add_command(set)
 cli.add_command(get)
 cli.add_command(env)
-cli.add_command(autocompletion)
+cli.add_command(completion)

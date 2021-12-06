@@ -1,6 +1,7 @@
 import click
 from mlad.cli import node
 from . import echo_exception
+from mlad.cli.autocompletion import list_node_names
 
 
 @click.command()
@@ -32,7 +33,9 @@ def disable(id):
 @click.pass_obj
 @echo_exception
 def add(id, kv):
-    '''Add label to node'''
+    '''Add label to node.
+    Format: mlad node label [NODE_NAME] add [KEY1]=[VALUE1] [KEY2]=[VALUE2]
+    '''
     kvdict = dict([_.split('=') for _ in kv])
     node.label_add(id, **kvdict)
 
@@ -42,7 +45,9 @@ def add(id, kv):
 @click.pass_obj
 @echo_exception
 def rm(id, key):
-    '''Remove label from node'''
+    '''Remove label from node
+    Format: mlad node label [NODE_NAME] rm [KEY1]=[VALUE1] [KEY2]=[VALUE2]
+    '''
     node.label_rm(id, *key)
 
 
@@ -56,12 +61,12 @@ def resource(names, no_trunc):
 
 
 @click.group()
-@click.argument('NODE')
+@click.argument('node-name', autocompletion=list_node_names)
 @click.pass_context
 @echo_exception
-def label(context, node):
+def label(context, node_name):
     '''Manage node labels'''
-    context.obj = node
+    context.obj = node_name
 
 
 label.add_command(add)

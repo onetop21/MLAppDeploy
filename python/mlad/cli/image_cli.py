@@ -28,8 +28,8 @@ def ls(all, tail):
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable')
 )
-@click.option('--quiet', '-q', is_flag=True, help='Do not print detail-log during build a project or plugin')
-@click.option('--no-cache', is_flag=True, help='Do not use the cache when building project or plugin')
+@click.option('--quiet', '-q', is_flag=True, help='Do not print the detail-log while building a project')
+@click.option('--no-cache', is_flag=True, help='Do not use the cache while building a project')
 @click.option('--pull', is_flag=True, help='Attempt to pull the base image even if an older image exists locally.')
 @echo_exception
 def build(file, quiet, no_cache, pull):
