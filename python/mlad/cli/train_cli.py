@@ -34,7 +34,7 @@ def up(file: Optional[str]):
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
               autocompletion=list_project_keys)
 @click.option('--no-dump', is_flag=True,
-              help='Save the log before shutting down the apps')
+              help='Don\'t save the log before shutting down the apps')
 @echo_exception
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     '''Stop and remove the train object on the cluster.'''

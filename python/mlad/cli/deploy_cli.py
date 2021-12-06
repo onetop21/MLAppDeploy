@@ -39,7 +39,7 @@ def update(project_key: str, file: Optional[str]):
 @click.command()
 @click.argument('project-key', required=True, autocompletion=list_project_keys)
 @click.option('--no-dump', is_flag=True,
-              help='Save the log before shutting down the services')
+              help='Don\'t save the log before shutting down the services')
 @echo_exception
 def kill(project_key: str, no_dump: bool):
     '''Stop and remove the train object on the cluster.'''
