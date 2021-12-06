@@ -102,7 +102,7 @@ def list(no_trunc: bool):
         for _, resource in resources.items():
             used['mem'] += resource['mem'] if resource['mem'] is not None else 0
             used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
-            used['gpu'] += resource['gpu']
+            used['gpu'] += resource['gpu'] if resource['gpu'] is not None else 0
         for k in used:
             used[k] = used[k] if no_trunc else round(used[k], 1)
 
