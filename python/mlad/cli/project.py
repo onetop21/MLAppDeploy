@@ -1,4 +1,5 @@
 import sys
+import datetime
 
 from typing import Optional, List
 
@@ -16,8 +17,11 @@ def _parse_log(log, max_name_width=32, len_short_id=10):
         name = f"{name}.{log['task_id'][:len_short_id]}"
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
     msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
-    timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
-    return name, namewidth, msg, timestamp
+
+    timestamp = f'{log["timestamp"]}' if 'timestamp' in log else None
+    dt = datetime.datetime.fromisoformat(timestamp) + datetime.timedelta(hours=9)
+    dt = f'[{dt.strftime("%Y-%m-%d %H:%M:%S")}]'
+    return name, namewidth, msg, dt
 
 
 def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
