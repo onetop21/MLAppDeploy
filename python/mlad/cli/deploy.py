@@ -125,22 +125,6 @@ def scale(scales: List[Tuple[str, int]], project_key: str):
             yield f'Cannot find app [{target_name}] in project [{project_key}].'
 
 
-def ingress():
-    config = config_core.get()
-    address = config['apiserver']['address'].rsplit('/beta')[0]
-    specs = API.app.get()['specs']
-    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
-    for spec in specs:
-        if spec['ingress'] != '':
-            username = spec['username']
-            project_name = spec['project']
-            app_name = spec['name']
-            key = spec['key']
-            path = f'{address}{spec["ingress"]}'
-            rows.append((username, project_name, app_name, key, path))
-    utils.print_table(rows, 'Cannot find running deployments', 0, False)
-
-
 def update(project_key: str, file: Optional[str]):
 
     project = API.project.inspect(project_key=project_key)

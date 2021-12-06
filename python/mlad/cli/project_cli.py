@@ -72,6 +72,13 @@ def logs(file: Optional[str], project_key: Optional[str],
     project.logs(file, project_key, tail, follow, timestamps, filters)
 
 
+@click.command()
+@echo_exception
+def ingress():
+    '''Show the ingress information of running services.'''
+    project.ingress()
+
+
 @click.group()
 @echo_exception
 def train():
@@ -94,7 +101,6 @@ deploy.add_command(deploy_cli.serve)
 deploy.add_command(deploy_cli.update)
 deploy.add_command(deploy_cli.kill)
 deploy.add_command(deploy_cli.scale)
-deploy.add_command(deploy_cli.ingress)
 
 
 @click.group('project')
@@ -107,5 +113,6 @@ cli.add_command(init)
 cli.add_command(ls)
 cli.add_command(ps)
 cli.add_command(logs)
+cli.add_command(ingress)
 cli.add_command(train)
 cli.add_command(deploy)

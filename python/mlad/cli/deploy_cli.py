@@ -64,10 +64,3 @@ def scale(project_key: str, scales: List[str]):
         parsed_scales.append((app_name, value))
     for line in deploy.scale(parsed_scales, project_key):
         click.echo(line)
-
-
-@click.command()
-@echo_exception
-def ingress():
-    '''Show the ingress information of running services.'''
-    deploy.ingress()

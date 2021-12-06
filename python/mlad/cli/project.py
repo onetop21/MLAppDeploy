@@ -217,3 +217,19 @@ def logs(file: Optional[str], project_key: Optional[str],
         if '[Ignored]' in log['stream']:
             continue
         _print_log(log, colorkey, 32, 20)
+
+
+def ingress():
+    config = config_core.get()
+    address = config['apiserver']['address'].rsplit('/beta')[0]
+    specs = API.app.get()['specs']
+    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
+    for spec in specs:
+        if spec['ingress'] != '':
+            username = spec['username']
+            project_name = spec['project']
+            app_name = spec['name']
+            key = spec['key']
+            path = f'{address}{spec["ingress"]}'
+            rows.append((username, project_name, app_name, key, path))
+    utils.print_table(rows, 'Cannot find running deployments', 0, False)

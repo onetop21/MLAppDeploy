@@ -72,7 +72,7 @@ else:
     main.add_command(deploy.serve, 'serve')
     main.add_command(deploy.kill, 'kill')
     main.add_command(deploy.update, 'update')
-    main.add_command(deploy.ingress, 'ingress')
+    main.add_command(project.ingress, 'ingress')
     main.add_command(project.logs, 'logs')
     main.add_command(project.ls, 'ls')
     main.add_command(project.ps, 'ps')
