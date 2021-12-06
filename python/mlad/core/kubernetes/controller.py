@@ -3,6 +3,7 @@ import copy
 import time
 import json
 import uuid
+from typing import Optional
 from collections import defaultdict
 from mlad.core import exceptions
 from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError
@@ -1261,15 +1262,7 @@ def parse_cpu(str_cpu):
     return cpu
 
 
-def get_node_resources(node, cli=None):
-    if cli is None:
-        cli = DEFAULT_CLI
-    elif not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-
-    if not isinstance(node, client.models.v1_node.V1Node):
-        raise TypeError('Parameter is not valid type.')
-
+def get_node_resources(node, cli=DEFAULT_CLI):
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
     api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
@@ -1314,15 +1307,19 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
     res = {}
     apps = get_apps(project_key, cli=cli)
 
-    def gpu_usage(pod):
-        used = 0
+    def parse_gpu(pod) -> Optional[None, int]:
+        used = None
         for container in pod.spec.containers:
-            requests = defaultdict(lambda: '0', container.resources.requests or {})
-            used += int(requests['nvidia.com/gpu'])
+            requests = defaultdict(lambda: None, container.resources.requests or {})
+            gpu = requests['nvidia.com/gpu']
+            if gpu is not None:
+                if used is None:
+                    used = 0
+                used += int(gpu)
         return used
 
     for name, app in apps.items():
-        resource = defaultdict(lambda: 0)
+        resource = defaultdict(lambda: None)
         namespace = app.metadata.namespace
 
         field_selector = ('status.phase!=Succeeded,status.phase!=Failed')
@@ -1341,13 +1338,21 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                         print(f"{body['status']} : {body['message']}")
                 resource['cpu'] = None
                 resource['mem'] = None
-                resource['gpu'] += gpu_usage(pod)
+                resource['gpu'] = None
                 break
 
             for _ in metric['containers']:
                 resource['cpu'] += parse_cpu(_['usage']['cpu'])
                 resource['mem'] += parse_mem(_['usage']['memory'])
-            resource['gpu'] += gpu_usage(pod)
+            pod_gpu_usage = parse_gpu(pod)
+            if pod_gpu_usage is not None and resource['gpu'] is None:
+                resource['gpu'] = 0
+            if pod_gpu_usage is not None:
+                resource['gpu'] += pod_gpu_usage
 
-        res[name] = {'mem': resource['mem'], 'cpu': resource['cpu'], 'gpu': resource['gpu']}
+        res[name] = {
+            'mem': resource['mem'],
+            'cpu': resource['cpu'],
+            'gpu': resource['gpu']
+        }
     return res

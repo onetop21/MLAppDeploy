@@ -157,15 +157,9 @@ def status(file: Optional[str], project_key: Optional[str], all: bool, no_trunc:
                 age = utils.created_to_age(pod['created'])
 
                 res = resources[spec['name']].copy()
-                if res['mem'] is None:
-                    res['mem'], res['cpu'] = 'NotReady', 'NotReady'
-                    res['gpu'] = round(res['gpu'], 1) \
-                        if not no_trunc else res['gpu']
-                else:
-                    if not no_trunc:
-                        res['mem'] = round(res['mem'], 1)
-                        res['cpu'] = round(res['cpu'], 1)
-                        res['gpu'] = round(res['gpu'], 1)
+                res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
+                res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
+                res['gpu'] = '-' if res['gpu'] is None else res['gpu']
 
                 if all or pod['phase'] not in ['Failed']:
                     task_info.append((
