@@ -165,7 +165,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                 res = resources[spec['name']].copy()
                 res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
                 res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
-                res['gpu'] = '-' if res['gpu'] is None else res['gpu']
+                res['gpu'] = 'NotReady' if res['gpu'] is None else res['gpu']
 
                 task_info.append((
                     pod_name,
