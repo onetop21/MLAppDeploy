@@ -28,6 +28,11 @@ def list_image_ids(ctx, args, incomplete):
     return [_id for _id in ids if _id.startswith(incomplete)]
 
 
+def list_node_names(ctx, args, incomplete):
+    nodes = API.node.list()
+    return [node['hostname'] for node in nodes if node['hostname'].startswith(incomplete)]
+
+
 # def get_project_file_completion(ctx, args, incomplete):
 #     files = glob.glob(f"{incomplete}*" or '*')
 #     subcommands = [f"{_}/" for _ in files if os.path.isdir(_)]
