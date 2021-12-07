@@ -100,8 +100,8 @@ def list(no_trunc: bool):
 
         used = {'cpu': 0, 'gpu': 0, 'mem': 0}
         resources = API.project.resource(project_key)
-        for app, tasks in resources.items():
-            for task, resource in tasks.items():
+        for tasks in resources.values():
+            for resource in tasks.values():
                 used['mem'] += resource['mem'] if resource['mem'] is not None else 0
                 used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
                 used['gpu'] += resource['gpu'] if resource['gpu'] is not None else 0
