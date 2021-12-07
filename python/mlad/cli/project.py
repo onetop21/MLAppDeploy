@@ -103,7 +103,7 @@ def list(no_trunc: bool):
         for _, resource in resources.items():
             used['mem'] += resource['mem'] if resource['mem'] is not None else 0
             used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
-            used['gpu'] += resource['gpu']
+            used['gpu'] += resource['gpu'] if resource['gpu'] is not None else 0
         for k in used:
             used[k] = used[k] if no_trunc else round(used[k], 1)
 
@@ -163,14 +163,9 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                 age = utils.created_to_age(pod['created'])
 
                 res = resources[spec['name']].copy()
-                if res['mem'] is None:
-                    res['mem'], res['cpu'] = 'NotReady', 'NotReady'
-                    res['gpu'] = round(res['gpu'], 1) \
-                        if not no_trunc else res['gpu']
-                elif not no_trunc:
-                    res['mem'] = round(res['mem'], 1)
-                    res['cpu'] = round(res['cpu'], 1)
-                    res['gpu'] = round(res['gpu'], 1)
+                res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
+                res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
+                res['gpu'] = 'NotReady' if res['gpu'] is None else res['gpu']
 
                 task_info.append((
                     pod_name,
