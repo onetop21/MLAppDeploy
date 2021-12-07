@@ -1317,7 +1317,7 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
         return used
 
     for name, app in apps.items():
-        resource = defaultdict(lambda: None)
+        res[name] = {}
         namespace = app.metadata.namespace
 
         field_selector = ('status.phase!=Succeeded,status.phase!=Failed')
@@ -1325,6 +1325,7 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                                           label_selector=f'MLAD.PROJECT.APP={name}',
                                           field_selector=field_selector)
         for pod in pods.items:
+            resource = {'mem': 0, 'cpu': 0, 'gpu': 0}
             pod_name = pod.metadata.name
             try:
                 metric = api.get_namespaced_custom_object("metrics.k8s.io", "v1beta1", namespace,
@@ -1334,21 +1335,16 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                     body = json.loads(e.body)
                     if body['kind'] == 'Status':
                         print(f"{body['status']} : {body['message']}")
-                resource['cpu'] = None
-                resource['mem'] = None
-                resource['gpu'] = None
-                break
+                res[name][pod_name] = {'mem': None, 'cpu': None, 'gpu': None}
+                continue
 
             for _ in metric['containers']:
-                resource['cpu'] = (resource['cpu'] or 0) + parse_cpu(_['usage']['cpu'])
-                resource['mem'] = (resource['mem'] or 0) + parse_mem(_['usage']['memory'])
+                resource['cpu'] += parse_cpu(_['usage']['cpu'])
+                resource['mem'] += parse_mem(_['usage']['memory'])
             pod_gpu_usage = parse_gpu(pod)
             if pod_gpu_usage is not None:
-                resource['gpu'] = (resource['gpu'] or 0) + pod_gpu_usage
+                resource['gpu'] += pod_gpu_usage
 
-        res[name] = {
-            'mem': resource['mem'],
-            'cpu': resource['cpu'],
-            'gpu': resource['gpu']
-        }
+            res[name][pod_name] = resource
+            
     return res
