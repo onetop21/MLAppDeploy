@@ -1,6 +1,6 @@
 import os
 
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from pathlib import Path
 
 from mlad.cli import context
@@ -16,8 +16,8 @@ def set(*args) -> None:
     return context.set(context.current(), *args)
 
 
-def get() -> context.Context:
-    return context.get()
+def get(key: Optional[str] = None) -> str:
+    return context.get(context.current(), key)
 
 
 def env(unset=False) -> Tuple[List[str], str]:

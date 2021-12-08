@@ -158,15 +158,25 @@ def delete(name: str) -> None:
     _save(config)
 
 
-def get(name: Optional[str] = None) -> Context:
+def get(name: str, key: Optional[str] = None) -> Context:
     config = _load()
-    if name is None:
-        name = config['current-context']
-
     context = _find_context(name, config=config)
     if context is None:
         raise ContextNotFoundError(name)
-    return context
+    if key is None:
+        return OmegaConf.to_yaml(context)
+    else:
+        try:
+            keys = key.split('.')
+            value = context
+            for k in keys:
+                value = value[k]
+        except omegaconf.errors.ConfigKeyError:
+            raise InvalidPropertyError(key)
+        try:
+            return OmegaConf.to_yaml(value)[:-1]
+        except ValueError:
+            return value
 
 
 def set(name: str, *args) -> None:

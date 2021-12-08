@@ -1,3 +1,5 @@
+from typing import Optional
+
 import click
 from omegaconf import OmegaConf
 from mlad.cli import config
@@ -25,11 +27,12 @@ def set(args):
 
 
 @click.command()
+@click.argument('KEY', required=False)
 @echo_exception
-def get():
+def get(key: Optional[str]):
     '''Get configurations'''
-    ret = config.get()
-    click.echo(OmegaConf.to_yaml(ret))
+    ret = config.get(key)
+    click.echo(ret)
 
 
 @click.command()

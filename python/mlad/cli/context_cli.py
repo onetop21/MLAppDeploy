@@ -56,12 +56,13 @@ def delete(name: str):
 
 
 @click.command()
-@click.argument('NAME', required=False)
+@click.argument('NAME', required=True)
+@click.argument('KEY', required=False)
 @echo_exception
-def get(name: Optional[str]):
+def get(name: str, key: Optional[str]):
     """Display lower-level information on the context."""
-    ret = context.get(name)
-    click.echo(OmegaConf.to_yaml(ret))
+    ret = context.get(name, key)
+    click.echo(ret)
 
 
 @click.command()
