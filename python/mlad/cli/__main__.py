@@ -12,7 +12,7 @@ from mlad.cli import train_cli as train
 from mlad.cli import deploy_cli as deploy
 from mlad.cli.libs.auth import auth_admin
 from mlad.cli.exceptions import ContextNotFoundError
-from mlad.cli.context import get as check_context
+from mlad.cli.context import get as check_context, current
 
 
 class EntryGroup(click.Group):
@@ -52,7 +52,7 @@ if auth_admin():
     main.add_command(context.cli, 'context')
 
 try:
-    check_context()
+    check_context(current())
 except ContextNotFoundError:
     pass
 else:
