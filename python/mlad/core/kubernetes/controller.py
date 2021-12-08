@@ -1320,10 +1320,8 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
         res[name] = {}
         namespace = app.metadata.namespace
 
-        field_selector = ('status.phase!=Succeeded,status.phase!=Failed')
         pods = v1_api.list_namespaced_pod(namespace,
-                                          label_selector=f'MLAD.PROJECT.APP={name}',
-                                          field_selector=field_selector)
+                                          label_selector=f'MLAD.PROJECT.APP={name}')
         for pod in pods.items:
             resource = {'mem': 0, 'cpu': 0, 'gpu': 0}
             pod_name = pod.metadata.name
