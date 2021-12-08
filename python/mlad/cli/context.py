@@ -174,7 +174,7 @@ def get(name: str, key: Optional[str] = None) -> Context:
         except omegaconf.errors.ConfigKeyError:
             raise InvalidPropertyError(key)
         try:
-            return OmegaConf.to_yaml(value)
+            return OmegaConf.to_yaml(value)[:-1]
         except ValueError:
             return value
 
