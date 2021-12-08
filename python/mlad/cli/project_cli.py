@@ -47,8 +47,7 @@ def ls(no_trunc: bool):
 @echo_exception
 def ps(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     '''Show project status deployed on cluster'''
-    for line in project.status(file, project_key, no_trunc, event):
-        click.echo(line)
+    project.status(file, project_key, no_trunc, event)
 
 
 @click.command()
