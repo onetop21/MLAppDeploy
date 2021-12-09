@@ -110,9 +110,9 @@ def install(file_path: str, no_build: bool):
         'COMPONENT_NAME': spec['name']
     }
     if no_build:
-        built_images = cli.images.list(filter={'label': labels})
+        built_images = cli.images.list(filters={'label': labels})
         if len(built_images) == 0:
-            raise ComponentImageNotExistError
+            raise ComponentImageNotExistError(spec['name'])
         image = built_images[0]
     else:
         image = image_core.build(file_path, False, True, False)
