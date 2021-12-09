@@ -29,8 +29,8 @@ def node_resource(names: List[str] = Query(None)):
     try:
         nodes = ctlr.get_nodes()
         if names is not None and len(names) > 0:
-            nodes = [node for node_name, node in nodes.items() if node_name in names]
-        for node in nodes:
+            nodes = {name: node for name, node in nodes.items() if name in names}
+        for node in nodes.values():
             resource = ctlr.get_node_resources(node)
             res[node.metadata.name] = resource
         return res
