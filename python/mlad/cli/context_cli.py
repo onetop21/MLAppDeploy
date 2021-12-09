@@ -62,7 +62,10 @@ def delete(name: str):
 def get(name: str, key: Optional[str]):
     """Display lower-level information on the context."""
     ret = context.get(name, key)
-    click.echo(ret)
+    try:
+        click.echo(OmegaConf.to_yaml(ret)[:-1])
+    except ValueError:
+        click.echo(ret)
 
 
 @click.command()
