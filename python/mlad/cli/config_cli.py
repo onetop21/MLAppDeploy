@@ -32,7 +32,10 @@ def set(args):
 def get(key: Optional[str]):
     '''Get configurations'''
     ret = config.get(key)
-    click.echo(ret)
+    try:
+        click.echo(OmegaConf.to_yaml(ret)[:-1])
+    except ValueError:
+        click.echo(ret)
 
 
 @click.command()

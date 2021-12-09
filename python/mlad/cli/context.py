@@ -173,10 +173,7 @@ def get(name: str, key: Optional[str] = None) -> Context:
                 value = value[k]
         except omegaconf.errors.ConfigKeyError:
             raise InvalidPropertyError(key)
-        try:
-            return OmegaConf.to_yaml(value)[:-1]
-        except ValueError:
-            return value
+        return value
 
 
 def set(name: str, *args) -> None:
