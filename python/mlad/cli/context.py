@@ -164,7 +164,7 @@ def get(name: str, key: Optional[str] = None) -> Context:
     if context is None:
         raise ContextNotFoundError(name)
     if key is None:
-        return OmegaConf.to_yaml(context)
+        return context
     else:
         try:
             keys = key.split('.')
