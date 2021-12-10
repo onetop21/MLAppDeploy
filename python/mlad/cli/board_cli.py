@@ -17,14 +17,14 @@ def activate():
 @click.command()
 @echo_exception
 def deactivate():
-    """Deactivate MLAD board and remove components."""
+    """Deactivate MLAD board and remove installed components."""
     for line in board.deactivate():
         click.echo(line)
 
 
 @click.command()
-@click.option('--file-path', '-f', required=True, help='The file path of the component')
-@click.option('--no-build', is_flag=True, help='Don\'t build the base image')
+@click.option('--file-path', '-f', required=True, help='The file path of the component.')
+@click.option('--no-build', is_flag=True, help='Don\'t build the base image.')
 @echo_exception
 def install(file_path: str, no_build: bool):
     """Install a component and attach it to MLAD board."""
@@ -44,7 +44,7 @@ def uninstall(name: str):
 @click.command()
 @echo_exception
 def status():
-    """Show a status of the MLAD board and list installed components"""
+    """Show a status of the MLAD board and list installed components."""
     for line in board.status():
         click.echo(line)
 
