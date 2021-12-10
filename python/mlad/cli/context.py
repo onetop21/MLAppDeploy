@@ -246,6 +246,10 @@ def _s3_finalizer(datastore: StrDict) -> StrDict:
 
 def get_env(context: Context) -> List[str]:
     envs = []
+
+    envs.append(f'MLAD_ADDRESS={context.apiserver.address}')
+    envs.append(f'MLAD_SESSION={context.session}')
+
     for k, v in context['datastore']['s3'].items():
         if v is None:
             v = ''

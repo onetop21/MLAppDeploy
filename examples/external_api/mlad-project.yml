@@ -1,0 +1,15 @@
+# MLAppDeploy Project v0.3
+apiVersion: v1
+maintainer: root
+kind: Train
+name: api-use
+version: 0.0.1
+workdir: .
+workspace:
+    kind: Workspace
+    base: python:latest
+    preps:
+      - run: pip install MLAppDeploy==0.2.0a0 --extra-index-url http://172.19.153.144:8081/repository/AISystem-PyPi/simple --trusted-host 172.19.153.144
+app:
+    entry:
+        command: python entry.py
