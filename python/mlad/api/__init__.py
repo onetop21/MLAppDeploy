@@ -43,7 +43,10 @@ class API:
 
     @classproperty
     def config(cls):
-        return config_core.get()
+        try:
+            return config_core.get()
+        except Exception:
+            return None
 
     @classproperty
     @lru_cache(maxsize=None)

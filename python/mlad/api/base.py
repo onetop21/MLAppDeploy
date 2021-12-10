@@ -1,3 +1,5 @@
+import os
+
 import requests
 
 from typing import Optional, Dict
@@ -8,8 +10,12 @@ from .exceptions import raise_error
 class APIBase:
 
     def __init__(self, config, prefix):
-        self.baseurl = f'{config.apiserver.address}/api/v1/{prefix}'
-        self.headers = {'session': config.session}
+        if config is not None:
+            self.baseurl = f'{config.apiserver.address}/api/v1/{prefix}'
+            self.headers = {'session': config.session}
+        else:
+            self.baseurl = f'{os.environ.get("MLAD_ADDRESS", "localhost:8440")}/api/v1/{prefix}'
+            self.headers = {'session': os.environ.get('MLAD_SESSION', '')}
         self.raise_error = raise_error
 
     def _get(self, path: str, params: Optional[Dict] = None,
