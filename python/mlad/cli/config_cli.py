@@ -39,7 +39,7 @@ def get(key: Optional[str]):
 
 
 @click.command()
-@click.option('--unset', '-u', is_flag=True)
+@click.option('--unset', '-u', is_flag=True, help='Display only names of the environment variables')
 @echo_exception
 def env(unset):
     '''To set environment variables, run "eval $(mlad config env)"'''
