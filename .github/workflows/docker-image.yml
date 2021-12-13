@@ -42,10 +42,10 @@ jobs:
         # Change all uppercase to lowercase
         IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
         
-        if [[ ${{ github.evnet_name }} == 'workflow_dispatch' ]]
+        if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
         then
           VERSION=dev
-        elif [[ ${{ github.event_name }} == 'release' ]]
+        elif [[ "${{ github.event_name }}" == 'release' ]]
         then
           # Strip git ref prefix from version
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
