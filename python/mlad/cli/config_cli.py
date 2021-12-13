@@ -3,17 +3,18 @@ from typing import Optional
 import click
 from omegaconf import OmegaConf
 from mlad.cli import config
+from mlad.cli.context_cli import _obtain_host
 from . import echo_exception
 
 
 @click.command()
-@click.option('--address', '-a', default='http://localhost:8440',
-              prompt='MLAppDeploy Service Address', help='Set service address')
+@click.option('--address', '-a', default=f'{_obtain_host()}:8440',
+              prompt='MLAD API Server Address', help='Set API server address.')
 @echo_exception
 def init(address):
-    '''Initialize configurations'''
+    '''Initialize a configuration.'''
     ret = config.init(address)
-    click.echo('Config created successfully.')
+    click.echo('Config has been successfully registered.')
     click.echo(OmegaConf.to_yaml(ret))
 
 
@@ -21,7 +22,8 @@ def init(address):
 @click.argument('ARGS', required=True, nargs=-1)
 @echo_exception
 def set(args):
-    '''Set configurations. [KEY=VALUE]...'''
+    '''Update values of the context.\n
+    Format: mlad config set [KEY1=VALUE1] [KEY2=VALUE2]'''
     config.set(*args)
     click.echo('The config is successfully configured.')
 
@@ -30,7 +32,7 @@ def set(args):
 @click.argument('KEY', required=False)
 @echo_exception
 def get(key: Optional[str]):
-    '''Get configurations'''
+    '''Display a detail specification of the configuration.'''
     ret = config.get(key)
     try:
         click.echo(OmegaConf.to_yaml(ret)[:-1])
@@ -42,7 +44,7 @@ def get(key: Optional[str]):
 @click.option('--unset', '-u', is_flag=True, help='Display only names of the environment variables')
 @echo_exception
 def env(unset):
-    '''To set environment variables, run "eval $(mlad config env)"'''
+    '''To set environment variables, run "eval $(mlad config env)."'''
     lines, msg = config.env(unset=unset)
     for line in lines:
         click.echo(line)
@@ -54,7 +56,7 @@ def env(unset):
 @click.option('--install', '-i', is_flag=True, help='Install the completion using bash-completion.')
 @echo_exception
 def completion(install: bool):
-    '''Activate auto completion (Linux bash shell only)'''
+    '''Activate auto completion (Linux bash shell only).'''
     if install:
         config.install_completion()
     click.echo('Run the following command to activate autocompletion:')
@@ -63,7 +65,7 @@ def completion(install: bool):
 
 @click.group('config')
 def cli():
-    '''Manage configuration'''
+    '''Manage configuration.'''
 
 
 cli.add_command(init)

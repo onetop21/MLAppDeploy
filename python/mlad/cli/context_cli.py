@@ -1,3 +1,4 @@
+import socket
 import click
 
 from typing import Optional
@@ -9,10 +10,18 @@ from mlad.cli.autocompletion import list_context_names
 from . import echo_exception
 
 
+def _obtain_host():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    host = s.getsockname()[0]
+    s.close()
+    return f'http://{host}'
+
+
 @click.command()
 @click.argument('NAME', required=True)
-@click.option('--address', '-a', default='http://localhost:8440',
-              prompt='MLAD Service Address', help='MLAD API Server Address.')
+@click.option('--address', '-a', default=f'{_obtain_host()}:8440',
+              prompt='MLAD API Server Address', help='Set MLAD API server address.')
 @echo_exception
 def add(name, address):
     """Add a new context."""
@@ -25,7 +34,7 @@ def add(name, address):
 @click.argument('NAME', required=True, autocompletion=list_context_names)
 @echo_exception
 def use(name: str):
-    """Change to the context."""
+    """Switch to the context."""
     context.use(name)
     click.echo(f'Current context name is: [{name}].')
 
@@ -60,7 +69,7 @@ def delete(name: str):
 @click.argument('KEY', required=False)
 @echo_exception
 def get(name: str, key: Optional[str]):
-    """Display lower-level information on the context."""
+    """Display a detail specification of the context."""
     ret = context.get(name, key)
     try:
         click.echo(OmegaConf.to_yaml(ret)[:-1])
@@ -73,7 +82,9 @@ def get(name: str, key: Optional[str]):
 @click.argument('ARGS', required=True, nargs=-1)
 @echo_exception
 def set(name, args):
-    """Set a context entry in config."""
+    """Update values of the context.\n
+    Format: mlad context set [NAME] [KEY1=VALUE1] [KEY2=VALUE2]
+    """
     context.set(name, *args)
     click.echo(f'The context [{name}] is successfully configured.')
 
