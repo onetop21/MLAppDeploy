@@ -50,7 +50,6 @@ jobs:
           
           # Strip "v" prefix from tag name
           [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-          
           WITH_LATEST=1
         fi
         
@@ -61,12 +60,8 @@ jobs:
 
         docker tag $ID $IMAGE_ID:$VERSION
         docker push $IMAGE_ID:$VERSION
-        echo WITH_LATEST=$WITH_LATEST
-        echo ID=$ID
         [ $WITH_LATEST ] && {
-          echo "PUSH LATEST"
           docker tag $ID $IMAGE_ID:latest
           docker push $IMAGE_ID:latest
         } || :
-        echo "DONE"
         
