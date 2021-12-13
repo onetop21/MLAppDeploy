@@ -59,9 +59,8 @@ jobs:
 
         docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
         docker push $IMAGE_ID:$VERSION
-        docker images
         [ $WITH_LATEST ] && {
           docker images
           docker tag $IMAGE_NAME $IMAGE_ID:latest
           docker push $IMAGE_ID:latest
-        }
+        } || :
