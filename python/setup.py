@@ -41,6 +41,9 @@ def main():
             'cerberus-kind==0.0.8',
             'dictdiffer==0.9.0'
         ],
+        package_data={
+            'mlad.cli.validator': ['schema.yaml']
+        },
         entry_points='''
             [console_scripts]
             mlad=mlad.cli.__main__:main
