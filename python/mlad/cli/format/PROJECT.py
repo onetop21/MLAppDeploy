@@ -1,7 +1,7 @@
 import sys
 
 
-FORMAT = '''# MLAppDeploy Project v0.3
+FORMAT = '''# MLAppDeploy Project v0.2.0
 apiVersion: v1                      # [OPTIONAL] Describe api version. (*v1)
 maintainer: {MAINTAINER}            # [OPTIONAL] Describe maintainer. (*env.USER)
 name: {NAME}                        # Describe project name.
