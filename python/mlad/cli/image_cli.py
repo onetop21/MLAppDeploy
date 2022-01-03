@@ -1,67 +1,62 @@
-import sys
-import os
 import click
 from mlad.cli import image
-from mlad.cli import project_cli as project
-from mlad.cli.autocompletion import *
+from mlad.cli.libs import utils
+from mlad.cli.autocompletion import list_image_ids
 
-# mlad image ls
-# mlad image search [to be delete]
-# mlad image rm
-# mlad image prune
+from . import echo_exception
 
-####################
-# mlad image build {From Project}
-# mlad image export [KEY] [FILENAME]
-# mlad image import [FILENAME]
-# mlad image commit
-# -> docker tag, (git commit, git tag) if has .git dir
-
-# mlad image publish [REGISTRY/ORGANIZATION]
-# mlad image deploy [...]
 
 @click.command()
-@click.option('--all', '-a', is_flag=True, help='Show all project images')
-@click.option('--plugin', '-p', is_flag=True, help='Show Plugin images')
-@click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10")')
-@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
-def ls(all, plugin, tail, no_trunc):
-    '''Show built image list'''
-    image.list(all, plugin, tail, no_trunc)
+@click.option('--all', '-a', is_flag=True, help='Show all MLAD relevant images.')
+@click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10").')
+@echo_exception
+def ls(all, tail):
+    '''Show built images.'''
+    image.list(all, tail)
+
 
 @click.command()
-@click.option('--quiet', '-q', is_flag=True, help='Do not print detail-log during build a project or plugin')
-@click.option('--plugin', '-p', is_flag=True, help='Build by plugin manifest')
-@click.option('--no-cache', is_flag=True, help='Do not use the cache when building project or plugin')
+@click.option('--file', '-f', default=None, help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
+)
+@click.option('--quiet', '-q', is_flag=True, help='Do not print the detail-log while building a project.')
+@click.option('--no-cache', is_flag=True, help='Do not use the cache while building a project.')
 @click.option('--pull', is_flag=True, help='Attempt to pull the base image even if an older image exists locally.')
-def build(quiet, plugin, no_cache, pull):
-    '''Build MLAppDeploy project or plguin'''
-    image.build(quiet, plugin, no_cache, pull)
+@echo_exception
+def build(file, quiet, no_cache, pull):
+    '''Build a project image.'''
+    for line in image.build(file, quiet, no_cache, pull):
+        click.echo(line)
+    click.echo('Done.')
+
 
 @click.command()
-@click.option('--force', '-f', is_flag=True, help='Remove forcely')
-@click.argument('ID', nargs=-1, required=True, autocompletion=get_image_list_completion)
+@click.option('--force', '-f', is_flag=True, help='Remove forcely.')
+@click.argument('ID', nargs=-1, required=True, autocompletion=list_image_ids)
+@echo_exception
 def rm(force, id):
-    '''Remove built image'''
+    '''Remove the built image.'''
+    click.echo('Remove project image...')
     image.remove(id, force)
+    click.echo('Done.')
+
 
 @click.command()
-@click.option('--all', '-a', is_flag=True, help='Remove unused all images')
+@click.option('--all', '-a', is_flag=True, help='Remove unused all images.')
+@echo_exception
 def prune(all):
-    '''Remove unused and untagged images'''
+    '''Remove unused and untagged images.'''
     image.prune(all)
 
+
 @click.group('image')
-@click.option('--file', '-f', default=None, help=f"Specify an alternate project file\t\t\t\n\
-        Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable",
-        autocompletion=get_project_file_completion)
-def cli(file):
-    '''Manage Docker Image'''
-    project.cli_args(file)
+def cli():
+    '''Manage Docker Image.'''
+    pass
+
 
 cli.add_command(ls)
 cli.add_command(build)
 cli.add_command(rm)
 cli.add_command(prune)
-
-#sys.modules[__name__] = image

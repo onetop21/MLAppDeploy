@@ -1,0 +1,16 @@
+{{- if .Values.clusterRole.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mlappdeploy.fullname" . }}-role-binding
+  labels:
+    {{- include "mlappdeploy.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mlappdeploy.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "mlappdeploy.fullname" . }}-role
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

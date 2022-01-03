@@ -1,0 +1,31 @@
+apiVersion: v1
+entries:
+  api-server:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2021-11-25T00:42:33.779452303+09:00"
+    dependencies:
+    - condition: nvidia-device-plugin.enabled
+      name: nvidia-device-plugin
+      repository: https://nvidia.github.io/k8s-device-plugin
+      version: 0.9.0
+    - condition: gpu-feature-discovery.enabled
+      name: gpu-feature-discovery
+      repository: https://nvidia.github.io/gpu-feature-discovery
+      version: 0.4.1
+    - condition: dcgm-exporter.enabled
+      name: dcgm-exporter
+      repository: ""
+      version: 2.4.0
+    description: Machine Learning Application Deployment Tool by Kubernetes
+    digest: 01d3e28da929d87b8bfd1cbc0679c7bfbefbd7af0e3a5014680cfda030131103
+    home: https://github.com/onetop21/MLAppDeploy
+    maintainers:
+    - email: onetop21@gmail.com
+      name: Hyoil LEE
+    name: api-server
+    type: application
+    urls:
+    - api-server-0.1.0.tgz
+    version: 0.1.0
+generated: "2021-11-25T00:42:33.776341224+09:00"

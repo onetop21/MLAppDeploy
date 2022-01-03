@@ -1,67 +1,36 @@
-# MLAppDeploy Project v0.1
-project:
-    name: example
-    version: 0.0.1
-    maintainer: onetop21
+# MLAppDeploy Project v0.3
+apiVersion: v1                     # Describe api version. (*v1)
+maintainer: root                   # Describe maintainer. (*env.USER)
+kind: Train
+name: example                      # Describe project name.
+version: 0.0.1                     # Describe verison. (*1.0.0)
+workdir: .
+# ingress:                           # [OPTIONAL] Describe ingress to expose.
+#     test-ingress:
+#         rewritePath: true
+#         target: server:1234
 workspace:
-    ## Describe base docker image tag
-    base: python:latest
-    ## Describe package manager and dependency list to install pre-required.
-    requires:
-        pip: requirements.txt
-    ## Describe environment variables.
-    #env:  
-    #    PYTHONUNBUFFERED: 1    
-    ## Describe exclude files from project.
-    ignore:
-       - "**/.*"
-       - "test"
-       - "*.tar"
-    ## Describe Pre/Post scripts for preparing.
-    #prescripts: []
-    #postscripts: []
-    ## Describe application to execute
-    #command: python run.py
-    ## Describe arguments for execute application
-    #arguments: --help
-services:
+    kind: Workspace                # Describe kind of workspace. (*Workspace, Dockerfile)
+    base: python:latest            # Describe base docker image tag.
+    preps:
+      - pip: requirements.txt      # [OPTIONAL] Describe prepare options for run.
+app:
     server:
-        ports: [5555]
-        command: python server.py
+        kind: Job                  # [OPTIONAL] Describe kind of app. (*App, Job, Service)
+        command: python server.py  # [OPTIONAL] Describe command to need overwrite.
+        ports: [5555]              # [OPTIONAL] Describe expose ports to other apps.
     client:
+        kind: Job
         command: python client.py
-        deploy:
-            replicas: 1
-            restart_policy:
-                condition: always
-    test:
-        command: python client.py
-#        deploy:
-#            replicas: 1
-            # constraints:
-            #     labels.type: master
-    #[SERVICENAME]:
-    ## Describe image to run docker service for run not built image from workspace.
-    #    image: 
-    ## Describe environment variables additionaly.
-    #    env:
-    #        [KEY]: [VALUE]
-    ## Describe services before running current service.
-    #    depends: [ SERVICENAME, ... ]
-    ## Describe command to need overwrite.
-    #    command:
-    ## Describe arguments to need overwrite.
-    #    arguments:
-    #
-    ## Deploy only options
-    #    deploy:
-    ## Describe required system resource quote.
-    #        quota:
-    #            cpus: 1
-    #            mems: 8G
-    #            gpus: 0
-    ## Describe target node to run services.
-    #        constraints:
-    ## Describe number to run service instances.
-    #        replicas: 1
-    #...
+        constraints:               # [OPTIONAL] Describe target node to run app.
+            hostname: docker-desktop
+        ports: [5555]
+#        env:
+#            test: test-env
+#        scale: 1                   # [OPTIONAL] Describe number of replicas or parallelism. (*1)
+#        quota:                     # [OPTIONAL] Describe required system resource q
+#            cpu: 1
+#            gpu: 0
+#        restartPolicy: never       # [OPTIONAL] Describe restart policy. (*never, on-failure, always)
+
+
