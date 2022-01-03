@@ -1,4 +1,4 @@
-name: API Server Image CI
+name: Docker Image CI
 
 on:
   release:
@@ -29,47 +29,39 @@ jobs:
         echo $IMAGE_NAME
         docker images
       
-    - name: Generate version tag
-      run: |
-        # Strip git ref prefix from version
-        VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-
-        # Strip "v" prefix from tag name
-        [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-        
-        # Use Docker `latest` tag convention
-        [[ "$VERSION" =~ [A-Za-z0-9_-]+ ]] && VERSION=latest
-    
-    - name: "GitHub: Log into registry"
+    - name: Log into registry
       run: >
         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 
 
-    - name: "GitHub: Push image"
+    - name: Push image
       run: |
-        GITHUB_IMAGE_ID=ghcr.io/${{ github.repository }}/$IMAGE_NAME
+        IMAGE_ID=${{ github.event.inputs.registry }}/${{ github.repository }}/$IMAGE_NAME
 
         # Change all uppercase to lowercase
-        GITHUB_IMAGE_ID=$(echo $GITHUB_IMAGE_ID | tr '[A-Z]' '[a-z]')
-
-        echo GITHUB_IMAGE_ID=$GITHUB_IMAGE_ID:$VERSION
+        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
         
-        docker tag $IMAGE_NAME $GITHUB_IMAGE_ID:$VERSION
-        docker images
-        docker push $GITHUB_IMAGE_ID:$VERSION
+        if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
+        then
+          VERSION=dev
+        elif [[ "${{ github.event_name }}" == 'release' ]]
+        then
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          WITH_LATEST=1
+        fi
         
-    - name: "DockerHub: Log into registry"
-      run: >
-        echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ github.actor }} --password-stdin
-
-    - name: "DockerHub: Push image"
-      run: |
-        DOCKERHUB_IMAGE_ID=docker.io/${{ github.actor }}/mlad-$IMAGE_NAME
-
-        # Change all uppercase to lowercase
-        DOCKERHUB_IMAGE_ID=$(echo $DOCKERHUB_IMAGE_ID | tr '[A-Z]' '[a-z]')
-
-        echo DOCKERHUB_IMAGE_ID=$DOCKERHUB_IMAGE_ID:$VERSION
+        ID=$(docker image ls $IMAGE_NAME:latest -q)
         
-        docker tag $IMAGE_NAME $DOCKERHUB_IMAGE_ID:$VERSION
-        docker images
-        docker push $DOCKERHUB_IMAGE_ID:$VERSION
+        echo IMAGE_ID=$IMAGE_ID
+        echo VERSION=$VERSION
+
+        docker tag $ID $IMAGE_ID:$VERSION
+        docker push $IMAGE_ID:$VERSION
+        [ $WITH_LATEST ] && {
+          docker tag $ID $IMAGE_ID:latest
+          docker push $IMAGE_ID:latest
+        } || :
+        
