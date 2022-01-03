@@ -46,6 +46,11 @@ def activate():
     else:
         raise MLADBoardAlreadyActivatedError
 
+    host_ip = _obtain_host()
+    requests.delete(f'{host_ip}:2021/mlad/component', json={
+        'name': 'mlad-board'
+    })
+
     yield 'Activating MLAD board.'
 
     cli.containers.run(
