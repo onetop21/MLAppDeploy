@@ -35,7 +35,8 @@ jobs:
 
     - name: Push image
       run: |
-        IMAGE_ID=${{ github.event.inputs.registry }}/${{ github.repository }}/$IMAGE_NAME
+        [[ ${{ github.event.inputs.registry }} ]] && REPO=${{ github.event.inputs.registry }} || REPO=ghcr.io
+        IMAGE_ID=$REPO/${{ github.repository }}/$IMAGE_NAME
 
         # Change all uppercase to lowercase
         IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
