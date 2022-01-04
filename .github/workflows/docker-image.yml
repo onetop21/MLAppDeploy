@@ -67,6 +67,8 @@ jobs:
 
           docker tag $IMAGE_ID $IMAGE_NAME:$VERSION
           [ $WITH_LATEST ] && docker tag $IMAGE_ID $IMAGE_NAME:latest
+          
+          docker images
           docker push $IMAGE_NAME
         else
           echo "::error title=Failed to build container image::Not support ${{ github.event_name }} event on $GITHUB_REF_NAME branch."
