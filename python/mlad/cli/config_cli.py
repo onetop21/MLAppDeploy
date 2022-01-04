@@ -1,72 +1,75 @@
-import sys
-import os
-import getpass
+from typing import Optional
+
 import click
+from omegaconf import OmegaConf
 from mlad.cli import config
-from mlad.cli.libs import utils
-from mlad.cli.autocompletion import *
+from mlad.cli.context_cli import _obtain_host
+from . import echo_exception
 
-# mlad config init
-# mlad config set [key=value]
-# mlad config get [key]
 
 @click.command()
-@click.option('--address', '-a', default='http://localhost:8440', prompt='MLAppDeploy Service Address', help='Set service address')
-@click.option('--token', '-t', default='', help='Set administrator token')
-def init(address, token):
-    '''Initialize configurations'''
-    config.init(address, token)
+@click.option('--address', '-a', default=f'{_obtain_host()}:8440',
+              prompt='MLAD API Server Address', help='Set API server address.')
+@echo_exception
+def init(address):
+    '''Initialize a configuration.'''
+    ret = config.init(address)
+    click.echo('Config has been successfully registered.')
+    click.echo(OmegaConf.to_yaml(ret))
+
 
 @click.command()
-@click.argument('VAR', required=True, nargs=-1, autocompletion=get_config_key_completion)
-def set(var):
-    '''Set configurations. [KEY=VALUE]...'''
-    config.set(*var) 
+@click.argument('ARGS', required=True, nargs=-1)
+@echo_exception
+def set(args):
+    '''Update values of the context.\n
+    Format: mlad config set [KEY1=VALUE1] [KEY2=VALUE2]'''
+    config.set(*args)
+    click.echo('The config is successfully configured.')
+
 
 @click.command()
-@click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
-@click.argument('KEY', required=False, autocompletion=get_config_key_completion)
-def get(no_trunc, key):
-    '''Get configurations'''
-    config.get(key, no_trunc)
+@click.argument('KEY', required=False)
+@echo_exception
+def get(key: Optional[str]):
+    '''Display a detail specification of the configuration.'''
+    ret = config.get(key)
+    try:
+        click.echo(OmegaConf.to_yaml(ret)[:-1])
+    except ValueError:
+        click.echo(ret)
+
 
 @click.command()
-@click.option('--unset', '-u', is_flag=True)
+@click.option('--unset', '-u', is_flag=True, help='Display only names of the environment variables')
+@echo_exception
 def env(unset):
-    '''To set environment variables, run "eval $(mlad config env)"'''
-    config.env(unset)
+    '''To set environment variables, run "eval $(mlad config env)."'''
+    lines, msg = config.env(unset=unset)
+    for line in lines:
+        click.echo(line)
+    click.echo('')
+    click.echo(msg)
+
 
 @click.command()
-@click.option('--install', is_flag=True, help='Install shell-completion to shell(Linux Only)')
-def completion(install):
-    '''Activate auto completion (Linux Only)'''
-    shell = os.path.basename(os.environ.get('SHELL'))
-    if shell in ['bash', 'zsh']:
-        if install:
-            utils.write_completion(shell)
-            click.echo(f"Register \"source {utils.COMPLETION_FILE}\" to rc file.")
-        else:
-            completion_script = utils.get_completion(shell)
-            click.echo(completion_script)
-            click.echo("# To set environment variables, run \"eval \"$(mlad config completion)\"\"")
-    else:
-        click.echo(f'Cannot support shell [{shell}].\nSupported Shell: bash, zsh')
+@click.option('--install', '-i', is_flag=True, help='Install the completion using bash-completion.')
+@echo_exception
+def completion(install: bool):
+    '''Activate auto completion (Linux bash shell only).'''
+    if install:
+        config.install_completion()
+    click.echo('Run the following command to activate autocompletion:')
+    click.echo('eval "$(_MLAD_COMPLETE=source_bash mlad)"')
 
-@click.command()
-@click.argument('KIND', required=False)
-def datastore(kind):
-    '''Set configurations for data storage'''
-    config.datastore(kind)
 
 @click.group('config')
 def cli():
-    '''Manage configuration'''
+    '''Manage configuration.'''
+
 
 cli.add_command(init)
-cli.add_command(datastore)
 cli.add_command(set)
 cli.add_command(get)
 cli.add_command(env)
 cli.add_command(completion)
-
-#sys.modules[__name__] = config

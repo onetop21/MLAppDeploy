@@ -1,4 +1,6 @@
-import sys, os, signal
+import sys
+import signal
+
 
 class InterruptHandler(object):
     def __init__(self, message='Aborted.', blocked=False, sig=signal.SIGINT):
@@ -10,7 +12,8 @@ class InterruptHandler(object):
         self.interrupted = False
         self.released = False
         self.original_handler = signal.getsignal(self.sig)
-        def handler(signum, frmae):
+
+        def handler(signum, frame):
             if not self.blocked:
                 self.release(True)
             self.interrupted = True
@@ -19,14 +22,16 @@ class InterruptHandler(object):
         return self
 
     def __exit__(self, type, value, tb):
-        return self.release()
+        self.release()
+        return False
 
     def release(self, interrupted=False):
         if self.released:
-            return True
+            return
         signal.signal(self.sig, self.original_handler)
         self.released = True
-        if interrupted: raise KeyboardInterrupt
-        return False
+        if interrupted:
+            raise KeyboardInterrupt
+
 
 sys.modules[__name__] = InterruptHandler

@@ -1,9 +1,5 @@
-import sys
-import os
 import time
-import datetime
 import struct
-import itertools
 import docker
 import socket
 import urllib3
@@ -12,6 +8,7 @@ from dateutil import parser
 from threading import Thread
 from multiprocessing import Queue, Value
 from mlad.core.libs import utils
+
 
 class LogHandler:
     def __init__(self, cli):
@@ -38,12 +35,14 @@ class LogHandler:
         host = utils.get_requests_host(self.cli)
         timeout = None if params['follow'] else 3
         try:
-            with requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, timeout=timeout, stream=True) as resp:
+            with requests_unixsocket.get(f"{host}/v1.24{target}/logs",
+                                         params=params, timeout=timeout, stream=True) as resp:
                 self.responses.append(resp)
-                Thread(target=LogHandler._monitor, args=(self.monitoring, host, target, lambda: self.close(resp)), daemon=True).start()
+                Thread(target=LogHandler._monitor,
+                       args=(self.monitoring, host, target, lambda: self.close(resp)),
+                       daemon=True).start()
+
                 def iter_lines(resp):
-                    #resp.raise_for_status()
-                    #except requests.exceptions.HTTPError as e:
                     while True:
                         header = resp.raw.read(docker.constants.STREAM_HEADER_SIZE_BYTES)
                         if not header:
@@ -51,11 +50,10 @@ class LogHandler:
                         _, length = struct.unpack('>BxxxL', header)
                         if not length:
                             continue
-                        data = resp.raw.read(length)   
+                        data = resp.raw.read(length)
                         if not data:
                             break
                         yield data
-                #for line in resp.iter_lines():
                 for line in iter_lines(resp):
                     if params.get('timestamps'):
                         separated = line.split(b' ')
@@ -71,13 +69,15 @@ class LogHandler:
     def _monitor(cls, should_run, host, target, callback):
         params = {'stderr': True, 'tail': 1}
         while should_run.value:
-            status = requests_unixsocket.get(f"{host}/v1.24{target}/logs", params=params, timeout=1).status_code
+            status = requests_unixsocket.get(
+                f"{host}/v1.24{target}/logs", params=params, timeout=1).status_code
             if status != 200:
                 callback()
                 break
             time.sleep(1)
 
-class LogCollector(): 
+
+class LogCollector():
     def __init__(self, maxbuffer=65535, release_callback=None):
         self.name_width = 0
         self.threads = {}
@@ -94,21 +94,27 @@ class LogCollector():
             if not self.threads[object_id]['from_dockerpy']:
                 if self.threads[object_id]['timestamps']:
                     separated = stream.split(' ', 2)
-                    if len(separated) < 3: _, timestamp, body = (*separated, '')
-                    else: _, timestamp, body = separated
+                    if len(separated) < 3:
+                        _, timestamp, body = (*separated, '')
+                    else:
+                        _, timestamp, body = separated
                     output['timestamp'] = parser.parse(timestamp).astimezone()
                     output['stream'] = body.encode()
                 else:
                     separated = stream.split(' ', 1)
-                    if len(separated) < 2: _, body = (*separated, '')
-                    else: _, body = separated
+                    if len(separated) < 2:
+                        _, body = (*separated, '')
+                    else:
+                        _, body = separated
                     output['stream'] = body.encode()
                 output['task_id'] = f"{_[_.rfind('=')+1:]}"
             else:
                 if self.threads[object_id]['timestamps']:
                     separated = stream.split(' ', 1)
-                    if len(separated) < 2: timestamp, body = (*separated, '')
-                    else: timestamp, body = separated
+                    if len(separated) < 2:
+                        timestamp, body = (*separated, '')
+                    else:
+                        timestamp, body = separated
                     output['timestamp'] = parser.parse(timestamp).astimezone()
                     output['stream'] = body.encode()
                 else:
@@ -116,9 +122,11 @@ class LogCollector():
             return output
         elif 'status' in msg and msg['status'] == 'stopped':
             del self.threads[object_id]
-            if not self.threads: raise StopIteration
+            if not self.threads:
+                raise StopIteration
             return self.__next__()
-        else: raise RuntimeError('Invalid stream type.')
+        else:
+            raise RuntimeError('Invalid stream type.')
 
     def __iter__(self):
         return self
@@ -129,7 +137,7 @@ class LogCollector():
 
     def __exit__(self, ty, val, tb):
         self.release()
-        if not ty in [None, KeyboardInterrupt]:
+        if ty not in [None, KeyboardInterrupt]:
             import traceback
             traceback.print_exception(ty, val, tb)
         return True
@@ -140,7 +148,7 @@ class LogCollector():
     def add_iterable(self, iterable, name=None, timestamps=False):
         self.name_width = max(self.name_width, len(name))
         self.threads[id(iterable)] = {
-            'name': name, 
+            'name': name,
             'timestamps': timestamps,
             'from_dockerpy': isinstance(iterable, docker.types.daemon.CancellableStream),
             'thread': Thread(target=LogCollector._read_stream, args=(iterable, self.queue, self.should_run), daemon=True)
@@ -158,6 +166,8 @@ class LogCollector():
     @classmethod
     def _read_stream(cls, iterable, queue, should_run):
         for _ in iterable:
-            if not should_run.value: break
-            if _: queue.put({'stream': _, 'object_id': id(iterable)})
+            if not should_run.value:
+                break
+            if _:
+                queue.put({'stream': _, 'object_id': id(iterable)})
         queue.put({'status': 'stopped', 'object_id': id(iterable)})

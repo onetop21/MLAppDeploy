@@ -1,146 +1,104 @@
 import sys
-import os
 import io
 import tarfile
-import json
-import base64
-import urllib3
-import requests
-import docker
-from pathlib import Path
-from mlad.core.default import project as default_project
-from mlad.core.default import plugin as default_plugin
+
+from typing import Optional
+
+from mlad.cli import config as config_core
+from mlad.cli.validator import validators
+from mlad.cli.libs import utils
+from mlad.cli.format import (
+    DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT,
+    DOCKERFILE_REQ_ADD, DOCKERFILE_REQ_RUN, DOCKERFILE_REQ_APK, DOCKERFILE_REQ_YUM
+)
+
 from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
-from mlad.cli.libs import utils
-from mlad.cli.libs import interrupt_handler
-from mlad.cli.Format import PROJECT
-from mlad.cli.Format import DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT
+from mlad.core.default import project as default_project
 
-def list(all, plugin, tail, no_trunc):
-    cli = ctlr.get_api_client()
+PREP_KEY_TO_TEMPLATE = {
+    'run': DOCKERFILE_REQ_RUN,
+    'add': DOCKERFILE_REQ_ADD,
+    'apt': DOCKERFILE_REQ_APT,
+    'pip': DOCKERFILE_REQ_PIP,
+    'apk': DOCKERFILE_REQ_APK,
+    'yum': DOCKERFILE_REQ_YUM
+}
+
+
+def list(all, tail):
     if all:
-        images = ctlr.get_images(cli, extra_labels=['MLAD.PROJECT.TYPE=project'])# + \
-        #         ctlr.get_images(cli, extra_labels=['MLAD.PROJECT.TYPE=plugin'])
-    elif plugin:
-        images = ctlr.get_images(cli, extra_labels=['MLAD.PROJECT.TYPE=plugin'])
+        images = ctlr.get_images()
     else:
-        project_key = utils.project_key(utils.get_workspace())
-        images = ctlr.get_images(cli, project_key)
+        project_key = utils.workspace_key()
+        images = ctlr.get_images(project_key=project_key)
 
-    data = [('ID', 'BUILD USER', 'TYPE', 'NAME', 'VERSION', 'MAINTAINER', 'CREATED')]
+    data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED')]
     if all:
-        data = [('ID', 'BUILD USER', 'TYPE', 'NAME', 'VERSION', 'MAINTAINER', 'CREATED', 'WORKSPACE')]
+        data = [('ID', 'BUILD USER', 'NAME', 'TAG', 'MAINTAINER', 'CREATED', 'WORKSPACE')]
 
     untagged = 0
-    for inspect in [ctlr.inspect_image(_) for _ in images[:tail]]:
-        if len(inspect['tags']) == 0:
+    for spec in [ctlr.inspect_image(image) for image in images]:
+        if len(spec['tags']) == 0:
             untagged += 1
         else:
             row = [
-                inspect['short_id'],
-                inspect['username'],
-                inspect['type'].upper(),
-                inspect['project_name'],
-                f"[{inspect['tag']}]" if inspect['latest'] else f"{inspect['tag']}",
-                inspect['maintainer'],
-                inspect['created']
+                spec['short_id'],
+                spec['username'],
+                spec['project_name'],
+                spec['tag'],
+                spec['maintainer'],
+                spec['created']
             ]
             if all:
-                row.append(inspect['workspace'])
+                row.append(spec['workspace'])
             data.append(row)
-    utils.print_table(*([data, 'No have built image.'] + ([0] if no_trunc else [])))
+    utils.print_table(data[:tail + 1], 'There is no built image.', 0)
     if untagged:
-        print(f'This project has {untagged} untagged images. To free disk spaces up by cleaning gabage images.') 
+        print(f'This project has {untagged} untagged images. '
+              'Delete untagged images to free the disk space. '
+              'Use command `mlad image prune`')
 
-def build(quiet, plugin, no_cache, pull):
-    config = utils.read_config()
-    cli = ctlr.get_api_client()
-    
-    manifest_type = 'plugin' if plugin else 'project'
-    default = default_plugin if plugin else default_project
-    manifest = utils.get_manifest(manifest_type, default)
-    
+
+def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
+    utils.process_file(file)
+    config = config_core.get()
+    project = utils.get_project(default_project)
+    project = validators.validate(project)
+
     # Generate Base Labels
+    workspace = utils.get_workspace()
+    registry_address = utils.get_registry_address(config)
     base_labels = core_utils.base_labels(
-        utils.get_workspace(), 
-        utils.get_username(config), 
-        manifest[manifest_type], 
-        manifest_type
-    )
+        workspace, config.session, project, registry_address, build=True)
     project_key = base_labels['MLAD.PROJECT']
+    version = base_labels['MLAD.PROJECT.VERSION']
+    repository = base_labels['MLAD.PROJECT.IMAGE']
 
-    # Append service manfest using label.
-    if plugin:
-        base_labels['MLAD.PROJECT.PLUGIN_MANIFEST']=base64.urlsafe_b64encode(json.dumps(manifest['service']).encode()).decode()
-
-    # Prepare Latest Image
-    latest_image = None
-    images = ctlr.get_images(cli, extra_labels=[f'MLAD.PROJECT.TYPE={manifest_type}'])
-    if len(images):
-        latest_image = sorted(filter(None, [ image if tag.endswith('latest') else None for image in images for tag in image.tags ]), key=lambda x: str(x))
-        if latest_image and len(latest_image): latest_image = latest_image[0]
-    image_version = f"{base_labels['MLAD.PROJECT.VERSION']}"
-
-    print(f'Generating {manifest_type} image...')
-
-    if manifest['workspace'] != default({})['workspace']:
-        # Prepare workspace data from manifest file
-        envs = []
-        for key in manifest['workspace']['env'].keys():
-            envs.append(DOCKERFILE_ENV.format(
-                KEY=key,
-                VALUE=manifest['workspace']['env'][key]
-            ))
-        requires = []
-        for key in manifest['workspace']['requires'].keys():
-            if key == 'apt':
-                requires.append(DOCKERFILE_REQ_APT.format(
-                    SRC=manifest['workspace']['requires'][key]
-                ))
-            elif key == 'pip':
-                requires.append(DOCKERFILE_REQ_PIP.format(
-                    SRC=manifest['workspace']['requires'][key]
-                )) 
-
-        # Dockerfile to memory
-        dockerfile = DOCKERFILE.format(
-            BASE=manifest['workspace']['base'],
-            MAINTAINER=manifest[manifest_type]['maintainer'],
-            ENVS='\n'.join(envs),
-            PRESCRIPTS=';'.join(manifest['workspace']['prescripts']) if len(manifest['workspace']['prescripts']) else "echo .",
-            REQUIRES='\n'.join(requires),
-            POSTSCRIPTS=';'.join(manifest['workspace']['postscripts']) if len(manifest['workspace']['postscripts']) else "echo .",
-            COMMAND='[{}]'.format(', '.join(
-                [f'"{item}"' for item in manifest['workspace']['command'].split()] + 
-                [f'"{item}"' for item in manifest['workspace']['arguments'].split()]
-            )),
-        )
-
-        tarbytes = io.BytesIO()
-        dockerfile_info = tarfile.TarInfo('.dockerfile')
-        dockerfile_info.size = len(dockerfile)
-        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-            for name, arcname in utils.arcfiles(manifest[manifest_type]['workdir'], manifest['workspace']['ignore']):
-                tar.add(name, arcname)
-            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-        tarbytes.seek(0)
-
-        # Build Image
-        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
-
+    workspace = project['workspace']
+    # For the workspace kind
+    if workspace['kind'] == 'Workspace':
+        payload = _obtain_workspace_payload(workspace, project['maintainer'])
+    # For the dockerfile kind
     else:
-        dockerfile = f"FROM {manifest['service']['image']}\nMAINTAINER {manifest[manifest_type]['maintainer']}"
+        if 'dockerfile' in workspace:
+            with open(workspace['dockerfile'], 'r') as dockerfile:
+                payload = dockerfile.read()
+        else:
+            payload = workspace['buildscript']
 
-        tarbytes = io.BytesIO()
-        dockerfile_info = tarfile.TarInfo('.dockerfile')
-        dockerfile_info.size = len(dockerfile)
-        with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-            tar.addfile(dockerfile_info, io.BytesIO(dockerfile.encode()))
-        tarbytes.seek(0)
+    tarbytes = io.BytesIO()
+    dockerfile_info = tarfile.TarInfo('.dockerfile')
+    dockerfile_info.size = len(payload)
+    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+        for name, arcname in utils.arcfiles(project['workdir'], workspace['ignores']):
+            tar.add(name, arcname)
+        tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
+    tarbytes.seek(0)
 
-        # Build Image
-        build_output = ctlr.build_image(cli, base_labels, tarbytes, dockerfile_info.name, no_cache, pull, stream=True)
+    # Build Image
+    build_output = ctlr.build_image(base_labels, tarbytes, dockerfile_info.name,
+                                    no_cache, pull, stream=True)
 
     # Print build output
     for _ in build_output:
@@ -151,91 +109,75 @@ def build(quiet, plugin, no_cache, pull):
             if not quiet:
                 sys.stdout.write(_['stream'])
 
-    image = ctlr.get_image(cli, base_labels['MLAD.PROJECT.IMAGE'])
+    image = ctlr.get_image(repository)
 
-    #print(docker.auth.resolve_repository_name(base_labels['MLAD.PROJECT.IMAGE']))
-    repository = base_labels['MLAD.PROJECT.IMAGE']
-    # Check updated
-    if latest_image != image:
-        if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
-            latest_image.tag('remove')
-            cli.images.remove('remove')
-        print(f"Built Image: {repository}")
-    else:
-        print(f'Already built {manifest_type} to image.', file=sys.stderr)
+    # Prepare the previous images
+    images = ctlr.get_images(project_key=project_key)
+    prev_images = [
+        im
+        for im in images
+        for tag in im.tags if tag.endswith(version)
+    ]
 
-    #updated = False
-    #if latest_image != image:
-    #    image.tag(repository)
-    #    updated = True
-    #    if latest_image and len(latest_image.tags) < 2 and latest_image.tags[-1].endswith(':latest'):
-    #        latest_image.tag('remove')
-    #        cli.images.remove('remove')
-    #else:
-    #    if len(latest_image.tags) < 2:
-    #        image.tag(repository, tag=image_version)
-    #        updated = True
-    #    else:
-    #        print(f'Already built {manifest_type} to image.', file=sys.stderr)
+    # Remove the previous images with different ids
+    for prev_image in prev_images:
+        if prev_image != image:
+            prev_image.tag('remove')
+            ctlr.remove_image(['remove'])
+    yield f'Built Image: {repository}'
 
-    #if updated:
-    #    #print(f"Built Image: {'/'.join(repository.split('/')[1:])}:{image_version}")
-    #    print(f"Built Image: {repository}")
+    # Push image
+    if project['kind'] != 'Component':
+        yield f'Upload the image to the registry [{registry_address}]...'
+        for line in ctlr.push_image(repository):
+            yield line
 
-    print('Done.')
+    return image
 
-def search(keyword):
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    config = utils.read_config()
-    try:
-        images = []
-        catalog = json.loads(requests.get(f"http://{config['docker']['registry']}/v2/_catalog", verify=False).text)
-        if 'repositories' in catalog:
-            repositories = catalog['repositories']
-            for repository in repositories:
-                tags = json.loads(requests.get(f'http://{config["docker"]["registry"]}/v2/{repository}/tags/list', verify=False).text)
-                images += [ f"{config['docker']['registry']}/{tags['name']}:{tag}" for tag in tags['tags'] ] 
-            found = [ item for item in filter(None, [image if keyword in image else None for image in images]) ]
 
-            columns = [('REPOSITORY', 'TAG')]
-            for item in found:
-                repo, tag = item.rsplit(':', 1)
-                columns.append((repo, tag))                 
-            utils.print_table(columns, 'Cannot find image.', 48)
-        else:
-            print('No images.', file=sys.stderr)
-    except requests.exceptions.ConnectionError as e:
-        print(f"Cannot connect to docker registry [{config['docker']['registry']}]", file=sys.stderr)
+def _obtain_workspace_payload(workspace, maintainer):
+    envs = [DOCKERFILE_ENV.format(KEY=k, VALUE=v) for k, v in workspace['env'].items()]
+    preps = workspace['preps']
+    prep_docker_formats = []
+    for prep in preps:
+        key = tuple(prep.keys())[0]
+        template = PREP_KEY_TO_TEMPLATE[key]
+        prep_docker_formats.append(template.format(SRC=prep[key]))
+
+    commands = [f'"{item}"' for item in workspace['command'].split()] + \
+        [f'"{item}"' for item in workspace['args'].split()]
+
+    return DOCKERFILE.format(
+        BASE=workspace['base'],
+        MAINTAINER=maintainer,
+        ENVS='\n'.join(envs),
+        PREPS='\n'.join(prep_docker_formats),
+        SCRIPT=';'.join(workspace['script']) if len(workspace['script']) else "echo .",
+        COMMAND=f'[{", ".join(commands)}]',
+    )
+
 
 def remove(ids, force):
-    print('Remove project image...')
-    cli = ctlr.get_api_client()
-    try:
-        result = ctlr.remove_image(cli, ids, force)
-    except docker.errors.ImageNotFound as e:
-        print(e, file=sys.stderr)
-        result = []
-    print('Done.')
+    ctlr.remove_image(ids, force)
+
 
 def prune(all):
-    cli = ctlr.get_api_client()
     if all:
-        result = ctlr.prune_images(cli) 
+        result = ctlr.prune_images()
     else:
-        project_key = utils.project_key(utils.get_workspace())
-        result = ctlr.prune_images(cli, project_key) 
+        project_key = utils.workspace_key()
+        result = ctlr.prune_images(project_key)
 
     if result['ImagesDeleted'] and len(result['ImagesDeleted']):
         for deleted in result['ImagesDeleted']:
-            status, value = [ (key, deleted[key]) for key in deleted ][-1]
+            status, value = [(key, deleted[key]) for key in deleted][-1]
             print(f'{status:12} {value:32}')
         reclaimed = result['SpaceReclaimed']
         unit = 0
-        unit_list = ['B', 'KB', 'MB', 'GB', 'TB' ]
+        unit_list = ['B', 'KB', 'MB', 'GB', 'TB']
         while reclaimed / 1000. > 1:
             reclaimed /= 1000.
             unit += 1
         print(f'{reclaimed:.2f}{unit_list[unit]} Space Reclaimed.')
     else:
         print('Already cleared.', file=sys.stderr)
-

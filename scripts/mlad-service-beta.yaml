@@ -8,8 +8,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: controller-role
 rules:
-- apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io", "metrics.k8s.io"]
-  resources: ["nodes", "namespaces", "services", "pods", "pods/log", "replicationcontrollers", "deployments", "replicaset", "jobs", "configmaps", "secrets", "events", "rolebindings", "ingresses", "podmetrics"]
+- apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io",
+              "metrics.k8s.io"]
+  resources: ["nodes", "namespaces", "services", "pods", "pods/log", "replicationcontrollers",
+              "deployments", "deployments/scale", "replicaset", "jobs", "configmaps", "secrets",
+              "events", "rolebindings", "ingresses", "podmetrics"]
   verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
 ---
 kind: ClusterRoleBinding
@@ -75,7 +78,7 @@ spec:
     port: 8440
     targetPort: 8440
 ---
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: mlad-service-beta
@@ -86,14 +89,14 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/rewrite-target: '/$2'
-    #kubernetes.io/ingress.class: traefik
-    #traefik.frontend.rule.type: PathPrefixStrip
 spec:
   rules:
   - http:
       paths:
       - path: /beta(/|$)(.*)
-        #pathType: Prefix
+        pathType: ImplementationSpecific
         backend:
-          serviceName: mlad-service-beta
-          servicePort: 8440
+          service:
+            name: mlad-service-beta
+            port:
+              number: 8440
