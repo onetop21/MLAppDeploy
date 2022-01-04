@@ -227,6 +227,7 @@ def hash(body: str):
 CLEAR_COLOR = '\x1b[0m'
 ERROR_COLOR = '\x1b[1;31;40m'
 INFO_COLOR = '\033[38;2;255;140;26m'
+OK_COLOR = '\033[92m'
 
 
 @lru_cache(maxsize=None)

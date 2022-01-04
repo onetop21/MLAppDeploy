@@ -10,6 +10,7 @@ from mlad.cli import context_cli as context
 from mlad.cli import board_cli as board
 from mlad.cli import train_cli as train
 from mlad.cli import deploy_cli as deploy
+from mlad.cli import install_cli as install
 from mlad.cli.libs.auth import auth_admin
 from mlad.cli.exceptions import ContextNotFoundError
 from mlad.cli.context import get as check_context, current
@@ -50,6 +51,7 @@ def main():
 main.add_command(config.cli, 'config')
 if auth_admin():
     main.add_command(context.cli, 'context')
+    main.add_command(install.cli, 'install')
 
 try:
     check_context(current())
