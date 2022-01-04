@@ -1,20 +1,21 @@
 name: API Server Image CI
 
-env:
-  # TODO: Change variable to your image's name.
-  REPOSITORY: ghcr.io
-  IMAGE_NAME: api-server
-  
 on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      registry:
-        description: 'Target registry'
-        required: False
-        default: ${{ env.REPOSITORY }}
+    #inputs:
+    #  registry:
+    #    description: 'Target registry'
+    #    required: False
+    #    default: ghcr.io
+    #  ${{ github.event.inputs.registry }}
 
+env:
+  # TODO: Change variable to your image's name.
+  REPOSITORY: ghcr.io/${{ github.repository }}
+  IMAGE_NAME: $REPOSITORY/api-server
+  
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,8 +23,10 @@ jobs:
     - uses: actions/checkout@v2
     
     - name: Build the Docker image
+      id: build_image
       run: |
-        docker build . --file scripts/Dockerfile_CI --tag $IMAGE_NAME
+        docker build . --file scripts/Dockerfile_CI
+        echo ::set-output name=id::$(docker build . --file scripts/Dockerfile_CI -q)
         
     - name: Log into registry
       run: >
@@ -31,34 +34,41 @@ jobs:
         
     - name: Push image
       run: |
-        [[ ${{ github.event.inputs.registry }} ]] && REPOSITORY=${{ github.event.inputs.registry }}
-        IMAGE_ID=$REPOSITORY/${{ github.repository }}/$IMAGE_NAME
-
         # Change all uppercase to lowercase
-        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+        IMAGE_NAME=$(echo $IMAGE_NAME | tr '[A-Z]' '[a-z]')
         
-        if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
+        if [[ "$GITHUB_REF_NAME" == "master" ]]
         then
-          VERSION=dev
-        elif [[ "${{ github.event_name }}" == 'release' ]]
-        then
-          # Strip git ref prefix from version
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          
-          # Strip "v" prefix from tag name
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-          WITH_LATEST=1
+          if [[ "${{ github.event_name }}" == 'release' ]]
+          then
+            # Strip git ref prefix from version
+            VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+
+            # Strip "v" prefix from tag name
+            [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          else
+            echo "::error title=Failed to build container image::Not support ${{ github.event_name }} event on $GITHUB_REF_NAME branch."
+            CANCELED=1
+          fi
+        else
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
+          then
+            VERSION=$(git rev-parse --short "$GITHUB_SHA")
+            WITH_LATEST=1
+          else
+            echo "::error title=Failed to build container image::Not support ${{ github.event_name }} event on $GITHUB_REF_NAME branch."
+            CANCELED=1
+          fi
         fi
         
-        ID=$(docker image ls $IMAGE_NAME:latest -q)
-        
-        echo IMAGE_ID=$IMAGE_ID
-        echo VERSION=$VERSION
+        if [ ! -z $CANCELED ]
+        then
+          IMAGE_ID=${{ steps.build_image.outputs.id }}
+          echo IMAGE_NAME=$IMAGE_NAME
+          echo VERSION=$VERSION
 
-        docker tag $ID $IMAGE_ID:$VERSION
-        docker push $IMAGE_ID:$VERSION
-        [ $WITH_LATEST ] && {
-          docker tag $ID $IMAGE_ID:latest
-          docker push $IMAGE_ID:latest
-        } || :
+          docker tag $IMAGE_ID $IMAGE_NAME:$VERSION
+          [ $WITH_LATEST ] && docker tag $IMAGE_ID $IMAGE_NAME:latest
+          docker push $IMAGE_NAME
+        fi
         
