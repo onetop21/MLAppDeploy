@@ -9,6 +9,11 @@ def check():
             'status': False,
             'info': ['Install ingress controller.']
         },
+        'Metrics Server': {
+            'status': False,
+            'info': ['Run \'helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ && '
+                     'helm install --set \'args={--kubelet-insecure-tls}\' -n kube-system metrics-server metrics-server/metrics-server\'.']
+        },
         'NVIDIA Device Plugin': {
             'status': False,
             'info': ['Run \'kubectl create -f ' 
@@ -36,6 +41,14 @@ def check():
     else:
         ctlr.delete_ingress(cli, 'mlad', 'dummy-ingress')
         checked['Ingress Controller']['status'] = True
+
+    # Check metrics server
+    try:
+        ctlr.get_deployment(cli, 'metrics-server', 'kube-system')
+    except CoreException.NotFound as e:
+        pass
+    else:
+        checked['Metrics Server']['status'] = True
 
     # Check nvidia device plugin
     try:
