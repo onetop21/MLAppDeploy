@@ -19,8 +19,8 @@ def teardown_module():
 
 def test_valid_input():
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
+        'https://abc.defg.com',
         'gameai',
         'https://localhost:9000',
         'us-west-1',
@@ -59,10 +59,10 @@ def test_valid_input():
 
 def test_valid_input2():
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
+        'https://abc.defg.com',
         '/home/.kube/config',
         'default',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
         '',
         'http://localhost:9000',
         '',
@@ -102,7 +102,7 @@ def test_valid_input2():
 def test_invalid_input():
     inputs = [
         '',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
         '',
         'http://localhost:9000',
         '',
@@ -119,8 +119,8 @@ def test_invalid_input():
 
 def test_invalid_input2():
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
+        'https://abc.defg.com',
         '',
         '/hello',
         '',
@@ -144,9 +144,9 @@ def test_dupilicate():
 def test_allow_duplicate():
     mock.add('test-allow-duplicate')
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
+        'https://abc.defg.com',
         'Y',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
         '',
         'http://localhost:9000',
         'us-west-1',

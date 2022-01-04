@@ -26,8 +26,8 @@ def teardown():
 
 def add(name):
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
+        'https://abc.defg.com',
         'gameai',
         'https://localhost:9000',
         'us-west-1',

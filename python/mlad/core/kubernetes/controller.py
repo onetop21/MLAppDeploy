@@ -10,6 +10,7 @@ from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 from kubernetes import client, config
+from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
 
 # https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
@@ -26,13 +27,9 @@ def get_api_client(config_file='~/.kube/config', context=None):
             return config.new_client_from_config(config_file=config_file)
     except config.config_exception.ConfigException:
         pass
-    try:
-        from kubernetes.client.api_client import ApiClient
-        config.load_incluster_config()
-        # If Need, set configuration parameter from client.Configuration
-        return ApiClient()
-    except config.config_exception.ConfigException:
-        return None
+    config.load_incluster_config()
+    # If Need, set configuration parameter from client.Configuration
+    return ApiClient()
 
 
 DEFAULT_CLI = get_api_client()
