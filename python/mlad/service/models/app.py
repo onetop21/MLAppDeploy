@@ -11,6 +11,7 @@ class Quota(BaseModel):
 
 class Ingress(BaseModel):
     name: str = None
+    path: str = None
     rewritePath: bool = True
     port: str = None
 
