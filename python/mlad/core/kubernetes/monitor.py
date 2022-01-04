@@ -3,8 +3,7 @@ import socket
 import urllib3
 from threading import Thread
 from multiprocessing import Queue
-from kubernetes import client, watch
-
+from kubernetes import client, config, watch
 
 class DelMonitor(Thread):
     @staticmethod
@@ -15,62 +14,62 @@ class DelMonitor(Thread):
             return resp
         return inner
 
-    def __init__(self, cli, collector, app_specs, namespace, timeout=0xFFFF):
-        super().__init__(daemon=True)
+    def __init__(self,cli, collector, services, namespace, timeout=0xFFFF):
+        Thread.__init__(self)
         self.__stopped = False
         self.api = client.CoreV1Api(cli)
         self.collector = collector
-        self.app_specs = app_specs
+        self.service_to_check = services
         self.namespace = namespace
         self.timeout = timeout
 
-        self.stream_resp = None
+        self.stream_resp=None
 
     def run(self):
         def assign(x):
             self.stream_resp = x
 
-        target_task_keys = []
-        app_name_to_task_keys = {}
-        for spec in self.app_specs:
-            name, _, task_keys = spec
-            app_name_to_task_keys[name] = task_keys
-            target_task_keys.extend(task_keys)
+        all_targets=[]
+        services={}
+        for service in self.service_to_check:
+            name, namespace, _, targets = service
+            services[name] = targets
+            all_targets.extend(targets)
         w = watch.Watch()
-        completed = len(target_task_keys) == 0
-        if not completed:
-            self.collector.queue.put({'stream': 'Wait for the apps to be removed...'})
-            try:
-                wrapped_api = DelMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
-                for ev in w.stream(wrapped_api, namespace=self.namespace,
-                                   _request_timeout=self.timeout):
-                    event = ev['type']
-                    pod_name = ev['object']['metadata']['name']
-                    app_name = ev['object']['metadata']['labels']['MLAD.PROJECT.APP']
-                    if event == 'DELETED':
-                        if pod_name in app_name_to_task_keys[app_name]:
-                            app_name_to_task_keys[app_name].remove(pod_name)
-                            if not app_name_to_task_keys[app_name]:
-                                msg = f'App \'{app_name}\' has been removed.'
-                                self.collector.queue.put({'result': 'succeed', 'stream': msg})
-                            target_task_keys.remove(pod_name)
-                    if len(target_task_keys) == 0:
-                        completed = True
-                        break
-            except urllib3.exceptions.ReadTimeoutError:
-                pass
-            except urllib3.exceptions.ProtocolError:
-                pass
-
-        if completed:
-            msg = "All apps were removed."
+        print(f'Watch start to check service removed')
+        service_removed = False
+        msg = f"Wait to remove services..\n"
+        self.collector.queue.put({'stream': msg})
+        try:
+            wrapped_api = DelMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
+            for ev in w.stream(wrapped_api, namespace=self.namespace,
+                               _request_timeout=self.timeout):
+                event = ev['type']
+                pod = ev['object']['metadata']['name']
+                service = ev['object']['metadata']['labels']['MLAD.PROJECT.SERVICE']
+                if event == 'DELETED':
+                    if pod in services[service]:
+                        services[service].remove(pod)
+                        if not services[service]:
+                            msg = f"Service {service} removed."
+                            self.collector.queue.put({'result': 'succeed', 'stream': msg})
+                        all_targets.remove(pod)
+                        if not all_targets:
+                            service_removed = True
+                            break
+        except urllib3.exceptions.ReadTimeoutError as e: #for timeout
+            pass
+        if service_removed:
+            msg = f"All Service removed."
+            print(msg)
             self.collector.queue.put({'result': 'completed', 'stream': msg})
         else:
-            for svc, task_keys in app_name_to_task_keys.items():
-                if len(task_keys) > 0:
-                    msg = f"Failed to remove app {svc}."
+            for svc, target in services.items():
+                if target:
+                    msg = f"Failed to remove service {svc}."
                     self.collector.queue.put({'result': 'failed', 'stream': msg})
         self.collector.queue.put({'result': 'stopped'})
+
 
     def stop(self):
         self.__stopped = True
@@ -88,7 +87,6 @@ class DelMonitor(Thread):
             finally:
                 self.stream_resp = None
 
-
 class Collector:
     def __init__(self, maxbuffer=65535):
         self.queue = Queue(maxsize=maxbuffer)
@@ -100,8 +98,7 @@ class Collector:
         elif 'result' in msg:
             if msg['result'] == 'stopped':
                 raise StopIteration
-            else:
-                return msg
+            else: return msg
 
     def __iter__(self):
         return self

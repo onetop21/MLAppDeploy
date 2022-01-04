@@ -3,10 +3,12 @@ import uvicorn
 from mlad import __version__
 from mlad.service.libs import utils
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from mlad.service.routers import app as app_router, project, node
-from mlad.core.default.config import service_config
+from fastapi.logger import logger
+from mlad.service.routers import image, service, project, node, auth
+from mlad.service.auth import Authorization
+from mlad.service.libs.auth import generate_admin_token
 
 '''
 # 인증 (Admin 전용)
@@ -54,13 +56,11 @@ DELETE  /api/v1/node/[ID]/labels    remove_node_labels
 
 APIV1 = '/api/v1'
 
-
 def create_app():
     root_path = os.environ.get('ROOT_PATH', '')
     app = FastAPI(
         title="MLAppDeploy API Server",
-        description="MLAppDeploy is a tool for training "
-                    "and deploying ML code easily.",
+        description="MLAppDeploy is a tool for training and deploying ML code easily.",
         version=__version__,
         root_path=root_path,
     )
@@ -73,20 +73,30 @@ def create_app():
         allow_headers=['*'],
     )
 
-    app.include_router(node.router, prefix=APIV1)
-    app.include_router(app_router.router, prefix=APIV1)
-    app.include_router(project.router, prefix=APIV1)
+    user = Authorization('user')
+    admin = Authorization('admin')
 
-    print("Orchestrator : 'Kubernetes'")
-    print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}")
+    #app.include_router(image.router, prefix=APIV1)
+    app.include_router(node.admin_router,prefix=APIV1,
+                       dependencies=[Depends(admin.verify_auth)])
+    app.include_router(node.user_router,prefix=APIV1,
+                       dependencies=[Depends(user.verify_auth)])
+    app.include_router(service.router, prefix=APIV1)
+    app.include_router(project.router, prefix=APIV1,
+                       dependencies=[Depends(user.verify_auth)])
+    app.include_router(auth.admin_router, prefix=APIV1,
+                       dependencies=[Depends(admin.verify_auth)])
+    app.include_router(auth.user_router, prefix=APIV1)
+
+    print(f"Admin Token  : {generate_admin_token().decode()}")
+    print(f"Orchestrator : {'Kubernetes' if utils.is_kube_mode() else 'Swarm'}") 
+    print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}") 
     print(f'Prefix       : {root_path}')
     return app
 
-
 app = create_app()
 
-
+#Run by 'python -m mlad.service'
 if __name__ == '__main__':
-    uvicorn.run(app, host=service_config['server']['host'],
-                port=service_config['server']['port'],
-                debug=service_config['server']['debug'])
+    config = utils.read_config()
+    uvicorn.run(app, host=config['server']['host'], port=config['server']['port'], debug=config['server']['debug'])

@@ -1,7 +1,0 @@
-repos:
-- repo: https://gitlab.com/pycpa/flake8
-  rev: 3.8.4
-  hooks:
-  - id: flake8
-    stages: [commit]
-    exclude: /venv

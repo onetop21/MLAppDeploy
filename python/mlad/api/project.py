@@ -1,85 +1,120 @@
 import sys
 import json
 import requests
-from .base import APIBase
+from .exception import APIError, ProjectNotFound, ServiceNotFound, InvalidLogRequest, raise_error
 
-
-def _parse_partial_json(value: str):
-    i = 0
-    li = 0
-    objs = []
-    while i < len(value) - 1:
-        i += 1
-        if value[i] == '}' and (i == len(value) - 1 or value[i + 1] == '{'):
-            try:
-                objs.append(json.loads(value[li: i + 1]))
-                li = i + 1
-            except json.JSONDecodeError:
-                continue
-    return objs, value[li:]
-
-
-class Project(APIBase):
-    def __init__(self, config):
-        super().__init__(config, 'project')
+class Project():
+    def __init__(self, url, token):
+        self.url = f'{url}/project'
+        self.token = token
 
     def get(self, extra_labels=[]):
-        params = {'extra_labels': ','.join(extra_labels)}
-        return self._get('', params=params)
+        url = self.url
+        header = {'token': self.token}
+        params={'extra_labels': ','.join(extra_labels)}
+        res = requests.get(url=url,headers=header,params=params)
+        raise_error(res)
+        return res.json()    
 
-    def create(self, base_labels, project_yaml, extra_envs=[], credential=None, allow_reuse=False):
-        body = {
-            'base_labels': base_labels,
-            'extra_envs': extra_envs,
-            'project_yaml': project_yaml,
-            'credential': credential,
-        }
-        params = {'allow_reuse': allow_reuse}
-        resp = self._post('', params=params, body=body, raw=True, stream=True)
-        res = ''
-        for _ in resp.iter_content(1024):
-            res += _.decode()
-            try:
-                dict_res = json.loads(res)
-            except json.decoder.JSONDecodeError:
-                continue
-            else:
-                res = ''
-            yield dict_res
-
-    def inspect(self, project_key):
-        return self._get(f'/{project_key}')
-
-    def delete(self, project_key):
-        resp = self._delete(f'/{project_key}', stream=True, raw=True)
-        for _ in resp.iter_content(1024):
-            res = _.decode()
-            dict_res = json.loads(res)
-            yield dict_res
-
-    def log(self, project_key, tail='all',
-            follow=False, timestamps=False, names_or_ids=[]):
-        params = {'tail': tail, 'follow': follow, 'timestamps': timestamps,
-                  'names_or_ids': names_or_ids}
-        while True:
-            try:
-                resp = self._get(f'/{project_key}/logs', params=params, raw=True, stream=True)
+    def create(self, project, base_labels, extra_envs=[], credential=None,
+            swarm=True, allow_reuse=False):
+        url = self.url
+        header = {'token': self.token}
+        with requests.post(url=url,headers=header,
+            json={'project':project,'base_labels':base_labels,
+                'extra_envs':extra_envs, 'credential':credential},
+            params={'swarm':swarm, 'allow_reuse': allow_reuse}, stream=True) as resp:
+            if resp.status_code == 200:
                 res = ''
                 for _ in resp.iter_content(1024):
-                    res += _.decode('utf-8', 'replace')
-                    objs, res = _parse_partial_json(res)
-                    for obj in objs:
-                        yield obj
+                    res += _.decode()
+                    try:
+                        dict_res = json.loads(res)
+                    except json.decoder.JSONDecodeError:
+                        continue
+                    else:
+                        res = ''
+                    yield dict_res
+            else:
+                raise APIError(f'Failed to create project : '
+                               f'{resp.json()["detail"]["msg"]}', resp)
+
+    def inspect(self, project_key):
+        url = f'{self.url}/{project_key}'
+        header = {'token': self.token}
+        res = requests.get(url=url, headers=header)
+        raise_error(res)
+        return res.json()
+
+    def delete(self, project_key):
+        url = f'{self.url}/{project_key}'
+        header = {'token': self.token}
+        with requests.delete(url=url, stream=True, headers=header) as resp:
+            if resp.status_code == 200:
+                for _ in resp.iter_content(1024):
+                    res = _.decode()
+                    dict_res = json.loads(res)
+                    yield dict_res
+            elif resp.status_code == 404: 
+                raise ProjectNotFound(f'Failed to delete project : '
+                                      f'{resp.json()["detail"]["msg"]}', resp)
+            else: 
+                raise APIError(f'Failed to delete project : '
+                               f'{resp.json()["detail"]["msg"]}', resp)
+
+    def log(self, project_key, tail='all', 
+            follow=False, timestamps=False, names_or_ids=[]):
+        url = f'{self.url}/{project_key}/logs'
+        params = {'tail':tail, 'follow':follow, 'timestamps':timestamps,
+                  'names_or_ids':names_or_ids}
+        header = {'token': self.token}
+
+        while True:
+            try:
+                with requests.get(url=url,params=params, stream=True, headers=header) as resp:
+                    status_code = resp.status_code
+                    if status_code == 200:
+                        res = ''
+                        for _ in resp.iter_content(1024):
+                            res += _.decode()
+                            try:
+                                dict_res = json.loads(res)
+                            except json.JSONDecodeError as e:
+                                log = _.decode()
+                                if "stream" in log:
+                                    # new log line but error occurs cuz tqdm
+                                    name = log.split('\"name\": \"')[1].split('\"')[0]
+                                    name_width = int(log.split('\"name_width\": ')[1].split(',')[0])
+                                    dict_res = {"name": name, "name_width": name_width,
+                                            "stream": f"[Ignored] Stream Broken : {e}"}
+                                else:
+                                    continue
+                            else:
+                                res = ''
+                            yield dict_res
+                    elif status_code == 404:
+                        detail = json.loads(resp.text)['detail']
+                        reason = detail['reason']
+                        msg = detail['msg']
+                        if reason == 'ProjectNotFound':
+                            raise ProjectNotFound(f'Failed to get logs : {msg}', resp)
+                        else:
+                            raise ServiceNotFound(f'Failed to get logs : {msg}', resp)
+                    elif status_code == 400:
+                        detail = json.loads(resp.text)['detail']
+                        msg = detail['msg']
+                        raise InvalidLogRequest(f'Failed to get logs : {msg}', resp)
+                    else:
+                        detail = json.loads(resp.text)['detail']
+                        msg = detail['msg']
+                        raise APIError(f'Failed to get logs : {msg}', resp)
                 break
             except requests.exceptions.ChunkedEncodingError as e:
                 print(f"[Retry] {e}", file=sys.stderr)
 
     def resource(self, project_key):
-        return self._get(f'/{project_key}/resource')
-
-    def update(self, project_key, update_yaml, apps):
-        body = {
-            'update_yaml': update_yaml,
-            'apps': apps
-        }
-        return self._post(f'/{project_key}', body=body)
+        url = f'{self.url}/{project_key}/resource'
+        header = {'token': self.token}
+        res = requests.get(url=url, headers=header)
+        raise_error(res)
+        return res.json()
