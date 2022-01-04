@@ -37,36 +37,22 @@ jobs:
         # Change all uppercase to lowercase
         IMAGE_NAME=$(echo ${REPOSITORY}/${IMAGE_NAME} | tr '[A-Z]' '[a-z]')
         
-        echo $GITHUB_REF_NAME
-        echo $GITHUB_REF
-        echo github.head_ref: ${{ github.head_ref }}
-        echo github.base_ref: ${{ github.base_ref }}
-        echo github.event.head_ref: ${{ github.event.head_ref }}
-        echo github.event.base_ref: ${{ github.event.base_ref }}
-        
-        if [[ "$GITHUB_REF_NAME" == "master" ]]
+        if [[ "${{ github.event_name }}" == 'release' ]]
         then
-          if [[ "${{ github.event_name }}" == 'release' ]]
-          then
-            # Strip git ref prefix from version
-            VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
 
-            # Strip "v" prefix from tag name
-            [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-          else
-            CANCELED=1
-          fi
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+        elif [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
+        then
+          VERSION=$(git rev-parse --short "$GITHUB_SHA")
+          WITH_LATEST=1
         else
-          if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
-          then
-            VERSION=$(git rev-parse --short "$GITHUB_SHA")
-            WITH_LATEST=1
-          else
-            CANCELED=1
-          fi
+          ERROR=Not support ${{ github.event_name }} event.
         fi
         
-        if [ -z $CANCELED ]
+        if [ -z $ERROR ]
         then
           IMAGE_ID=${{ steps.build_image.outputs.id }}
           echo IMAGE_NAME=$IMAGE_NAME
@@ -76,6 +62,6 @@ jobs:
           [ $WITH_LATEST ] && docker tag $IMAGE_ID $IMAGE_NAME:latest
           docker push $IMAGE_NAME --all-tags
         else
-          echo "::error title=Failed to build container image::Not support ${{ github.event_name }} event on $GITHUB_REF_NAME branch."
+          echo "::error title=Failed to build container image::$ERROR"
         fi
         
