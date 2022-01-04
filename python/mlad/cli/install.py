@@ -33,7 +33,7 @@ def check():
 
     yield 'Check installed plugins...'
 
-    # Check ingress-nginx
+    # Check ingress controller
     try:
         ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
     except Exception as e:
