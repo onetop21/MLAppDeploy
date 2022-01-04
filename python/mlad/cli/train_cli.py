@@ -2,8 +2,8 @@ import click
 from typing import Optional
 
 from mlad.cli import train
+from mlad.cli import config
 from mlad.cli.libs import utils, MutuallyExclusiveOption
-from mlad.cli.libs.auth import auth_admin
 from mlad.cli.autocompletion import list_project_keys
 
 from . import echo_exception
@@ -38,7 +38,7 @@ def up(file: Optional[str]):
 @echo_exception
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     '''Stop and remove the Train object on the cluster.'''
-    lines = train.down_force(file, project_key, no_dump) if auth_admin() \
+    lines = train.down_force(file, project_key, no_dump) if config.validate_kubeconfig() \
         else train.down(file, project_key, no_dump)
     for line in lines:
         click.echo(line)

@@ -1,39 +1,77 @@
-from typing import Optional
-
+import socket
 import click
+
+from typing import Optional
 from omegaconf import OmegaConf
+
 from mlad.cli import config
-from mlad.cli.context_cli import _obtain_host
+from mlad.cli.autocompletion import list_config_names
+
 from . import echo_exception
 
 
+def _obtain_host():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    host = s.getsockname()[0]
+    s.close()
+    return f'http://{host}'
+
+
 @click.command()
+@click.argument('NAME', required=True)
 @click.option('--address', '-a', default=f'{_obtain_host()}:8440',
-              prompt='MLAD API Server Address', help='Set API server address.')
+              prompt='MLAD API Server Address', help='Set MLAD API server address.')
+@click.option('--admin', is_flag=True, help='Create a config with administrator privileges.')
 @echo_exception
-def init(address):
-    '''Initialize a configuration.'''
-    ret = config.init(address)
-    click.echo('Config has been successfully registered.')
+def add(name, address, admin):
+    """Add a new config."""
+    ret = config.add(name, address)
+    click.echo('Config created successfully.')
     click.echo(OmegaConf.to_yaml(ret))
 
 
 @click.command()
-@click.argument('ARGS', required=True, nargs=-1)
+@click.argument('NAME', required=True, autocompletion=list_config_names)
 @echo_exception
-def set(args):
-    '''Update values of the context.\n
-    Format: mlad config set [KEY1=VALUE1] [KEY2=VALUE2]'''
-    config.set(*args)
-    click.echo('The config is successfully configured.')
+def use(name: str):
+    """Switch to the config."""
+    config.use(name)
+    click.echo(f'Current config name is: [{name}].')
 
 
 @click.command()
+@echo_exception
+def next():
+    """Change to the next config."""
+    name = config.next()
+    click.echo(f'Current config name is [{name}].')
+
+
+@click.command()
+@echo_exception
+def prev():
+    """Change to the previous config."""
+    name = config.prev()
+    click.echo(f'Current config name is [{name}].')
+
+
+@click.command()
+@click.argument('NAME', required=True)
+@echo_exception
+def delete(name: str):
+    """Delete the config."""
+    config.delete(name)
+    click.echo(f'Delete the config of [{name}].')
+
+
+@click.command()
+@click.argument('NAME', required=True)
 @click.argument('KEY', required=False)
 @echo_exception
-def get(key: Optional[str]):
-    '''Display a detail specification of the configuration.'''
-    ret = config.get(key)
+def get(name: str, key: Optional[str]):
+    """Display a detail specification of the config."""
+    ret = config.get(name, key)
     try:
         click.echo(OmegaConf.to_yaml(ret)[:-1])
     except ValueError:
@@ -41,15 +79,22 @@ def get(key: Optional[str]):
 
 
 @click.command()
-@click.option('--unset', '-u', is_flag=True, help='Display only names of the environment variables')
+@click.argument('NAME', required=True)
+@click.argument('ARGS', required=True, nargs=-1)
 @echo_exception
-def env(unset):
-    '''To set environment variables, run "eval $(mlad config env)."'''
-    lines, msg = config.env(unset=unset)
-    for line in lines:
-        click.echo(line)
-    click.echo('')
-    click.echo(msg)
+def set(name, args):
+    """Update values of the config.\n
+    Format: mlad config set [NAME] [KEY1=VALUE1] [KEY2=VALUE2]
+    """
+    config.set(name, *args)
+    click.echo(f'The config [{name}] is successfully configured.')
+
+
+@click.command()
+@echo_exception
+def ls():
+    """List configs."""
+    config.ls()
 
 
 @click.command()
@@ -65,11 +110,15 @@ def completion(install: bool):
 
 @click.group('config')
 def cli():
-    '''Manage configuration.'''
+    """Manage configs."""
 
 
-cli.add_command(init)
-cli.add_command(set)
+cli.add_command(add)
+cli.add_command(use)
+cli.add_command(next)
+cli.add_command(prev)
+cli.add_command(delete)
 cli.add_command(get)
-cli.add_command(env)
+cli.add_command(set)
+cli.add_command(ls)
 cli.add_command(completion)

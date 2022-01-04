@@ -2,8 +2,8 @@ import click
 from typing import Optional, List
 
 from mlad.cli import deploy
+from mlad.cli import config
 from mlad.cli.libs import utils
-from mlad.cli.libs.auth import auth_admin
 from mlad.cli.autocompletion import list_project_keys
 
 from . import echo_exception
@@ -43,7 +43,7 @@ def update(project_key: str, file: Optional[str]):
 @echo_exception
 def kill(project_key: str, no_dump: bool):
     '''Stop and remove the Deployment object on the cluster.'''
-    lines = deploy.kill_force(project_key, no_dump) if auth_admin() \
+    lines = deploy.kill_force(project_key, no_dump) if config.validate_kubeconfig() \
         else deploy.kill(project_key, no_dump)
     for line in lines:
         click.echo(line)

@@ -1,7 +1,7 @@
 import os
 import sys
 
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict
 from pathlib import Path
 
 import yaml
@@ -153,13 +153,14 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove the apps
-        namespace = k8s_ctlr.get_namespace(project_key=project_key)
+        k8s_cli = k8s_ctlr.get_api_client(context=config_core.get_context())
+        namespace = k8s_ctlr.get_namespace(cli=k8s_cli, project_key=project_key)
         if namespace is None:
             raise ProjectNotFound(f'Cannot find project {project_key}')
         namespace_name = namespace.metadata.name
-        targets = [k8s_ctlr.get_app(name, namespace_name) for name in app_names]
+        targets = [k8s_ctlr.get_app(name, namespace_name, cli=k8s_cli) for name in app_names]
         for target in targets:
-            k8s_ctlr.check_project_key(project_key, target)
+            k8s_ctlr.check_project_key(project_key, target, cli=k8s_cli)
 
         class DisconnectHandler:
             def __init__(self):
@@ -173,7 +174,8 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
                     cb()
 
         handler = DisconnectHandler()
-        lines = k8s_ctlr.remove_apps(targets, namespace_name, disconnect_handler=handler, stream=True)
+        lines = k8s_ctlr.remove_apps(targets, namespace_name,
+                                     disconnect_handler=handler, stream=True, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 yield line['stream']
@@ -182,7 +184,7 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
         handler()
 
         # Remove the project
-        lines = k8s_ctlr.remove_namespace(namespace, stream=True)
+        lines = k8s_ctlr.remove_namespace(namespace, stream=True, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 sys.stdout.write(line['stream'])

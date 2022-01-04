@@ -38,20 +38,12 @@ def get_api_client(config_file='~/.kube/config', context=None):
 DEFAULT_CLI = get_api_client()
 
 
-def check_project_key(project_key, app):
-    inspect_key = str(inspect_app(app)['key'])
+def check_project_key(project_key, app, cli=DEFAULT_CLI):
+    inspect_key = str(inspect_app(app, cli=cli)['key'])
     if project_key == inspect_key:
         return True
     else:
         raise InvalidAppError(project_key, app.metadata.name)
-
-
-def get_current_context():
-    try:
-        current_context = config.list_kube_config_contexts()[1]
-    except config.config_exception.ConfigException as e:
-        raise exceptions.APIError(str(e), 404)
-    return current_context['name']
 
 
 def get_namespaces(extra_labels=[], cli=DEFAULT_CLI):
