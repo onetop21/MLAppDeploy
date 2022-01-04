@@ -67,6 +67,7 @@ def serve(file: Optional[str]):
         if app_name in apps.keys():
             apps[app_name]['ingress'] = {
                 'name': name,
+                'path': value['path'] if 'path' in value else None,
                 'rewritePath': value['rewritePath'],
                 'port': port
             }

@@ -805,9 +805,11 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
             if ingress:
                 ingress_name = ingress['name']
+                path = ingress['path']
                 rewritePath = ingress['rewritePath']
                 port = int(ingress['port'])
-                ingress_path = f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
+                ingress_path = path if path is not None else \
+                    f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
                 envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
                 config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
                 create_ingress(cli, namespace_name, name, ingress_name, port, ingress_path, rewritePath)
