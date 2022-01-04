@@ -1333,5 +1333,5 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                 resource['gpu'] += pod_gpu_usage
 
             res[name][pod_name] = resource
-            
+
     return res
