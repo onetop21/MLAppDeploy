@@ -14,7 +14,7 @@ on:
 env:
   # TODO: Change variable to your image's name.
   REPOSITORY: ghcr.io/${{ github.repository }}
-  IMAGE_NAME: $REPOSITORY/api-server
+  IMAGE_NAME: api-server
   
 jobs:
   build:
@@ -35,7 +35,7 @@ jobs:
     - name: Push image
       run: |
         # Change all uppercase to lowercase
-        IMAGE_NAME=$(echo $IMAGE_NAME | tr '[A-Z]' '[a-z]')
+        IMAGE_NAME=$(echo ${REPOSITORY}/${IMAGE_NAME} | tr '[A-Z]' '[a-z]')
         
         if [[ "$GITHUB_REF_NAME" == "master" ]]
         then
