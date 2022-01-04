@@ -258,7 +258,8 @@ def _s3_finalizer(datastore: StrDict) -> StrDict:
     return datastore
 
 
-def get_env(config: Config) -> List[str]:
+def get_env(dict=False) -> List[str]:
+    config = get()
     envs = []
 
     envs.append(f'MLAD_ADDRESS={config.apiserver.address}')
@@ -286,7 +287,7 @@ def get_env(config: Config) -> List[str]:
             v = ''
         envs.append(f'DB_{k.upper()}={v}')
     envs = sorted(envs)
-    return envs
+    return {env.split('=')[0]: env.split('=')[1] for env in envs} if dict else envs
 
 
 def validate_kubeconfig() -> bool:
