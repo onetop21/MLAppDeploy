@@ -8,10 +8,11 @@ on:
       registry:
         description: 'Target registry'
         required: False
-        default: 'ghcr.io'
+        default: $REPOSITORY
       
 env:
   # TODO: Change variable to your image's name.
+  REPOSITORY: ghcr.io
   IMAGE_NAME: api-server
   
 jobs:
