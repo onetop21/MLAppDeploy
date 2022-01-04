@@ -26,7 +26,7 @@ def _obtain_host():
 @echo_exception
 def add(name, address, admin):
     """Add a new config."""
-    ret = config.add(name, address)
+    ret = config.add(name, address, admin)
     click.echo('Config created successfully.')
     click.echo(OmegaConf.to_yaml(ret))
 
