@@ -36,14 +36,13 @@ def check():
 
     # Check ingress controller
     try:
-        res = ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
         res = ctlr.check_ingress(cli, 'dummy-ingress', 'mlad')
-    except Exception:
-        pass
-    else:
+    except core_exception.NotFound:
+        ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
+        res = ctlr.check_ingress(cli, 'dummy-ingress', 'mlad')
+    if res:
         ctlr.delete_ingress(cli, 'mlad', 'dummy-ingress')
-        if res:
-            checked['Ingress Controller']['status'] = True
+        checked['Ingress Controller']['status'] = True
 
     # Check metrics server
     try:

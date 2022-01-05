@@ -1255,6 +1255,15 @@ def create_ingress(cli, namespace, app_name, ingress_name, port, base_path='/', 
 def check_ingress(cli, ingress_name, namespace):
     w = watch.Watch()
     api = client.NetworkingV1Api(cli)
+    try:
+        res = api.read_namespaced_ingress(ingress_name, namespace)
+        status = res.status.load_balancer.ingress
+        if status is not None:
+            return True
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find ingress "{ingress_name}" in "{namespace}".')
     for event in w.stream(func=api.list_namespaced_ingress,
                           namespace=namespace,
                           field_selector=f'metadata.name={ingress_name}',
