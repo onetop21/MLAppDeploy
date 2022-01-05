@@ -9,7 +9,7 @@ from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, In
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
-from kubernetes import client, config
+from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 
 # https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
@@ -1250,6 +1250,20 @@ def create_ingress(cli, namespace, app_name, ingress_name, port, base_path='/', 
         namespace=namespace,
         body=body
     )
+
+
+def check_ingress(cli, ingress_name, namespace):
+    w = watch.Watch()
+    api = client.NetworkingV1Api(cli)
+    for event in w.stream(func=api.list_namespaced_ingress,
+                          namespace=namespace,
+                          field_selector=f'metadata.name={ingress_name}',
+                          timeout_seconds=60):
+        if event['type'] == 'MODIFIED':
+            status = event['object'].status.load_balancer.ingress
+            if status is not None:
+                return True
+    return False
 
 
 def delete_ingress(cli, namespace, ingress_name):

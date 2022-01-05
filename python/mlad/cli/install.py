@@ -7,7 +7,8 @@ def check():
     checked = {
         'Ingress Controller': {
             'status': False,
-            'msg': ['Install ingress controller.']
+            'msg': ['Ingress resource does not work. Install ingress controller.',
+                    'If ingress controller is running, retry \'mlad install check\'.']
         },
         'Metrics Server': {
             'status': False,
@@ -35,12 +36,14 @@ def check():
 
     # Check ingress controller
     try:
-        ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
+        res = ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
+        res = ctlr.check_ingress(cli, 'dummy-ingress', 'mlad')
     except Exception:
         pass
     else:
         ctlr.delete_ingress(cli, 'mlad', 'dummy-ingress')
-        checked['Ingress Controller']['status'] = True
+        if res:
+            checked['Ingress Controller']['status'] = True
 
     # Check metrics server
     try:
