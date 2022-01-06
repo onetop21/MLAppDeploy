@@ -118,6 +118,6 @@ def deploy_api_server(image_tag: str, ingress: bool):
     is_running = _is_running_api_server(cli)
     if not is_running:
         yield 'Create docker registry secret named \'docker-mlad-sc\''
-        ctlr.create_docker_registry_secret()
+        ctlr.create_docker_registry_secret(cli)
     else:
         pass
