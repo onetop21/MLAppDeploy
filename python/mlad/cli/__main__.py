@@ -3,17 +3,17 @@ import copy
 
 from mlad import __version__
 from mlad.cli import config_cli as config
+from mlad.cli import install_cli as install
 from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
 from mlad.cli import node_cli as node
-from mlad.cli import context_cli as context
 from mlad.cli import board_cli as board
 from mlad.cli import train_cli as train
 from mlad.cli import deploy_cli as deploy
-from mlad.cli import install_cli as install
-from mlad.cli.libs.auth import auth_admin
-from mlad.cli.exceptions import ContextNotFoundError
-from mlad.cli.context import get as check_context, current
+from mlad.cli.exceptions import ConfigNotFoundError
+from mlad.cli.config import get as check_config
+from mlad.cli.config import validate_kubeconfig as is_admin
+from mlad.cli.install import has_kubeconfig
 
 
 class EntryGroup(click.Group):
@@ -49,19 +49,18 @@ def main():
 
 
 main.add_command(config.cli, 'config')
-if auth_admin():
-    main.add_command(context.cli, 'context')
+if has_kubeconfig():
     main.add_command(install.cli, 'install')
 
 try:
-    check_context(current())
-except ContextNotFoundError:
+    check_config()
+except ConfigNotFoundError:
     pass
 else:
     main.add_command(image.cli, 'image')
     main.add_command(project.cli, 'project')
     main.add_command(board.cli, 'board')
-    main.add_command(node.admin_cli if auth_admin() else node.cli, 'node')
+    main.add_command(node.admin_cli if is_admin() else node.cli, 'node')
 
     main.add_dummy_command()
     main.add_dummy_command('\b\bPrefer:')

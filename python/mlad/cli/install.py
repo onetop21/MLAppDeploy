@@ -3,6 +3,14 @@ from mlad.core.kubernetes import controller as ctlr
 from mlad.cli.libs import utils
 
 
+def has_kubeconfig() -> bool:
+    try:
+        ctlr.get_current_context()
+    except core_exception.APIError:
+        return False
+    return True
+
+
 def check():
     checked = {
         'Ingress Controller': {

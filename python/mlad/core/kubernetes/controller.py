@@ -10,6 +10,7 @@ from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 from kubernetes import client, config, watch
+from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
 
 # https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
@@ -26,24 +27,9 @@ def get_api_client(config_file='~/.kube/config', context=None):
             return config.new_client_from_config(config_file=config_file)
     except config.config_exception.ConfigException:
         pass
-    try:
-        from kubernetes.client.api_client import ApiClient
-        config.load_incluster_config()
-        # If Need, set configuration parameter from client.Configuration
-        return ApiClient()
-    except config.config_exception.ConfigException:
-        return None
-
-
-DEFAULT_CLI = get_api_client()
-
-
-def check_project_key(project_key, app):
-    inspect_key = str(inspect_app(app)['key'])
-    if project_key == inspect_key:
-        return True
-    else:
-        raise InvalidAppError(project_key, app.metadata.name)
+    config.load_incluster_config()
+    # If Need, set configuration parameter from client.Configuration
+    return ApiClient()
 
 
 def get_current_context():
@@ -52,6 +38,17 @@ def get_current_context():
     except config.config_exception.ConfigException as e:
         raise exceptions.APIError(str(e), 404)
     return current_context['name']
+
+
+DEFAULT_CLI = get_api_client()
+
+
+def check_project_key(project_key, app, cli=DEFAULT_CLI):
+    inspect_key = str(inspect_app(app, cli=cli)['key'])
+    if project_key == inspect_key:
+        return True
+    else:
+        raise InvalidAppError(project_key, app.metadata.name)
 
 
 def get_namespaces(extra_labels=[], cli=DEFAULT_CLI):
@@ -1390,5 +1387,5 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                 resource['gpu'] += pod_gpu_usage
 
             res[name][pod_name] = resource
-            
+
     return res

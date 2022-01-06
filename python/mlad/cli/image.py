@@ -1,4 +1,5 @@
 import sys
+import os
 import io
 import tarfile
 
@@ -60,7 +61,7 @@ def list(all, tail):
               'Use command `mlad image prune`')
 
 
-def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
+def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bool = True):
     utils.process_file(file)
     config = config_core.get()
     project = utils.get_project(default_project)
@@ -81,9 +82,15 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
         payload = _obtain_workspace_payload(workspace, project['maintainer'])
     # For the dockerfile kind
     else:
-        if 'dockerfile' in workspace:
-            with open(workspace['dockerfile'], 'r') as dockerfile:
+        if 'filePath' in workspace:
+            with open(workspace['filePath'], 'r') as dockerfile:
                 payload = dockerfile.read()
+            if os.path.isfile(workspace['ignorePath']):
+                with open(workspace['ignorePath'], 'r') as ignorefile:
+                    workspace['ignores'] = [
+                        line.replace('\n', '') for line in ignorefile.readlines()]
+            else:
+                workspace['ignores'] = []
         else:
             payload = workspace['buildscript']
 
@@ -127,7 +134,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool):
     yield f'Built Image: {repository}'
 
     # Push image
-    if project['kind'] != 'Component':
+    if project['kind'] != 'Component' and push:
         yield f'Upload the image to the registry [{registry_address}]...'
         for line in ctlr.push_image(repository):
             yield line

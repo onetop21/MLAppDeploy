@@ -1,5 +1,6 @@
 import sys
 from mlad.cli.libs import utils
+from mlad.cli.config import get_context
 from mlad.api import API
 from mlad.api.exceptions import APIError
 from mlad.core import exceptions as CoreException
@@ -69,7 +70,7 @@ def resource(names=None, no_trunc=False):
 
 
 def enable(name: str):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.enable_node(name, cli)
     except CoreException.NotFound as e:
@@ -82,7 +83,7 @@ def enable(name: str):
 
 
 def disable(name: str):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.disable_node(name, cli)
     except CoreException.NotFound as e:
@@ -95,7 +96,7 @@ def disable(name: str):
 
 
 def label_add(node, **kvs):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.add_node_labels(node, cli, **kvs)
     except CoreException.NotFound as e:
@@ -108,7 +109,7 @@ def label_add(node, **kvs):
 
 
 def label_rm(node, *keys):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.remove_node_labels(node, cli, *keys)
     except CoreException.NotFound as e:

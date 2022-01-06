@@ -96,13 +96,11 @@ def convert_tag_only_image_prop(app_spec, image_tag):
     return app_spec
 
 
-@lru_cache(maxsize=None)
 def get_project_file():
     # Patch for WSL2 (/home/... -> /mnt/c/Users...)
     return os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
 
 
-@lru_cache(maxsize=None)
 def read_project():
     project_file = get_project_file()
     if os.path.isfile(project_file):
@@ -112,7 +110,6 @@ def read_project():
         return None
 
 
-@lru_cache(maxsize=None)
 def get_project(default_project):
     project = read_project()
     if not project:

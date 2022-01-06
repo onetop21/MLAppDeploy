@@ -3,9 +3,8 @@ import io
 import pytest
 
 from omegaconf import OmegaConf
-from mlad.cli import context
-from mlad.cli.exceptions import ContextAlreadyExistError
-from mlad.cli.exceptions import InvalidURLError
+from mlad.cli import config
+from mlad.cli.exceptions import ConfigAlreadyExistError, InvalidURLError
 
 from . import mock
 
@@ -20,8 +19,8 @@ def teardown_module():
 
 def test_valid_input():
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
+        'https://abc.defg.com',
         'gameai',
         'https://localhost:9000',
         'us-west-1',
@@ -35,6 +34,8 @@ def test_valid_input():
     expected = {
         'name': 'test-valid',
         'apiserver': {'address': inputs[0]},
+        'kubeconfig_path': None,
+        'context_name': None,
         'docker': {'registry': {'address': inputs[1], 'namespace': 'gameai'}},
         'datastore': {
             's3': {
@@ -51,15 +52,17 @@ def test_valid_input():
             }
         }
     }
-    context_dict = OmegaConf.to_object(context.add('test-valid', inputs[0]))
-    del context_dict['session']
-    assert context_dict == expected
+    config_dict = OmegaConf.to_object(config.add('test-valid', inputs[0], False))
+    del config_dict['session']
+    assert config_dict == expected
 
 
 def test_valid_input2():
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
+        '/home/.kube/config',
+        'default',
+        'https://abc.defg.com',
         '',
         'http://localhost:9000',
         '',
@@ -73,31 +76,33 @@ def test_valid_input2():
     expected = {
         'name': 'test-valid2',
         'apiserver': {'address': inputs[0]},
-        'docker': {'registry': {'address': inputs[1], 'namespace': None}},
+        'kubeconfig_path': inputs[1],
+        'context_name': inputs[2],
+        'docker': {'registry': {'address': inputs[3], 'namespace': None}},
         'datastore': {
             's3': {
-                'endpoint': inputs[3],
+                'endpoint': inputs[5],
                 'region': 'us-east-1',
-                'accesskey': inputs[5],
-                'secretkey': inputs[6],
+                'accesskey': inputs[7],
+                'secretkey': inputs[8],
                 'verify': False
             },
             'db': {
-                'address': inputs[7],
+                'address': inputs[9],
                 'username': None,
                 'password': None
             }
         }
     }
-    context_dict = OmegaConf.to_object(context.add('test-valid2', inputs[0]))
-    del context_dict['session']
-    expected == context_dict
+    config_dict = OmegaConf.to_object(config.add('test-valid2', inputs[0], True))
+    del config_dict['session']
+    expected == config_dict
 
 
 def test_invalid_input():
     inputs = [
         '',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
         '',
         'http://localhost:9000',
         '',
@@ -109,13 +114,13 @@ def test_invalid_input():
     ]
     with pytest.raises(InvalidURLError):
         sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
-        context.add('test-invalid', inputs[0])
+        config.add('test-invalid', inputs[0], False)
 
 
 def test_invalid_input2():
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
+        'https://abc.defg.com',
         '',
         '/hello',
         '',
@@ -127,21 +132,21 @@ def test_invalid_input2():
     ]
     with pytest.raises(InvalidURLError):
         sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
-        context.add('test-invalid2', inputs[0])
+        config.add('test-invalid2', inputs[0], False)
 
 
 def test_dupilicate():
     mock.add('test')
-    with pytest.raises(ContextAlreadyExistError):
+    with pytest.raises(ConfigAlreadyExistError):
         mock.add('test')
 
 
 def test_allow_duplicate():
     mock.add('test-allow-duplicate')
     inputs = [
-        'https://ncml-dev.cloud.ncsoft.com',
+        'https://abc.defg.com',
         'Y',
-        'https://harbor.sailio.ncsoft.com',
+        'https://abc.defg.com',
         '',
         'http://localhost:9000',
         'us-west-1',
@@ -155,6 +160,8 @@ def test_allow_duplicate():
     expected = {
         'name': 'test-allow-duplicate',
         'apiserver': {'address': inputs[0]},
+        'kubeconfig_path': None,
+        'context_name': None,
         'docker': {'registry': {'address': inputs[2], 'namespace': None}},
         'datastore': {
             's3': {
@@ -171,8 +178,8 @@ def test_allow_duplicate():
             }
         }
     }
-    context_dict = OmegaConf.to_object(
-        context.add('test-allow-duplicate', inputs[0], allow_duplicate=True)
+    config_dict = OmegaConf.to_object(
+        config.add('test-allow-duplicate', inputs[0], False, allow_duplicate=True)
     )
-    del context_dict['session']
-    assert expected == context_dict
+    del config_dict['session']
+    assert expected == config_dict
