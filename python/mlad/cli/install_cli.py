@@ -12,7 +12,7 @@ def check():
 
 
 @click.command('api-server')
-@click.argument('IMAGE_TAG', help='An image tag of MLAD api server.')
+@click.argument('image-tag', required=True)
 @click.option('--ingress', is_flag=True, help='Use an ingress to expose the api server.')
 @echo_exception
 def api_server(image_tag: str, ingress: bool):
@@ -26,3 +26,4 @@ def cli():
 
 
 cli.add_command(check)
+cli.add_command(api_server)
