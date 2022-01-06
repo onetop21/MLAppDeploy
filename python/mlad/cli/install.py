@@ -1,4 +1,4 @@
-from mlad.core import exceptions as core_exception
+from mlad.core import exceptions as core_exceptions
 from mlad.core.kubernetes import controller as ctlr
 from mlad.cli.libs import utils
 
@@ -6,7 +6,7 @@ from mlad.cli.libs import utils
 def has_kubeconfig() -> bool:
     try:
         ctlr.get_current_context()
-    except core_exception.APIError:
+    except core_exceptions.APIError:
         return False
     return True
 
@@ -45,7 +45,7 @@ def check():
     # Check ingress controller
     try:
         res = ctlr.check_ingress(cli, 'dummy-ingress', 'mlad')
-    except core_exception.NotFound:
+    except core_exceptions.NotFound:
         ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
         res = ctlr.check_ingress(cli, 'dummy-ingress', 'mlad')
     if res:
@@ -55,7 +55,7 @@ def check():
     # Check metrics server
     try:
         ctlr.get_deployment(cli, 'metrics-server', 'kube-system')
-    except core_exception.NotFound:
+    except core_exceptions.NotFound:
         pass
     else:
         checked['Metrics Server']['status'] = True
@@ -63,7 +63,7 @@ def check():
     # Check nvidia device plugin
     try:
         ctlr.get_daemonset(cli, 'nvidia-device-plugin-daemonset', 'kube-system')
-    except core_exception.NotFound:
+    except core_exceptions.NotFound:
         pass
     else:
         checked['NVIDIA Device Plugin']['status'] = True
@@ -71,11 +71,11 @@ def check():
     # Check node feature discovery
     try:
         ctlr.get_daemonset(cli, 'nfd', 'node-feature-discovery')
-    except core_exception.NotFound:
+    except core_exceptions.NotFound:
         checked['Node Feature Discovery']['msgs'].append('"nfs" not found. Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml\'.')
     try:
         ctlr.get_daemonset(cli, 'gpu-feature-discovery', 'node-feature-discovery')
-    except core_exception.NotFound:
+    except core_exceptions.NotFound:
         checked['Node Feature Discovery']['msgs'].append('"gpu-feature-discovery" not found. Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/gpu-feature-discovery-daemonset.yaml -n node-feature-discovery\'.')
     finally:
         if len(checked['Node Feature Discovery']['msgs']) == 0:
@@ -86,7 +86,7 @@ def check():
     # Check mlad api server
     try:
         ctlr.get_deployment(cli, 'mlad-service', 'mlad')
-    except core_exception.NotFound:
+    except core_exceptions.NotFound:
         pass
     else:
         checked['MLAD API Server']['status'] = True
@@ -102,3 +102,22 @@ def check():
         if not status:
             for line in msgs:
                 yield f'˙ {line}'
+
+
+def _is_running_api_server(cli) -> bool:
+    try:
+        ctlr.get_deployment(cli, 'mlad-apiserver', 'mlad')
+    except core_exceptions.NotFound:
+        return False
+
+    return True
+
+
+def deploy_api_server(image_tag: str, ingress: bool):
+    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    is_running = _is_running_api_server(cli)
+    if not is_running:
+        yield 'Create docker registry secret named \'docker-mlad-sc\''
+        ctlr.create_docker_registry_secret()
+    else:
+        pass

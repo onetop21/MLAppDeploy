@@ -3,7 +3,10 @@ import copy
 import time
 import json
 import uuid
+import base64
+
 from collections import defaultdict
+from pathlib import Path
 from mlad.core import exceptions
 from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError
 from mlad.core.libs import utils
@@ -1389,3 +1392,22 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
             res[name][pod_name] = resource
 
     return res
+
+
+def create_docker_registry_secret():
+    v1_api = client.CoreV1Api()
+    with open(f'{Path.home()}/.docker/config.json', 'rb') as config_file:
+        data = {
+            '.dockerconfigjson': base64.b64encode(config_file.read()).decode()
+        }
+    secret = client.V1Secret(
+        api_version='v1',
+        data=data,
+        kind='Secret',
+        metadata=dict(name='docker-mlad-sc', namespace='mlad'),
+        type='kubernetes.io/dockerconfigjson'
+    )
+    try:
+        v1_api.create_namespaced_secret('mlad', body=secret)
+    except Exception as e:
+        print(e)
