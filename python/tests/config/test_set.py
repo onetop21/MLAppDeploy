@@ -24,11 +24,11 @@ def test_set():
 
     expected = {
         'name': 'test1',
-        'apiserver': {'address': 'https://ncml-dev.cloud.ncsoft.com'},
+        'apiserver': {'address': 'https://abc.defg.com'},
         'kubeconfig_path': None,
         'context_name': None,
         'docker': {'registry': {
-            'address': 'https://harbor.sailio.ncsoft.com',
+            'address': 'https://abc.defg.com',
             'namespace': None
         }},
         'datastore': {
