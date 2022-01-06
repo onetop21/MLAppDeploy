@@ -16,7 +16,8 @@ def check():
 @click.option('--ingress', is_flag=True, help='Use an ingress to expose the api server.')
 @echo_exception
 def api_server(image_tag: str, ingress: bool):
-    for line in install.api_server(image_tag, ingress):
+    '''Deploy the MLAD api server.'''
+    for line in install.deploy_api_server(image_tag, ingress):
         click.echo(line)
 
 
