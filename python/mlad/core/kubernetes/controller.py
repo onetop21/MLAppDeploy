@@ -9,7 +9,7 @@ from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, In
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
-from kubernetes import client, config
+from kubernetes import client, config, watch
 from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
 
@@ -30,6 +30,14 @@ def get_api_client(config_file='~/.kube/config', context=None):
     config.load_incluster_config()
     # If Need, set configuration parameter from client.Configuration
     return ApiClient()
+
+
+def get_current_context():
+    try:
+        current_context = config.list_kube_config_contexts()[1]
+    except config.config_exception.ConfigException as e:
+        raise exceptions.APIError(str(e), 404)
+    return current_context['name']
 
 
 DEFAULT_CLI = get_api_client()
@@ -269,14 +277,30 @@ def update_namespace(namespace, update_yaml, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-def _get_job(cli, name, namespace):
-    api = client.BatchV1Api(cli)
-    return api.read_namespaced_job(name, namespace)
-
-
-def _get_deployment(cli, name, namespace):
+def get_deployment(cli, name, namespace):
     api = client.AppsV1Api(cli)
-    return api.read_namespaced_deployment(name, namespace)
+    try:
+        res = api.read_namespaced_deployment(name, namespace)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
+        else:
+            raise exceptions.APIError(msg, status)
+    return res
+
+
+def get_daemonset(cli, name, namespace):
+    api = client.AppsV1Api(cli)
+    try:
+        res = api.read_namespaced_daemon_set(name, namespace)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find daemonset "{name}" in "{namespace}".')
+        else:
+            raise exceptions.APIError(msg, status)
+    return res
 
 
 def get_app(name, namespace, cli=DEFAULT_CLI):
@@ -794,9 +818,11 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
             if ingress:
                 ingress_name = ingress['name']
+                path = ingress['path']
                 rewritePath = ingress['rewritePath']
                 port = int(ingress['port'])
-                ingress_path = f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
+                ingress_path = path if path is not None else \
+                    f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
                 envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
                 config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
                 create_ingress(cli, namespace_name, name, ingress_name, port, ingress_path, rewritePath)
@@ -859,7 +885,7 @@ def update_apps(namespace, apps, cli=DEFAULT_CLI):
             body.append(_body("image", app['image']))
 
         # update env
-        deployment = _get_deployment(cli, app_name, namespace)
+        deployment = get_deployment(cli, app_name, namespace)
         container_spec = deployment.spec.template.spec.containers[0]
         current = {env.name: env.value for env in container_spec.env}
         for key in list(app['env']['current'].keys()):
@@ -1221,6 +1247,34 @@ def create_ingress(cli, namespace, app_name, ingress_name, port, base_path='/', 
         namespace=namespace,
         body=body
     )
+
+
+def check_ingress(cli, ingress_name, namespace):
+    w = watch.Watch()
+    api = client.NetworkingV1Api(cli)
+    try:
+        res = api.read_namespaced_ingress(ingress_name, namespace)
+        status = res.status.load_balancer.ingress
+        if status is not None:
+            return True
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find ingress "{ingress_name}" in "{namespace}".')
+    for event in w.stream(func=api.list_namespaced_ingress,
+                          namespace=namespace,
+                          field_selector=f'metadata.name={ingress_name}',
+                          timeout_seconds=60):
+        if event['type'] == 'MODIFIED':
+            status = event['object'].status.load_balancer.ingress
+            if status is not None:
+                return True
+    return False
+
+
+def delete_ingress(cli, namespace, ingress_name):
+    api = client.NetworkingV1Api(cli)
+    return api.delete_namespaced_ingress(ingress_name, namespace)
 
 
 def parse_mem(str_mem):

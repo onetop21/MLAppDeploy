@@ -3,6 +3,7 @@ import copy
 
 from mlad import __version__
 from mlad.cli import config_cli as config
+from mlad.cli import install_cli as install
 from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
 from mlad.cli import node_cli as node
@@ -12,6 +13,7 @@ from mlad.cli import deploy_cli as deploy
 from mlad.cli.exceptions import ConfigNotFoundError
 from mlad.cli.config import get as check_config
 from mlad.cli.config import validate_kubeconfig as is_admin
+from mlad.cli.install import has_kubeconfig
 
 
 class EntryGroup(click.Group):
@@ -47,6 +49,8 @@ def main():
 
 
 main.add_command(config.cli, 'config')
+if has_kubeconfig():
+    main.add_command(install.cli, 'install')
 
 try:
     check_config()
