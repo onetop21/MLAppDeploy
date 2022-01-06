@@ -294,7 +294,6 @@ def validate_kubeconfig() -> bool:
     config = get()
     kubeconfig_path = config.kubeconfig_path
     context_name = config.context_name
-    kubeconfig = OmegaConf.create()
     try:
         kubeconfig = OmegaConf.load(kubeconfig_path)
     except Exception:
