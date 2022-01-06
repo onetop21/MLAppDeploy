@@ -17,6 +17,9 @@ def _parse_log(log, max_name_width=32, len_short_id=10):
     if 'task_id' in log:
         name = f"{name}.{log['task_id'][:len_short_id]}"
         namewidth = min(max_name_width, namewidth + len_short_id + 1)
+    if len(name) > max_name_width:
+        name = name[:max_name_width - 3] + '...'
+
     msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
 
     dt = None
