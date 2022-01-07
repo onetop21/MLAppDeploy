@@ -1394,8 +1394,16 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
     return res
 
 
+def _handle_already_exists_exception(e):
+    body = json.loads(e.body)
+    if 'reason' in body and body['reason'] == 'AlreadyExists':
+        pass
+    else:
+        raise e
+
+
 def create_docker_registry_secret(cli):
-    v1_api = client.CoreV1Api(cli)
+    api = client.CoreV1Api(cli)
     with open(f'{Path.home()}/.docker/config.json', 'rb') as config_file:
         data = {
             '.dockerconfigjson': base64.b64encode(config_file.read()).decode()
@@ -1408,6 +1416,137 @@ def create_docker_registry_secret(cli):
         type='kubernetes.io/dockerconfigjson'
     )
     try:
-        v1_api.create_namespaced_secret('mlad', secret)
-    except Exception as e:
-        print(e)
+        api.create_namespaced_secret('mlad', secret)
+    except ApiException as e:
+        _handle_already_exists_exception(e)
+
+
+def create_mlad_namespace(cli):
+    api = client.CoreV1Api(cli)
+    try:
+        api.create_namespace(
+            client.V1Namespace(metadata=client.V1ObjectMeta(name='mlad'))
+        )
+    except ApiException as e:
+        _handle_already_exists_exception(e)
+
+
+def create_api_server_role_and_rolebinding(cli):
+    api = client.RbacAuthorizationV1Api(cli)
+    cluster_role = client.V1ClusterRole(
+        api_version='rbac.authorization.k8s.io/v1',
+        kind='ClusterRole',
+        metadata=client.V1ObjectMeta(name='mlad-cluster-role'),
+        rules=[
+            client.V1PolicyRule(
+                api_groups=[
+                    '', 'apps', 'batch', 'extensions', 'rbac.authorization.k8s.io',
+                    'networking.k8s.io', 'metrics.k8s.io'
+                ],
+                resources=[
+                    'nodes', 'namespaces', 'services', 'pods', 'pods/log', 'replicationcontrollers',
+                    'deployments', 'deployments/scale', 'replicaset', 'jobs', 'configmaps',
+                    'secrets', 'events', 'rolebindings', 'ingresses', 'podmetrics'
+                ],
+                verbs=[
+                    'get', 'watch', 'list', 'create', 'update', 'delete', 'patch',
+                    'deletecollection'
+                ]
+            )
+        ]
+    )
+
+    cluster_role_binding = client.V1ClusterRoleBinding(
+        api_version='rbac.authorization.k8s.io/v1',
+        kind='ClusterRoleBinding',
+        metadata=client.V1ObjectMeta(name='mlad-cluster-role-binding'),
+        role_ref=client.V1RoleRef(
+            api_group='rbac.authorization.k8s.io',
+            kind='ClusterRole',
+            name='mlad-cluster-role'
+        ),
+        subjects=[
+            client.V1Subject(
+                kind='ServiceAccount',
+                name='default',
+                namespace='mlad'
+            )
+        ]
+    )
+
+    try:
+        api.create_cluster_role(body=cluster_role)
+    except ApiException as e:
+        _handle_already_exists_exception(e)
+
+    try:
+        api.create_cluster_role_binding(body=cluster_role_binding)
+    except ApiException as e:
+        _handle_already_exists_exception(e)
+
+
+def create_mlad_service(cli, nodeport: bool = True):
+    api = client.CoreV1Api(cli)
+    service = client.V1Service(
+        api_version='v1',
+        kind='Service',
+        metadata=client.V1ObjectMeta(
+            name='mlad-service',
+            namespace='mlad',
+            labels={'app': 'mlad-api-server'}
+        ),
+        spec=client.V1ServiceSpec(
+            selector={'app': 'mlad-api-server'},
+            type='ClusterIP' if not nodeport else 'NodePort',
+            ports=[client.V1ServicePort(port=8440, target_port=8440, name='mlad-port')]
+        )
+    )
+    try:
+        api.create_namespaced_service('mlad', body=service)
+    except ApiException as e:
+        _handle_already_exists_exception(e)
+
+
+def create_mlad_api_server_deployment(cli, image_tag: str):
+    api = client.AppsV1Api(cli)
+    deployment = client.V1Deployment(
+        metadata=client.V1ObjectMeta(
+            name='mlad-api-server',
+            namespace='mlad'
+        ),
+        spec=client.V1DeploymentSpec(
+            replicas=1,
+            selector=client.V1LabelSelector(
+                match_labels={'app': 'mlad-api-server'}
+            ),
+            template=client.V1PodTemplateSpec(
+                metadata=client.V1ObjectMeta(
+                    name='mlad-api-server-pod',
+                    labels={'app': 'mlad-api-server'}
+                ),
+                spec=client.V1PodSpec(
+                    restart_policy='Always',
+                    termination_grace_period_seconds=10,
+                    containers=[client.V1Container(
+                        name='mlad-api-server',
+                        image=image_tag,
+                        image_pull_policy='Always',
+                        env=[
+                            client.V1EnvVar(name='MLAD_DEBUG', value='1'),
+                            client.V1EnvVar(name='MLAD_KUBE', value='1'),
+                            client.V1EnvVar(name='PYTHONUNBUFFERED', value='1'),
+                        ],
+                        ports=[
+                            client.V1ContainerPort(name='http', container_port=8440)
+                        ]
+                    )],
+                    image_pull_secrets=[client.V1LocalObjectReference(name='docker-mlad-sc')]
+                )
+            )
+        )
+    )
+
+    try:
+        api.create_namespaced_deployment('mlad', body=deployment)
+    except ApiException as e:
+        _handle_already_exists_exception(e)

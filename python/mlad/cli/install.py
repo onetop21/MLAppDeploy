@@ -106,7 +106,7 @@ def check():
 
 def _is_running_api_server(cli) -> bool:
     try:
-        ctlr.get_deployment(cli, 'mlad-apiserver', 'mlad')
+        ctlr.get_deployment(cli, 'mlad-api-server', 'mlad')
     except core_exceptions.NotFound:
         return False
 
@@ -117,7 +117,18 @@ def deploy_api_server(image_tag: str, ingress: bool):
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     is_running = _is_running_api_server(cli)
     if not is_running:
-        yield 'Create docker registry secret named \'docker-mlad-sc\''
+        yield 'Create docker registry secret named \'docker-mlad-sc\'.'
         ctlr.create_docker_registry_secret(cli)
-    else:
-        pass
+
+    yield 'Create \'mlad\' namespace.'
+    ctlr.create_mlad_namespace(cli)
+
+    yield 'Create \'mlad-cluster-role\' cluster role.'
+    yield 'Create \'mlad-cluster-role-binding\' cluster role binding.'
+    ctlr.create_api_server_role_and_rolebinding(cli)
+
+    yield 'Create \'mlad-service\' service.'
+    ctlr.create_mlad_service(cli, nodeport=not ingress)
+
+    yield 'Create \'mlad-api-server\' deployment.'
+    ctlr.create_mlad_api_server_deployment(cli, image_tag)
