@@ -71,13 +71,8 @@ def check():
     # Check node feature discovery
     try:
         ctlr.get_daemonset(cli, 'nfd', 'node-feature-discovery')
-<<<<<<< HEAD
     except core_exceptions.NotFound:
         checked['Node Feature Discovery']['msgs'].append('"nfs" not found. Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml\'.')
-=======
-    except core_exception.NotFound:
-        checked['Node Feature Discovery']['msgs'].append('"nfd" not found. Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml\'.')
->>>>>>> dev
     try:
         ctlr.get_daemonset(cli, 'gpu-feature-discovery', 'node-feature-discovery')
     except core_exceptions.NotFound:
