@@ -6,6 +6,7 @@ import uuid
 import base64
 
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from mlad.core import exceptions
 from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError
@@ -1402,6 +1403,14 @@ def _handle_already_exists_exception(e):
         raise e
 
 
+def _handle_not_found_exception(e):
+    body = json.loads(e.body)
+    if 'reason' in body and body['reason'] == 'NotFound':
+        pass
+    else:
+        raise e
+
+
 def create_docker_registry_secret(cli):
     api = client.CoreV1Api(cli)
     with open(f'{Path.home()}/.docker/config.json', 'rb') as config_file:
@@ -1550,3 +1559,91 @@ def create_mlad_api_server_deployment(cli, image_tag: str):
         api.create_namespaced_deployment('mlad', body=deployment)
     except ApiException as e:
         _handle_already_exists_exception(e)
+
+
+def create_mlad_ingress(cli):
+    api = client.NetworkingV1Api(cli)
+    annotations = {
+        "kubernetes.io/ingress.class": "nginx",
+        "nginx.ingress.kubernetes.io/proxy-body-size": "0",
+        "nginx.ingress.kubernetes.io/proxy-read-timeout": "600",
+        "nginx.ingress.kubernetes.io/proxy-send-timeout": "600",
+    }
+    ingress = client.V1Ingress(
+        api_version="networking.k8s.io/v1",
+        kind="Ingress",
+        metadata=client.V1ObjectMeta(
+            name='mlad-ingress', namespace='mlad', annotations=annotations),
+        spec=client.V1IngressSpec(
+            rules=[
+                client.V1IngressRule(
+                    http=client.V1HTTPIngressRuleValue(
+                        paths=[client.V1HTTPIngressPath(
+                            path='/',
+                            path_type='ImplementationSpecific',
+                            backend=client.V1IngressBackend(
+                                service=client.V1IngressServiceBackend(
+                                    name='mlad-service',
+                                    port=client.V1ServiceBackendPort(
+                                        number=8440
+                                    )
+                                )
+                            )
+                        )]
+                    )
+                )
+            ]
+        )
+    )
+
+    try:
+        api.create_namespaced_ingress('mlad', body=ingress)
+    except ApiException as e:
+        _handle_already_exists_exception(e)
+
+
+def delete_mlad_ingress(cli):
+    api = client.NetworkingV1Api(cli)
+    try:
+        api.delete_namespaced_ingress('mlad-ingress', 'mlad')
+    except ApiException as e:
+        _handle_not_found_exception(e)
+
+
+def patch_mlad_service(cli, nodeport: bool):
+    api = client.CoreV1Api(cli)
+    now = datetime.utcnow()
+    now = str(now.isoformat('T') + 'Z')
+    body = {
+        'metadata': {
+            'annotations': {
+                'kubectl.kubernetes.io/restartedAt': now
+            }
+        },
+        'spec': {
+            'type': 'ClusterIP' if not nodeport else 'NodePort'
+        }
+    }
+    res = api.list_namespaced_service('mlad', label_selector='app=mlad-api-server')
+    service_exists = len(res.items) == 1
+
+    if service_exists:
+        api.patch_namespaced_service('mlad-service', 'mlad', body=body)
+
+
+def patch_mlad_api_server_deployment(cli):
+    api = client.AppsV1Api(cli)
+    now = datetime.utcnow()
+    now = str(now.isoformat('T') + 'Z')
+    body = {
+        'spec': {
+            'template': {
+                'metadata': {
+                    'annotations': {
+                        'kubectl.kubernetes.io/restartedAt': now
+                    }
+                }
+            }
+        }
+    }
+    api.patch_namespaced_deployment('mlad-api-server', 'mlad', body=body)

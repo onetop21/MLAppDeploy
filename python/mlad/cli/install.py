@@ -120,15 +120,28 @@ def deploy_api_server(image_tag: str, ingress: bool):
         yield 'Create docker registry secret named \'docker-mlad-sc\'.'
         ctlr.create_docker_registry_secret(cli)
 
-    yield 'Create \'mlad\' namespace.'
-    ctlr.create_mlad_namespace(cli)
+        yield 'Create \'mlad\' namespace.'
+        ctlr.create_mlad_namespace(cli)
 
-    yield 'Create \'mlad-cluster-role\' cluster role.'
-    yield 'Create \'mlad-cluster-role-binding\' cluster role binding.'
-    ctlr.create_api_server_role_and_rolebinding(cli)
+        yield 'Create \'mlad-cluster-role\' cluster role.'
+        yield 'Create \'mlad-cluster-role-binding\' cluster role binding.'
+        ctlr.create_api_server_role_and_rolebinding(cli)
 
-    yield 'Create \'mlad-service\' service.'
-    ctlr.create_mlad_service(cli, nodeport=not ingress)
+        yield 'Create \'mlad-service\' service.'
+        ctlr.create_mlad_service(cli, nodeport=not ingress)
 
-    yield 'Create \'mlad-api-server\' deployment.'
-    ctlr.create_mlad_api_server_deployment(cli, image_tag)
+        yield 'Create \'mlad-api-server\' deployment.'
+        ctlr.create_mlad_api_server_deployment(cli, image_tag)
+    else:
+        yield 'Patch the \'mlad-service\' service.'
+        ctlr.patch_mlad_service(cli, nodeport=not ingress)
+
+        yield 'Patch the \'mlad-api-service\' deployment.'
+        ctlr.patch_mlad_api_server_deployment(cli)
+
+    if ingress:
+        yield 'Create \'mlad-ingress\' ingress.'
+        ctlr.create_mlad_ingress(cli)
+    else:
+        yield 'Remove running \'mlad-ingress\' ingress.'
+        ctlr.delete_mlad_ingress(cli)
