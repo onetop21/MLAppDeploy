@@ -129,12 +129,18 @@ def deploy_api_server(image_tag: str, ingress: bool):
 
         yield 'Create \'mlad-service\' service.'
         ctlr.create_mlad_service(cli, nodeport=not ingress)
+        if not ingress:
+            yield 'Check the node port value of the \'mlad-service\'.'
+            yield 'Run \'kubectl get svc -n mlad\'.'
 
         yield 'Create \'mlad-api-server\' deployment.'
         ctlr.create_mlad_api_server_deployment(cli, image_tag)
     else:
         yield 'Patch the \'mlad-service\' service.'
         ctlr.patch_mlad_service(cli, nodeport=not ingress)
+        if not ingress:
+            yield 'Check the NodePort value of the \'mlad-service\'.'
+            yield 'Run \'kubectl get svc -n mlad\'.'
 
         yield 'Patch the \'mlad-api-service\' deployment.'
         ctlr.patch_mlad_api_server_deployment(cli)
@@ -143,5 +149,5 @@ def deploy_api_server(image_tag: str, ingress: bool):
         yield 'Create \'mlad-ingress\' ingress.'
         ctlr.create_mlad_ingress(cli)
     else:
-        yield 'Remove running \'mlad-ingress\' ingress.'
+        yield 'Delete running \'mlad-ingress\' ingress.'
         ctlr.delete_mlad_ingress(cli)
