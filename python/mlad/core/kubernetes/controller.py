@@ -1612,18 +1612,11 @@ def delete_mlad_ingress(cli):
 
 def patch_mlad_service(cli, nodeport: bool):
     api = client.CoreV1Api(cli)
-    now = datetime.utcnow()
-    now = str(now.isoformat('T') + 'Z')
-    body = {
-        'metadata': {
-            'annotations': {
-                'kubectl.kubernetes.io/restartedAt': now
-            }
-        },
-        'spec': {
-            'type': 'ClusterIP' if not nodeport else 'NodePort'
-        }
-    }
+    port_type = 'ClusterIP' if not nodeport else 'NodePort'
+    body = [
+        {'op': 'replace', 'path': '/spec/type', 'value': port_type},
+        {'op': 'replace', 'path': '/spec/ports/0/nodePort', 'value': None}
+    ]
     res = api.list_namespaced_service('mlad', label_selector='app=mlad-api-server')
     service_exists = len(res.items) == 1
 
