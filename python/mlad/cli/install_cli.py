@@ -14,10 +14,11 @@ def check():
 @click.command('api-server')
 @click.argument('image-tag', required=True)
 @click.option('--ingress', is_flag=True, help='Use an ingress to expose the api server.')
+@click.option('--beta', is_flag=True, help='Deploy beta version of the api server.')
 @echo_exception
-def api_server(image_tag: str, ingress: bool):
+def api_server(image_tag: str, ingress: bool, beta: bool):
     '''Deploy the MLAD api server.'''
-    for line in install.deploy_api_server(image_tag, ingress):
+    for line in install.deploy_api_server(image_tag, ingress, beta):
         click.echo(line)
 
 
