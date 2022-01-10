@@ -1,5 +1,6 @@
 from mlad.core import exceptions as core_exceptions
 from mlad.core.kubernetes import controller as ctlr
+from mlad.core.kubernetes import install as installer
 from mlad.cli.libs import utils
 
 
@@ -113,41 +114,41 @@ def _is_running_api_server(cli) -> bool:
     return True
 
 
-def deploy_api_server(image_tag: str, ingress: bool):
+def deploy_api_server(image_tag: str, ingress: bool, beta: bool):
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
     is_running = _is_running_api_server(cli)
     if not is_running:
         yield 'Create docker registry secret named \'docker-mlad-sc\'.'
-        ctlr.create_docker_registry_secret(cli)
+        installer.create_docker_registry_secret(cli)
 
         yield 'Create \'mlad\' namespace.'
-        ctlr.create_mlad_namespace(cli)
+        installer.create_mlad_namespace(cli)
 
         yield 'Create \'mlad-cluster-role\' cluster role.'
         yield 'Create \'mlad-cluster-role-binding\' cluster role binding.'
-        ctlr.create_api_server_role_and_rolebinding(cli)
+        installer.create_api_server_role_and_rolebinding(cli)
 
         yield 'Create \'mlad-service\' service.'
-        ctlr.create_mlad_service(cli, nodeport=not ingress)
+        installer.create_mlad_service(cli, nodeport=not ingress, beta=beta)
         if not ingress:
             yield 'Check the node port value of the \'mlad-service\'.'
             yield 'Run \'kubectl get svc -n mlad\'.'
 
         yield 'Create \'mlad-api-server\' deployment.'
-        ctlr.create_mlad_api_server_deployment(cli, image_tag)
+        installer.create_mlad_api_server_deployment(cli, image_tag, beta=beta)
     else:
         yield 'Patch the \'mlad-service\' service.'
-        ctlr.patch_mlad_service(cli, nodeport=not ingress)
+        installer.patch_mlad_service(cli, nodeport=not ingress, beta=beta)
         if not ingress:
             yield 'Check the NodePort value of the \'mlad-service\'.'
             yield 'Run \'kubectl get svc -n mlad\'.'
 
         yield 'Patch the \'mlad-api-service\' deployment.'
-        ctlr.patch_mlad_api_server_deployment(cli)
+        installer.patch_mlad_api_server_deployment(cli, beta=beta)
 
     if ingress:
         yield 'Create \'mlad-ingress\' ingress.'
-        ctlr.create_mlad_ingress(cli)
+        installer.create_mlad_ingress(cli, beta=beta)
     else:
         yield 'Delete running \'mlad-ingress\' ingress.'
-        ctlr.delete_mlad_ingress(cli)
+        installer.delete_mlad_ingress(cli, beta=beta)
