@@ -185,6 +185,9 @@ def create_mlad_ingress(cli, beta: bool = False):
         "nginx.ingress.kubernetes.io/proxy-read-timeout": "600",
         "nginx.ingress.kubernetes.io/proxy-send-timeout": "600",
     }
+    if beta:
+        annotations['nginx.ingress.kubernetes.io/rewrite-target'] = '/$2'
+
     ingress_name = 'mlad-ingress' if not beta else 'mlad-ingress-beta'
     service_name = 'mlad-service' if not beta else 'mlad-service-beta'
     path = '/' if not beta else '/beta(/|$)(.*)'
