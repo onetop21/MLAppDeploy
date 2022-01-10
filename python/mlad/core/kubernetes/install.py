@@ -187,6 +187,7 @@ def create_mlad_ingress(cli, beta: bool = False):
     }
     ingress_name = 'mlad-ingress' if not beta else 'mlad-ingress-beta'
     service_name = 'mlad-service' if not beta else 'mlad-service-beta'
+    path = '/' if not beta else '/beta(/|$)(.*)'
     ingress = client.V1Ingress(
         api_version="networking.k8s.io/v1",
         kind="Ingress",
@@ -197,7 +198,7 @@ def create_mlad_ingress(cli, beta: bool = False):
                 client.V1IngressRule(
                     http=client.V1HTTPIngressRuleValue(
                         paths=[client.V1HTTPIngressPath(
-                            path='/',
+                            path=path,
                             path_type='ImplementationSpecific',
                             backend=client.V1IngressBackend(
                                 service=client.V1IngressServiceBackend(
