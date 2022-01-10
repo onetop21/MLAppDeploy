@@ -5,39 +5,40 @@
 fromDockerhub: false
 
 # Dependencies and subcharts
-nvidia-device-plugin:
-  enabled: true
-gpu-feature-discovery:
-  enabled: true
-  nfd:
-    deploy: true
-dcgm-exporter:
-  enabled: true
-  serviceMonitor:
-    enabled: true
-    additionalLabels: 
-      release: prometheus-stack
-    namespace:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: nvidia.com/gpu.product
-            operator: Exists
+# nvidia-device-plugin:
+#   enabled: true
+# gpu-feature-discovery:
+#   enabled: true
+#   nfd:
+#     deploy: true
+# dcgm-exporter:
+#   enabled: true
+#   serviceMonitor:
+#     enabled: true
+#     additionalLabels: 
+#       release: prometheus-stack
+#     namespace:
+#   affinity:
+#     nodeAffinity:
+#       requiredDuringSchedulingIgnoredDuringExecution:
+#         nodeSelectorTerms:
+#         - matchExpressions:
+#           - key: nvidia.com/gpu.product
+#             operator: Exists
 ###################
 
 replicaCount: 1
 
 image:
   repository: ghcr.io/onetop21/mlappdeploy/api-server
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
+  tag: 0.2.0
 
 port: 8440
 
 imagePullSecrets: []
-nameOverride: "api-server"
-fullnameOverride: ""
+nameOverride: "mlad"
+fullnameOverride: "mlad-api-server"
 
 additionLabels:
 
@@ -67,7 +68,8 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
+  privileged: true
   # capabilities:
   #   drop:
   #   - ALL
@@ -76,12 +78,12 @@ securityContext: {}
   # runAsUser: 1000
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 8440
   targetPort: 8440
 
 ingress:
-  enabled: true
+  enabled: false
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
