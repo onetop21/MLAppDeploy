@@ -115,3 +115,12 @@ class NotRunningTrainError(MLADException):
 
     def __str__(self):
         return f'There is no running Train object (project key: {self.key})'
+
+
+class InvalidFileTypeError(MLADException):
+
+    def __init__(self, type: str):
+        self.type = type
+
+    def __str__(self):
+        return f'"{self.type}" is unsupported project file type.'

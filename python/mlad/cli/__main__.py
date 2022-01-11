@@ -77,6 +77,7 @@ else:
     main.add_command(project.logs, 'logs')
     main.add_command(project.ls, 'ls')
     main.add_command(project.ps, 'ps')
+    main.add_command(project.edit, 'edit')
     # main.add_command(project.scale, 'scale')
 
 
