@@ -153,13 +153,13 @@ x-definitions:
         description: Constraints to place the app on nodes.
   - definition: &app
       <<: *_app_base
-      restartPolicy:              # Describe restart policy. (never, onFailure, always)
+      restartPolicy: &restartPolicy # Describe restart policy. (never, onFailure, always)
         type: string
         allowed: [never, onFailure, always]
         default: never
         excludes: runSpec
         description: Restart policy for app. (never, onFailure, always)
-      scale:                      # Describe number of replicas or parallelism
+      scale: &scale               # Describe number of replicas or parallelism
         type: integer
         default: 1
         excludes: runSpec
@@ -179,22 +179,20 @@ x-definitions:
   - definition: &job
       <<: *app
       restartPolicy:
-        type: string
+        <<: *restartPolicy
         allowed: [never, onFailure]
         default: never
-        excludes: runSpec
-        dependencies:
-          scale: 1
         description: Restart policy for job. (never, onFailure)
+      scale:
+        <<: *scale
+        allowed: [1]
   - definition: &service
       <<: *app
       restartPolicy:
-        type: string
+        <<: *restartPolicy
         allowed: [always]
         default: always
-        excludes: runSpec
         description: Restart policy for service. (always)
-
   - definition: &_advanced_base
       resources:
         type: dict
