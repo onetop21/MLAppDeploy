@@ -38,7 +38,7 @@ def main():
             'kubernetes>=19.0.0,<20.0.0',
             'PyJWT>=2.1.0,<3.0.0',
             'Cerberus>=1.3.0,<1.4.0',
-            'cerberus-kind==0.0.10',
+            'cerberus-kind==0.0.11',
             'dictdiffer==0.9.0',
             'cerberus-document-editor==0.0.3'
         ],
