@@ -40,7 +40,7 @@ def main():
             'Cerberus>=1.3.0,<1.4.0',
             'cerberus-kind==0.0.10',
             'dictdiffer==0.9.0',
-            'cerberus-document-editor==0.0.2'
+            'cerberus-document-editor==0.0.3'
         ],
         package_data={
             'mlad.cli.validator': ['schema.yaml']
