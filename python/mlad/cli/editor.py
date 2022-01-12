@@ -27,8 +27,5 @@ def run_editor(document_path: str = './mlad-project.yml'):
     modified = app.run(cde.EditorPage(os.path.basename(document_path), schema, document))
 
     if modified:
-        if doc_ext in ['.yaml', '.yml']:
-            with open(document_path, 'wt') as f:
-                f.write(yaml_parser.dump(modified))
-        else:
-            raise InvalidFileTypeError(doc_ext)
+        with open(document_path, 'wt') as f:
+            f.write(yaml_parser.dump(modified))

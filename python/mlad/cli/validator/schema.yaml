@@ -64,7 +64,7 @@ x-definitions:
           type: string
       script:
         type: string
-        description: Script to run after copy files.
+        description: Script to be run after copying files.
       env:                        # Describe environment variables.
         type: dict
         description: Environment variables.
@@ -84,7 +84,7 @@ x-definitions:
         type: string
         default: "FROM    python:latest"
         required: true
-        description: Describe Dockerfile script directly as workspace.
+        description: Describe Dockerfile script directly as a workspace.
       ignores:                    # Describe exclude files from project.
         type: list
         description: Files to be excluded from project.
@@ -97,7 +97,7 @@ x-definitions:
         type: string
         default: 'Dockerfile'
         required: true
-        description: Decribe path of Dockerfile as workspace.
+        description: Decribe path of Dockerfile as a workspace.
       ignorePath:
         type: string
         description: File that includes the files to be excluded from project.
@@ -304,7 +304,7 @@ __root__:
           buildscript: *buildscript
           dockerfile: *dockerfile
         order: 10
-        description: Workspace specs to build project.
+        description: Workspace specs to build the project.
       app:
         type: dict
         keysrules:
