@@ -18,6 +18,19 @@ from mlad.cli.libs import utils
 from mlad.cli.validator import validators
 
 
+class ValueGenerator:
+    def __init__(self, generator):
+        self.gen = generator
+
+    def __iter__(self):
+        self.value = yield from self.gen
+
+    def get_value(self):
+        for x in self:
+            pass
+        return self.value
+
+
 def get_cli():
     try:
         return docker.from_env()
@@ -120,7 +133,7 @@ def install(file_path: str, no_build: bool):
             raise ComponentImageNotExistError(spec['name'])
         image = built_images[0]
     else:
-        image = image_core.build(file_path, False, True, False)
+        image = ValueGenerator(image_core.build(file_path, False, True, False)).get_value()
 
     host_ip = _obtain_host()
     component_specs = []

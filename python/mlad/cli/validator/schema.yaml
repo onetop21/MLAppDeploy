@@ -125,8 +125,6 @@ x-definitions:
               type: list
               schema:
                 type: string
-          type: string
-          regex: "[A-Za-z0-9-_]+:/\\w+"
         #- ${datastore:URL}:/storage
   - definition: &_app_base
       <<: *component
