@@ -162,7 +162,6 @@ def install(file_path: str, no_build: bool):
             image.tags[-1],
             environment=env,
             name=f'{spec["name"]}-{app_name}',
-            auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
             mounts=[Mount(source=mount['path'], target=mount['mountPath'], type='bind')
@@ -202,6 +201,9 @@ def uninstall(name: str) -> None:
     })
     for container in containers:
         container.stop()
+
+    for container in containers:
+        container.remove()
 
     yield f'The component [{name}] is uninstalled'
 
