@@ -3,7 +3,7 @@ x-definitions:
   - definition: &metadata
       apiVersion:
         type: string
-        regex: "v[0-9]+"
+        regex: "^v[0-9]+$"
         default: v1
         order: 0
       name:
@@ -12,31 +12,39 @@ x-definitions:
         regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
         empty: false
         order: 1
+        description: Project name.
+        multiline: True
       version:
         type: string
-        regex: "[0-9]+\\.[0-9]+\\.[0-9]+"
+        regex: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
         default: 0.0.1
         order: 2
+        description: Version of project.
       maintainer:
         type: string
         default: ${USER}
         order: 3
+        description: Maintainer of project.
       workdir:                    # Describe workspace directory.
         type: string
         default: .
         order: 4
+        description: Workspace directory.
   - definition: &workspace
       base:                       # Describe base docker image tag
         type: string
-        regex: "(?:.+/)?([^:]+)(?::.+)?"
+        regex: "^(?:.+/)?([^:]+)(?::.+)?$"
         required: true
+        description: Base docker image tag.
       preps:                      # Describe preparations for making envorinment.
         type: list
+        description: Preparations for making environment before docker image build.
         schema:
           type: dict
           schema:
             run:
               type: string
+              multiline: true
             add:
               type: string
             pip:
@@ -49,14 +57,17 @@ x-definitions:
               type: string
       ignores:                    # Describe exclude files from project.
         type: list
+        description: Files to be excluded from project.
         default:
           - "**/.*"
         schema:                   # Describe script run after copy files.
           type: string
       script:
         type: string
+        description: Script to be run after copying files.
       env:                        # Describe environment variables.
         type: dict
+        description: Environment variables.
         valuesrules:
           schema:
             type: [string]
@@ -64,56 +75,71 @@ x-definitions:
           PYTHONUNBUFFERED: "1"
       command:                    # Describe application to execute
         type: [string, list]
+        description: Command to execute application
       args:                       # Describe arguments for execute application
         type: [string, list]
+        description: Arguments to execute application.
   - definition: &buildscript
       buildscript:
         type: string
         default: "FROM    python:latest"
         required: true
+        description: Describe Dockerfile script directly as a workspace.
       ignores:                    # Describe exclude files from project.
         type: list
+        description: Files to be excluded from project.
         default:
           - "**/.*"
-        schema:                   # Describe script run after copy files.
+        schema:
           type: string
   - definition: &dockerfile
       filePath:
         type: string
         default: 'Dockerfile'
         required: true
+        description: Decribe path of Dockerfile as a workspace.
       ignorePath:
         type: string
+        description: File that includes the files to be excluded from project.
         default: '.dockerignore'
   - definition: &ingress
       target:
         type: string
         regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9]):[0-9]+$"
         required: true
+        description: Target app and port to expose with ingress. (<APP NAME>:<PORT>)
       path:
         type: string
+        description: Ingress path to access apps.
       rewritePath:
         type: boolean
         default: true
+        description: Whether to use rewrite path.
   - definition: &component
       image:                      # Describe image to run docker service for run not built image from workspace.
         type: string
         regex: "(?:(?=[^:\/]{4,253})(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(?:\\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*(?::[0-9]{1,5})?/)?((?![._-])(?:[a-z0-9._-]*)(?<![._-])(?:/(?![._-])[a-z0-9._-]*(?<![._-]))*)(?::(?![.-])[a-zA-Z0-9_.-]{1,128})?"
+        description: Image to run a docker service, not using image built from workspace.
       env:                        # Describe environment variables additionaly.
         type: dict
+        description: Additional environment variables.
       ports:                      # Describe expose ports to other services.
         type: list
         schema:
           type: integer
+        description: Expose ports to other apps.
       command:                    # Describe command to need overwrite.
         type: [string, list]
+        description: Commands to need overwrite.
       args:                       # Describe arguments to need overwrite.
         type: [string, list]
+        description: Arguments to need overwrite.
       mounts:
         type: list
         schema:
           type: string
-          regex: "[A-Za-z0-9-_]+:/\\w+"
+          regex: "^[A-Za-z0-9-_]+:/\\w+$"
+        description: Volume path to be mounted on the host node. (/hostPath:/mountPath)
         #- ${datastore:URL}:/storage
   - definition: &_app_base
       <<: *component
@@ -124,17 +150,20 @@ x-definitions:
             type: string
           label:
             type: dict
+        description: Constraints to place the app on nodes.
   - definition: &app
       <<: *_app_base
-      restartPolicy:              # Describe restart policy. (never, onFailure, always)
+      restartPolicy: &restartPolicy # Describe restart policy. (never, onFailure, always)
         type: string
         allowed: [never, onFailure, always]
         default: never
         excludes: runSpec
-      scale:                      # Describe number of replicas or parallelism
+        description: Restart policy for app. (never, onFailure, always)
+      scale: &scale               # Describe number of replicas or parallelism
         type: integer
         default: 1
         excludes: runSpec
+        description: Number of replicas or parallelism.
       quota:                      # Describe required system resource quota.
         type: dict
         excludes: resources
@@ -145,23 +174,25 @@ x-definitions:
             type: integer
           mem:
             type: string
-            regex: "[0-9]+[GMK]?[i]?"
+            regex: "^[0-9]+[GMK]?[i]?$"
+        description: Required system resource quota.
   - definition: &job
       <<: *app
       restartPolicy:
-        type: string
+        <<: *restartPolicy
         allowed: [never, onFailure]
         default: never
-        excludes: runSpec
-        dependencies:
-          scale: 1
+        description: Restart policy for job. (never, onFailure)
+      scale:
+        <<: *scale
+        allowed: [1]
   - definition: &service
       <<: *app
       restartPolicy:
-        type: string
+        <<: *restartPolicy
         allowed: [always]
         default: always
-        excludes: runSpec
+        description: Restart policy for service. (always)
   - definition: &_advanced_base
       resources:
         type: dict
@@ -176,7 +207,7 @@ x-definitions:
                 type: integer
               mem:
                 type: string
-                regex: "[0-9]+[GMK]?[i]?"
+                regex: "^[0-9]+[GMK]?[i]?$"
           requests:
             type: dict
             schema:
@@ -186,7 +217,7 @@ x-definitions:
                 type: integer
               mem:
                 type: string
-                regex: "[0-9]+[GMK]?[i]?"
+                regex: "^[0-9]+[GMK]?[i]?$"
   - definition: &job_advanced
       <<: *_app_base
       <<: *_advanced_base
@@ -271,6 +302,7 @@ __root__:
           buildscript: *buildscript
           dockerfile: *dockerfile
         order: 10
+        description: Workspace specs to build the project.
       app:
         type: dict
         keysrules:
@@ -282,6 +314,7 @@ __root__:
             job: *job
             service: *service
         order: 30
+        description: Apps to run.
     deployment:
       <<: *metadata
       workspace:
@@ -292,6 +325,7 @@ __root__:
           buildscript: *buildscript
           dockerfile: *dockerfile
         order: 10
+        description: Workspace specs to build project.
       ingress:
         type: dict
         required: true
@@ -302,6 +336,7 @@ __root__:
           type: dict
           schema: *ingress
         order: 20
+        description: Ingress specs to expose apps.
       app:
         type: dict
         keysrules:
@@ -312,6 +347,7 @@ __root__:
           selector:
             service: *service
         order: 30
+        description: Apps to run.
     component:
       <<: *metadata
       workspace:
@@ -322,6 +358,7 @@ __root__:
           buildscript: *buildscript
           dockerfile: *dockerfile
         order: 10
+        description: Workspace specs to build project.
       app:
         type: dict
         keysrules:
@@ -332,3 +369,4 @@ __root__:
           selector:
             component: *component
         order: 30
+        description: Apps to run.

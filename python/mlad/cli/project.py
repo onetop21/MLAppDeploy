@@ -6,6 +6,7 @@ from typing import Optional, List
 from mlad.cli.libs import utils
 from mlad.cli.format import PROJECT
 from mlad.cli import config as config_core
+from mlad.cli.editor import run_editor
 from mlad.cli.exceptions import NotRunningTrainError
 from mlad.api import API
 from mlad.api.exceptions import NotFound
@@ -262,3 +263,9 @@ def ingress():
             path = f'{address}{spec["ingress"]}'
             rows.append((username, project_name, app_name, key, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
+
+
+def edit(file: Optional[str]):
+    utils.process_file(file)
+    file_path = utils.get_project_file()
+    run_editor(file_path)

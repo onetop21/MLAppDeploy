@@ -1,5 +1,6 @@
 #!/home/onetop21/base3.7/bin/python
 from cerberus.validator import DocumentError
+from cerberus_kind.utils import parse_error
 
 from mlad.cli.validator.yaml_validator import Validator
 from mlad.cli.validator.yaml_parser import load, SCHEMA_PATH
@@ -17,4 +18,4 @@ def validate(target):
     if res:
         return v.normalized_by_order(target)
     else:
-        raise InvalidProjectYaml(v.errors)
+        raise InvalidProjectYaml(parse_error(v.errors, with_path=True))
