@@ -115,3 +115,7 @@ class NotRunningTrainError(MLADException):
 
     def __str__(self):
         return f'There is no running Train object (project key: {self.key})'
+
+
+class PluginUninstalledError(MLADException):
+    pass

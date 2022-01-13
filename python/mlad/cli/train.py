@@ -10,7 +10,8 @@ from mlad.cli import config as config_core
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError
+    ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
+    PluginUninstalledError
 )
 
 from mlad.core.docker import controller as docker_ctlr
@@ -20,6 +21,14 @@ from mlad.core.libs import utils as core_utils
 
 from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest
+
+
+def check_nvidia_plugin_installed(app_spec: dict):
+    if 'quota' in app_spec and 'gpu' in app_spec['quota']:
+        nvidia_status = API.check.check_nvidia_device_plugin()
+        if not nvidia_status:
+            raise PluginUninstalledError('Nvidia device plugin must be installed to use gpu quota. '
+                                         'Please contact the admin.')
 
 
 def up(file: Optional[str]):
@@ -55,6 +64,14 @@ def up(file: Optional[str]):
     if len(images) == 0:
         raise ImageNotFoundError(image_tag)
 
+    # Check app specs
+    app_specs = []
+    for name, app_spec in project.get('app', dict()).items():
+        check_nvidia_plugin_installed(app_spec)
+        app_spec['name'] = name
+        app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
+        app_specs.append(app_spec)
+
     # Create a project
     yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()
@@ -67,12 +84,6 @@ def up(file: Optional[str]):
             break
 
     # Create apps
-    app_specs = []
-    for name, app_spec in project.get('app', dict()).items():
-        app_spec['name'] = name
-        app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
-        app_specs.append(app_spec)
-
     yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:

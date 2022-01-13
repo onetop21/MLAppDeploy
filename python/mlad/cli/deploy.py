@@ -10,7 +10,8 @@ from mlad.cli import train
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ImageNotFoundError, InvalidProjectKindError, InvalidUpdateOptionError
+    ImageNotFoundError, InvalidProjectKindError, InvalidUpdateOptionError,
+    PluginUninstalledError
 )
 
 from mlad.core.docker import controller as docker_ctlr
@@ -48,17 +49,6 @@ def serve(file: Optional[str]):
     if len(images) == 0:
         raise ImageNotFoundError(image_tag)
 
-    # Create a project
-    yield 'Deploy apps to the cluster...'
-    credential = docker_ctlr.obtain_credential()
-    extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, project, extra_envs, credential=credential, allow_reuse=False)
-    for line in lines:
-        if 'stream' in line:
-            sys.stdout.write(line['stream'])
-        if 'result' in line and line['result'] == 'succeed':
-            break
-
     # Apply ingress for app
     apps = project.get('app', dict())
     ingress = project['ingress']
@@ -72,13 +62,26 @@ def serve(file: Optional[str]):
                 'port': port
             }
 
-    # Create apps
+    # Check app specs
     app_specs = []
     for name, app_spec in apps.items():
+        train.check_nvidia_plugin_installed(app_spec)
         app_spec['name'] = name
         app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
         app_specs.append(app_spec)
 
+    # Create a project
+    yield 'Deploy apps to the cluster...'
+    credential = docker_ctlr.obtain_credential()
+    extra_envs = config_core.get_env()
+    lines = API.project.create(base_labels, project, extra_envs, credential=credential, allow_reuse=False)
+    for line in lines:
+        if 'stream' in line:
+            sys.stdout.write(line['stream'])
+        if 'result' in line and line['result'] == 'succeed':
+            break
+
+    # Create apps
     yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:

@@ -32,11 +32,16 @@ def check():
         },
         'Node Feature Discovery': {
             'status': False,
-            'msgs': []
+            'msgs': ['Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml\'.']
+        },
+        'GPU Feature Discovery': {
+            'status': False,
+            'msgs': ['Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/'
+                     'gpu-feature-discovery-daemonset.yaml -n node-feature-discovery\'.']
         },
         'MLAD API Server': {
             'status': False,
-            'msgs': ['Run \'mlad install api-server [IMAGE_TAG]\'.']
+            'msgs': ['Run \'helm install mlad ./api-server --create-namespace -n mlad\'.']
         },
     }
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
@@ -45,17 +50,17 @@ def check():
 
     # Check ingress controller
     try:
-        res = ctlr.check_ingress(cli, 'dummy-ingress', 'mlad')
+        res = ctlr.check_ingress('dummy-ingress', 'mlad', cli)
     except core_exceptions.NotFound:
         ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
-        res = ctlr.check_ingress(cli, 'dummy-ingress', 'mlad')
+        res = ctlr.check_ingress('dummy-ingress', 'mlad', cli)
     if res:
         ctlr.delete_ingress(cli, 'mlad', 'dummy-ingress')
         checked['Ingress Controller']['status'] = True
 
     # Check metrics server
     try:
-        ctlr.get_deployment(cli, 'metrics-server', 'kube-system')
+        ctlr.get_deployment('metrics-server', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -63,7 +68,7 @@ def check():
 
     # Check nvidia device plugin
     try:
-        ctlr.get_daemonset(cli, 'nvidia-device-plugin-daemonset', 'kube-system')
+        ctlr.get_daemonset('nvidia-device-plugin-daemonset', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -71,22 +76,21 @@ def check():
 
     # Check node feature discovery
     try:
-        ctlr.get_daemonset(cli, 'nfd', 'node-feature-discovery')
+        ctlr.get_daemonset('nfd', 'node-feature-discovery', cli)
     except core_exceptions.NotFound:
-        checked['Node Feature Discovery']['msgs'].append('"nfs" not found. Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/nfd.yaml\'.')
+        pass
+    else:
+        checked['Node Feature Discovery']['status'] = True
     try:
-        ctlr.get_daemonset(cli, 'gpu-feature-discovery', 'node-feature-discovery')
+        ctlr.get_daemonset('gpu-feature-discovery', 'node-feature-discovery', cli)
     except core_exceptions.NotFound:
-        checked['Node Feature Discovery']['msgs'].append('"gpu-feature-discovery" not found. Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/gpu-feature-discovery-daemonset.yaml -n node-feature-discovery\'.')
-    finally:
-        if len(checked['Node Feature Discovery']['msgs']) == 0:
-            checked['Node Feature Discovery']['status'] = True
-        else:
-            checked['Node Feature Discovery']['msgs'].append('Or visit MLAD docs : ...')
+        pass
+    else:
+        checked['GPU Feature Discovery']['status'] = True
 
     # Check mlad api server
     try:
-        ctlr.get_deployment(cli, 'mlad-service', 'mlad')
+        ctlr.get_deployment('mlad-api-server', 'mlad', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -108,7 +112,7 @@ def check():
 def _is_running_api_server(cli, beta: bool) -> bool:
     try:
         name = 'mlad-api-server' if not beta else 'mlad-api-server-beta'
-        ctlr.get_deployment(cli, name, 'mlad')
+        ctlr.get_deployment(name, 'mlad', cli)
     except core_exceptions.NotFound:
         return False
     return True
