@@ -151,7 +151,7 @@ def install(file_path: str, no_build: bool):
             auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
-            mounts=mounts,
+            mounts=[f'{mount["path"]}:{mount["mountPath"]}' for mount in mounts],
             labels=labels,
             detach=True)
 
