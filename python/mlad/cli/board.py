@@ -4,6 +4,7 @@ import socket
 import docker
 import requests
 
+from docker.types import Mount
 from typing import List
 from omegaconf import OmegaConf
 from mlad.core.exceptions import DockerNotFoundError
@@ -164,7 +165,8 @@ def install(file_path: str, no_build: bool):
             auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
-            mounts=[f'{mount["path"]}:{mount["mountPath"]}' for mount in mounts],
+            mounts=[Mount(source=mount['path'], target=mount['mountPath'], type='bind')
+                    for mount in mounts],
             labels=labels,
             detach=True)
 
