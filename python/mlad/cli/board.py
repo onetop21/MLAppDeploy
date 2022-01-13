@@ -219,7 +219,7 @@ def status(no_print: bool = False):
 
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
-    })
+    }, all=True)
     containers = [c for c in containers if c.name != 'mlad-board']
     ports_list = [_obtain_ports(c) for c in containers]
     columns = [('ID', 'NAME', 'APP_NAME', 'PORT')]
