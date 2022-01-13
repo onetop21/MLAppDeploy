@@ -20,6 +20,14 @@ def init(name: str, version: str, maintainer: str):
 
 
 @click.command()
+@click.argument('file', required=False, type=click.Path(exists=True))
+@echo_exception
+def edit(file: Optional[str]):
+    '''Run editor to edit a MLAD project file.'''
+    project.edit(file)
+
+
+@click.command()
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
 @echo_exception
 def ls(no_trunc: bool):
@@ -103,6 +111,7 @@ def cli():
 
 
 cli.add_command(init)
+cli.add_command(edit)
 cli.add_command(ls)
 cli.add_command(ps)
 cli.add_command(logs)

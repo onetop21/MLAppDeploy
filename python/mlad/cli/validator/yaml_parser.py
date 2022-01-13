@@ -60,4 +60,4 @@ def load(file):
 
 
 def dump(doc):
-    return yaml.dump(doc, Dumper=Dumper, default_flow_style=False)
+    return yaml.dump(doc, Dumper=Dumper, default_flow_style=False, sort_keys=False)
