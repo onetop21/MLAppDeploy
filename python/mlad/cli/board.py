@@ -226,6 +226,8 @@ def status(no_print: bool = False):
     ports_list = [_obtain_ports(c) for c in containers]
     columns = [('ID', 'NAME', 'APP_NAME', 'PORT')]
     for container, ports in zip(containers, ports_list):
+        if len(ports) == 0:
+            ports = ['-']
         for port in ports:
             columns.append((
                 container.short_id,
