@@ -198,7 +198,7 @@ def uninstall(name: str) -> None:
 
     containers = cli.containers.list(filters={
         'label': f'COMPONENT_NAME={name}'
-    })
+    }, all=True)
     for container in containers:
         container.stop()
 
