@@ -501,7 +501,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
     return spec
 
 
-def _mounts_to_V1Volume(name, mounts, pvc_names):
+def _mounts_to_V1Volume(name, mounts, pvc_specs):
     _mounts = []
     _volumes = []
     if mounts:
@@ -522,12 +522,21 @@ def _mounts_to_V1Volume(name, mounts, pvc_names):
                     )
                 )
             )
-    for pvc_name in pvc_names:
+    for pvc_spec in pvc_specs:
+        name = pvc_spec['name']
+        mount_path = pvc_spec['mountPath']
+        volume_name = f'{name}-vol'
+        _mounts.append(
+            client.VolumeMount(
+                name=volume_name,
+                mount_path=mount_path
+            )
+        )
         _volumes.append(
             client.V1Volume(
-                name=f'{pvc_name}-vol',
+                name=volume_name,
                 persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-                    claim_name=pvc_name
+                    claim_name=name
                 )
             )
         )
@@ -580,7 +589,7 @@ def _constraints_to_labels(constraints):
 
 
 def _create_job(name, image, command, namespace='default', restart_policy='Never',
-                envs=None, mounts=None, pvc_names=[], parallelism=None, completions=None, quota=None,
+                envs=None, mounts=None, pvc_specs=[], parallelism=None, completions=None, quota=None,
                 resources=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
@@ -588,7 +597,7 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
 
     _constraints = _constraints_to_labels(constraints)
 
-    _mounts, _volumes = _mounts_to_V1Volume(name, mounts, pvc_names)
+    _mounts, _volumes = _mounts_to_V1Volume(name, mounts, pvc_specs)
 
     api = client.BatchV1Api(cli)
     body = client.V1Job(
@@ -627,7 +636,7 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
 
 
 def _create_deployment(name, image, command, namespace='default',
-                       envs=None, mounts=None, pvc_names=[], replicas=1, quota=None, resources=None,
+                       envs=None, mounts=None, pvc_specs=[], replicas=1, quota=None, resources=None,
                        labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
@@ -635,7 +644,7 @@ def _create_deployment(name, image, command, namespace='default',
 
     _constraints = _constraints_to_labels(constraints)
 
-    _mounts, _volumes = _mounts_to_V1Volume(name, mounts, pvc_names)
+    _mounts, _volumes = _mounts_to_V1Volume(name, mounts, pvc_specs)
 
     api = client.AppsV1Api(cli)
     body = client.V1Deployment(
@@ -860,16 +869,19 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         quota = app['quota']
 
         try:
-            pvc_names = []
+            pvc_specs = []
             for pv_index, pv_mount in enumerate(pv_mounts):
                 _create_pv(name, pv_index, pv_mount)
-                pvc_names.append(_create_pvc(name, pv_index, pv_mount, namespace_name))
+                pvc_specs.append({
+                    'name': _create_pvc(name, pv_index, pv_mount, namespace_name),
+                    'mountPath': pv_mount['mountPath'] 
+                })
 
             if kind == 'Job':
-                ret = _create_job(name, image, command, namespace_name, restart_policy, envs, v_mounts, pvc_names,
+                ret = _create_job(name, image, command, namespace_name, restart_policy, envs, v_mounts, pvc_specs,
                                   scale, None, quota, None, labels, constraints, secrets, cli)
             elif kind == 'Service':
-                ret = _create_deployment(name, image, command, namespace_name, envs, v_mounts, pvc_names, scale,
+                ret = _create_deployment(name, image, command, namespace_name, envs, v_mounts, pvc_specs, scale,
                                          quota, None, labels, constraints, secrets, cli)
             else:
                 raise DeprecatedError
