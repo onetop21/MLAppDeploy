@@ -97,6 +97,14 @@ def convert_tag_only_image_prop(app_spec, image_tag):
     return app_spec
 
 
+def _obtain_my_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    host = s.getsockname()[0]
+    s.close()
+    return host
+
+
 def _find_free_port(used_ports: set, max_retries=100) -> str:
     for _ in range(max_retries):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
@@ -126,7 +134,9 @@ def bind_default_values_for_mounts(app_spec, app_specs):
             if port is not None:
                 used_ports.add(port)
 
+    ip = _obtain_my_ip()
     for mount in app_spec['mounts']:
+        mount['server'] = ip
         if 'path' not in mount:
             mount['path'] = str(Path(get_project_file()).parent.resolve())
 
