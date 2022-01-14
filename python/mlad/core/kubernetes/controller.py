@@ -527,7 +527,7 @@ def _mounts_to_V1Volume(name, mounts, pvc_specs):
         mount_path = pvc_spec['mountPath']
         volume_name = f'{name}-vol'
         _mounts.append(
-            client.VolumeMount(
+            client.V1VolumeMount(
                 name=volume_name,
                 mount_path=mount_path
             )
