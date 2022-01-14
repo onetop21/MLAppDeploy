@@ -126,21 +126,13 @@ def prune_images(project_key: Optional[str] = None):
     return cli.images.prune(filters={'label': filters, 'dangling': True})
 
 
-def run_nfs_container(path: str):
+def run_nfs_container(project_key: str, path: str, port: str):
     cli = get_cli()
-    try:
-        container = cli.containers.get('mlad-nfs-server')
-        container.stop()
-        container.remove()
-    except docker.errors.NotFound:
-        pass
-
     pwuid = pwd.getpwuid(os.getuid())
     uid = pwuid.pw_uid
     gid = pwuid.pw_gid
     cli.containers.run(
         'ghcr.io/onetop21/nfs-server-alpine',
-        name='mlad-nfs-server',
         privileged=True,
         environment=[
             'SHARED_DIRECTORY=/shared',
@@ -148,8 +140,9 @@ def run_nfs_container(path: str):
             f'ANONUID={uid}',
             f'ANONGID={gid}'
         ],
-        ports={'2049/tcp': '2049'},
+        ports={'2049/tcp': port},
         mounts=[Mount(source=path, target='/shared', type='bind')],
         detach=True,
-        auto_remove=True
+        auto_remove=True,
+        labels=[f'MLAD.PROJECT={project_key}']
     )
