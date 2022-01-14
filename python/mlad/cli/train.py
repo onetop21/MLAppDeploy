@@ -122,7 +122,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                 yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove NFS server containers
-            docker_ctlr.remove_nfs_containers(project_key)
+        docker_ctlr.remove_nfs_containers(project_key)
 
         # Remove the apps
         lines = API.app.remove(project_key, apps=app_names, stream=True)
