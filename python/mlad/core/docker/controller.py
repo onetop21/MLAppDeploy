@@ -144,5 +144,14 @@ def run_nfs_container(project_key: str, path: str, port: str):
         mounts=[Mount(source=path, target='/shared', type='bind')],
         detach=True,
         auto_remove=True,
-        labels=[f'MLAD.PROJECT={project_key}']
+        labels=[f'MLAD.PROJECT={project_key}', 'role=nfs-server']
     )
+
+
+def remove_nfs_containers(project_key: str):
+    cli = get_cli()
+    containers = cli.containers.list(
+        filters={'label': [f'MLAD.PROJECT={project_key}', 'role=nfs-server']},
+        all=True)
+    for container in containers:
+        container.stop()

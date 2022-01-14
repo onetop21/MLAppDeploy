@@ -97,6 +97,24 @@ def convert_tag_only_image_prop(app_spec, image_tag):
     return app_spec
 
 
+def _find_free_port(used_ports: set, max_retries=100) -> str:
+    for _ in range(max_retries):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            s.bind(('', 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            port = str(s.getsockname()[1])
+            if port not in used_ports:
+                return port
+    raise RuntimeError('Cannot found the free port')
+
+
+def find_port_from_mount_options(mount) -> Optional[str]:
+    for option in mount.get('options', []):
+        if option.startswith('ports='):
+            return option.replace('ports=', '')
+    return None
+
+
 def bind_default_values_for_mounts(app_spec, app_specs):
     if 'mounts' not in app_spec:
         return app_spec
@@ -104,9 +122,9 @@ def bind_default_values_for_mounts(app_spec, app_specs):
     used_ports = set()
     for app_spec in app_specs:
         for mount in app_spec.get('mounts', []):
-            for option in mount.get('options', []):
-                if option.startswith('ports='):
-                    used_ports.add(option.replace('ports='))
+            port = find_port_from_mount_options(mount)
+            if port is not None:
+                used_ports.add(port)
 
     for mount in app_spec['mounts']:
         if 'path' not in mount:
@@ -378,14 +396,3 @@ def created_to_age(created: str):
     else:
         uptime = f"{uptime:.0f} seconds"
     return uptime
-
-
-def _find_free_port(used_ports: set, max_retries=100) -> str:
-    for _ in range(max_retries):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(('', 0))
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            port = str(s.getsockname()[1])
-            if port not in used_ports:
-                return port
-    raise RuntimeError('Cannot found the free port')

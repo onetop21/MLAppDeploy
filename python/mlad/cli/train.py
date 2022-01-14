@@ -74,6 +74,16 @@ def up(file: Optional[str]):
         app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs)
         app_specs.append(app_spec)
 
+    # Run NFS server containers
+    for app_spec in app_specs:
+        for mount in app_spec.get('mounts', []):
+            path = mount['path']
+            port = utils.find_port_from_mount_options(mount)
+            yield 'Run NFS server container'
+            yield f'  Path: {path}'
+            yield f'  Port: {port}'
+            docker_ctlr.run_nfs_container(project_key, path, port)
+
     yield 'Start apps...'
     try:
         with interrupt_handler(message='Wait...', blocked=True) as h:
@@ -109,6 +119,9 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
                     yaml.dump(project, log_file)
             for app_name in app_names:
                 yield _dump_logs(app_name, project_key, dirpath)
+
+        # Remove NFS server containers
+            docker_ctlr.remove_nfs_containers(project_key)
 
         # Remove the apps
         lines = API.app.remove(project_key, apps=app_names, stream=True)
