@@ -144,7 +144,10 @@ def run_nfs_container(project_key: str, path: str, port: str):
         mounts=[Mount(source=path, target='/shared', type='bind')],
         detach=True,
         auto_remove=True,
-        labels=[f'MLAD.PROJECT={project_key}', 'role=nfs-server']
+        labels={
+            'MLAD.PROJECT': project_key,
+            'role': 'nfs-server'
+        }
     )
 
 
