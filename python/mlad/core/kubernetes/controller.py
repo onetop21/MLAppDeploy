@@ -758,6 +758,13 @@ def _create_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
     )
 
 
+def _delete_pvs(name: str, cli=DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    pvs = api.list_persistent_volume(label_selector=f'MLAD.PROJECT.APP={name}').items
+    for pv in pvs:
+        api.delete_persistent_volume(pv.metadata.name)
+
+
 def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     pvc_name = f'{name}-{pv_index}-pvc'
@@ -1011,6 +1018,7 @@ def remove_apps(apps, namespace,
     for spec in app_specs:
         app_name, kind, _ = spec
         try:
+            _delete_pvs(app_name)
             if kind == 'Job':
                 _delete_job(cli, app_name, namespace)
             elif kind == 'Service':
