@@ -742,7 +742,8 @@ def _create_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
             metadata=client.V1ObjectMeta(
                 name=f'{name}-{pv_index}-pv',
                 labels={
-                    'mount': f'{name}-{pv_index}'
+                    'mount': f'{name}-{pv_index}',
+                    'MLAD.PROJECT.APP': name
                 }
             ),
             spec=client.V1PersistentVolumeSpec(
