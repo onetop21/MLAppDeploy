@@ -92,7 +92,7 @@ def up(file: Optional[str]):
                 pass
     except Exception as e:
         next(API.project.delete(project_key))
-        docker_ctlr.remove_nfs_containers()
+        docker_ctlr.remove_nfs_containers(project_key)
         raise e
     yield 'Done.'
 

@@ -32,7 +32,7 @@ class Component(BaseModel):
     command: Optional[Union[list, str]] = None
     args: Optional[Union[list, str]] = None
     ports: Optional[list] = None
-    mounts: Optional[list] = None
+    mounts: Optional[List[Mount]] = None
     ingress: Optional[Ingress] = None
 
 

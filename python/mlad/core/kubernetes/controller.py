@@ -768,8 +768,8 @@ def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_
             kind='PersistentVolumeClaim',
             metadata=client.V1ObjectMeta(
                 name=pvc_name
-            )
-            spec=client.V1PersistVolumeClaimSpec(
+            ),
+            spec=client.V1PersistentVolumeClaimSpec(
                 access_modes=['ReadWriteOnce'],
                 resources=client.V1ResourceRequirements(
                     requests={'storage': '10Gi'}
@@ -838,7 +838,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
         constraints = app['constraints']
         ingress = app['ingress'] if 'ingress' in app else None
-        pv_mounts = app.get('mounts', [])
+        pv_mounts = app['mounts'] or []
         v_mounts = ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
 
         config_labels['MLAD.PROJECT.APP'] = name
