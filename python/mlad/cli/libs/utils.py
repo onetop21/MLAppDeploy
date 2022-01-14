@@ -96,6 +96,15 @@ def convert_tag_only_image_prop(app_spec, image_tag):
     return app_spec
 
 
+def bind_default_paths_for_mounts(app_spec):
+    if 'mounts' not in app_spec:
+        return app_spec
+    for mount in app_spec['mounts']:
+        if 'path' not in mount:
+            mount['path'] = Path(get_project_file()).parent.resolve()
+    return app_spec
+
+
 def get_project_file():
     # Patch for WSL2 (/home/... -> /mnt/c/Users...)
     return os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))

@@ -16,6 +16,12 @@ class Ingress(BaseModel):
     port: str = None
 
 
+class Mount(BaseModel):
+    path: str
+    mountPath: str
+    options: Optional[List[str]]
+
+
 class Component(BaseModel):
     kind = 'Component'
     name: str

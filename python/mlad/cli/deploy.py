@@ -77,6 +77,7 @@ def serve(file: Optional[str]):
     for name, app_spec in apps.items():
         app_spec['name'] = name
         app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
+        app_spec = utils.bind_default_paths_for_mounts(app_spec)
         app_specs.append(app_spec)
 
     yield 'Start apps...'

@@ -1,3 +1,5 @@
+import os
+import pwd
 import json
 import base64
 import requests_unixsocket
@@ -5,7 +7,7 @@ import requests_unixsocket
 from typing import List, Optional
 
 import docker
-
+from docker.types import Mount
 from mlad.core.libs import utils
 from mlad.core.exceptions import (
     DockerNotFoundError
@@ -122,3 +124,32 @@ def prune_images(project_key: Optional[str] = None):
     if project_key is not None:
         filters += [f'MLAD.PROJECT={project_key}']
     return cli.images.prune(filters={'label': filters, 'dangling': True})
+
+
+def run_nfs_container(path: str):
+    cli = get_cli()
+    try:
+        container = cli.containers.get('mlad-nfs-server')
+        container.stop()
+        container.remove()
+    except docker.errors.NotFound:
+        pass
+
+    pwuid = pwd.getpwuid(os.getuid())
+    uid = pwuid.pw_uid
+    gid = pwuid.pw_gid
+    cli.containers.run(
+        'ghcr.io/onetop21/nfs-server-alpine',
+        name='mlad-nfs-server',
+        privileged=True,
+        environment=[
+            'SHARED_DIRECTORY=/shared',
+            'SQUASH=1',
+            f'ANONUID={uid}',
+            f'ANONGID={gid}'
+        ],
+        ports={'2049/tcp': '2049'},
+        mounts=[Mount(source=path, target='/shared', type='bind')],
+        detach=True,
+        auto_remove=True
+    )
