@@ -32,12 +32,12 @@ replicaCount: 1
 image:
   repository: ghcr.io/onetop21/mlappdeploy/api-server
   pullPolicy: Always
-  tag: 0.2.0
+  tag: 0.2.0	# AUTO GENERATED
 
 port: 8440
 
 imagePullSecrets: []
-nameOverride: "mlad"
+nameOverride: "mlad-api-server"
 fullnameOverride: "mlad-api-server"
 
 additionLabels:
@@ -69,7 +69,7 @@ podSecurityContext: {}
   # fsGroup: 2000
 
 securityContext:
-  privileged: true
+  privileged: true  # for solving a performance issue in docker engine.
   # capabilities:
   #   drop:
   #   - ALL
@@ -82,16 +82,16 @@ service:
   port: 8440
   targetPort: 8440
 
-ingress:
-  enabled: false
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/proxy-body-size: "0"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-  hosts:
-    - paths:
-      - path: /
+# ingress:
+#   enabled: false
+#   annotations:
+#     kubernetes.io/ingress.class: nginx
+#     nginx.ingress.kubernetes.io/proxy-body-size: "0"
+#     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+#     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+#   hosts:
+#     - paths:
+#       - path: /
           
 tls: []
 #  - secretName: chart-example-tls
