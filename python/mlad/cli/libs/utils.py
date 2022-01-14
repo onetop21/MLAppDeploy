@@ -118,8 +118,8 @@ def _find_free_port(used_ports: set, max_retries=100) -> str:
 
 def find_port_from_mount_options(mount) -> Optional[str]:
     for option in mount.get('options', []):
-        if option.startswith('ports='):
-            return option.replace('ports=', '')
+        if option.startswith('port='):
+            return option.replace('port=', '')
     return None
 
 

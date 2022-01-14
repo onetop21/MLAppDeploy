@@ -760,7 +760,7 @@ def _create_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
                 access_modes=['ReadWriteOnce'],
                 mount_options=pv_mount['options'],
                 nfs=client.V1NFSVolumeSource(
-                    path=pv_mount['path'],
+                    path='/',
                     server=pv_mount['server']
                 )
             )
