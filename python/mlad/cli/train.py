@@ -121,9 +121,6 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             for app_name in app_names:
                 yield _dump_logs(app_name, project_key, dirpath)
 
-        # Remove NFS server containers
-        docker_ctlr.remove_nfs_containers(project_key)
-
         # Remove the apps
         lines = API.app.remove(project_key, apps=app_names, stream=True)
         for line in lines:
@@ -140,6 +137,10 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             if 'result' in line and line['result'] == 'succeed':
                 yield 'The namespace was successfully removed.'
                 break
+
+        # Remove NFS server containers
+        docker_ctlr.remove_nfs_containers(project_key)
+
     yield 'Done.'
 
 
