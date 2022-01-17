@@ -137,8 +137,17 @@ def bind_default_values_for_mounts(app_spec, app_specs):
     ip = _obtain_my_ip()
     for mount in app_spec['mounts']:
         mount['server'] = ip
+
+        if not mount['path'].startswith('/'):
+            mount['path'] = str(Path(get_project_file()).parent / Path(mount['path']))
+
+        if not mount['mountPath'].startswith('/'):
+            mount['mountPath'] = str(Path('/workspace') / Path(mount['mountPath']))
+
         if 'options' not in mount:
             mount['options'] = []
+        if 'soft' not in mount['options']:
+            mount['options'].append('soft')
 
         registered_port = find_port_from_mount_options(mount)
         if registered_port is not None and registered_port in used_ports:

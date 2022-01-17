@@ -141,11 +141,11 @@ x-definitions:
           schema:
             path:
               type: string
-              regex: "^(\/[a-zA-Z0-9_-]*)*$"
+              regex: "^.*(\/[a-zA-Z0-9_-]*)*$"
               required: true
             mountPath:
               type: string
-              regex: "^(\/[a-zA-Z0-9_-]*)*$"
+              regex: "^.*(\/[a-zA-Z0-9_-]*)*$"
               required: true
             options:
               type: list
