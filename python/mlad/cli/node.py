@@ -28,11 +28,12 @@ def list(no_trunc):
 
 
 def resource(names=None, no_trunc=False):
-    try:
-        res = API.node.resource(names)
-    except APIError as e:
-        print(e)
-        sys.exit(1)
+    res = API.node.resource(names)
+    metrics_server_running = API.check.check_metrics_server()
+
+    if not metrics_server_running:
+        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
+
     columns = [('HOSTNAME', 'TYPE', 'CAPACITY', 'USED', 'FREE(%)')]
 
     def get_unit(type):
