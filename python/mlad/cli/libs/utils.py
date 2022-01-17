@@ -146,8 +146,6 @@ def bind_default_values_for_mounts(app_spec, app_specs):
 
         if 'options' not in mount:
             mount['options'] = []
-        if 'soft' not in mount['options']:
-            mount['options'].append('soft')
 
         registered_port = find_port_from_mount_options(mount)
         if registered_port is not None and registered_port in used_ports:

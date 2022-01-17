@@ -149,6 +149,8 @@ x-definitions:
               required: true
             options:
               type: list
+              default:
+              - "soft"
               schema:
                 type: string
   - definition: &_app_base
