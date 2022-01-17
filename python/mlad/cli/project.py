@@ -76,10 +76,10 @@ def init(name, version, maintainer):
 def list(no_trunc: bool):
     projects = {}
     project_specs = API.project.get()
-    metrics_server_status = API.check.check_metrics_server()
+    metrics_server_running = API.check.check_metrics_server()
 
-    if not metrics_server_status:
-        print(f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}')
+    if metrics_server_running:
+        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'APPS',
                 'TASKS', 'HOSTNAME', 'WORKSPACE', 'AGE',
@@ -108,7 +108,7 @@ def list(no_trunc: bool):
             projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
 
-        if metrics_server_status:
+        if metrics_server_running:
             used = {'cpu': 0, 'gpu': 0, 'mem': 0}
             resources = API.project.resource(project_key)
             for tasks in resources.values():
@@ -161,7 +161,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
             raise e
 
     if not metrics_server_status:
-        print(f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}')
+        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     events = []
     columns = [

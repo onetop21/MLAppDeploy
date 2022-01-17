@@ -25,8 +25,8 @@ from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest
 
 def check_nvidia_plugin_installed(app_spec: dict):
     if 'quota' in app_spec and 'gpu' in app_spec['quota']:
-        nvidia_status = API.check.check_nvidia_device_plugin()
-        if not nvidia_status:
+        nvidia_running = API.check.check_nvidia_device_plugin()
+        if not nvidia_running:
             raise PluginUninstalledError('Nvidia device plugin must be installed to use gpu quota. '
                                          'Please contact the admin.')
 

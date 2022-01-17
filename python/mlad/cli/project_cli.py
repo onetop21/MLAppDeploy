@@ -32,8 +32,8 @@ def edit(file: Optional[str]):
 @echo_exception
 def ls(no_trunc: bool):
     '''Display projects deployed on the cluster.'''
-    project.list(no_trunc)
-
+    for line in project.list(no_trunc):
+        click.echo(line)
 
 @click.command()
 @click.option('--file', '-f', default=None, help=(
@@ -49,7 +49,8 @@ def ls(no_trunc: bool):
 @echo_exception
 def ps(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     '''Display project status deployed on the cluster.'''
-    project.status(file, project_key, no_trunc, event)
+    for line in project.status(file, project_key, no_trunc, event):
+        click.echo(line)
 
 
 @click.command()

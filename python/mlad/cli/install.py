@@ -41,7 +41,7 @@ def check():
         },
         'MLAD API Server': {
             'status': False,
-            'msgs': ['Run \'helm install mlad ./api-server --create-namespace -n mlad\'.']
+            'msgs': ['Run \'helm install mlad ./charts/api-server --create-namespace -n mlad\'.']
         },
     }
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
