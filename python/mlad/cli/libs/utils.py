@@ -137,9 +137,6 @@ def bind_default_values_for_mounts(app_spec, app_specs):
     ip = _obtain_my_ip()
     for mount in app_spec['mounts']:
         mount['server'] = ip
-        if 'path' not in mount:
-            mount['path'] = str(Path(get_project_file()).parent.resolve())
-
         if 'options' not in mount:
             mount['options'] = []
         free_port = _find_free_port(used_ports)

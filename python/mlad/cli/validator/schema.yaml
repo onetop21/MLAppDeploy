@@ -117,6 +117,7 @@ x-definitions:
             path:
               type: string
               regex: "^(\/[a-zA-Z0-9_-]*)*$"
+              required: true
             mountPath:
               type: string
               regex: "^(\/[a-zA-Z0-9_-]*)*$"

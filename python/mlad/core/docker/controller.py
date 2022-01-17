@@ -143,11 +143,11 @@ def run_nfs_container(project_key: str, path: str, port: str):
         ports={'2049/tcp': port},
         mounts=[Mount(source=path, target='/shared', type='bind')],
         detach=True,
-        auto_remove=True,
         labels={
             'MLAD.PROJECT': project_key,
             'role': 'nfs-server'
-        }
+        },
+        restart_policy={'Name': 'always'}
     )
 
 
@@ -158,3 +158,4 @@ def remove_nfs_containers(project_key: str):
         all=True)
     for container in containers:
         container.stop()
+        container.remove()
