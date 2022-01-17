@@ -128,8 +128,8 @@ def bind_default_values_for_mounts(app_spec, app_specs):
         return app_spec
 
     used_ports = set()
-    for app_spec in app_specs:
-        for mount in app_spec.get('mounts', []):
+    for spec in app_specs:
+        for mount in spec.get('mounts', []):
             port = find_port_from_mount_options(mount)
             if port is not None:
                 used_ports.add(port)
