@@ -139,9 +139,16 @@ def bind_default_values_for_mounts(app_spec, app_specs):
         mount['server'] = ip
         if 'options' not in mount:
             mount['options'] = []
-        free_port = _find_free_port(used_ports)
-        used_ports.add(free_port)
-        mount['options'].append(f'port={free_port}')
+
+        registered_port = find_port_from_mount_options(mount)
+        if registered_port is not None and registered_port in used_ports:
+            raise RuntimeError('A registered port for mount options is already used.')
+        elif registered_port is None:
+            free_port = _find_free_port(used_ports)
+            used_ports.add(free_port)
+            mount['options'].append(f'port={free_port}')
+        else:
+            used_ports.add(registered_port)
 
     return app_spec
 
