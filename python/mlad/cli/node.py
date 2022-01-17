@@ -28,7 +28,6 @@ def list(no_trunc):
 
 
 def resource(names=None, no_trunc=False):
-    res = API.node.resource(names)
     metrics_server_running = API.check.check_metrics_server()
 
     if not metrics_server_running:
@@ -45,7 +44,8 @@ def resource(names=None, no_trunc=False):
         elif type == 'gpu':
             res = f'{type}(#)'
         return res
-
+    
+    res = API.node.resource(names)
     for name, resources in res.items():
         for i, type in enumerate(resources):
             status = resources[type]
