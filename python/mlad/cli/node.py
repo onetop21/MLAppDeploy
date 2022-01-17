@@ -1,6 +1,8 @@
 import sys
+
 from mlad.cli.libs import utils
 from mlad.cli.config import get_context
+from mlad.cli.exceptions import PluginUninstalledError
 from mlad.api import API
 from mlad.api.exceptions import APIError
 from mlad.core import exceptions as CoreException
@@ -31,7 +33,7 @@ def resource(names=None, no_trunc=False):
     metrics_server_running = API.check.check_metrics_server()
 
     if not metrics_server_running:
-        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
+        raise PluginUninstalledError('Metrics server must be installed to load resource information. Please contact the admin.')
 
     columns = [('HOSTNAME', 'TYPE', 'CAPACITY', 'USED', 'FREE(%)')]
 

@@ -57,8 +57,8 @@ def rm(id, key):
 @echo_exception
 def resource(names, no_trunc):
     '''Show resource status of nodes.'''
-    for line in node.resource(names=names, no_trunc=no_trunc):
-        click.echo(line)
+    node.resource(names=names, no_trunc=no_trunc)
+
 
 @click.group()
 @click.argument('node-name', autocompletion=list_node_names)
