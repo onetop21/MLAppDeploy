@@ -141,7 +141,7 @@ x-definitions:
           schema:
             nfs:
               type: string
-              regex: "^\\.*(\/*[a-zA-Z0-9_-]*)*$"
+              regex: "^([0-9]+.+):(\/*[a-zA-Z0-9_-]*)*$"
               excludes: path
             path:
               type: string
