@@ -142,11 +142,9 @@ x-definitions:
             nfs:
               type: string
               regex: "^\.*(\/*[a-zA-Z0-9_-]*)*$"
-              excludes: path
             path:
               type: string
               regex: "^\.*(\/*[a-zA-Z0-9_-]*)*$"
-              excludes: nfs
             mountPath:
               type: string
               regex: "^\.*(\/*[a-zA-Z0-9_-]*)*$"
