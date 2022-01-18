@@ -70,7 +70,7 @@ def serve(file: Optional[str]):
         train.check_nvidia_plugin_installed(app_spec)
         app_spec['name'] = name
         app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
-        app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs)
+        app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs, images[0])
         app_specs.append(app_spec)
 
     # Create a project

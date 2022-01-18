@@ -123,7 +123,7 @@ def find_port_from_mount_options(mount) -> Optional[str]:
     return None
 
 
-def bind_default_values_for_mounts(app_spec, app_specs):
+def bind_default_values_for_mounts(app_spec, app_specs, image):
     if 'mounts' not in app_spec:
         return app_spec
 
@@ -142,7 +142,8 @@ def bind_default_values_for_mounts(app_spec, app_specs):
             mount['path'] = str(Path(get_project_file()).parent / Path(mount['path']))
 
         if not mount['mountPath'].startswith('/'):
-            mount['mountPath'] = str(Path('/workspace') / Path(mount['mountPath']))
+            workdir = image.attrs['Config'].get('WorkingDir', '/workspace')
+            mount['mountPath'] = str(Path(workdir) / Path(mount['mountPath']))
 
         if 'options' not in mount:
             mount['options'] = []
