@@ -16,6 +16,14 @@ class Ingress(BaseModel):
     port: str = None
 
 
+class Mount(BaseModel):
+    path: Optional[str] = None
+    mountPath: str
+    server: str
+    serverPath: str
+    options: Optional[List[str]]
+
+
 class Component(BaseModel):
     kind = 'Component'
     name: str
@@ -25,7 +33,7 @@ class Component(BaseModel):
     command: Optional[Union[list, str]] = None
     args: Optional[Union[list, str]] = None
     ports: Optional[list] = None
-    mounts: Optional[list] = None
+    mounts: Optional[List[Mount]] = None
     ingress: Optional[Ingress] = None
 
 

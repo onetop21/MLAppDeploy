@@ -15,8 +15,9 @@ from functools import lru_cache
 from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from getpass import getuser
+from contextlib import closing
 
-from mlad.cli.exceptions import InvalidURLError
+from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
 from datetime import datetime
 from dateutil import parser
 
@@ -93,6 +94,77 @@ def check_podname_syntax(obj):
 def convert_tag_only_image_prop(app_spec, image_tag):
     if 'image' in app_spec and app_spec['image'].startswith(':'):
         app_spec['image'] = image_tag.rsplit(':', 1)[0] + app_spec['image']
+    return app_spec
+
+
+def _obtain_my_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    host = s.getsockname()[0]
+    s.close()
+    return host
+
+
+def _find_free_port(used_ports: set, max_retries=100) -> str:
+    for _ in range(max_retries):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            s.bind(('', 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            port = str(s.getsockname()[1])
+            if port not in used_ports:
+                return port
+    raise RuntimeError('Cannot found the free port')
+
+
+def find_port_from_mount_options(mount) -> Optional[str]:
+    # ignore the registered port if a nfs value is assigned
+    if 'nfs' in mount:
+        return None
+    for option in mount.get('options', []):
+        if option.startswith('port='):
+            return option.replace('port=', '')
+    return None
+
+
+def bind_default_values_for_mounts(app_spec, app_specs, image):
+    if 'mounts' not in app_spec:
+        return app_spec
+
+    used_ports = set()
+    for spec in app_specs:
+        for mount in spec.get('mounts', []):
+            port = find_port_from_mount_options(mount)
+            if port is not None:
+                used_ports.add(port)
+
+    ip = _obtain_my_ip()
+    for mount in app_spec['mounts']:
+        # Set the server and server path
+        if 'nfs' in mount:
+            mount['server'], mount['serverPath'] = mount['nfs'].split(':')
+        else:
+            mount['server'] = ip
+            mount['serverPath'] = '/'
+            if not mount['path'].startswith('/'):
+                mount['path'] = str(Path(get_project_file()).parent / Path(mount['path']))
+
+        # Set the mount path
+        if not mount['mountPath'].startswith('/'):
+            workdir = image.attrs['Config'].get('WorkingDir', '/workspace')
+            mount['mountPath'] = str(Path(workdir) / Path(mount['mountPath']))
+
+        # Set the options
+        if 'nfs' not in mount:
+            registered_port = find_port_from_mount_options(mount)
+            if registered_port is not None and registered_port in used_ports:
+                raise MountPortAlreadyUsedError(registered_port)
+            elif registered_port is None:
+                free_port = _find_free_port(used_ports)
+                used_ports.add(free_port)
+                mount['options'].append(f'port={free_port}')
+            else:
+                used_ports.add(registered_port)
+
     return app_spec
 
 

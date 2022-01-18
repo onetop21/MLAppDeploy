@@ -4,6 +4,7 @@ import socket
 import docker
 import requests
 
+from docker.types import Mount
 from typing import List
 from omegaconf import OmegaConf
 from mlad.core.exceptions import DockerNotFoundError
@@ -16,6 +17,19 @@ from mlad.cli import image as image_core
 from mlad.cli.libs import utils
 
 from mlad.cli.validator import validators
+
+
+class ValueGenerator:
+    def __init__(self, generator):
+        self.gen = generator
+
+    def __iter__(self):
+        self.value = yield from self.gen
+
+    def get_value(self):
+        for x in self:
+            pass
+        return self.value
 
 
 def get_cli():
@@ -120,7 +134,7 @@ def install(file_path: str, no_build: bool):
             raise ComponentImageNotExistError(spec['name'])
         image = built_images[0]
     else:
-        image = image_core.build(file_path, False, True, False)
+        image = ValueGenerator(image_core.build(file_path, False, True, False)).get_value()
 
     host_ip = _obtain_host()
     component_specs = []
@@ -148,10 +162,10 @@ def install(file_path: str, no_build: bool):
             image.tags[-1],
             environment=env,
             name=f'{spec["name"]}-{app_name}',
-            auto_remove=True,
             ports={f'{p}/tcp': p for p in ports},
             command=command + args,
-            mounts=mounts,
+            mounts=[Mount(source=mount['path'], target=mount['mountPath'], type='bind')
+                    for mount in mounts],
             labels=labels,
             detach=True)
 
@@ -184,9 +198,12 @@ def uninstall(name: str) -> None:
 
     containers = cli.containers.list(filters={
         'label': f'COMPONENT_NAME={name}'
-    })
+    }, all=True)
     for container in containers:
         container.stop()
+
+    for container in containers:
+        container.remove()
 
     yield f'The component [{name}] is uninstalled'
 
@@ -204,11 +221,13 @@ def status(no_print: bool = False):
 
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
-    })
+    }, all=True)
     containers = [c for c in containers if c.name != 'mlad-board']
     ports_list = [_obtain_ports(c) for c in containers]
     columns = [('ID', 'NAME', 'APP_NAME', 'PORT')]
     for container, ports in zip(containers, ports_list):
+        if len(ports) == 0:
+            ports = ['-']
         for port in ports:
             columns.append((
                 container.short_id,

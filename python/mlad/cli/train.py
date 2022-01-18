@@ -5,13 +5,14 @@ from typing import Optional, Dict
 from pathlib import Path
 
 import yaml
+import docker
 
 from mlad.cli import config as config_core
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
-    PluginUninstalledError
+    MountError, PluginUninstalledError
 )
 
 from mlad.core.docker import controller as docker_ctlr
@@ -70,6 +71,7 @@ def up(file: Optional[str]):
         check_nvidia_plugin_installed(app_spec)
         app_spec['name'] = name
         app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
+        app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs, images[0])
         app_specs.append(app_spec)
 
     # Create a project
@@ -83,15 +85,31 @@ def up(file: Optional[str]):
         if 'result' in line and line['result'] == 'succeed':
             break
 
-    # Create apps
-    yield 'Start apps...'
     try:
+        # Run NFS server containers
+        for app_spec in app_specs:
+            for mount in app_spec.get('mounts', []):
+                if 'nfs' in mount:
+                    continue
+                path = mount['path']
+                port = utils.find_port_from_mount_options(mount)
+                yield 'Run NFS server container'
+                yield f'  Path: {path}'
+                yield f'  Port: {port}'
+                try:
+                    docker_ctlr.run_nfs_container(project_key, path, port)
+                except docker.errors.APIError as e:
+                    raise MountError(str(e))
+
+        yield 'Start apps...'
+
         with interrupt_handler(message='Wait...', blocked=True) as h:
             API.app.create(project_key, app_specs)
             if h.interrupted:
                 pass
     except Exception as e:
         next(API.project.delete(project_key))
+        docker_ctlr.remove_nfs_containers(project_key)
         raise e
     yield 'Done.'
 
@@ -136,6 +154,10 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
             if 'result' in line and line['result'] == 'succeed':
                 yield 'The namespace was successfully removed.'
                 break
+
+        # Remove NFS server containers
+        docker_ctlr.remove_nfs_containers(project_key)
+
     yield 'Done.'
 
 

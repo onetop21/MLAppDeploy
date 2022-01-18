@@ -501,7 +501,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
     return spec
 
 
-def _mounts_to_V1Volume(name, mounts):
+def _mounts_to_V1Volume(name, mounts, pvc_specs):
     _mounts = []
     _volumes = []
     if mounts:
@@ -522,6 +522,24 @@ def _mounts_to_V1Volume(name, mounts):
                     )
                 )
             )
+    for pvc_spec in pvc_specs:
+        name = pvc_spec['name']
+        mount_path = pvc_spec['mountPath']
+        volume_name = f'{name}-vol'
+        _mounts.append(
+            client.V1VolumeMount(
+                name=volume_name,
+                mount_path=mount_path
+            )
+        )
+        _volumes.append(
+            client.V1Volume(
+                name=volume_name,
+                persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                    claim_name=name
+                )
+            )
+        )
     return _mounts, _volumes
 
 
@@ -571,7 +589,7 @@ def _constraints_to_labels(constraints):
 
 
 def _create_job(name, image, command, namespace='default', restart_policy='Never',
-                envs=None, mounts=None, parallelism=None, completions=None, quota=None,
+                envs=None, mounts=None, pvc_specs=[], parallelism=None, completions=None, quota=None,
                 resources=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
@@ -579,7 +597,7 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
 
     _constraints = _constraints_to_labels(constraints)
 
-    _mounts, _volumes = _mounts_to_V1Volume(name, mounts)
+    _mounts, _volumes = _mounts_to_V1Volume(name, mounts, pvc_specs)
 
     api = client.BatchV1Api(cli)
     body = client.V1Job(
@@ -618,7 +636,7 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
 
 
 def _create_deployment(name, image, command, namespace='default',
-                       envs=None, mounts=None, replicas=1, quota=None, resources=None,
+                       envs=None, mounts=None, pvc_specs=[], replicas=1, quota=None, resources=None,
                        labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
@@ -626,7 +644,7 @@ def _create_deployment(name, image, command, namespace='default',
 
     _constraints = _constraints_to_labels(constraints)
 
-    _mounts, _volumes = _mounts_to_V1Volume(name, mounts)
+    _mounts, _volumes = _mounts_to_V1Volume(name, mounts, pvc_specs)
 
     api = client.AppsV1Api(cli)
     body = client.V1Deployment(
@@ -724,6 +742,64 @@ def _create_kind_service(cli, name, image, command, namespace, envs, mounts, run
     return res
 
 
+def _create_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    api.create_persistent_volume(
+        client.V1PersistentVolume(
+            api_version='v1',
+            kind='PersistentVolume',
+            metadata=client.V1ObjectMeta(
+                name=f'{name}-{pv_index}-pv',
+                labels={
+                    'mount': f'{name}-{pv_index}',
+                    'MLAD.PROJECT.APP': name
+                }
+            ),
+            spec=client.V1PersistentVolumeSpec(
+                capacity={'storage': '10Gi'},
+                access_modes=['ReadWriteOnce'],
+                mount_options=pv_mount['options'],
+                nfs=client.V1NFSVolumeSource(
+                    path=pv_mount['serverPath'],
+                    server=pv_mount['server']
+                )
+            )
+        )
+    )
+
+
+def _delete_pvs(name: str, cli=DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    pvs = api.list_persistent_volume(label_selector=f'MLAD.PROJECT.APP={name}').items
+    for pv in pvs:
+        api.delete_persistent_volume(pv.metadata.name)
+
+
+def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    pvc_name = f'{name}-{pv_index}-pvc'
+    api.create_namespaced_persistent_volume_claim(
+        namespace,
+        client.V1PersistentVolumeClaim(
+            api_version='v1',
+            kind='PersistentVolumeClaim',
+            metadata=client.V1ObjectMeta(
+                name=pvc_name
+            ),
+            spec=client.V1PersistentVolumeClaimSpec(
+                access_modes=['ReadWriteOnce'],
+                resources=client.V1ResourceRequirements(
+                    requests={'storage': '10Gi'}
+                ),
+                selector=client.V1LabelSelector(
+                    match_labels={'mount': f'{name}-{pv_index}'}
+                )
+            )
+        )
+    )
+    return pvc_name
+
+
 def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
@@ -779,8 +855,8 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
         constraints = app['constraints']
         ingress = app['ingress'] if 'ingress' in app else None
-        mounts = app['mounts'] or []
-        mounts += ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
+        pv_mounts = app['mounts'] or []
+        v_mounts = ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
 
         config_labels['MLAD.PROJECT.APP'] = name
         config_labels['MLAD.PROJECT.APP.KIND'] = kind
@@ -793,11 +869,19 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         quota = app['quota']
 
         try:
+            pvc_specs = []
+            for pv_index, pv_mount in enumerate(pv_mounts):
+                _create_pv(name, pv_index, pv_mount)
+                pvc_specs.append({
+                    'name': _create_pvc(name, pv_index, pv_mount, namespace_name),
+                    'mountPath': pv_mount['mountPath'] 
+                })
+
             if kind == 'Job':
-                ret = _create_job(name, image, command, namespace_name, restart_policy, envs, mounts,
+                ret = _create_job(name, image, command, namespace_name, restart_policy, envs, v_mounts, pvc_specs,
                                   scale, None, quota, None, labels, constraints, secrets, cli)
             elif kind == 'Service':
-                ret = _create_deployment(name, image, command, namespace_name, envs, mounts, scale,
+                ret = _create_deployment(name, image, command, namespace_name, envs, v_mounts, pvc_specs, scale,
                                          quota, None, labels, constraints, secrets, cli)
             else:
                 raise DeprecatedError
@@ -947,6 +1031,7 @@ def remove_apps(apps, namespace,
     for spec in app_specs:
         app_name, kind, _ = spec
         try:
+            _delete_pvs(app_name)
             if kind == 'Job':
                 _delete_job(cli, app_name, namespace)
             elif kind == 'Service':

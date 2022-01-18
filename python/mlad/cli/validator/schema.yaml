@@ -137,10 +137,28 @@ x-definitions:
       mounts:
         type: list
         schema:
-          type: string
-          regex: "^[A-Za-z0-9-_]+:/\\w+$"
-        description: Volume path to be mounted on the host node. (/hostPath:/mountPath)
-        #- ${datastore:URL}:/storage
+          type: dict
+          schema:
+            nfs:
+              type: string
+              regex: "^([0-9]+.+):(\/*[a-zA-Z0-9_-]*)*$"
+              excludes: path
+            path:
+              type: string
+              regex: "^\\.*(\/*[a-zA-Z0-9_-]*)*$"
+              excludes: nfs
+            mountPath:
+              type: string
+              regex: "^\\.*(\/*[a-zA-Z0-9_-]*)*$"
+              default: "."
+            options:
+              type: list
+              default:
+              - "soft"
+              - "timeo=30"
+              - "retry=5"
+              schema:
+                type: string
   - definition: &_app_base
       <<: *component
       constraints:                # Describe placement constraints.
