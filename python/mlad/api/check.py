@@ -10,3 +10,6 @@ class Check(APIBase):
 
     def check_nvidia_device_plugin(self):
         return self._get('/nvidia-device-plugin')
+
+    def check_ingress_controller(self):
+        return self._get('/ingress-controller')

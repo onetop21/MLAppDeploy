@@ -16,8 +16,8 @@ def check():
     checked = {
         'Ingress Controller': {
             'status': False,
-            'msgs': ['Ingress resource does not work. Install ingress controller.',
-                     'If ingress controller is running, retry \'mlad install check\'.']
+            'msgs': ['Run \'helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && '
+                     'helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx --set controller.service.type=NodePort\'.']
         },
         'Metrics Server': {
             'status': False,
@@ -50,12 +50,10 @@ def check():
 
     # Check ingress controller
     try:
-        res = ctlr.check_ingress('dummy-ingress', 'mlad', cli)
+        ctlr.get_deployment('ingress-nginx-controller', 'ingress-nginx', cli)
     except core_exceptions.NotFound:
-        ctlr.create_ingress(cli, 'mlad', 'mlad-service', 'dummy-ingress', 8440, '/dummy')
-        res = ctlr.check_ingress('dummy-ingress', 'mlad', cli)
-    if res:
-        ctlr.delete_ingress(cli, 'mlad', 'dummy-ingress')
+        pass
+    else:
         checked['Ingress Controller']['status'] = True
 
     # Check metrics server

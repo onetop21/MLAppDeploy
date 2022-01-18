@@ -34,3 +34,16 @@ def check_nvidia_device_plugin():
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
     return status
+
+
+@router.get("/check/ingress-controller")
+def check_ingress_controller():
+    status = True
+    try:
+        ctlr.get_deployment('ingress-nginx-controller', 'ingress-nginx')
+    except exceptions.NotFound:
+        status = False
+    except Exception as e:
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=exception_detail(e))
+    return status
