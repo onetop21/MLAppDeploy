@@ -137,3 +137,7 @@ class MountPortAlreadyUsedError(MLADException):
 
 class MountError(MLADException):
     pass
+
+
+class PluginUninstalledError(MLADException):
+    pass

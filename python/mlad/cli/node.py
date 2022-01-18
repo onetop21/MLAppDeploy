@@ -1,6 +1,8 @@
 import sys
+
 from mlad.cli.libs import utils
 from mlad.cli.config import get_context
+from mlad.cli.exceptions import PluginUninstalledError
 from mlad.api import API
 from mlad.api.exceptions import APIError
 from mlad.core import exceptions as CoreException
@@ -28,11 +30,11 @@ def list(no_trunc):
 
 
 def resource(names=None, no_trunc=False):
-    try:
-        res = API.node.resource(names)
-    except APIError as e:
-        print(e)
-        sys.exit(1)
+    metrics_server_running = API.check.check_metrics_server()
+
+    if not metrics_server_running:
+        raise PluginUninstalledError('Metrics server must be installed to load resource information. Please contact the admin.')
+
     columns = [('HOSTNAME', 'TYPE', 'CAPACITY', 'USED', 'FREE(%)')]
 
     def get_unit(type):
@@ -44,7 +46,8 @@ def resource(names=None, no_trunc=False):
         elif type == 'gpu':
             res = f'{type}(#)'
         return res
-
+    
+    res = API.node.resource(names)
     for name, resources in res.items():
         for i, type in enumerate(resources):
             status = resources[type]

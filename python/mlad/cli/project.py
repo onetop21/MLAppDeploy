@@ -76,6 +76,10 @@ def init(name, version, maintainer):
 def list(no_trunc: bool):
     projects = {}
     project_specs = API.project.get()
+    metrics_server_running = API.check.check_metrics_server()
+
+    if metrics_server_running:
+        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'APPS',
                 'TASKS', 'HOSTNAME', 'WORKSPACE', 'AGE',
@@ -104,15 +108,18 @@ def list(no_trunc: bool):
             projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
 
-        used = {'cpu': 0, 'gpu': 0, 'mem': 0}
-        resources = API.project.resource(project_key)
-        for tasks in resources.values():
-            for resource in tasks.values():
-                used['mem'] += resource['mem'] if resource['mem'] is not None else 0
-                used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
-                used['gpu'] += resource['gpu'] if resource['gpu'] is not None else 0
-        for k in used:
-            used[k] = used[k] if no_trunc else round(used[k], 1)
+        if metrics_server_running:
+            used = {'cpu': 0, 'gpu': 0, 'mem': 0}
+            resources = API.project.resource(project_key)
+            for tasks in resources.values():
+                for resource in tasks.values():
+                    used['mem'] += resource['mem'] if resource['mem'] is not None else 0
+                    used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
+                    used['gpu'] += resource['gpu'] if resource['gpu'] is not None else 0
+            for k in used:
+                used[k] = used[k] if no_trunc else round(used[k], 1)
+        else:
+            used = {'cpu': '-', 'gpu': '-', 'mem': '-'}
 
         projects[project_key].update(used)
 
@@ -144,12 +151,17 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
     # Raise exception if the target project is not found.
     try:
         API.project.inspect(project_key=project_key)
-        resources = API.project.resource(project_key)
+        metrics_server_status = API.check.check_metrics_server()
+        if metrics_server_status:
+            resources = API.project.resource(project_key)
     except NotFound as e:
         if target_kind == 'Train':
             raise NotRunningTrainError(project_key)
         else:
             raise e
+
+    if not metrics_server_status:
+        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     events = []
     columns = [
@@ -169,10 +181,13 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
                 age = utils.created_to_age(pod['created'])
 
-                res = resources[spec['name']][pod_name].copy()
-                res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
-                res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
-                res['gpu'] = 'NotReady' if res['gpu'] is None else res['gpu']
+                if metrics_server_status:
+                    res = resources[spec['name']][pod_name].copy()
+                    res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
+                    res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
+                    res['gpu'] = 'NotReady' if res['gpu'] is None else res['gpu']
+                else:
+                    res = {'cpu': '-', 'gpu': '-', 'mem': '-'}
 
                 task_info.append((
                     pod_name,
