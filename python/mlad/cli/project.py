@@ -78,7 +78,7 @@ def list(no_trunc: bool):
     project_specs = API.project.get()
     metrics_server_running = API.check.check_metrics_server()
 
-    if metrics_server_running:
+    if not metrics_server_running:
         yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'APPS',
@@ -151,8 +151,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
     # Raise exception if the target project is not found.
     try:
         API.project.inspect(project_key=project_key)
-        metrics_server_status = API.check.check_metrics_server()
-        if metrics_server_status:
+        metrics_server_running = API.check.check_metrics_server()
+        if metrics_server_running:
             resources = API.project.resource(project_key)
     except NotFound as e:
         if target_kind == 'Train':
@@ -160,7 +160,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         else:
             raise e
 
-    if not metrics_server_status:
+    if not metrics_server_running:
         yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     events = []
@@ -181,7 +181,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
                 age = utils.created_to_age(pod['created'])
 
-                if metrics_server_status:
+                if metrics_server_running:
                     res = resources[spec['name']][pod_name].copy()
                     res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
                     res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
@@ -253,6 +253,12 @@ def ingress():
     config = config_core.get()
     address = config['apiserver']['address'].rsplit('/beta')[0]
     specs = API.app.get()['specs']
+
+    # check ingress controller
+    ingress_ctrl_running = API.check.check_ingress_controller()
+    if not ingress_ctrl_running:
+        yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
+
     rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
     for spec in specs:
         if spec['ingress'] != '':

@@ -78,7 +78,8 @@ def logs(file: Optional[str], project_key: Optional[str],
 @echo_exception
 def ingress():
     '''Show the ingress information of running services.'''
-    project.ingress()
+    for line in project.ingress():
+        click.echo(line)
 
 
 @click.group()
