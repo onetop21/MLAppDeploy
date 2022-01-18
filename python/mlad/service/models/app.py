@@ -17,9 +17,10 @@ class Ingress(BaseModel):
 
 
 class Mount(BaseModel):
-    path: str
+    path: Optional[str] = None
     mountPath: str
     server: str
+    serverPath: str
     options: Optional[List[str]]
 
 

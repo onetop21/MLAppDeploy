@@ -117,6 +117,9 @@ def _find_free_port(used_ports: set, max_retries=100) -> str:
 
 
 def find_port_from_mount_options(mount) -> Optional[str]:
+    # ignore the registered port if a nfs value is assigned
+    if 'nfs' in mount:
+        return None
     for option in mount.get('options', []):
         if option.startswith('port='):
             return option.replace('port=', '')
@@ -136,27 +139,31 @@ def bind_default_values_for_mounts(app_spec, app_specs, image):
 
     ip = _obtain_my_ip()
     for mount in app_spec['mounts']:
-        mount['server'] = ip
+        # Set the server and server path
+        if 'nfs' in mount:
+            mount['server'], mount['serverPath'] = mount['nfs'].split(':')
+        else:
+            mount['server'] = ip
+            mount['serverPath'] = '/'
+            if not mount['path'].startswith('/'):
+                mount['path'] = str(Path(get_project_file()).parent / Path(mount['path']))
 
-        if not mount['path'].startswith('/'):
-            mount['path'] = str(Path(get_project_file()).parent / Path(mount['path']))
-
+        # Set the mount path
         if not mount['mountPath'].startswith('/'):
             workdir = image.attrs['Config'].get('WorkingDir', '/workspace')
             mount['mountPath'] = str(Path(workdir) / Path(mount['mountPath']))
 
-        if 'options' not in mount:
-            mount['options'] = []
-
-        registered_port = find_port_from_mount_options(mount)
-        if registered_port is not None and registered_port in used_ports:
-            raise MountPortAlreadyUsedError(registered_port)
-        elif registered_port is None:
-            free_port = _find_free_port(used_ports)
-            used_ports.add(free_port)
-            mount['options'].append(f'port={free_port}')
-        else:
-            used_ports.add(registered_port)
+        # Set the options
+        if 'nfs' not in mount:
+            registered_port = find_port_from_mount_options(mount)
+            if registered_port is not None and registered_port in used_ports:
+                raise MountPortAlreadyUsedError(registered_port)
+            elif registered_port is None:
+                free_port = _find_free_port(used_ports)
+                used_ports.add(free_port)
+                mount['options'].append(f'port={free_port}')
+            else:
+                used_ports.add(registered_port)
 
     return app_spec
 

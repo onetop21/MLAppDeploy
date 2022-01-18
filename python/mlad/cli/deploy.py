@@ -88,6 +88,8 @@ def serve(file: Optional[str]):
         # Run NFS server containers
         for app_spec in app_specs:
             for mount in app_spec.get('mounts', []):
+                if 'nfs' in mount:
+                    continue
                 path = mount['path']
                 port = utils.find_port_from_mount_options(mount)
                 yield 'Run NFS server container'

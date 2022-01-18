@@ -139,14 +139,18 @@ x-definitions:
         schema:
           type: dict
           schema:
+            nfs:
+              type: string
+              regex: "^\.*(\/*[a-zA-Z0-9_-]*)*$"
+              excludes: path
             path:
               type: string
-              regex: "^.*(\/[a-zA-Z0-9_-]*)*$"
-              required: true
+              regex: "^\.*(\/*[a-zA-Z0-9_-]*)*$"
+              excludes: nfs
             mountPath:
               type: string
-              regex: "^.*(\/[a-zA-Z0-9_-]*)*$"
-              required: true
+              regex: "^\.*(\/*[a-zA-Z0-9_-]*)*$"
+              default: "."
             options:
               type: list
               default:
