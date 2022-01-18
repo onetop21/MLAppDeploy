@@ -124,3 +124,16 @@ class InvalidFileTypeError(MLADException):
 
     def __str__(self):
         return f'"{self.type}" is unsupported project file type.'
+
+
+class MountPortAlreadyUsedError(MLADException):
+
+    def __init__(self, port):
+        self.port = port
+
+    def __str__(self):
+        return f'A registered port [{self.port}] for mount options is already used.'
+
+
+class MountError(MLADException):
+    pass

@@ -5,12 +5,14 @@ from typing import Optional, Dict
 from pathlib import Path
 
 import yaml
+import docker
 
 from mlad.cli import config as config_core
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
-    ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError
+    ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
+    MountError
 )
 
 from mlad.core.docker import controller as docker_ctlr
@@ -83,7 +85,10 @@ def up(file: Optional[str]):
                 yield 'Run NFS server container'
                 yield f'  Path: {path}'
                 yield f'  Port: {port}'
-                docker_ctlr.run_nfs_container(project_key, path, port)
+                try:
+                    docker_ctlr.run_nfs_container(project_key, path, port)
+                except docker.errors.APIError as e:
+                    raise MountError(str(e))
 
         yield 'Start apps...'
 

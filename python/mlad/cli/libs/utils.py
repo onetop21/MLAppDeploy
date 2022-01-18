@@ -17,7 +17,7 @@ from omegaconf import OmegaConf
 from getpass import getuser
 from contextlib import closing
 
-from mlad.cli.exceptions import InvalidURLError
+from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
 from datetime import datetime
 from dateutil import parser
 
@@ -149,7 +149,7 @@ def bind_default_values_for_mounts(app_spec, app_specs):
 
         registered_port = find_port_from_mount_options(mount)
         if registered_port is not None and registered_port in used_ports:
-            raise RuntimeError('A registered port for mount options is already used.')
+            raise MountPortAlreadyUsedError(registered_port)
         elif registered_port is None:
             free_port = _find_free_port(used_ports)
             used_ports.add(free_port)
