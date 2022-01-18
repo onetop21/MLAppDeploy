@@ -151,6 +151,8 @@ x-definitions:
               type: list
               default:
               - "soft"
+              - "timeo=30"
+              - "retry=5"
               schema:
                 type: string
   - definition: &_app_base
