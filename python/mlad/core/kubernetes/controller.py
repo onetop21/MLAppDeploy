@@ -278,7 +278,7 @@ def update_namespace(namespace, update_yaml, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-def get_deployment(cli, name, namespace):
+def get_deployment(name, namespace, cli=DEFAULT_CLI):
     api = client.AppsV1Api(cli)
     try:
         res = api.read_namespaced_deployment(name, namespace)
@@ -291,7 +291,7 @@ def get_deployment(cli, name, namespace):
     return res
 
 
-def get_daemonset(cli, name, namespace):
+def get_daemonset(name, namespace, cli=DEFAULT_CLI):
     api = client.AppsV1Api(cli)
     try:
         res = api.read_namespaced_daemon_set(name, namespace)
@@ -886,7 +886,7 @@ def update_apps(namespace, apps, cli=DEFAULT_CLI):
             body.append(_body("image", app['image']))
 
         # update env
-        deployment = get_deployment(cli, app_name, namespace)
+        deployment = get_deployment(app_name, namespace, cli)
         container_spec = deployment.spec.template.spec.containers[0]
         current = {env.name: env.value for env in container_spec.env}
         for key in list(app['env']['current'].keys()):
@@ -1250,7 +1250,7 @@ def create_ingress(cli, namespace, app_name, ingress_name, port, base_path='/', 
     )
 
 
-def check_ingress(cli, ingress_name, namespace):
+def check_ingress(ingress_name, namespace, cli=DEFAULT_CLI):
     w = watch.Watch()
     api = client.NetworkingV1Api(cli)
     try:

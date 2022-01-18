@@ -3,6 +3,7 @@ import sys
 from .node import Node
 from .project import Project
 from .app import App
+from .check import Check
 
 from mlad.cli import config as config_core
 from functools import lru_cache
@@ -62,3 +63,8 @@ class API:
     @lru_cache(maxsize=None)
     def app(cls):
         return App(cls.config)
+
+    @classproperty
+    @lru_cache(maxsize=None)
+    def check(cls):
+        return Check(cls.config)
