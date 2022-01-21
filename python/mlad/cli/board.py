@@ -4,6 +4,7 @@ import socket
 import docker
 import requests
 
+from urllib3.exceptions import ConnectionError
 from docker.types import Mount
 from typing import List
 from omegaconf import OmegaConf
@@ -60,10 +61,13 @@ def activate():
     else:
         raise MLADBoardAlreadyActivatedError
 
-    host_ip = _obtain_host()
-    requests.delete(f'{host_ip}:2021/mlad/component', json={
-        'name': 'mlad-board'
-    })
+    try:
+        host_ip = _obtain_host()
+        requests.delete(f'{host_ip}:2021/mlad/component', json={
+            'name': 'mlad-board'
+        })
+    except ConnectionError:
+        pass
 
     yield 'Activating MLAD board.'
 
