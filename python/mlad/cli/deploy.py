@@ -51,6 +51,11 @@ def serve(file: Optional[str]):
     if len(images) == 0:
         raise ImageNotFoundError(image_tag)
 
+    # check ingress controller
+    ingress_ctrl_running = API.check.check_ingress_controller()
+    if not ingress_ctrl_running:
+        yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
+
     # Apply ingress for app
     apps = project.get('app', dict())
     ingress = project['ingress']
