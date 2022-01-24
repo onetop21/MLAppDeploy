@@ -150,7 +150,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
     # Raise exception if the target project is not found.
     try:
-        API.project.inspect(project_key=project_key)
+        project = API.project.inspect(project_key=project_key)
         apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
         if metrics_server_running:
@@ -212,7 +212,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
             pass
         columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
     username = utils.get_username(config.session)
-    print(f"USERNAME: [{username}] / PROJECT: [{spec['project']}]")
+    print(f"USERNAME: [{username}] / PROJECT: [{project['project']}]")
     utils.print_table(columns, 'Cannot find running apps.', 0 if no_trunc else 32, False)
 
     if event:
