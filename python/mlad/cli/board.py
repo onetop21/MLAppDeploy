@@ -110,6 +110,7 @@ def deactivate():
     })
     for container in containers:
         container.stop()
+        container.remove()
 
     yield 'Successfully deactivate MLAD board.'
 
