@@ -3,6 +3,7 @@ import errno
 import socket
 import docker
 import requests
+from requests.exceptions import ConnectionError
 
 from docker.types import Mount
 from typing import List
@@ -60,10 +61,13 @@ def activate():
     else:
         raise MLADBoardAlreadyActivatedError
 
-    host_ip = _obtain_host()
-    requests.delete(f'{host_ip}:2021/mlad/component', json={
-        'name': 'mlad-board'
-    })
+    try:
+        host_ip = _obtain_host()
+        requests.delete(f'{host_ip}:2021/mlad/component', json={
+            'name': 'mlad-board'
+        })
+    except ConnectionError:
+        pass
 
     yield 'Activating MLAD board.'
 
@@ -93,10 +97,13 @@ def deactivate():
 
     yield 'Deactivating MLAD board.'
 
-    host_ip = _obtain_host()
-    requests.delete(f'{host_ip}:2021/mlad/component', json={
-        'name': 'mlad-board'
-    })
+    try:
+        host_ip = _obtain_host()
+        requests.delete(f'{host_ip}:2021/mlad/component', json={
+            'name': 'mlad-board'
+        })
+    except ConnectionError:
+        pass
 
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
