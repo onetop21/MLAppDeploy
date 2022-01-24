@@ -250,8 +250,6 @@ def logs(file: Optional[str], project_key: Optional[str],
 
 
 def ingress():
-    config = config_core.get()
-    address = config['apiserver']['address'].rsplit('/beta')[0]
     specs = API.app.get()['specs']
 
     # check ingress controller
@@ -266,7 +264,7 @@ def ingress():
             project_name = spec['project']
             app_name = spec['name']
             key = spec['key']
-            path = f'{address}{spec["ingress"]}'
+            path = spec['ingress']
             rows.append((username, project_name, app_name, key, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
