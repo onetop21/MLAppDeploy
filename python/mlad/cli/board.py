@@ -78,7 +78,6 @@ def activate():
             f'MLAD_SESSION={config.session}',
         ] + config_core.get_env(),
         name='mlad-board',
-        auto_remove=True,
         ports={'2021/tcp': '2021'},
         labels=['MLAD_BOARD'],
         detach=True)
@@ -110,6 +109,7 @@ def deactivate():
     })
     for container in containers:
         container.stop()
+        container.remove()
 
     yield 'Successfully deactivate MLAD board.'
 

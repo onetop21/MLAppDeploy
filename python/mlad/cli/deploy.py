@@ -120,11 +120,9 @@ def serve(file: Optional[str]):
     yield utils.print_info(f'Project key : {project_key}')
 
     # Get ingress path for deployed app
-    address = config['apiserver']['address'].rsplit('/beta')[0]
     for app in res:
         if app['ingress']:
-            path = f'{address}{app["ingress"]}'
-            yield utils.print_info(f'[{app["name"]}] Ingress Path : {path}')
+            yield utils.print_info(f'[{app["name"]}] Ingress Path : {app["ingress"]}')
 
 
 def kill(project_key: str, no_dump: bool):
