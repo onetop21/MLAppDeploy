@@ -37,10 +37,8 @@ def main():
             'omegaconf>=2.0.6,<3.0.0',
             'kubernetes>=19.0.0,<20.0.0',
             'PyJWT>=2.1.0,<3.0.0',
-            'Cerberus>=1.3.0,<1.4.0',
-            'cerberus-kind==0.0.11',
             'dictdiffer==0.9.0',
-            'cerberus-document-editor==0.0.3'
+            'cerberus-document-editor==0.0.4'
         ],
         package_data={
             'mlad.cli.validator': ['schema.yaml']

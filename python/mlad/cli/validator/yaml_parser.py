@@ -50,11 +50,12 @@ def load(file):
 
     def drop_recursive(data):
         _data = {}
-        for k, v in data.items():
-            if isinstance(v, dict):
-                v = drop_recursive(v)
-            if not k.startswith('x-'):
-                _data[k] = v
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(v, dict):
+                    v = drop_recursive(v)
+                if not k.startswith('x-'):
+                    _data[k] = v
         return _data
     return drop_recursive(yaml.load(sub_load(file), Loader=Loader))
 
