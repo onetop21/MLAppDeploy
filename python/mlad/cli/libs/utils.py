@@ -16,10 +16,12 @@ from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from getpass import getuser
 from contextlib import closing
-
-from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
 from datetime import datetime
 from dateutil import parser
+
+from mlad.cli.validator import validators
+from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
+
 
 if TYPE_CHECKING:
     from mlad.cli.context import Context
@@ -182,16 +184,18 @@ def read_project():
         return None
 
 
-def get_project(default_project):
+def get_project():
     project = read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)
         print(f'$ {sys.argv[0]} --help', file=sys.stderr)
         sys.exit(1)
 
+    # validate project schema
+    project = validators.validate(project)
+
     # replace workdir to abspath
     project_file = get_project_file()
-    project = default_project(project)
     path = project.get('workdir', './')
     if not os.path.isabs(path):
         project['workdir'] = os.path.normpath(
@@ -200,11 +204,6 @@ def get_project(default_project):
                 path
             )
         )
-    if not check_podname_syntax(project['name']):
-        print('Syntax Error: Project and app require a name to '
-              'follow standard as defined in RFC1123.', file=sys.stderr)
-        sys.exit(1)
-
     return project
 
 

@@ -9,7 +9,6 @@ import docker
 
 from mlad.cli import config as config_core
 from mlad.cli.libs import utils, interrupt_handler
-from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
     MountError, PluginUninstalledError
@@ -17,7 +16,6 @@ from mlad.cli.exceptions import (
 
 from mlad.core.docker import controller as docker_ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
-from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 
 from mlad.api import API
@@ -36,8 +34,7 @@ def up(file: Optional[str]):
 
     utils.process_file(file)
     config = config_core.get()
-    project = utils.get_project(default_project)
-    project = validators.validate(project)
+    project = utils.get_project()
 
     kind = project['kind']
     if not kind == 'Train':
@@ -228,7 +225,7 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
 
 def _get_log_dirpath(project: Dict, project_key_assigned: bool) -> Path:
-    workdir = utils.get_project(default_project)['workdir'] \
+    workdir = utils.get_project()['workdir'] \
         if not project_key_assigned else str(Path().absolute())
     path = Path(f'{workdir}/.logs/{project["created"].replace(":", "-")}')
     path.mkdir(exist_ok=True, parents=True)

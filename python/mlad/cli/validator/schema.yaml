@@ -41,20 +41,26 @@ x-definitions:
         description: Preparations for making environment before docker image build.
         schema:
           type: dict
-          schema:
-            run:
-              type: string
-              multiline: true
-            add:
-              type: string
-            pip:
-              type: string
-            apt:
-              type: string
-            yum:
-              type: string
-            apk:
-              type: string
+          oneof:
+          - schema:
+              run:
+                type: string
+                multiline: true
+          - schema:
+              add:
+                type: string
+          - schema:
+              pip:
+                type: string
+          - schema:
+              apt:
+                type: string
+          - schema:
+              yum:
+                type: string
+          - schema:
+              apk:
+                type: string
       ignores:                    # Describe exclude files from project.
         type: list
         description: Files to be excluded from project.
