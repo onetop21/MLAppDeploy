@@ -183,7 +183,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
                 age = utils.created_to_age(pod['created'])
 
-                if metrics_server_running:
+                if metrics_server_running and app_name in resources:
                     res = resources[app_name][pod_name].copy()
                     res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
                     res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
