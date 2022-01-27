@@ -1,0 +1,67 @@
+name: Dashboard Image CI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    #inputs:
+    #  registry:
+    #    description: 'Target registry'
+    #    required: False
+    #    default: ghcr.io
+    #  ${{ github.event.inputs.registry }}
+
+env:
+  # TODO: Change variable to your image's name.
+  REPOSITORY: ghcr.io/${{ github.repository }}
+  IMAGE_NAME: dashboard
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Build the Docker image
+      id: build_image
+      run: |
+        docker build . --file scripts/Dockerfile_CI
+        echo ::set-output name=id::$(docker build . --file dashboard/Dockerfile -q)
+        
+    - name: Log into registry
+      run: >
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 
+        
+    - name: Push image
+      run: |
+        # Change all uppercase to lowercase
+        IMAGE_NAME=$(echo ${REPOSITORY}/${IMAGE_NAME} | tr '[A-Z]' '[a-z]')
+        
+        if [[ "${{ github.event_name }}" == 'release' ]]
+        then
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+        elif [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
+        then
+          VERSION=$(git rev-parse --short "$GITHUB_SHA")
+          WITH_LATEST=1
+        else
+          ERROR=Not support ${{ github.event_name }} event.
+        fi
+        
+        if [ -z $ERROR ]
+        then
+          IMAGE_ID=${{ steps.build_image.outputs.id }}
+          echo IMAGE_NAME=$IMAGE_NAME
+          echo VERSION=$VERSION
+
+          docker tag $IMAGE_ID $IMAGE_NAME:$VERSION
+          [ $WITH_LATEST ] && docker tag $IMAGE_ID $IMAGE_NAME:latest
+          docker push $IMAGE_NAME --all-tags
+        else
+          echo "::error title=Failed to build container image::$ERROR"
+        fi
+        
