@@ -1,26 +1,18 @@
-import socket
 import click
 
 from typing import Optional
 from omegaconf import OmegaConf
 
 from mlad.cli import config
+from mlad.cli.libs.utils import obtain_my_ip
 from mlad.cli.autocompletion import list_config_names
 
 from . import echo_exception
 
 
-def _obtain_host():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(('8.8.8.8', 80))
-    host = s.getsockname()[0]
-    s.close()
-    return f'http://{host}'
-
-
 @click.command()
 @click.argument('NAME', required=True)
-@click.option('--address', '-a', default=f'{_obtain_host()}:8440',
+@click.option('--address', '-a', default=f'http://{obtain_my_ip()}:8440',
               prompt='MLAD API Server Address', help='Set MLAD API server address.')
 @click.option('--admin', is_flag=True, help='Create a config with administrator privileges.')
 @echo_exception

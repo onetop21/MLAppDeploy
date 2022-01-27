@@ -312,7 +312,7 @@ def _db_initializer() -> StrDict:
     if mongo_port:
         address = f'mongodb://{service_addr}:{mongo_port}'
     else:
-        address = 'mongodb://localhost:27017'
+        address = f'mongodb://{utils.obtain_my_ip()}:27017'
     return {'address': address, 'username': '', 'password': ''}
 
 

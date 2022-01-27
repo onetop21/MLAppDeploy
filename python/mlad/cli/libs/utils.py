@@ -97,12 +97,12 @@ def convert_tag_only_image_prop(app_spec, image_tag):
     return app_spec
 
 
-def _obtain_my_ip():
+def obtain_my_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(('8.8.8.8', 80))
-    host = s.getsockname()[0]
+    ip = s.getsockname()[0]
     s.close()
-    return host
+    return ip
 
 
 def _find_free_port(used_ports: set, max_retries=100) -> str:
@@ -137,7 +137,7 @@ def bind_default_values_for_mounts(app_spec, app_specs, image):
             if port is not None:
                 used_ports.add(port)
 
-    ip = _obtain_my_ip()
+    ip = obtain_my_ip()
     for mount in app_spec['mounts']:
         # Set the server and server path
         if 'nfs' in mount:

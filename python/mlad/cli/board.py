@@ -1,6 +1,5 @@
 import os
 import errno
-import socket
 import docker
 import requests
 from requests.exceptions import ConnectionError
@@ -248,11 +247,7 @@ def status(no_print: bool = False):
 
 
 def _obtain_host():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(('8.8.8.8', 80))
-    host = s.getsockname()[0]
-    s.close()
-    return f'http://{host}'
+    return f'http://{utils.obtain_my_ip()}'
 
 
 def _obtain_ports(container) -> List[str]:
