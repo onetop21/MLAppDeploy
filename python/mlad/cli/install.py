@@ -66,7 +66,7 @@ def check():
 
     # Check nvidia device plugin
     try:
-        ctlr.get_daemonset('nvidia-device-plugin-daemonset', 'kube-system', cli)
+        ctlr.get_daemonset('nvidia-device-plugin', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
