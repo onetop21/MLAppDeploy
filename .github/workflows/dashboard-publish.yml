@@ -55,6 +55,7 @@ jobs:
         if [ -z $ERROR ]
         then
           IMAGE_ID=${{ steps.build_image.outputs.id }}
+          echo IMAGE_ID=$IMAGE_ID
           echo IMAGE_NAME=$IMAGE_NAME
           echo VERSION=$VERSION
 
