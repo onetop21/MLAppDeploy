@@ -106,7 +106,7 @@ def deactivate():
 
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
-    })
+    }, all=True)
     for container in containers:
         container.stop()
         container.remove()
