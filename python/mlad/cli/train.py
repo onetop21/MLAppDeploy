@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 
 from typing import Optional, Dict
 from pathlib import Path
@@ -225,7 +226,7 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
 
 def _get_log_dirpath(project: Dict, project_key_assigned: bool) -> Path:
-    workdir = utils.get_project()['workdir'] \
+    workdir = json.loads(project['project_yaml'])['workdir'] \
         if not project_key_assigned else str(Path().absolute())
     path = Path(f'{workdir}/.logs/{project["created"].replace(":", "-")}')
     path.mkdir(exist_ok=True, parents=True)

@@ -15,7 +15,7 @@ SCHEMA_PATH = os.path.dirname(os.path.abspath(__file__))
 def validate(target):
     with open(f'{SCHEMA_PATH}/schema.yaml') as f:
         schema = yaml_parser.load(f)
-    v = Validator(schema, purge_unknown=True)
+    v = Validator(schema)
     try:
         res = v.validate(target)
     except DocumentError as e:

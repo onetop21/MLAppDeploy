@@ -13,7 +13,6 @@ x-definitions:
         empty: false
         order: 1
         description: Project name.
-        multiline: True
       version:
         type: string
         regex: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
