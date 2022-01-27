@@ -36,12 +36,14 @@ def check():
         },
         'GPU Feature Discovery': {
             'status': False,
-            'msgs': ['Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/'
-                     'gpu-feature-discovery-daemonset.yaml -n node-feature-discovery\'.']
+            'msgs': ['Run \'helm repo add nvgfd https://nvidia.github.io/gpu-feature-discovery && '
+                     'helm repo update && helm install gpu-feature-discovery nvgfd/gpu-feature-discovery '
+                     '-n gpu-feature-discovery --create-namespace --set namespace=gpu-feature-discovery\'.']
         },
         'MLAD API Server': {
             'status': False,
-            'msgs': ['Run \'helm install mlad ./charts/api-server --create-namespace -n mlad\'.']
+            'msgs': ['Run \'helm repo add mlad https://onetop21.github.io/MLAppDeploy/charts && '
+                     'helm repo update && helm install mlad mlad/api-server --create-namespace -n mlad\'.']
         },
     }
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
@@ -93,6 +95,10 @@ def check():
         pass
     else:
         checked['MLAD API Server']['status'] = True
+        service = ctlr.get_service('mlad-api-server', 'mlad', cli)
+        kube_host = cli.configuration.host.rsplit(':', 1)[0]
+        node_port = service.spec.ports[0].node_port
+        address = f'{kube_host}:{node_port}'
 
     for plugin, result in checked.items():
         status = result['status']
@@ -104,7 +110,10 @@ def check():
 
         if not status:
             for line in msgs:
-                yield f'˙ {line}'
+                yield f' · {line}'
+
+        if plugin == 'MLAD API Server' and status:
+            yield f' · Address : {address}'
 
 
 def _is_running_api_server(cli, beta: bool) -> bool:
