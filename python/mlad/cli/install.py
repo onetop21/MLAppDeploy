@@ -91,11 +91,11 @@ def check():
     # Check mlad api server
     try:
         ctlr.get_deployment('mlad-api-server', 'mlad', cli)
+        service = ctlr.get_service('mlad-api-server', 'mlad', cli)
     except core_exceptions.NotFound:
         pass
     else:
         checked['MLAD API Server']['status'] = True
-        service = ctlr.get_service('mlad-api-server', 'mlad', cli)
         kube_host = cli.configuration.host.rsplit(':', 1)[0]
         node_port = service.spec.ports[0].node_port
         address = f'{kube_host}:{node_port}'
@@ -113,7 +113,7 @@ def check():
                 yield f' · {line}'
 
         if plugin == 'MLAD API Server' and status:
-            yield f' · Address : {address}'
+            yield f' · API Server Address : {address}'
 
 
 def _is_running_api_server(cli, beta: bool) -> bool:
