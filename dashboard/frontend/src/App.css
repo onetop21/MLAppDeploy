@@ -1,0 +1,16 @@
+.logo {
+  display: flex;
+  height: 3rem;
+  pointer-events: none;
+  padding: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo img {
+  max-width: 70%;
+}
+
+.container {
+    padding: 0.5rem 1rem;
+}

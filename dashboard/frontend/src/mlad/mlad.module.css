@@ -1,0 +1,10 @@
+.expandedRow {
+    display: flex;
+}
+
+.expandedRow > div {
+    width: 50%;
+    padding: 0.5rem 1rem;
+    overflow-y: auto;
+    max-height: 300px;
+}
