@@ -146,7 +146,7 @@ def _obtain_workspace_payload(workspace, maintainer):
         'preps': workspace.get('preps', []),
         'command': workspace.get('command', ''),
         'args': workspace.get('args', ''),
-        'script': workspace.get('script', "echo .")
+        'script': f'RUN {workspace["script"]}' if 'script' in workspace else ''
     }
 
     envs = [DOCKERFILE_ENV.format(KEY=k, VALUE=v) for k, v in default['env'].items()]
@@ -167,7 +167,7 @@ def _obtain_workspace_payload(workspace, maintainer):
         ENVS='\n'.join(envs),
         PREPS='\n'.join(prep_docker_formats),
         SCRIPT=default['script'],
-        COMMAND=f'[{", ".join(commands)}]',
+        COMMAND=f'CMD [{", ".join(commands)}]' if len(commands) > 0 else ''
     )
 
 
