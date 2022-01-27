@@ -36,7 +36,7 @@ def ls(no_trunc: bool):
         click.echo(line)
 
 @click.command()
-@click.option('--file', '-f', default=None, help=(
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
     cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
@@ -54,7 +54,7 @@ def ps(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: b
 
 
 @click.command()
-@click.option('--file', '-f', default=None, help=(
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
     cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
