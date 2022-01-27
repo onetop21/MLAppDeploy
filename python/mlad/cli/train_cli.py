@@ -13,7 +13,7 @@ from . import echo_exception
 # mlad train down
 
 @click.command()
-@click.option('--file', '-f', default=None, help=(
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
 )
@@ -25,7 +25,7 @@ def up(file: Optional[str]):
 
 
 @click.command()
-@click.option('--file', '-f', default=None, help=(
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
     cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
