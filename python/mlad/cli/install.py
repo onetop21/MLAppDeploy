@@ -26,8 +26,8 @@ def check():
         },
         'NVIDIA Device Plugin': {
             'status': False,
-            'msgs': ['Run \'kubectl create -f '
-                     'https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml\'',
+            'msgs': ['Run \'helm repo add nvdp https://nvidia.github.io/k8s-device-plugin && '
+                     'helm repo update && helm install nvidia-device-plugin nvdp/nvidia-device-plugin\'.',
                      'Or visit MLAD docs : ...']
         },
         'Node Feature Discovery': {
