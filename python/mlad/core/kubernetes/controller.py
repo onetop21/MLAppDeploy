@@ -459,7 +459,8 @@ def get_pod_info(pod):
         pod_info['status'] = {
             'state': 'Waiting',
             'detail': {
-                'reason': pod.status.conditions[0].reason if pod.status.conditions else None
+                'reason': pod.status.conditions[0].reason if pod.status.conditions
+                else pod.status.reason
             }
         }
     return pod_info
