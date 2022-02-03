@@ -13,7 +13,6 @@ x-definitions:
         empty: false
         order: 1
         description: Project name.
-        multiline: True
       version:
         type: string
         regex: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
@@ -42,21 +41,26 @@ x-definitions:
         description: Preparations for making environment before docker image build.
         schema:
           type: dict
-          schema:
-            run:
-              type: string
-              multiline: true
-            add:
-              type: string
-            pip:
-              type: string
-            apt:
-              type: string
-            yum:
-              type: string
-            apk:
-              type: string
-        order: 1
+          oneof:
+          - schema:
+              run:
+                type: string
+                multiline: true
+          - schema:
+              add:
+                type: string
+          - schema:
+              pip:
+                type: string
+          - schema:
+              apt:
+                type: string
+          - schema:
+              yum:
+                type: string
+          - schema:
+              apk:
+                type: string
       ignores:                    # Describe exclude files from project.
         type: list
         description: Files to be excluded from project.
@@ -174,6 +178,8 @@ x-definitions:
             type: string
           label:
             type: dict
+            valuesrules:
+              type: string
         description: Constraints to place the app on nodes.
   - definition: &app
       <<: *_app_base

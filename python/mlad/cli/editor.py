@@ -1,8 +1,9 @@
 import os
 
 import cerberus_document_editor as cde
+from cerberus_document_editor import yaml_parser
 
-from mlad.cli.validator import yaml_parser
+from mlad.cli.validator.validators import SCHEMA_PATH
 from mlad.cli.exceptions import InvalidFileTypeError
 
 
@@ -11,7 +12,7 @@ APP_NAME = 'MLAD Project YAML Editor'
 
 def run_editor(document_path: str = './mlad-project.yml'):
 
-    with open(f'{yaml_parser.SCHEMA_PATH}/schema.yaml') as f:
+    with open(f'{SCHEMA_PATH}/schema.yaml') as f:
         schema = yaml_parser.load(f)
 
     doc_ext = os.path.splitext(document_path)[1]

@@ -12,9 +12,9 @@ WORKDIR /workspace
 
 COPY . .
 
-RUN {SCRIPT}
+{SCRIPT}
 
-CMD {COMMAND}
+{COMMAND}
 '''
 
 sys.modules[__name__] = FORMAT
