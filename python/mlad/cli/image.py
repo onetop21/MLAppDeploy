@@ -6,7 +6,6 @@ import tarfile
 from typing import Optional
 
 from mlad.cli import config as config_core
-from mlad.cli.validator import validators
 from mlad.cli.libs import utils
 from mlad.cli.format import (
     DOCKERFILE, DOCKERFILE_ENV, DOCKERFILE_REQ_PIP, DOCKERFILE_REQ_APT,
@@ -15,7 +14,7 @@ from mlad.cli.format import (
 
 from mlad.core.docker import controller as ctlr
 from mlad.core.libs import utils as core_utils
-from mlad.core.default import project as default_project
+
 
 PREP_KEY_TO_TEMPLATE = {
     'run': DOCKERFILE_REQ_RUN,
@@ -64,8 +63,7 @@ def list(all, tail):
 def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bool = True):
     utils.process_file(file)
     config = config_core.get()
-    project = utils.get_project(default_project)
-    project = validators.validate(project)
+    project = utils.get_project()
 
     # Generate Base Labels
     workspace = utils.get_workspace()
@@ -143,24 +141,33 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
 
 
 def _obtain_workspace_payload(workspace, maintainer):
-    envs = [DOCKERFILE_ENV.format(KEY=k, VALUE=v) for k, v in workspace['env'].items()]
-    preps = workspace['preps']
+    default = {
+        'env': workspace.get('env', {}),
+        'preps': workspace.get('preps', []),
+        'command': workspace.get('command', ''),
+        'args': workspace.get('args', ''),
+        'script': f'RUN {workspace["script"]}' if 'script' in workspace else ''
+    }
+
+    envs = [DOCKERFILE_ENV.format(KEY=k, VALUE=v) for k, v in default['env'].items()]
+
+    preps = default['preps']
     prep_docker_formats = []
     for prep in preps:
         key = tuple(prep.keys())[0]
         template = PREP_KEY_TO_TEMPLATE[key]
         prep_docker_formats.append(template.format(SRC=prep[key]))
 
-    commands = [f'"{item}"' for item in workspace['command'].split()] + \
-        [f'"{item}"' for item in workspace['args'].split()]
+    commands = [f'"{item}"' for item in default['command'].split()] + \
+               [f'"{item}"' for item in default['args'].split()]
 
     return DOCKERFILE.format(
         BASE=workspace['base'],
         MAINTAINER=maintainer,
         ENVS='\n'.join(envs),
         PREPS='\n'.join(prep_docker_formats),
-        SCRIPT=';'.join(workspace['script']) if len(workspace['script']) else "echo .",
-        COMMAND=f'[{", ".join(commands)}]',
+        SCRIPT=default['script'],
+        COMMAND=f'CMD [{", ".join(commands)}]' if len(commands) > 0 else ''
     )
 
 

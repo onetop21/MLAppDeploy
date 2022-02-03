@@ -150,7 +150,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
     # Raise exception if the target project is not found.
     try:
-        API.project.inspect(project_key=project_key)
+        project = API.project.inspect(project_key=project_key)
+        apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
         if metrics_server_running:
             resources = API.project.resource(project_key)
@@ -166,11 +167,12 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
     events = []
     columns = [
         ('NAME', 'APP NAME', 'NODE', 'PHASE', 'STATUS', 'RESTART', 'AGE', 'PORTS', 'MEM(Mi)', 'CPU', 'GPU')]
-    for spec in API.app.get(project_key)['specs']:
+    for spec in apps:
         task_info = []
+        app_name = spec['name']
         try:
             ports = ','.join(map(str, spec['ports']))
-            for pod_name, pod in API.app.get_tasks(project_key, spec['name']).items():
+            for pod_name, pod in spec['tasks'].items():
                 ready_cnt = 0
                 restart_cnt = 0
                 if pod['container_status']:
@@ -181,8 +183,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
                 age = utils.created_to_age(pod['created'])
 
-                if metrics_server_running:
-                    res = resources[spec['name']][pod_name].copy()
+                if metrics_server_running and app_name in resources:
+                    res = resources[app_name][pod_name].copy()
                     res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
                     res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
                     res['gpu'] = 'NotReady' if res['gpu'] is None else res['gpu']
@@ -191,7 +193,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
                 task_info.append((
                     pod_name,
-                    spec['name'],
+                    app_name,
                     pod['node'] if pod['node'] else '-',
                     pod['phase'],
                     'Running' if pod['status']['state'] == 'Running' else
@@ -210,7 +212,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
             pass
         columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
     username = utils.get_username(config.session)
-    print(f"USERNAME: [{username}] / PROJECT: [{spec['project']}]")
+    print(f"USERNAME: [{username}] / PROJECT: [{project['project']}]")
     utils.print_table(columns, 'Cannot find running apps.', 0 if no_trunc else 32, False)
 
     if event:
@@ -250,8 +252,6 @@ def logs(file: Optional[str], project_key: Optional[str],
 
 
 def ingress():
-    config = config_core.get()
-    address = config['apiserver']['address'].rsplit('/beta')[0]
     specs = API.app.get()['specs']
 
     # check ingress controller
@@ -266,7 +266,7 @@ def ingress():
             project_name = spec['project']
             app_name = spec['name']
             key = spec['key']
-            path = f'{address}{spec["ingress"]}'
+            path = spec['ingress']
             rows.append((username, project_name, app_name, key, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 

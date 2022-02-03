@@ -1,8 +1,8 @@
 import os
 import errno
-import socket
 import docker
 import requests
+from requests.exceptions import ConnectionError
 
 from docker.types import Mount
 from typing import List
@@ -10,7 +10,7 @@ from omegaconf import OmegaConf
 from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
-    MLADBoardNotActivatedError, BoardImageNotExistError, ComponentImageNotExistError,
+    MLADBoardNotActivatedError, ComponentImageNotExistError,
     MLADBoardAlreadyActivatedError, CannotBuildComponentError
 )
 from mlad.cli import image as image_core
@@ -46,12 +46,9 @@ def get_lo_cli():
         raise DockerNotFoundError
 
 
-def activate():
+def activate(image_repository: str):
     cli = get_cli()
     config = config_core.get()
-    image_tag = _obtain_board_image_tag()
-    if image_tag is None:
-        raise BoardImageNotExistError
 
     try:
         cli.containers.get('mlad-board')
@@ -60,21 +57,23 @@ def activate():
     else:
         raise MLADBoardAlreadyActivatedError
 
-    host_ip = _obtain_host()
-    requests.delete(f'{host_ip}:2021/mlad/component', json={
-        'name': 'mlad-board'
-    })
+    try:
+        host_ip = _obtain_host()
+        requests.delete(f'{host_ip}:2021/mlad/component', json={
+            'name': 'mlad-board'
+        })
+    except ConnectionError:
+        pass
 
     yield 'Activating MLAD board.'
 
     cli.containers.run(
-        image_tag,
+        image_repository,
         environment=[
             f'MLAD_ADDRESS={config.apiserver.address}',
             f'MLAD_SESSION={config.session}',
         ] + config_core.get_env(),
         name='mlad-board',
-        auto_remove=True,
         ports={'2021/tcp': '2021'},
         labels=['MLAD_BOARD'],
         detach=True)
@@ -93,16 +92,20 @@ def deactivate():
 
     yield 'Deactivating MLAD board.'
 
-    host_ip = _obtain_host()
-    requests.delete(f'{host_ip}:2021/mlad/component', json={
-        'name': 'mlad-board'
-    })
+    try:
+        host_ip = _obtain_host()
+        requests.delete(f'{host_ip}:2021/mlad/component', json={
+            'name': 'mlad-board'
+        })
+    except ConnectionError:
+        pass
 
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
-    })
+    }, all=True)
     for container in containers:
         container.stop()
+        container.remove()
 
     yield 'Successfully deactivate MLAD board.'
 
@@ -241,22 +244,10 @@ def status(no_print: bool = False):
 
 
 def _obtain_host():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(('8.8.8.8', 80))
-    host = s.getsockname()[0]
-    s.close()
-    return f'http://{host}'
+    return f'http://{utils.obtain_my_ip()}'
 
 
 def _obtain_ports(container) -> List[str]:
     lo_cli = get_lo_cli()
     port_data = lo_cli.inspect_container(container.id)['NetworkSettings']['Ports']
     return [k.replace('/tcp', '') for k in port_data.keys()]
-
-
-def _obtain_board_image_tag():
-    cli = get_cli()
-    images = cli.images.list(filters={'label': 'MLAD_BOARD'})
-    latest_images = [image for image in images
-                     if any([tag.endswith('latest') for tag in image.tags])]
-    return latest_images[0].tags[-1] if len(latest_images) > 0 else None

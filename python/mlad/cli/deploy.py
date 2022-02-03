@@ -1,5 +1,6 @@
 import sys
 import json
+import copy
 
 from typing import Optional, List, Tuple
 
@@ -10,14 +11,12 @@ from dictdiffer import diff
 from mlad.cli import config as config_core
 from mlad.cli import train
 from mlad.cli.libs import utils, interrupt_handler
-from mlad.cli.validator import validators
 from mlad.cli.exceptions import (
     ImageNotFoundError, InvalidProjectKindError, InvalidUpdateOptionError,
     MountError
 )
 
 from mlad.core.docker import controller as docker_ctlr
-from mlad.core.default import project as default_project
 from mlad.core.libs import utils as core_utils
 
 from mlad.api import API
@@ -27,8 +26,8 @@ def serve(file: Optional[str]):
 
     utils.process_file(file)
     config = config_core.get()
-    project = utils.get_project(default_project)
-    project = validators.validate(project)
+    project = utils.get_project()
+    origin_project = copy.deepcopy(project)
 
     kind = project['kind']
     if not kind == 'Deployment':
@@ -82,7 +81,8 @@ def serve(file: Optional[str]):
     yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, project, extra_envs, credential=credential, allow_reuse=False)
+    lines = API.project.create(base_labels, origin_project, extra_envs, credential=credential, 
+                               allow_reuse=False)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])
@@ -120,11 +120,9 @@ def serve(file: Optional[str]):
     yield utils.print_info(f'Project key : {project_key}')
 
     # Get ingress path for deployed app
-    address = config['apiserver']['address'].rsplit('/beta')[0]
     for app in res:
         if app['ingress']:
-            path = f'{address}{app["ingress"]}'
-            yield utils.print_info(f'[{app["name"]}] Ingress Path : {path}')
+            yield utils.print_info(f'[{app["name"]}] Ingress Path : {app["ingress"]}')
 
 
 def kill(project_key: str, no_dump: bool):
@@ -160,8 +158,7 @@ def update(project_key: str, file: Optional[str]):
     image_tag = project['image']
 
     utils.process_file(file)
-    project = utils.get_project(default_project)
-    project = validators.validate(project)
+    project = utils.get_project()
 
     kind = project['kind']
     if not kind == 'Deployment':

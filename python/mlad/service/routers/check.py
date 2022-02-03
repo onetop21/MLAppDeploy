@@ -27,7 +27,7 @@ def check_metrics_server():
 def check_nvidia_device_plugin():
     status = True
     try:
-        ctlr.get_daemonset('nvidia-device-plugin-daemonset', 'kube-system')
+        ctlr.get_daemonset('nvidia-device-plugin', 'kube-system')
     except exceptions.NotFound:
         status = False
     except Exception as e:

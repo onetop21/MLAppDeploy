@@ -10,7 +10,7 @@ from . import echo_exception
 
 
 @click.command()
-@click.option('--file', '-f', default=None, help=(
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
     'Specify an alternate project file.\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
 )
@@ -23,7 +23,7 @@ def serve(file: Optional[str]):
 
 @click.command()
 @click.argument('project-key', required=True, autocompletion=list_project_keys)
-@click.option('--file', '-f', default=None, help=(
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
     'Specify an project file to be used for update.\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
 )
