@@ -26,8 +26,8 @@ def check():
         },
         'NVIDIA Device Plugin': {
             'status': False,
-            'msgs': ['Run \'kubectl create -f '
-                     'https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.9.0/nvidia-device-plugin.yml\'',
+            'msgs': ['Run \'helm repo add nvdp https://nvidia.github.io/k8s-device-plugin && '
+                     'helm repo update && helm install nvidia-device-plugin nvdp/nvidia-device-plugin\'.',
                      'Or visit MLAD docs : ...']
         },
         'Node Feature Discovery': {
@@ -36,12 +36,14 @@ def check():
         },
         'GPU Feature Discovery': {
             'status': False,
-            'msgs': ['Run \'kubectl apply -f https://raw.githubusercontent.com/NVIDIA/gpu-feature-discovery/v0.4.1/deployments/static/'
-                     'gpu-feature-discovery-daemonset.yaml -n node-feature-discovery\'.']
+            'msgs': ['Run \'helm repo add nvgfd https://nvidia.github.io/gpu-feature-discovery && '
+                     'helm repo update && helm install gpu-feature-discovery nvgfd/gpu-feature-discovery '
+                     '-n gpu-feature-discovery --create-namespace --set namespace=gpu-feature-discovery\'.']
         },
         'MLAD API Server': {
             'status': False,
-            'msgs': ['Run \'helm install mlad ./charts/api-server --create-namespace -n mlad\'.']
+            'msgs': ['Run \'helm repo add mlad https://onetop21.github.io/MLAppDeploy/charts && '
+                     'helm repo update && helm install mlad mlad/api-server --create-namespace -n mlad\'.']
         },
     }
     cli = ctlr.get_api_client(context=ctlr.get_current_context())
@@ -66,7 +68,7 @@ def check():
 
     # Check nvidia device plugin
     try:
-        ctlr.get_daemonset('nvidia-device-plugin-daemonset', 'kube-system', cli)
+        ctlr.get_daemonset('nvidia-device-plugin', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -89,10 +91,14 @@ def check():
     # Check mlad api server
     try:
         ctlr.get_deployment('mlad-api-server', 'mlad', cli)
+        service = ctlr.get_service('mlad-api-server', 'mlad', cli)
     except core_exceptions.NotFound:
         pass
     else:
         checked['MLAD API Server']['status'] = True
+        kube_host = cli.configuration.host.rsplit(':', 1)[0]
+        node_port = service.spec.ports[0].node_port
+        address = f'{kube_host}:{node_port}'
 
     for plugin, result in checked.items():
         status = result['status']
@@ -104,7 +110,10 @@ def check():
 
         if not status:
             for line in msgs:
-                yield f'˙ {line}'
+                yield f' · {line}'
+
+        if plugin == 'MLAD API Server' and status:
+            yield f' · API Server Address : {address}'
 
 
 def _is_running_api_server(cli, beta: bool) -> bool:

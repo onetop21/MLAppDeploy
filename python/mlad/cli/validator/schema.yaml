@@ -35,6 +35,7 @@ x-definitions:
         regex: "^(?:.+/)?([^:]+)(?::.+)?$"
         required: true
         description: Base docker image tag.
+        order: 0
       preps:                      # Describe preparations for making envorinment.
         type: list
         description: Preparations for making environment before docker image build.
@@ -70,6 +71,7 @@ x-definitions:
       script:
         type: string
         description: Script to be run after copying files.
+        order: 2
       env:                        # Describe environment variables.
         type: dict
         description: Environment variables.
@@ -90,6 +92,7 @@ x-definitions:
         default: "FROM    python:latest"
         required: true
         description: Describe Dockerfile script directly as a workspace.
+        order: 0
       ignores:                    # Describe exclude files from project.
         type: list
         description: Files to be excluded from project.
@@ -103,10 +106,12 @@ x-definitions:
         default: 'Dockerfile'
         required: true
         description: Decribe path of Dockerfile as a workspace.
+        order: 0
       ignorePath:
         type: string
         description: File that includes the files to be excluded from project.
         default: '.dockerignore'
+        order: 1
   - definition: &ingress
       target:
         type: string

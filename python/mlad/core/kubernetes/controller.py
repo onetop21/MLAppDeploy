@@ -334,7 +334,22 @@ def get_apps(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
                      for _ in apps])
 
 
-def get_service(cli, namespace, name):
+def get_service(name, namespace, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not valid type.')
+    api = client.CoreV1Api(cli)
+    try:
+        res = api.read_namespaced_service(name, namespace)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
+        else:
+            raise exceptions.APIError(msg, status)
+    return res
+
+
+def get_app_service(cli, namespace, name):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -444,7 +459,8 @@ def get_pod_info(pod):
         pod_info['status'] = {
             'state': 'Waiting',
             'detail': {
-                'reason': pod.status.conditions[0].reason if pod.status.conditions else None
+                'reason': pod.status.conditions[0].reason if pod.status.conditions
+                else pod.status.reason
             }
         }
     return pod_info
@@ -470,7 +486,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
-    service = get_service(cli, namespace, name)
+    service = get_app_service(cli, namespace, name)
     spec = {
         'key': config_labels['MLAD.PROJECT'] if config_labels.get(
             'MLAD.VERSION') else '',
@@ -1037,7 +1053,7 @@ def remove_apps(apps, namespace,
             elif kind == 'Service':
                 _delete_deployment(cli, app_name, namespace)
 
-            if get_service(cli, namespace, app_name) is not None:
+            if get_app_service(cli, namespace, app_name) is not None:
                 api.delete_namespaced_service(app_name, namespace)
 
             ingress_list = network_api.list_namespaced_ingress(

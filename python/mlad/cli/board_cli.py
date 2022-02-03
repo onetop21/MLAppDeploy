@@ -23,7 +23,8 @@ def deactivate():
 
 
 @click.command()
-@click.option('--file-path', '-f', required=True, help='The file path of the component.')
+@click.option('--file-path', '-f', required=True, type=click.Path(exists=True),
+              help='The file path of the component.')
 @click.option('--no-build', is_flag=True, help='Don\'t build the base image.')
 @echo_exception
 def install(file_path: str, no_build: bool):
