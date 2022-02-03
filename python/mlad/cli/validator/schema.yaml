@@ -77,7 +77,7 @@ x-definitions:
         description: Environment variables.
         valuesrules:
           schema:
-            type: [string]
+            type: string
         default:
           PYTHONUNBUFFERED: "1"
       command:                    # Describe application to execute
@@ -133,6 +133,9 @@ x-definitions:
       env:                        # Describe environment variables additionaly.
         type: dict
         description: Additional environment variables.
+        valuesrules:
+          schema:
+            type: string
       ports:                      # Describe expose ports to other services.
         type: list
         schema:
