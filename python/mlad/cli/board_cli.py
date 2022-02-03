@@ -7,10 +7,13 @@ from . import echo_exception
 
 
 @click.command()
+@click.option('--image-repository', '-i', required=False,
+              default='ghcr.io/onetop21/mlappdeploy/dashboard:latest',
+              help='The image repository for MLAD board.')
 @echo_exception
-def activate():
+def activate(image_repository):
     """Activate MLAD board."""
-    for line in board.activate():
+    for line in board.activate(image_repository):
         click.echo(line)
 
 
