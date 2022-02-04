@@ -816,6 +816,18 @@ def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_
     return pvc_name
 
 
+def _create_V1Env(name: str, value: str = None, field_path: str = None):
+    return client.V1EnvVar(
+        name=name,
+        value=value,
+        value_from=client.V1EnvVarSource(
+            field_ref=client.V1ObjectFieldSelector(
+                field_path=field_path
+            )
+        ) if field_path else None
+    )
+
+
 def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not valid type.')
@@ -843,19 +855,18 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         kind = app['kind']
         image = app['image'] or image_name
 
-        env = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
-        env += [f"{key}={app['env'][key]}" for key in app['env'].keys()] \
-            if app['env'] else []
-        env += ["TF_CPP_MIN_LOG_LEVEL=3"]
-        env += [f"PROJECT={namespace_spec['project']}"]
-        env += [f"USERNAME={namespace_spec['username']}"]
-        env += [f"PROJECT_KEY={namespace_spec['key']}"]
-        env += [f"PROJECT_ID={namespace_spec['id']}"]
-        env += [f"APP={name}"]
-        env += ['TASK_ID={{.Task.ID}}', f'TASK_NAME={name}.{{{{.Task.Slot}}}}',
-                'NODE_HOSTNAME={{.Node.Hostname}}']
-        envs = [client.V1EnvVar(name=_.split('=', 1)[0], value=_.split('=', 1)[1])
-                for _ in env]
+        app_envs = app['env'] or {}
+        app_envs['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        app_envs['PROJECT'] = namespace_spec['project']
+        app_envs['USERNAME'] = namespace_spec['username']
+        app_envs['PROJECT_KEY'] = namespace_spec['key']
+        app_envs['PROJECT_ID'] = str(namespace_spec['id'])
+        app_envs['APP'] = name
+        config_envs = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
+        config_envs = {env.split('=', 1)[0]: env.split('=', 1)[1] for env in config_envs}
+        app_envs.update(config_envs)
+        envs = [_create_V1Env(k, v) for k, v in app_envs.items()]
+        envs.append(_create_V1Env('POD_NAME', field_path='metadata.name'))
 
         command = app['command'] or []
         args = app['args'] or []
@@ -924,7 +935,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                 port = int(ingress['port'])
                 ingress_path = path if path is not None else \
                     f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
-                envs.append(client.V1EnvVar(name='INGRESS_PATH', value=ingress_path))
+                envs.append(_create_V1Env('INGRESS_PATH', ingress_path))
                 config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
                 create_ingress(cli, namespace_name, name, ingress_name, port, ingress_path, rewritePath)
             else:
@@ -992,7 +1003,7 @@ def update_apps(namespace, apps, cli=DEFAULT_CLI):
         for key in list(app['env']['current'].keys()):
             current.pop(key)
         current.update(app['env']['update'])
-        env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
+        env = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
         body.append(_body("env", env))
 
         try:
