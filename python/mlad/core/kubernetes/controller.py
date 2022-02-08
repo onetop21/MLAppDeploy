@@ -951,7 +951,7 @@ def update_apps(namespace, update_yaml, update_specs, cli=DEFAULT_CLI):
         if update_yaml['app'][app_name]['kind'] == 'Service':
             results.append(_update_k8s_deployment(cli, namespace_name, update_spec))
         else:
-            results.append(_update_k8s_job(cli, namespace_name, update_spec, update_yaml))
+            results.append(_update_k8s_job(cli, namespace_name, update_spec))
     return results
 
 
@@ -1011,7 +1011,7 @@ def _update_k8s_deployment(cli, namespace, update_spec):
         raise exceptions.APIError(err_msg, status)
 
 
-def _update_k8s_job(cli, namespace, update_spec, update_yaml):
+def _update_k8s_job(cli, namespace, update_spec):
     app_name = update_spec['name']
     image = update_spec['image']
     command = update_spec['command'] or []
