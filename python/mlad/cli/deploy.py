@@ -175,7 +175,7 @@ def update(project_key: str, file: Optional[str]):
     def _validate(key: str, value: Union[str, list] = None):
         if key not in update_key_store:
             raise InvalidUpdateOptionError(key)
-        # Check env for protect MLAD config
+        # Check env to protect MLAD config
         if key == 'env':
             env_checked = set()
             if isinstance(value, list):
