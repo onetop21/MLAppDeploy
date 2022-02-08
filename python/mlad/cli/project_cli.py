@@ -90,7 +90,7 @@ def ingress():
 @echo_exception
 def up(file: Optional[str]):
     '''Deploy and run a Train object on the cluster.'''
-    for line in train.up(file):
+    for line in project.up(file):
         click.echo(line)
 
 
@@ -108,8 +108,8 @@ def up(file: Optional[str]):
 @echo_exception
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     '''Stop and remove the Train object on the cluster.'''
-    lines = train.down_force(file, project_key, no_dump) if config.validate_kubeconfig() \
-        else train.down(file, project_key, no_dump)
+    lines = project.down_force(file, project_key, no_dump) if config.validate_kubeconfig() \
+        else project.down(file, project_key, no_dump)
     for line in lines:
         click.echo(line)
 
@@ -125,7 +125,7 @@ def update(project_key: str, file: Optional[str]):
     '''Update deployed service with updated project file.\n
     Valid options for updates: [image, command, args, scale, env, quota]'''
 
-    for line in deploy.update(project_key, file):
+    for line in project.update(project_key, file):
         click.echo(line)
 
 
@@ -142,7 +142,7 @@ def scale(project_key: str, scales: List[str]):
         app_name, value = scale.split('=')
         value = int(value)
         parsed_scales.append((app_name, value))
-    for line in deploy.scale(parsed_scales, project_key):
+    for line in project.scale(parsed_scales, project_key):
         click.echo(line)
 
 
