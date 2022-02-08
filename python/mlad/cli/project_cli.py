@@ -115,34 +115,43 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
 
 
 @click.command()
-@click.argument('project-key', required=True, autocompletion=list_project_keys)
 @click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
-    'Specify an project file to be used for update.\t\t\t\n'
-    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
 )
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
+              autocompletion=list_project_keys)
 @echo_exception
-def update(project_key: str, file: Optional[str]):
+def update(file: Optional[str], project_key: Optional[str]):
     '''Update deployed service with updated project file.\n
     Valid options for updates: [image, command, args, scale, env, quota]'''
-
-    for line in project.update(project_key, file):
+    for line in project.update(file, project_key):
         click.echo(line)
 
 
 @click.command()
-@click.argument('project-key', required=True, autocompletion=list_project_keys)
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
+)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
+              autocompletion=list_project_keys)
 @click.argument('scales', required=True, nargs=-1)
 @echo_exception
-def scale(project_key: str, scales: List[str]):
+def scale(file: Optional[str], project_key: Optional[str], scales: List[str]):
     '''Change the scale of one of the running apps.\n
-    Format: mlad deploy scale [PROJECT_KEY] [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
+    Format: mlad deploy scale [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
     '''
     parsed_scales = []
     for scale in scales:
         app_name, value = scale.split('=')
         value = int(value)
         parsed_scales.append((app_name, value))
-    for line in project.scale(parsed_scales, project_key):
+    for line in project.scale(file, project_key, parsed_scales):
         click.echo(line)
 
 

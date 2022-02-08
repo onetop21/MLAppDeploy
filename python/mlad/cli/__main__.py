@@ -8,8 +8,6 @@ from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
 from mlad.cli import node_cli as node
 from mlad.cli import board_cli as board
-from mlad.cli import train_cli as train
-from mlad.cli import deploy_cli as deploy
 from mlad.cli.exceptions import ConfigNotFoundError
 from mlad.cli.config import get as check_config
 from mlad.cli.config import validate_kubeconfig as is_admin

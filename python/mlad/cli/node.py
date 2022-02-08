@@ -46,7 +46,7 @@ def resource(names=None, no_trunc=False):
         elif type == 'gpu':
             res = f'{type}(#)'
         return res
-    
+
     res = API.node.resource(names)
     for name, resources in res.items():
         for i, type in enumerate(resources):

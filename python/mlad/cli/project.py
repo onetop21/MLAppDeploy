@@ -4,11 +4,13 @@ import json
 import copy
 import datetime
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from pathlib import Path
 
 import yaml
 import docker
+
+from dictdiffer import diff
 
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.format import PROJECT
@@ -16,7 +18,7 @@ from mlad.cli import config as config_core
 from mlad.cli.editor import run_editor
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
-    MountError, PluginUninstalledError, NotRunningTrainError
+    MountError, PluginUninstalledError, NotRunningTrainError, InvalidUpdateOptionError
 )
 from mlad.core.docker import controller as docker_ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
@@ -538,3 +540,93 @@ def _dump_logs(app_name: str, project_key: str, dirpath: Path):
         except InvalidLogRequest:
             return f'There is no log in [{app_name}].'
     return f'The log file of app [{app_name}] saved.'
+
+
+def scale(file: Optional[str], project_key: Optional[str], scales: List[Tuple[str, int]]):
+    utils.process_file(file)
+    if project_key is None:
+        project_key = utils.workspace_key()
+
+    project = API.project.inspect(project_key)
+    if not project['kind'] == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'scale')
+
+    app_names = [app['name'] for app in API.app.get(project_key)['specs']]
+
+    for target_name, value in scales:
+        if target_name in app_names:
+            API.app.scale(project_key, target_name, value)
+            yield f'Scale updated [{target_name}] = {value}'
+        else:
+            yield f'Cannot find app [{target_name}] in project [{project_key}].'
+
+
+def update(file: Optional[str], project_key: Optional[str]):
+    utils.process_file(file)
+    if project_key is None:
+        project_key = utils.workspace_key()
+    project = API.project.inspect(project_key=project_key)
+    cur_project_yaml = json.loads(project['project_yaml'])
+    image_tag = project['image']
+
+    utils.process_file(file)
+    project = utils.get_project()
+
+    kind = project['kind']
+    if not kind == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'deploy')
+
+    update_key_store = ['image', 'command', 'args', 'scale', 'env', 'quota']
+
+    cur_apps = cur_project_yaml['app']
+    update_apps = project['app']
+
+    def _validate(key: str):
+        if key not in update_key_store:
+            raise InvalidUpdateOptionError(key)
+
+    # Get diff from project yaml
+    update_specs = []
+    diff_keys = {}
+    for name, app in cur_apps.items():
+        update_app = update_apps[name]
+        update_app = utils.convert_tag_only_image_prop(update_app, image_tag)
+
+        env = {
+            'current': app['env'] if 'env' in app else {},
+            'update': update_app['env'] if 'env' in update_app else {}
+        }
+
+        update_spec = {key: (env if key == 'env' else update_app.get(key, None))
+                       for key in update_key_store}
+        update_spec['name'] = name
+
+        diff_keys[name] = set()
+        diffs = list(diff(app, update_app))
+        for diff_type, key, value in diffs:
+            key = key.split('.')[0]
+
+            if diff_type == 'change':
+                _validate(key)
+                diff_keys[name].add(key)
+            else:
+                if key != '':
+                    _validate(key)
+                    diff_keys[name].add(key)
+                else:
+                    for key, value in value:
+                        _validate(key)
+                        diff_keys[name].add(key)
+
+        if len(diff_keys[name]) > 0:
+            update_specs.append(update_spec)
+
+    for name, keys in diff_keys.items():
+        if len(keys) > 0:
+            yield f'Update {list(keys)} for app "{name}"...'
+
+    if len(update_specs) > 0:
+        API.project.update(project_key, project, update_specs)
+        yield 'Done.'
+    else:
+        yield 'No changes to update.'

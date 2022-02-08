@@ -81,7 +81,7 @@ def serve(file: Optional[str]):
     yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, origin_project, extra_envs, credential=credential, 
+    lines = API.project.create(base_labels, origin_project, extra_envs, credential=credential,
                                allow_reuse=False)
     for line in lines:
         if 'stream' in line:

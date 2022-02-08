@@ -890,7 +890,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                 _create_pv(name, pv_index, pv_mount)
                 pvc_specs.append({
                     'name': _create_pvc(name, pv_index, pv_mount, namespace_name),
-                    'mountPath': pv_mount['mountPath'] 
+                    'mountPath': pv_mount['mountPath']
                 })
 
             if kind == 'Job':
