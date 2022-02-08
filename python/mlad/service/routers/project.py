@@ -167,11 +167,11 @@ def send_resources(project_key: str, session: str = Header(None)):
 @router.post("/project/{project_key}")
 def update_project(project_key: str, req: project.UpdateRequest):
     update_yaml = req.update_yaml
-    apps = req.apps
+    update_specs = req.update_specs
     try:
         namespace = ctlr.get_namespace(project_key=project_key)
         ctlr.update_namespace(namespace, update_yaml)
-        res = ctlr.update_apps(namespace, apps)
+        res = ctlr.update_apps(namespace, update_yaml, update_specs)
         return [ctlr.inspect_app(_) for _ in res]
     except Exception as e:
         print(traceback.format_exc())

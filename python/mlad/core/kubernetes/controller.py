@@ -938,73 +938,114 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     return instances
 
 
-def update_apps(namespace, apps, cli=DEFAULT_CLI):
+def update_apps(namespace, update_yaml, update_specs, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
+        raise TypeError('Parameter is not a valid type.')
     if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not valid type.')
-    api = client.AppsV1Api(cli)
-    namespace = namespace.metadata.name
+        raise TypeError('Parameter is not a valid type.')
+    namespace_name = namespace.metadata.name
+    results = []
+    for update_spec in update_specs:
+        update_spec = update_spec.dict()
+        app_name = update_spec['name']
+        if update_yaml['app'][app_name]['kind'] == 'Service':
+            results.append(_update_k8s_deployment(cli, namespace_name, update_spec))
+        else:
+            results.append(_update_k8s_job(cli, namespace_name, update_spec, update_yaml))
+    return results
 
-    instances = []
-    for app in apps:
-        app = app.dict()
-        app_name = app['name']
 
-        scale = app['scale']
-        command = app['command'] or []
-        args = app['args'] or []
-        quota = app['quota'] or {}
+def _update_k8s_deployment(cli, namespace, update_spec):
+    app_name = update_spec['name']
+    scale = update_spec['scale']
+    command = update_spec['command'] or []
+    args = update_spec['args'] or []
+    quota = update_spec['quota'] or {}
 
-        # parse
-        resources = _resources_to_V1Resource(resources=quota).to_dict()
+    resources = _resources_to_V1Resource(resources=quota).to_dict()
 
-        if isinstance(command, str):
-            command = command.split()
-        if isinstance(args, str):
-            args = args.split()
-        command += args
+    if isinstance(command, str):
+        command = command.split()
+    if isinstance(args, str):
+        args = args.split()
+    command += args
 
-        def _body(option: str, value: str, spec: str = "container"):
-            if spec == "container":
-                path = f"/spec/template/spec/containers/0/{option}"
-            elif spec == "deployment":
-                path = f"/spec/{option}"
-            elif spec == "metadata":
-                path = f"/metadata/{option}"
-            return {"op": "replace", "path": path, "value": value}
+    def _body(option: str, value: str, spec: str = "container"):
+        if spec == "container":
+            path = f"/spec/template/spec/containers/0/{option}"
+        elif spec == "deployment":
+            path = f"/spec/{option}"
+        elif spec == "metadata":
+            path = f"/metadata/{option}"
+        return {"op": "replace", "path": path, "value": value}
 
-        # update
-        body = []
-        body.append(_body("replicas", scale, "deployment"))
-        body.append(_body("command", command))
+    # update
+    body = []
+    body.append(_body("replicas", scale, "deployment"))
+    body.append(_body("command", command))
 
-        for resource in resources:
-            body.append(_body(f"resources/{resource}", resources[resource]))
+    for resource in resources:
+        body.append(_body(f"resources/{resource}", resources[resource]))
 
-        if app['image'] is not None:
-            body.append(_body("image", app['image']))
+    if update_spec['image'] is not None:
+        body.append(_body("image", update_spec['image']))
 
-        # update env
-        deployment = get_deployment(app_name, namespace, cli)
-        container_spec = deployment.spec.template.spec.containers[0]
-        current = {env.name: env.value for env in container_spec.env}
-        for key in list(app['env']['current'].keys()):
-            current.pop(key)
-        current.update(app['env']['update'])
-        env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
-        body.append(_body("env", env))
+    # update env
+    deployment = get_deployment(app_name, namespace, cli)
+    container_spec = deployment.spec.template.spec.containers[0]
+    current = {env.name: env.value for env in container_spec.env}
+    for key in list(update_spec['env']['current'].keys()):
+        current.pop(key)
+    current.update(update_spec['env']['update'])
+    env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
+    body.append(_body("env", env))
 
-        try:
-            cause = {"kubernetes.io/change-cause": f"MLAD:{app}"}
-            body.append(_body("annotations", cause, "metadata"))
-            res = api.patch_namespaced_deployment(app_name, namespace, body=body)
-            instances.append(res)
-        except ApiException as e:
-            msg, status = exceptions.handle_k8s_api_error(e)
-            err_msg = f'Failed to update apps: {msg}'
-            raise exceptions.APIError(err_msg, status)
-    return instances
+    try:
+        cause = {"kubernetes.io/change-cause": f"MLAD:{update_spec}"}
+        body.append(_body("annotations", cause, "metadata"))
+        api = client.AppsV1Api(cli)
+        return api.patch_namespaced_deployment(app_name, namespace, body=body)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        err_msg = f'Failed to update apps: {msg}'
+        raise exceptions.APIError(err_msg, status)
+
+
+def _update_k8s_job(cli, namespace, update_spec, update_yaml):
+    app_name = update_spec['name']
+    image = update_spec['image']
+    command = update_spec['command'] or []
+    args = update_spec['args'] or []
+    quota = update_spec['quota'] or {}
+
+    resources = _resources_to_V1Resource(resources=quota)
+
+    if isinstance(command, str):
+        command = command.split()
+    if isinstance(args, str):
+        args = args.split()
+    command += args
+
+    k8s_job = get_app_from_kind(cli, app_name, namespace, 'Job')
+    container_spec = k8s_job.spec.template.spec.containers[0]
+    current = {env.name: env.value for env in container_spec.env}
+    for key in list(update_spec['env']['current'].keys()):
+        current.pop(key)
+    current.update(update_spec['env']['update'])
+    env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
+
+    container_spec.command = command
+    container_spec.resources = resources
+    container_spec.image = image
+    container_spec.env = env
+
+    try:
+        api = client.BatchV1Api(cli)
+        return api.replace_namespaced_job(app_name, namespace, body=k8s_job)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        err_msg = f'Failed to update apps: {msg}'
+        raise exceptions.APIError(err_msg, status)
 
 
 def _delete_job(cli, name, namespace):
