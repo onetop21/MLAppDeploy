@@ -1027,6 +1027,11 @@ def _update_k8s_job(cli, namespace, update_spec):
     command += args
 
     k8s_job = get_app_from_kind(cli, app_name, namespace, 'Job')
+    # remove invalid properties to re-run the job
+    k8s_job.metadata = client.V1ObjectMeta(name=k8s_job.metadata.name, labels=k8s_job.metadata.labels)
+    k8s_job.spec.selector = None
+    del k8s_job.spec.template.metadata.labels['controller-uid']
+
     container_spec = k8s_job.spec.template.spec.containers[0]
     current = {env.name: env.value for env in container_spec.env}
     for key in list(update_spec['env']['current'].keys()):
@@ -1039,10 +1044,17 @@ def _update_k8s_job(cli, namespace, update_spec):
     if image is not None:
         container_spec.image = image
     container_spec.env = env
-
     try:
         api = client.BatchV1Api(cli)
         api.delete_namespaced_job(app_name, namespace)
+        w = watch.Watch()
+        for event in w.stream(
+                func=api.list_namespaced_job,
+                namespace=namespace,
+                field_selector=f'metadata.name={app_name}',
+                timeout_seconds=180):
+            if event['type'] == 'DELETED':
+                w.stop()
         return api.create_namespaced_job(namespace, body=k8s_job)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
