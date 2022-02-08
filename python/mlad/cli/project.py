@@ -18,7 +18,7 @@ from mlad.cli import config as config_core
 from mlad.cli.editor import run_editor
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
-    MountError, PluginUninstalledError, NotRunningTrainError, InvalidUpdateOptionError
+    MountError, PluginUninstalledError, InvalidUpdateOptionError
 )
 from mlad.core.docker import controller as docker_ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
@@ -157,9 +157,7 @@ def list(no_trunc: bool):
 def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, event: bool):
     utils.process_file(file)
     config = config_core.get()
-    target_kind = None
     if project_key is None:
-        target_kind = 'Train'
         project_key = utils.workspace_key()
 
     # Raise exception if the target project is not found.
@@ -170,10 +168,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         if metrics_server_running:
             resources = API.project.resource(project_key)
     except NotFound as e:
-        if target_kind == 'Train':
-            raise NotRunningTrainError(project_key)
-        else:
-            raise e
+        raise e
 
     if not metrics_server_running:
         yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
@@ -242,19 +237,14 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
     utils.process_file(file)
-    target_kind = None
     if project_key is None:
-        target_kind = 'Train'
         project_key = utils.workspace_key()
 
     # Raise exception if the target project is not found.
     try:
         API.project.inspect(project_key=project_key)
     except NotFound as e:
-        if target_kind == 'Train':
-            raise NotRunningTrainError(project_key)
-        else:
-            raise e
+        raise e
 
     logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
 
