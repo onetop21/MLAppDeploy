@@ -1036,7 +1036,8 @@ def _update_k8s_job(cli, namespace, update_spec):
 
     container_spec.command = command
     container_spec.resources = resources
-    container_spec.image = image
+    if image is not None:
+        container_spec.image = image
     container_spec.env = env
 
     try:
