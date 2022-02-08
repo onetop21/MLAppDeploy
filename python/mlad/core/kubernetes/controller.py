@@ -1007,9 +1007,8 @@ def update_apps(namespace, apps, cli=DEFAULT_CLI):
         container_spec = deployment.spec.template.spec.containers[0]
         current = {env.name: env.value for env in container_spec.env}
         for key in list(app['env']['current'].keys()):
-            if key in config_envs:
-                continue
-            current.pop(key)
+            if key not in config_envs:
+                current.pop(key)
         for key in list(app['env']['update'].keys()):
             if key in config_envs:
                 app['env']['update'].pop(key)
