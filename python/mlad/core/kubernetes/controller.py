@@ -19,6 +19,12 @@ from kubernetes.client.rest import ApiException
 SHORT_LEN = 10
 
 
+config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
+               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'POD_NAME',
+               'PROJECT', 'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS',
+               'S3_VERIFY_SSL', 'USERNAME'}
+
+
 def get_api_client(config_file='~/.kube/config', context=None):
     try:
         if context:
@@ -856,12 +862,13 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         image = app['image'] or image_name
 
         app_envs = app['env'] or {}
-        app_envs['TF_CPP_MIN_LOG_LEVEL'] = '3'
-        app_envs['PROJECT'] = namespace_spec['project']
-        app_envs['USERNAME'] = namespace_spec['username']
-        app_envs['PROJECT_KEY'] = namespace_spec['key']
-        app_envs['PROJECT_ID'] = str(namespace_spec['id'])
-        app_envs['APP'] = name
+        app_envs.update({
+            'PROJECT': namespace_spec['project'],
+            'USERNAME': namespace_spec['username'],
+            'PROJECT_KEY': namespace_spec['key'],
+            'PROJECT_ID': str(namespace_spec['id']),
+            'APP': name
+        })
         config_envs = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         config_envs = {env.split('=', 1)[0]: env.split('=', 1)[1] for env in config_envs}
         app_envs.update(config_envs)
@@ -935,7 +942,6 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                 port = int(ingress['port'])
                 ingress_path = path if path is not None else \
                     f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
-                envs.append(_create_V1Env('INGRESS_PATH', ingress_path))
                 config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
                 create_ingress(cli, namespace_name, name, ingress_name, port, ingress_path, rewritePath)
             else:
@@ -1001,10 +1007,16 @@ def update_apps(namespace, apps, cli=DEFAULT_CLI):
         container_spec = deployment.spec.template.spec.containers[0]
         current = {env.name: env.value for env in container_spec.env}
         for key in list(app['env']['current'].keys()):
+            if key in config_envs:
+                continue
             current.pop(key)
+        for key in list(app['env']['update'].keys()):
+            if key in config_envs:
+                app['env']['update'].pop(key)
         current.update(app['env']['update'])
-        env = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
-        body.append(_body("env", env))
+        envs = [_create_V1Env(k, v).to_dict() for k, v in current.items() if k != 'POD_NAME']
+        envs.append(_create_V1Env('POD_NAME', field_path='metadata.name'))
+        body.append(_body("env", envs))
 
         try:
             cause = {"kubernetes.io/change-cause": f"MLAD:{app}"}
