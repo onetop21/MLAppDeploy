@@ -773,7 +773,7 @@ def _create_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
             ),
             spec=client.V1PersistentVolumeSpec(
                 capacity={'storage': '10Gi'},
-                access_modes=['ReadWriteOnce'],
+                access_modes=['ReadWriteMany'],
                 mount_options=pv_mount['options'],
                 nfs=client.V1NFSVolumeSource(
                     path=pv_mount['serverPath'],
@@ -803,7 +803,7 @@ def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_
                 name=pvc_name
             ),
             spec=client.V1PersistentVolumeClaimSpec(
-                access_modes=['ReadWriteOnce'],
+                access_modes=['ReadWriteMany'],
                 resources=client.V1ResourceRequirements(
                     requests={'storage': '10Gi'}
                 ),
