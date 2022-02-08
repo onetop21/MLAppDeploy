@@ -1042,7 +1042,7 @@ def _update_k8s_job(cli, namespace, update_spec):
     try:
         api = client.BatchV1Api(cli)
         api.delete_namespaced_job(app_name, namespace)
-        return api.create_namespaced_job(app_name, namespace, body=k8s_job)
+        return api.create_namespaced_job(namespace, body=k8s_job)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         err_msg = f'Failed to update apps: {msg}'
