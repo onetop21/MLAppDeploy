@@ -97,7 +97,7 @@ def list(no_trunc: bool):
     if not metrics_server_running:
         yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
-    columns = [('USERNAME', 'PROJECT', 'KIND', 'KEY', 'APPS',
+    columns = [('USERNAME', 'PROJECT', 'KEY', 'APPS',
                 'TASKS', 'HOSTNAME', 'WORKSPACE', 'AGE',
                 'MEM(Mi)', 'CPU', 'GPU')]
     for spec in project_specs:
@@ -142,14 +142,12 @@ def list(no_trunc: bool):
     for project in projects.values():
         if project['apps'] > 0:
             running_tasks = f"{project['tasks']}/{project['replicas']}"
-            columns.append((project['username'], project['project'],
-                            project['kind'], project['key'],
+            columns.append((project['username'], project['project'], project['key'],
                             project['apps'], f"{running_tasks:>5}", project['hostname'],
                             project['workspace'], project['age'],
                             project['mem'], project['cpu'], project['gpu']))
         else:
-            columns.append((project['username'], project['project'],
-                            project['kind'], project['key'],
+            columns.append((project['username'], project['project'], project['key'],
                             '-', '-', project['hostname'],
                             project['workspace'], project['age'],
                             project['mem'], project['cpu'], project['gpu']))

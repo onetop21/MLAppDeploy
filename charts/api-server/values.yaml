@@ -53,7 +53,8 @@ clusterRole:
     - apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io", "metrics.k8s.io"]
       resources: [
         "nodes", "namespaces", "services", "pods", "pods/log", "replicationcontrollers",
-        "deployments", "daemonsets", "replicasets", "jobs", "configmaps", "secrets", "events", "rolebindings",
+        "deployments", "deployments/scale", "daemonsets", "replicasets", "jobs",
+        "configmaps", "secrets", "events", "rolebindings",
         "ingresses", "podmetrics", "persistentvolumeclaims", "persistentvolumes"]
       verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
 
