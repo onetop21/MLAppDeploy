@@ -1046,7 +1046,7 @@ def _update_k8s_job(cli, namespace, update_spec):
     container_spec.env = env
     try:
         api = client.BatchV1Api(cli)
-        api.delete_namespaced_job(app_name, namespace)
+        api.delete_namespaced_job(app_name, namespace, propagation_policy='Foreground')
         w = watch.Watch()
         for event in w.stream(
                 func=api.list_namespaced_job,
