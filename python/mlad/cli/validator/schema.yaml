@@ -325,29 +325,29 @@ x-definitions:
 __root__:
   type: dict
   selector:
-    train:
-      <<: *metadata
-      workspace:
-        type: dict
-        required: true
-        selector:
-          workspace: *workspace
-          buildscript: *buildscript
-          dockerfile: *dockerfile
-        order: 10
-        description: Workspace specs to build the project.
-      app:
-        type: dict
-        keysrules:
-          type: string
-          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
-        valuesrules:
-          type: dict
-          selector:
-            job: *job
-            service: *service
-        order: 30
-        description: Apps to run.
+    # train:
+    #   <<: *metadata
+    #   workspace:
+    #     type: dict
+    #     required: true
+    #     selector:
+    #       workspace: *workspace
+    #       buildscript: *buildscript
+    #       dockerfile: *dockerfile
+    #     order: 10
+    #     description: Workspace specs to build the project.
+    #   app:
+    #     type: dict
+    #     keysrules:
+    #       type: string
+    #       regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
+    #     valuesrules:
+    #       type: dict
+    #       selector:
+    #         job: *job
+    #         service: *service
+    #     order: 30
+    #     description: Apps to run.
     deployment:
       <<: *metadata
       workspace:
@@ -361,7 +361,7 @@ __root__:
         description: Workspace specs to build project.
       ingress:
         type: dict
-        required: true
+        required: false
         keysrules:
           type: string
           regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
@@ -378,6 +378,7 @@ __root__:
         valuesrules:
           type: dict
           selector:
+            job: *job
             service: *service
         order: 30
         description: Apps to run.

@@ -145,7 +145,7 @@ def inspect_namespace(namespace, cli=DEFAULT_CLI):
         'version': config_labels['MLAD.PROJECT.VERSION'],
         'base': config_labels['MLAD.PROJECT.BASE'],
         'image': config_labels['MLAD.PROJECT.IMAGE'],
-        'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
+        'kind': config_labels.get('MLAD.PROJECT.KIND', 'Deployment'),
         'created': namespace.metadata.creation_timestamp,
         'project_yaml': (namespace.metadata.annotations or dict()).get('MLAD.PROJECT.YAML', '{}')
     }
