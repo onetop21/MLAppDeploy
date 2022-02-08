@@ -31,7 +31,7 @@ def edit(file: Optional[str]):
 @echo_exception
 def ls(no_trunc: bool):
     '''Display projects deployed on the cluster.'''
-    for line in project.list(no_trunc):
+    for line in project.ls(no_trunc):
         click.echo(line)
 
 

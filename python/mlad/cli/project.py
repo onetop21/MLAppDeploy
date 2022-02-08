@@ -89,7 +89,7 @@ def init(name, version, maintainer):
         ))
 
 
-def list(no_trunc: bool):
+def ls(no_trunc: bool):
     projects = {}
     project_specs = API.project.get()
     metrics_server_running = API.check.check_metrics_server()
@@ -557,7 +557,6 @@ def update(file: Optional[str], project_key: Optional[str]):
     cur_project_yaml = json.loads(project['project_yaml'])
     image_tag = project['image']
 
-    utils.process_file(file)
     project = utils.get_project()
 
     kind = project['kind']
