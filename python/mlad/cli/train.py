@@ -24,9 +24,9 @@ from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest
 
 
 config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
-               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'POD_NAME',
-               'PROJECT', 'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS',
-               'S3_VERIFY_SSL', 'USERNAME'}
+               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
+               'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
+               'USERNAME'}
 
 
 def check_config_envs(name: str, app_spec: dict):
@@ -80,9 +80,9 @@ def up(file: Optional[str]):
     app_specs = []
     for name, app_spec in project.get('app', dict()).items():
         check_nvidia_plugin_installed(app_spec)
-        env_checked = check_config_envs(name, app_spec)
-        if env_checked:
-            yield env_checked
+        warning_msg = check_config_envs(name, app_spec)
+        if warning_msg:
+            yield warning_msg
         app_spec['name'] = name
         app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
         app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs, images[0])

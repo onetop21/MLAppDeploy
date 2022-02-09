@@ -72,9 +72,9 @@ def serve(file: Optional[str]):
     app_specs = []
     for name, app_spec in apps.items():
         train.check_nvidia_plugin_installed(app_spec)
-        env_checked = train.check_config_envs(name, app_spec)
-        if env_checked:
-            yield env_checked
+        warning_msg = train.check_config_envs(name, app_spec)
+        if warning_msg:
+            yield warning_msg
         app_spec['name'] = name
         app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
         app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs, images[0])
@@ -172,18 +172,20 @@ def update(project_key: str, file: Optional[str]):
     cur_apps = cur_project_yaml['app']
     update_apps = project['app']
 
-    def _validate(key: str, value: Union[str, list] = None):
+    def _validate(key: str):
         if key not in update_key_store:
             raise InvalidUpdateOptionError(key)
+
+    def _check_env(key: str, value: Union[str, list] = None):
         # Check env to protect MLAD config
+        env_checked = set()
         if key == 'env':
-            env_checked = set()
             if isinstance(value, list):
                 env_checked = set(value).intersection(train.config_envs)
             elif isinstance(value, str):
                 if value in train.config_envs:
                     env_checked.add(value)
-            return env_checked
+        return env_checked
 
     # Get diff from project yaml
     update_specs = []
@@ -203,32 +205,35 @@ def update(project_key: str, file: Optional[str]):
 
         diff_keys[name] = set()
         diffs = list(diff(app, update_app))
-        env_checked = set()
+        env_ignored = set()
         for diff_type, key, value in diffs:
             key_list = key.split('.')
             root_key = key_list[0]
             elem_key = key_list[1] if len(key_list) > 1 else None
 
             if diff_type == 'change':
-                validated = _validate(root_key, elem_key)
-                if validated:
-                    env_checked.update(validated)
+                _validate(root_key)
+                env_checked = _check_env(root_key, elem_key)
+                if len(env_checked) > 0:
+                    env_ignored.update(env_checked)
                 diff_keys[name].add(root_key)
             else:
                 if root_key != '':
-                    validated = _validate(root_key, [_[0] for _ in value])
-                    if validated:
-                        env_checked.update(validated)
+                    _validate(root_key)
+                    env_checked = _check_env(root_key, [_[0] for _ in value])
+                    if len(env_checked) > 0:
+                        env_ignored.update(env_checked)
                     diff_keys[name].add(root_key)
                 else:
-                    for key, value in value:
-                        validated = _validate(key, list(value.keys()))
-                        if validated:
-                            env_checked.update(validated)
-                        diff_keys[name].add(key)
+                    for root_key, elem in value:
+                        _validate(root_key)
+                        env_checked = _check_env(root_key, list(elem.keys()))
+                        if len(env_checked) > 0:
+                            env_ignored.update(env_checked)
+                        diff_keys[name].add(root_key)
 
-        if len(env_checked) > 0:
-            yield utils.print_info(f"Warning: '{name}' env {env_checked} "
+        if len(env_ignored) > 0:
+            yield utils.print_info(f"Warning: '{name}' env {env_ignored} "
                                    f"will be ignored for MLAD preferences.")
 
         if len(diff_keys[name]) > 0:

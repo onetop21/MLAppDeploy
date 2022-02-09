@@ -20,9 +20,9 @@ SHORT_LEN = 10
 
 
 config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
-               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'POD_NAME',
-               'PROJECT', 'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS',
-               'S3_VERIFY_SSL', 'USERNAME'}
+               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
+               'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
+               'USERNAME'}
 
 
 def get_api_client(config_file='~/.kube/config', context=None):
@@ -1013,8 +1013,7 @@ def update_apps(namespace, apps, cli=DEFAULT_CLI):
             if key in config_envs:
                 app['env']['update'].pop(key)
         current.update(app['env']['update'])
-        envs = [_create_V1Env(k, v).to_dict() for k, v in current.items() if k != 'POD_NAME']
-        envs.append(_create_V1Env('POD_NAME', field_path='metadata.name'))
+        envs = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
         body.append(_body("env", envs))
 
         try:
