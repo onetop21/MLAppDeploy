@@ -888,7 +888,6 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         labels['MLAD.PROJECT.APP'] = name
 
         constraints = app['constraints']
-        ingress = app['ingress'] if 'ingress' in app else None
         pv_mounts = app['mounts'] or []
         v_mounts = ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
 
@@ -921,9 +920,9 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                 raise DeprecatedError
             instances.append(ret)
 
-            if app['ports']:
-                ports = list(set(app['ports']))
-                ret = api.create_namespaced_service(namespace_name, client.V1Service(
+            if app['expose'] is not None:
+                ports = set([expose['port'] for expose in app['expose']])
+                api.create_namespaced_service(namespace_name, client.V1Service(
                     metadata=client.V1ObjectMeta(
                         name=name,
                         labels=labels
@@ -934,18 +933,21 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                                for port in ports]
                     )
                 ))
-
-            if ingress:
-                ingress_name = ingress['name']
-                path = ingress['path']
-                rewritePath = ingress['rewritePath']
-                port = int(ingress['port'])
-                ingress_path = path if path is not None else \
-                    f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
-                config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
-                create_ingress(cli, namespace_name, name, ingress_name, port, ingress_path, rewritePath)
-            else:
-                config_labels['MLAD.PROJECT.INGRESS'] = None
+                for expose in app['expose']:
+                    port = expose['port']
+                    ingress = expose['ingress']
+                    if ingress is not None:
+                        ingress = expose['ingress']
+                        path = ingress['path']
+                        rewrite_path = ingress['rewritePath']
+                        ingress_name = f'{name}-ingress-{port}'
+                        ingress_path = path if path is not None else \
+                            f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
+                        config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
+                        create_ingress(cli, namespace_name, name, ingress_name, port,
+                                       ingress_path, rewrite_path)
+                    else:
+                        config_labels['MLAD.PROJECT.INGRESS'] = None
 
             create_config_labels(cli, f'app-{name}-labels', namespace_name, config_labels)
         except ApiException as e:

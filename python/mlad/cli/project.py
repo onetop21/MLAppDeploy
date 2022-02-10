@@ -340,21 +340,9 @@ def up(file: Optional[str]):
     if not ingress_ctrl_running:
         yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
 
-    # Apply ingress for app
-    app_dict = project.get('app', dict())
-    ingress = project.get('ingress', dict())
-    for name, value in ingress.items():
-        app_name, port = value['target'].split(':')
-        if app_name in app_dict.keys():
-            app_dict[app_name]['ingress'] = {
-                'name': name,
-                'path': value['path'] if 'path' in value else None,
-                'rewritePath': value['rewritePath'],
-                'port': port
-            }
-
     # Check app specs
     app_specs = []
+    app_dict = project.get('app', dict())
     for name, app_spec in app_dict.items():
         check_nvidia_plugin_installed(app_spec)
         warning_msg = check_config_envs(name, app_spec)

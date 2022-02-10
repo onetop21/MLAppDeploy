@@ -147,7 +147,7 @@ def install(file_path: str, no_build: bool):
             cli.images.pull(image_name)
             image = cli.images.get(image_name)
         env = {**component.get('env', dict()), **config_core.get_env(dict=True)}
-        ports = component.get('ports', [])
+        ports = [expose['port'] for expose in component.get('expose', [])]
         command = component.get('command', [])
         if isinstance(command, str):
             command = command.split(' ')
