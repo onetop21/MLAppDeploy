@@ -185,11 +185,6 @@ x-definitions:
         default: never
         excludes: runSpec
         description: Restart policy for app. (never, onFailure, always)
-      scale: &scale               # Describe number of replicas or parallelism
-        type: integer
-        default: 1
-        excludes: runSpec
-        description: Number of replicas or parallelism.
       quota:                      # Describe required system resource quota.
         type: dict
         excludes: resources
@@ -209,11 +204,13 @@ x-definitions:
         allowed: [never, onFailure]
         default: never
         description: Restart policy for job. (never, onFailure)
-      scale:
-        <<: *scale
-        allowed: [1]
   - definition: &service
       <<: *app
+      scale:                  # Describe number of replicas or parallelism
+        type: integer
+        default: 1
+        excludes: runSpec
+        description: Number of replicas or parallelism.
       restartPolicy:
         <<: *restartPolicy
         allowed: [always]
