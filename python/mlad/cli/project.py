@@ -576,15 +576,14 @@ def update(file: Optional[str], project_key: Optional[str]):
         if key not in update_key_store:
             raise InvalidUpdateOptionError(key)
 
-    def _check_env(key: str, value: Union[str, list] = None):
+    def _check_env(env_key: Union[str, list] = None):
         # Check env to protect MLAD config
         env_checked = set()
-        if key == 'env':
-            if isinstance(value, list):
-                env_checked = set(value).intersection(config_envs)
-            elif isinstance(value, str):
-                if value in config_envs:
-                    env_checked.add(value)
+        if isinstance(env_key, list):
+            env_checked = set(env_key).intersection(config_envs)
+        elif isinstance(env_key, str):
+            if env_key in config_envs:
+                env_checked.add(env_key)
         return env_checked
 
     # Get diff from project yaml
@@ -599,7 +598,8 @@ def update(file: Optional[str], project_key: Optional[str]):
             'update': update_app['env'] if 'env' in update_app else {}
         }
 
-        update_spec = {key: (env if key == 'env' else update_app.get(key, None))
+        update_spec = {key: (env if key == 'env' else
+                             update_app.get(key, 1 if key == 'scale' else None))
                        for key in update_key_store}
         update_spec['name'] = name
 
@@ -613,23 +613,20 @@ def update(file: Optional[str], project_key: Optional[str]):
 
             if diff_type == 'change':
                 _validate(root_key)
-                env_checked = _check_env(root_key, elem_key)
-                if len(env_checked) > 0:
-                    env_ignored.update(env_checked)
+                if root_key == 'env':
+                    env_ignored.update(_check_env(elem_key))
                 diff_keys[name].add(root_key)
             else:
                 if root_key != '':
                     _validate(root_key)
-                    env_checked = _check_env(root_key, [_[0] for _ in value])
-                    if len(env_checked) > 0:
-                        env_ignored.update(env_checked)
+                    if root_key == 'env':
+                        env_ignored.update(_check_env([_[0] for _ in value]))
                     diff_keys[name].add(root_key)
                 else:
                     for root_key, elem in value:
                         _validate(root_key)
-                        env_checked = _check_env(root_key, list(elem.keys()))
-                        if len(env_checked) > 0:
-                            env_ignored.update(env_checked)
+                        if root_key == 'env':
+                            env_ignored.update(_check_env(list(elem.keys())))
                         diff_keys[name].add(root_key)
 
         if len(env_ignored) > 0:
