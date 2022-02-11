@@ -112,19 +112,6 @@ x-definitions:
         description: File that includes the files to be excluded from project.
         default: '.dockerignore'
         order: 1
-  - definition: &ingress
-      target:
-        type: string
-        regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9]):[0-9]+$"
-        required: true
-        description: Target app and port to expose with ingress. (<APP NAME>:<PORT>)
-      path:
-        type: string
-        description: Ingress path to access apps.
-      rewritePath:
-        type: boolean
-        default: true
-        description: Whether to use rewrite path.
   - definition: &component
       image:                      # Describe image to run docker service for run not built image from workspace.
         type: string
@@ -136,11 +123,17 @@ x-definitions:
         valuesrules:
           schema:
             type: string
-      ports:                      # Describe expose ports to other services.
+      expose:
         type: list
+        required: false
+        description: Expose the app.
         schema:
-          type: integer
-        description: Expose ports to other apps.
+          type: dict
+          schema:
+            port: &port
+              type: integer
+              required: true
+              description: Expose ports to other apps.
       command:                    # Describe command to need overwrite.
         type: [string, list]
         description: Commands to need overwrite.
@@ -192,11 +185,6 @@ x-definitions:
         default: never
         excludes: runSpec
         description: Restart policy for app. (never, onFailure, always)
-      scale: &scale               # Describe number of replicas or parallelism
-        type: integer
-        default: 1
-        excludes: runSpec
-        description: Number of replicas or parallelism.
       quota:                      # Describe required system resource quota.
         type: dict
         excludes: resources
@@ -216,16 +204,38 @@ x-definitions:
         allowed: [never, onFailure]
         default: never
         description: Restart policy for job. (never, onFailure)
-      scale:
-        <<: *scale
-        allowed: [1]
   - definition: &service
       <<: *app
+      scale:                  # Describe number of replicas or parallelism
+        type: integer
+        default: 1
+        excludes: runSpec
+        description: Number of replicas or parallelism.
       restartPolicy:
         <<: *restartPolicy
         allowed: [always]
         default: always
         description: Restart policy for service. (always)
+      expose:
+        type: list
+        required: false
+        description: Expose the app.
+        schema:
+          type: dict
+          schema:
+            port:
+              <<: *port
+            ingress:
+              type: dict
+              description: Ingress specs to expose apps.
+              schema:
+                path:
+                  type: string
+                  description: Ingress path to access apps.
+                rewritePath:
+                  type: boolean
+                  default: true
+                  description: Whether to use rewrite path.
   - definition: &_advanced_base
       resources:
         type: dict
@@ -336,17 +346,6 @@ __root__:
           dockerfile: *dockerfile
         order: 10
         description: Workspace specs to build project.
-      ingress:
-        type: dict
-        required: false
-        keysrules:
-          type: string
-          regex: "^([a-z]+[a-z0-9\\-]*[a-z0-9]+|[a-z0-9])$"
-        valuesrules:
-          type: dict
-          schema: *ingress
-        order: 20
-        description: Ingress specs to expose apps.
       app:
         type: dict
         keysrules:

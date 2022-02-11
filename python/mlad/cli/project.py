@@ -340,21 +340,9 @@ def up(file: Optional[str]):
     if not ingress_ctrl_running:
         yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
 
-    # Apply ingress for app
-    app_dict = project.get('app', dict())
-    ingress = project.get('ingress', dict())
-    for name, value in ingress.items():
-        app_name, port = value['target'].split(':')
-        if app_name in app_dict.keys():
-            app_dict[app_name]['ingress'] = {
-                'name': name,
-                'path': value['path'] if 'path' in value else None,
-                'rewritePath': value['rewritePath'],
-                'port': port
-            }
-
     # Check app specs
     app_specs = []
+    app_dict = project.get('app', dict())
     for name, app_spec in app_dict.items():
         check_nvidia_plugin_installed(app_spec)
         warning_msg = check_config_envs(name, app_spec)
@@ -579,24 +567,33 @@ def update(file: Optional[str], project_key: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
-    update_key_store = ['image', 'command', 'args', 'scale', 'env', 'quota']
+    default_update_spec = {
+        'image': None,
+        'command': None,
+        'args': None,
+        'scale': 1,
+        'env': {
+            'current': {},
+            'update': {}
+        },
+        'quota': None
+    }
 
     cur_apps = cur_project_yaml['app']
     update_apps = project['app']
 
     def _validate(key: str):
-        if key not in update_key_store:
+        if key not in default_update_spec.keys():
             raise InvalidUpdateOptionError(key)
 
-    def _check_env(key: str, value: Union[str, list] = None):
+    def _check_env(env_key: Union[str, list] = None):
         # Check env to protect MLAD config
         env_checked = set()
-        if key == 'env':
-            if isinstance(value, list):
-                env_checked = set(value).intersection(config_envs)
-            elif isinstance(value, str):
-                if value in config_envs:
-                    env_checked.add(value)
+        if isinstance(env_key, list):
+            env_checked = set(env_key).intersection(config_envs)
+        elif isinstance(env_key, str):
+            if env_key in config_envs:
+                env_checked.add(env_key)
         return env_checked
 
     # Get diff from project yaml
@@ -606,13 +603,14 @@ def update(file: Optional[str], project_key: Optional[str]):
         update_app = update_apps[name]
         update_app = utils.convert_tag_only_image_prop(update_app, image_tag)
 
-        env = {
-            'current': app['env'] if 'env' in app else {},
-            'update': update_app['env'] if 'env' in update_app else {}
-        }
-
-        update_spec = {key: (env if key == 'env' else update_app.get(key, None))
-                       for key in update_key_store}
+        update_spec = copy.deepcopy(default_update_spec)
+        for key in update_app:
+            if key == 'env':
+                update_spec[key]['update'] = update_app['env']
+            else:
+                update_spec[key] = update_app[key]
+        if 'env' in app:
+            update_spec['env']['current'] = app['env']
         update_spec['name'] = name
 
         diff_keys[name] = set()
@@ -625,23 +623,20 @@ def update(file: Optional[str], project_key: Optional[str]):
 
             if diff_type == 'change':
                 _validate(root_key)
-                env_checked = _check_env(root_key, elem_key)
-                if len(env_checked) > 0:
-                    env_ignored.update(env_checked)
+                if root_key == 'env':
+                    env_ignored.update(_check_env(elem_key))
                 diff_keys[name].add(root_key)
             else:
                 if root_key != '':
                     _validate(root_key)
-                    env_checked = _check_env(root_key, [_[0] for _ in value])
-                    if len(env_checked) > 0:
-                        env_ignored.update(env_checked)
+                    if root_key == 'env':
+                        env_ignored.update(_check_env([_[0] for _ in value]))
                     diff_keys[name].add(root_key)
                 else:
                     for root_key, elem in value:
                         _validate(root_key)
-                        env_checked = _check_env(root_key, list(elem.keys()))
-                        if len(env_checked) > 0:
-                            env_ignored.update(env_checked)
+                        if root_key == 'env':
+                            env_ignored.update(_check_env(list(elem.keys())))
                         diff_keys[name].add(root_key)
 
         if len(env_ignored) > 0:
