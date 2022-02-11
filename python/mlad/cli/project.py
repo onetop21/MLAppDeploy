@@ -278,15 +278,14 @@ def ingress():
 
     rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PORT', 'PATH')]
     for spec in specs:
-        if len(spec['ingress']) > 0:
-            username = spec['username']
-            project_name = spec['project']
-            app_name = spec['name']
-            key = spec['key']
-            for ingress in spec['ingress']:
-                port = ingress['port']
-                path = ingress['path']
-                rows.append((username, project_name, app_name, key, port, path))
+        username = spec['username']
+        project_name = spec['project']
+        app_name = spec['name']
+        key = spec['key']
+        for ingress in spec['ingress']:
+            port = ingress['port']
+            path = ingress['path']
+            rows.append((username, project_name, app_name, key, port, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
 
