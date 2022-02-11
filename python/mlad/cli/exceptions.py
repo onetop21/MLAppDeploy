@@ -129,4 +129,9 @@ class PluginUninstalledError(MLADException):
 
 
 class ProjectDeletedError(MLADException):
-    pass
+
+    def __init__(self, key: str):
+        self.key = key
+
+    def __str__(self):
+        return f'Project [{self.key}] is deleted.'
