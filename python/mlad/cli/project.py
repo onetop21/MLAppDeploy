@@ -18,7 +18,7 @@ from mlad.cli import config as config_core
 from mlad.cli.editor import run_editor
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
-    MountError, PluginUninstalledError, InvalidUpdateOptionError
+    MountError, PluginUninstalledError, InvalidUpdateOptionError, ProjectDeletedError
 )
 from mlad.core.docker import controller as docker_ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
@@ -176,6 +176,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
     # Raise exception if the target project is not found.
     try:
         project = API.project.inspect(project_key=project_key)
+        if 'deleted' in project and project['deleted']:
+            raise ProjectDeletedError(project['key'])
         apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
         if metrics_server_running:
@@ -276,15 +278,16 @@ def ingress():
     if not ingress_ctrl_running:
         yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
 
-    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
+    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PORT', 'PATH')]
     for spec in specs:
-        if spec['ingress'] != '':
-            username = spec['username']
-            project_name = spec['project']
-            app_name = spec['name']
-            key = spec['key']
-            path = spec['ingress']
-            rows.append((username, project_name, app_name, key, path))
+        username = spec['username']
+        project_name = spec['project']
+        app_name = spec['name']
+        key = spec['key']
+        for ingress in spec['ingress']:
+            port = ingress['port']
+            path = ingress['path']
+            rows.append((username, project_name, app_name, key, port, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
 
@@ -396,8 +399,10 @@ def up(file: Optional[str]):
 
     # Get ingress path for deployed app
     for app in res:
-        if app['ingress']:
-            yield utils.print_info(f'[{app["name"]}] Ingress Path : {app["ingress"]}')
+        if len(app['ingress']) > 0:
+            yield utils.print_info(f'[{app["name"]}] Ingress Path :')
+            for ingress in app['ingress']:
+                yield utils.print_info(f'- port: {ingress["port"]} -> {ingress["path"]}')
 
 
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):

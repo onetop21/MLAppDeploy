@@ -126,3 +126,12 @@ class MountError(MLADException):
 
 class PluginUninstalledError(MLADException):
     pass
+
+
+class ProjectDeletedError(MLADException):
+
+    def __init__(self, key: str):
+        self.key = key
+
+    def __str__(self):
+        return f'Project [{self.key}] is deleted.'
