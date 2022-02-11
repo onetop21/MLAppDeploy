@@ -276,15 +276,17 @@ def ingress():
     if not ingress_ctrl_running:
         yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
 
-    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PATH')]
+    rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PORT', 'PATH')]
     for spec in specs:
-        if spec['ingress'] != '':
+        if len(spec['ingress']) > 0:
             username = spec['username']
             project_name = spec['project']
             app_name = spec['name']
             key = spec['key']
-            path = spec['ingress']
-            rows.append((username, project_name, app_name, key, path))
+            for ingress in spec['ingress']:
+                port = ingress['port']
+                path = ingress['path']
+                rows.append((username, project_name, app_name, key, port, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
 
@@ -396,8 +398,10 @@ def up(file: Optional[str]):
 
     # Get ingress path for deployed app
     for app in res:
-        if app['ingress']:
-            yield utils.print_info(f'[{app["name"]}] Ingress Path : {app["ingress"]}')
+        if len(app['ingress']) > 0:
+            yield utils.print_info(f'[{app["name"]}] Ingress Path :')
+            for ingress in app['ingress']:
+                yield utils.print_info(f'- port: {ingress["port"]} -> {ingress["path"]}')
 
 
 def down(file: Optional[str], project_key: Optional[str], no_dump: bool):

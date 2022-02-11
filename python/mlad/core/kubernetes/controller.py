@@ -515,7 +515,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': [port_spec.port for port_spec in service.spec.ports] if service is not None else [],
-        'ingress': config_labels.get('MLAD.PROJECT.INGRESS'),
+        'ingress': json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '')),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
     }
@@ -920,6 +920,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                 raise DeprecatedError
             instances.append(ret)
 
+            ingress_specs = []
             if app['expose'] is not None:
                 ports = set([expose['port'] for expose in app['expose']])
                 api.create_namespaced_service(namespace_name, client.V1Service(
@@ -943,12 +944,10 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                         ingress_name = f'{name}-ingress-{port}'
                         ingress_path = path if path is not None else \
                             f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
-                        config_labels['MLAD.PROJECT.INGRESS'] = ingress_path
+                        ingress_specs.append({'port': port, 'path': ingress_path})
                         create_ingress(cli, namespace_name, name, ingress_name, port,
                                        ingress_path, rewrite_path)
-                    else:
-                        config_labels['MLAD.PROJECT.INGRESS'] = None
-
+            config_labels['MLAD.PROJECT.INGRESS'] = json.dumps(ingress_specs)
             create_config_labels(cli, f'app-{name}-labels', namespace_name, config_labels)
         except ApiException as e:
             msg, status = exceptions.handle_k8s_api_error(e)
