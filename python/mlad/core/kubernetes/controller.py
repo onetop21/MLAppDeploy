@@ -962,15 +962,14 @@ def update_apps(namespace, update_yaml, update_specs, cli=DEFAULT_CLI):
         raise TypeError('Parameter is not a valid type.')
     if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
         raise TypeError('Parameter is not a valid type.')
-    namespace_name = namespace.metadata.name
     results = []
     for update_spec in update_specs:
         update_spec = update_spec.dict()
         app_name = update_spec['name']
         if update_yaml['app'][app_name]['kind'] == 'Service':
-            results.append(_update_k8s_deployment(cli, namespace_name, update_spec))
+            results.append(_update_k8s_deployment(cli, namespace, update_spec))
         else:
-            results.append(_update_k8s_job(cli, namespace_name, update_spec))
+            results.append(_update_k8s_job(cli, namespace, update_spec))
     return results
 
 
@@ -980,6 +979,7 @@ def _update_k8s_deployment(cli, namespace, update_spec):
     command = update_spec['command'] or []
     args = update_spec['args'] or []
     quota = update_spec['quota'] or {}
+    namespace_name = namespace.metadata.name
 
     resources = _resources_to_V1Resource(resources=quota).to_dict()
 
@@ -1013,7 +1013,7 @@ def _update_k8s_deployment(cli, namespace, update_spec):
         body.append(_body("image", namespace_spec['image']))
 
     # update env
-    deployment = get_deployment(app_name, namespace, cli)
+    deployment = get_deployment(app_name, namespace_name, cli)
     container_spec = deployment.spec.template.spec.containers[0]
     current = {env.name: env.value for env in container_spec.env}
     for key in list(update_spec['env']['current'].keys()):
@@ -1030,7 +1030,7 @@ def _update_k8s_deployment(cli, namespace, update_spec):
         cause = {"kubernetes.io/change-cause": f"MLAD:{update_spec}"}
         body.append(_body("annotations", cause, "metadata"))
         api = client.AppsV1Api(cli)
-        return api.patch_namespaced_deployment(app_name, namespace, body=body)
+        return api.patch_namespaced_deployment(app_name, namespace_name, body=body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         err_msg = f'Failed to update apps: {msg}'
@@ -1043,6 +1043,7 @@ def _update_k8s_job(cli, namespace, update_spec):
     command = update_spec['command'] or []
     args = update_spec['args'] or []
     quota = update_spec['quota'] or {}
+    namespace_name = namespace.metadata.name
 
     resources = _resources_to_V1Resource(resources=quota)
 
@@ -1052,7 +1053,7 @@ def _update_k8s_job(cli, namespace, update_spec):
         args = args.split()
     command += args
 
-    k8s_job = get_app_from_kind(cli, app_name, namespace, 'Job')
+    k8s_job = get_app_from_kind(cli, app_name, namespace_name, 'Job')
     # remove invalid properties to re-run the job
     k8s_job.metadata = client.V1ObjectMeta(name=k8s_job.metadata.name, labels=k8s_job.metadata.labels)
     k8s_job.spec.selector = None
@@ -1080,16 +1081,16 @@ def _update_k8s_job(cli, namespace, update_spec):
     container_spec.env = env
     try:
         api = client.BatchV1Api(cli)
-        api.delete_namespaced_job(app_name, namespace, propagation_policy='Foreground')
+        api.delete_namespaced_job(app_name, namespace_name, propagation_policy='Foreground')
         w = watch.Watch()
         for event in w.stream(
                 func=api.list_namespaced_job,
-                namespace=namespace,
+                namespace=namespace_name,
                 field_selector=f'metadata.name={app_name}',
                 timeout_seconds=180):
             if event['type'] == 'DELETED':
                 w.stop()
-        return api.create_namespaced_job(namespace, body=k8s_job)
+        return api.create_namespaced_job(namespace_name, body=k8s_job)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         err_msg = f'Failed to update apps: {msg}'
