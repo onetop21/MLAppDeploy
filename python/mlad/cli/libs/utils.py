@@ -218,6 +218,7 @@ def print_table(data, no_data_msg=None, max_width=32, upper=True):
     for datum in data:
         datum = [_ if not isinstance(_, str) or len(_) <= w else f"{_[:w-3]}..."
                  for _, w in zip(datum, widths)]
+        datum = ['None' if _ is None else _ for _ in datum]
         if firstline:
             if upper:
                 print(format.format(*datum).upper())

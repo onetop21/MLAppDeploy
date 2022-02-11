@@ -815,7 +815,8 @@ def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_
                 ),
                 selector=client.V1LabelSelector(
                     match_labels={'mount': f'{name}-{pv_index}'}
-                )
+                ),
+                storage_class_name=''
             )
         )
     )
