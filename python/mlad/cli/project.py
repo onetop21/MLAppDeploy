@@ -18,7 +18,7 @@ from mlad.cli import config as config_core
 from mlad.cli.editor import run_editor
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
-    MountError, PluginUninstalledError, InvalidUpdateOptionError
+    MountError, PluginUninstalledError, InvalidUpdateOptionError, ProjectDeletedError
 )
 from mlad.core.docker import controller as docker_ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
@@ -176,6 +176,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
     # Raise exception if the target project is not found.
     try:
         project = API.project.inspect(project_key=project_key)
+        if 'deleted' in project and project['deleted']:
+            raise ProjectDeletedError(project['key'])
         apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
         if metrics_server_running:

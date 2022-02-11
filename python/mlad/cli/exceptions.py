@@ -126,3 +126,7 @@ class MountError(MLADException):
 
 class PluginUninstalledError(MLADException):
     pass
+
+
+class ProjectDeletedError(MLADException):
+    pass
