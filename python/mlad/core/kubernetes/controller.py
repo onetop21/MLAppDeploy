@@ -1008,6 +1008,9 @@ def _update_k8s_deployment(cli, namespace, update_spec):
 
     if update_spec['image'] is not None:
         body.append(_body("image", update_spec['image']))
+    else:
+        namespace_spec = inspect_namespace(namespace, cli)
+        body.append(_body("image", namespace_spec['image']))
 
     # update env
     deployment = get_deployment(app_name, namespace, cli)
@@ -1070,6 +1073,10 @@ def _update_k8s_job(cli, namespace, update_spec):
     container_spec.resources = resources
     if image is not None:
         container_spec.image = image
+    else:
+        namespace_spec = inspect_namespace(namespace, cli)
+        container_spec.image = namespace_spec['image']
+
     container_spec.env = env
     try:
         api = client.BatchV1Api(cli)
