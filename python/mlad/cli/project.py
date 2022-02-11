@@ -567,13 +567,23 @@ def update(file: Optional[str], project_key: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
-    update_key_store = ['image', 'command', 'args', 'scale', 'env', 'quota']
+    default_update_spec = {
+        'image': None,
+        'command': None,
+        'args': None,
+        'scale': 1,
+        'env': {
+            'current': {},
+            'update': {}
+        },
+        'quota': None
+    }
 
     cur_apps = cur_project_yaml['app']
     update_apps = project['app']
 
     def _validate(key: str):
-        if key not in update_key_store:
+        if key not in default_update_spec.keys():
             raise InvalidUpdateOptionError(key)
 
     def _check_env(env_key: Union[str, list] = None):
@@ -593,14 +603,14 @@ def update(file: Optional[str], project_key: Optional[str]):
         update_app = update_apps[name]
         update_app = utils.convert_tag_only_image_prop(update_app, image_tag)
 
-        env = {
-            'current': app['env'] if 'env' in app else {},
-            'update': update_app['env'] if 'env' in update_app else {}
-        }
-
-        update_spec = {key: (env if key == 'env' else
-                             update_app.get(key, 1 if key == 'scale' else None))
-                       for key in update_key_store}
+        update_spec = copy.deepcopy(default_update_spec)
+        for key in update_app:
+            if key == 'env':
+                update_spec[key]['update'] = update_app['env']
+            else:
+                update_spec[key] = update_app[key]
+        if 'env' in app:
+            update_spec['env']['current'] = app['env']
         update_spec['name'] = name
 
         diff_keys[name] = set()
