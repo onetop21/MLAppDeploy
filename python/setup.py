@@ -38,7 +38,7 @@ def main():
             'kubernetes>=19.0.0,<20.0.0',
             'PyJWT>=2.1.0,<3.0.0',
             'dictdiffer==0.9.0',
-            'cerberus-document-editor==0.0.5'
+            'cerberus-document-editor==0.0.8'
         ],
         package_data={
             'mlad.cli.validator': ['schema.yaml']
