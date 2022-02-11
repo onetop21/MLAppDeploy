@@ -151,7 +151,7 @@ def inspect_namespace(namespace, cli=DEFAULT_CLI):
         'version': config_labels['MLAD.PROJECT.VERSION'],
         'base': config_labels['MLAD.PROJECT.BASE'],
         'image': config_labels['MLAD.PROJECT.IMAGE'],
-        'kind': config_labels.get('MLAD.PROJECT.KIND', 'Train'),
+        'kind': config_labels.get('MLAD.PROJECT.KIND', 'Deployment'),
         'created': namespace.metadata.creation_timestamp,
         'project_yaml': (namespace.metadata.annotations or dict()).get('MLAD.PROJECT.YAML', '{}')
     }
@@ -779,7 +779,7 @@ def _create_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
             ),
             spec=client.V1PersistentVolumeSpec(
                 capacity={'storage': '10Gi'},
-                access_modes=['ReadWriteOnce'],
+                access_modes=['ReadWriteMany'],
                 mount_options=pv_mount['options'],
                 nfs=client.V1NFSVolumeSource(
                     path=pv_mount['serverPath'],
@@ -809,7 +809,7 @@ def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_
                 name=pvc_name
             ),
             spec=client.V1PersistentVolumeClaimSpec(
-                access_modes=['ReadWriteOnce'],
+                access_modes=['ReadWriteMany'],
                 resources=client.V1ResourceRequirements(
                     requests={'storage': '10Gi'}
                 ),
@@ -908,7 +908,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                 _create_pv(name, pv_index, pv_mount)
                 pvc_specs.append({
                     'name': _create_pvc(name, pv_index, pv_mount, namespace_name),
-                    'mountPath': pv_mount['mountPath'] 
+                    'mountPath': pv_mount['mountPath']
                 })
 
             if kind == 'Job':
@@ -955,77 +955,144 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     return instances
 
 
-def update_apps(namespace, apps, cli=DEFAULT_CLI):
+def update_apps(namespace, update_yaml, update_specs, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
+        raise TypeError('Parameter is not a valid type.')
     if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not valid type.')
-    api = client.AppsV1Api(cli)
-    namespace = namespace.metadata.name
+        raise TypeError('Parameter is not a valid type.')
+    results = []
+    for update_spec in update_specs:
+        update_spec = update_spec.dict()
+        app_name = update_spec['name']
+        if update_yaml['app'][app_name]['kind'] == 'Service':
+            results.append(_update_k8s_deployment(cli, namespace, update_spec))
+        else:
+            results.append(_update_k8s_job(cli, namespace, update_spec))
+    return results
 
-    instances = []
-    for app in apps:
-        app = app.dict()
-        app_name = app['name']
 
-        scale = app['scale']
-        command = app['command'] or []
-        args = app['args'] or []
-        quota = app['quota'] or {}
+def _update_k8s_deployment(cli, namespace, update_spec):
+    app_name = update_spec['name']
+    scale = update_spec['scale']
+    command = update_spec['command'] or []
+    args = update_spec['args'] or []
+    quota = update_spec['quota'] or {}
+    namespace_name = namespace.metadata.name
 
-        # parse
-        resources = _resources_to_V1Resource(resources=quota).to_dict()
+    resources = _resources_to_V1Resource(resources=quota).to_dict()
 
-        if isinstance(command, str):
-            command = command.split()
-        if isinstance(args, str):
-            args = args.split()
-        command += args
+    if isinstance(command, str):
+        command = command.split()
+    if isinstance(args, str):
+        args = args.split()
+    command += args
 
-        def _body(option: str, value: str, spec: str = "container"):
-            if spec == "container":
-                path = f"/spec/template/spec/containers/0/{option}"
-            elif spec == "deployment":
-                path = f"/spec/{option}"
-            elif spec == "metadata":
-                path = f"/metadata/{option}"
-            return {"op": "replace", "path": path, "value": value}
+    def _body(option: str, value: str, spec: str = "container"):
+        if spec == "container":
+            path = f"/spec/template/spec/containers/0/{option}"
+        elif spec == "deployment":
+            path = f"/spec/{option}"
+        elif spec == "metadata":
+            path = f"/metadata/{option}"
+        return {"op": "replace", "path": path, "value": value}
 
-        # update
-        body = []
-        body.append(_body("replicas", scale, "deployment"))
-        body.append(_body("command", command))
+    # update
+    body = []
+    body.append(_body("replicas", scale, "deployment"))
+    body.append(_body("command", command))
 
-        for resource in resources:
-            body.append(_body(f"resources/{resource}", resources[resource]))
+    for resource in resources:
+        body.append(_body(f"resources/{resource}", resources[resource]))
 
-        if app['image'] is not None:
-            body.append(_body("image", app['image']))
+    if update_spec['image'] is not None:
+        body.append(_body("image", update_spec['image']))
+    else:
+        namespace_spec = inspect_namespace(namespace, cli)
+        body.append(_body("image", namespace_spec['image']))
 
-        # update env
-        deployment = get_deployment(app_name, namespace, cli)
-        container_spec = deployment.spec.template.spec.containers[0]
-        current = {env.name: env.value for env in container_spec.env}
-        for key in list(app['env']['current'].keys()):
-            if key not in config_envs:
-                current.pop(key)
-        for key in list(app['env']['update'].keys()):
-            if key in config_envs:
-                app['env']['update'].pop(key)
-        current.update(app['env']['update'])
-        envs = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
-        body.append(_body("env", envs))
+    # update env
+    deployment = get_deployment(app_name, namespace_name, cli)
+    container_spec = deployment.spec.template.spec.containers[0]
+    current = {env.name: env.value for env in container_spec.env}
+    for key in list(update_spec['env']['current'].keys()):
+        if key not in config_envs:
+            current.pop(key)
+    for key in list(update_spec['env']['update'].keys()):
+        if key in config_envs:
+            update_spec['env']['update'].pop(key)
+    current.update(update_spec['env']['update'])
+    envs = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
+    body.append(_body("env", envs))
 
-        try:
-            cause = {"kubernetes.io/change-cause": f"MLAD:{app}"}
-            body.append(_body("annotations", cause, "metadata"))
-            res = api.patch_namespaced_deployment(app_name, namespace, body=body)
-            instances.append(res)
-        except ApiException as e:
-            msg, status = exceptions.handle_k8s_api_error(e)
-            err_msg = f'Failed to update apps: {msg}'
-            raise exceptions.APIError(err_msg, status)
-    return instances
+    try:
+        cause = {"kubernetes.io/change-cause": f"MLAD:{update_spec}"}
+        body.append(_body("annotations", cause, "metadata"))
+        api = client.AppsV1Api(cli)
+        return api.patch_namespaced_deployment(app_name, namespace_name, body=body)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        err_msg = f'Failed to update apps: {msg}'
+        raise exceptions.APIError(err_msg, status)
+
+
+def _update_k8s_job(cli, namespace, update_spec):
+    app_name = update_spec['name']
+    image = update_spec['image']
+    command = update_spec['command'] or []
+    args = update_spec['args'] or []
+    quota = update_spec['quota'] or {}
+    namespace_name = namespace.metadata.name
+
+    resources = _resources_to_V1Resource(resources=quota)
+
+    if isinstance(command, str):
+        command = command.split()
+    if isinstance(args, str):
+        args = args.split()
+    command += args
+
+    k8s_job = get_app_from_kind(cli, app_name, namespace_name, 'Job')
+    # remove invalid properties to re-run the job
+    k8s_job.metadata = client.V1ObjectMeta(name=k8s_job.metadata.name, labels=k8s_job.metadata.labels)
+    k8s_job.spec.selector = None
+    del k8s_job.spec.template.metadata.labels['controller-uid']
+
+    container_spec = k8s_job.spec.template.spec.containers[0]
+    current = {env.name: env.value for env in container_spec.env}
+    for key in list(update_spec['env']['current'].keys()):
+        if key not in config_envs:
+            current.pop(key)
+    for key in list(update_spec['env']['update'].keys()):
+        if key in config_envs:
+            update_spec['env']['update'].pop(key)
+    current.update(update_spec['env']['update'])
+    env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
+
+    container_spec.command = command
+    container_spec.resources = resources
+    if image is not None:
+        container_spec.image = image
+    else:
+        namespace_spec = inspect_namespace(namespace, cli)
+        container_spec.image = namespace_spec['image']
+
+    container_spec.env = env
+    try:
+        api = client.BatchV1Api(cli)
+        api.delete_namespaced_job(app_name, namespace_name, propagation_policy='Foreground')
+        w = watch.Watch()
+        for event in w.stream(
+                func=api.list_namespaced_job,
+                namespace=namespace_name,
+                field_selector=f'metadata.name={app_name}',
+                timeout_seconds=180):
+            if event['type'] == 'DELETED':
+                w.stop()
+        return api.create_namespaced_job(namespace_name, body=k8s_job)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        err_msg = f'Failed to update apps: {msg}'
+        raise exceptions.APIError(err_msg, status)
 
 
 def _delete_job(cli, name, namespace):

@@ -77,9 +77,9 @@ class Project(APIBase):
     def resource(self, project_key):
         return self._get(f'/{project_key}/resource')
 
-    def update(self, project_key, update_yaml, apps):
+    def update(self, project_key, update_yaml, update_specs):
         body = {
             'update_yaml': update_yaml,
-            'apps': apps
+            'update_specs': update_specs
         }
         return self._post(f'/{project_key}', body=body)

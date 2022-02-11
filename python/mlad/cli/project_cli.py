@@ -1,8 +1,7 @@
 import getpass
 import click
-from typing import Optional
-from mlad.cli import project
-from mlad.cli import train_cli, deploy_cli
+from typing import Optional, List
+from mlad.cli import project, config
 from mlad.cli.libs import utils, MutuallyExclusiveOption
 from mlad.cli.autocompletion import list_project_keys
 
@@ -32,8 +31,9 @@ def edit(file: Optional[str]):
 @echo_exception
 def ls(no_trunc: bool):
     '''Display projects deployed on the cluster.'''
-    for line in project.list(no_trunc):
+    for line in project.ls(no_trunc):
         click.echo(line)
+
 
 @click.command()
 @click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
@@ -82,28 +82,77 @@ def ingress():
         click.echo(line)
 
 
-@click.group()
+@click.command()
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
+)
 @echo_exception
-def train():
-    '''Create and manage Train objects.'''
-    pass
+def up(file: Optional[str]):
+    '''Deploy and run a Train object on the cluster.'''
+    for line in project.up(file):
+        click.echo(line)
 
 
-train.add_command(train_cli.up)
-train.add_command(train_cli.down)
-
-
-@click.group()
+@click.command()
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
+)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
+              autocompletion=list_project_keys)
+@click.option('--no-dump', is_flag=True,
+              help='Don\'t save the log before shutting down the apps.')
 @echo_exception
-def deploy():
-    '''Create and manage Deployment objects.'''
-    pass
+def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
+    '''Stop and remove the Train object on the cluster.'''
+    lines = project.down_force(file, project_key, no_dump) if config.validate_kubeconfig() \
+        else project.down(file, project_key, no_dump)
+    for line in lines:
+        click.echo(line)
 
 
-deploy.add_command(deploy_cli.serve)
-deploy.add_command(deploy_cli.update)
-deploy.add_command(deploy_cli.kill)
-deploy.add_command(deploy_cli.scale)
+@click.command()
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
+)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
+              autocompletion=list_project_keys)
+@echo_exception
+def update(file: Optional[str], project_key: Optional[str]):
+    '''Update deployed service with updated project file.\n
+    Valid options for updates: [image, command, args, scale, env, quota]'''
+    for line in project.update(file, project_key):
+        click.echo(line)
+
+
+@click.command()
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.'),
+    cls=MutuallyExclusiveOption, mutually_exclusive=['project_key']
+)
+@click.option('--project-key', '-k', help='Project Key', default=None,
+              cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
+              autocompletion=list_project_keys)
+@click.argument('scales', required=True, nargs=-1)
+@echo_exception
+def scale(file: Optional[str], project_key: Optional[str], scales: List[str]):
+    '''Change the scale of one of the running apps.\n
+    Format: mlad deploy scale [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
+    '''
+    parsed_scales = []
+    for scale in scales:
+        app_name, value = scale.split('=')
+        value = int(value)
+        parsed_scales.append((app_name, value))
+    for line in project.scale(file, project_key, parsed_scales):
+        click.echo(line)
 
 
 @click.group('project')
@@ -118,5 +167,7 @@ cli.add_command(ls)
 cli.add_command(ps)
 cli.add_command(logs)
 cli.add_command(ingress)
-cli.add_command(train)
-cli.add_command(deploy)
+cli.add_command(up)
+cli.add_command(down)
+cli.add_command(update)
+cli.add_command(scale)

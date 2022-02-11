@@ -102,15 +102,6 @@ class InvalidUpdateOptionError(MLADException):
         return f'"{self.key}" cannot be updated. Check the schema for update.'
 
 
-class NotRunningTrainError(MLADException):
-
-    def __init__(self, key: str):
-        self.key = key
-
-    def __str__(self):
-        return f'There is no running Train object (project key: {self.key})'
-
-
 class InvalidFileTypeError(MLADException):
 
     def __init__(self, type: str):
