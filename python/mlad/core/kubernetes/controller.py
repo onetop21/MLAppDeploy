@@ -515,7 +515,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': [port_spec.port for port_spec in service.spec.ports] if service is not None else [],
-        'ingress': json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '')),
+        'ingress': json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]')),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
     }
