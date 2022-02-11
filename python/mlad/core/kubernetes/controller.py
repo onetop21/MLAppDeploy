@@ -493,6 +493,11 @@ def inspect_app(app, cli=DEFAULT_CLI):
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
     service = get_app_service(cli, namespace, name)
+    try:
+        ingress = json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]'))
+    except json.decoder.JSONDecodeError:
+        ingress = [config_labels.get('MLAD.PROJECT.INGRESS', '')]
+        
     spec = {
         'key': config_labels['MLAD.PROJECT'] if config_labels.get(
             'MLAD.VERSION') else '',
@@ -515,7 +520,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
         'ports': [port_spec.port for port_spec in service.spec.ports] if service is not None else [],
-        'ingress': json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]')),
+        'ingress': ingress,
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
     }
