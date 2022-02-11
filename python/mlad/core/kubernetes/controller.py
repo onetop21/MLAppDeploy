@@ -496,8 +496,11 @@ def inspect_app(app, cli=DEFAULT_CLI):
     try:
         ingress = json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]'))
     except json.decoder.JSONDecodeError:
-        ingress = [config_labels.get('MLAD.PROJECT.INGRESS', '')]
-        
+        path = config_labels.get('MLAD.PROJECT.INGRESS', '')
+        ingress = []
+        if path != '':
+            ingress.append({'port': '-', 'path': path})
+
     spec = {
         'key': config_labels['MLAD.PROJECT'] if config_labels.get(
             'MLAD.VERSION') else '',
