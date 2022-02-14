@@ -48,7 +48,7 @@ def uninstall(name: str):
 @click.command()
 @echo_exception
 def status():
-    """Show a status of the MLAD board and list installed components."""
+    """Show the status of the MLAD board and list installed components."""
     for line in board.status():
         click.echo(line)
 
