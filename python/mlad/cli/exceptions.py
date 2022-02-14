@@ -47,6 +47,15 @@ class InvalidPropertyError(MLADException):
         return f'There is no matched key in "{self._arg}".'
 
 
+class InvalidSetPropertyError(MLADException):
+
+    def __init__(self, arg: str):
+        self._arg = arg
+
+    def __str__(self):
+        return f'Config set command should be applied to the leaf keys: {self._arg}'
+
+
 class MLADBoardNotActivatedError(MLADException):
 
     def __str__(self):
