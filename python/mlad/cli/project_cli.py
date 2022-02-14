@@ -77,7 +77,7 @@ def logs(file: Optional[str], project_key: Optional[str],
 @click.command()
 @echo_exception
 def ingress():
-    '''Show the ingress information of running services.'''
+    '''Show the ingress information of running apps.'''
     for line in project.ingress():
         click.echo(line)
 
@@ -143,7 +143,7 @@ def update(file: Optional[str], project_key: Optional[str]):
 @click.argument('scales', required=True, nargs=-1)
 @echo_exception
 def scale(file: Optional[str], project_key: Optional[str], scales: List[str]):
-    '''Change the scale of one of the running apps. Only for service apps.\n
+    '''Change the scale of one of the running apps. Only for apps with kind service.\n
     Format: mlad scale [APP_NAME1]=[SCALE1] [APP_NAME2]=[SCALE2]
     '''
     parsed_scales = []
@@ -157,7 +157,7 @@ def scale(file: Optional[str], project_key: Optional[str], scales: List[str]):
 
 @click.group('project')
 def cli():
-    '''Commands for creating and monitoring project objects.'''
+    '''Commands for creating and monitoring projects.'''
     pass
 
 
