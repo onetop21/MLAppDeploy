@@ -87,7 +87,7 @@ admin_cli.add_command(label)
 
 @click.group('node')
 def cli():
-    '''Show connected nodes'''
+    '''Show connected nodes.'''
 
 
 cli.add_command(ls)
