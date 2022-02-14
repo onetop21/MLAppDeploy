@@ -49,7 +49,7 @@ def prev():
 
 
 @click.command()
-@click.argument('NAME', required=True)
+@click.argument('NAME', required=True, autocompletion=list_config_names)
 @echo_exception
 def delete(name: str):
     """Delete the config."""
@@ -58,11 +58,11 @@ def delete(name: str):
 
 
 @click.command()
-@click.argument('NAME', required=True)
+@click.argument('NAME', required=True, autocompletion=list_config_names)
 @click.argument('KEY', required=False)
 @echo_exception
 def get(name: str, key: Optional[str]):
-    """Display a detail specification of the config."""
+    """Display the detail specification of the config."""
     ret = config.get(name, key)
     try:
         click.echo(OmegaConf.to_yaml(ret)[:-1])
@@ -71,7 +71,7 @@ def get(name: str, key: Optional[str]):
 
 
 @click.command()
-@click.argument('NAME', required=True)
+@click.argument('NAME', required=True, autocompletion=list_config_names)
 @click.argument('ARGS', required=True, nargs=-1)
 @echo_exception
 def set(name, args):
