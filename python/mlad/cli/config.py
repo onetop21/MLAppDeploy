@@ -8,7 +8,7 @@ from omegaconf import OmegaConf
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
     ConfigNotFoundError, CannotDeleteConfigError, InvalidPropertyError,
-    ConfigAlreadyExistError
+    ConfigAlreadyExistError, InvalidSetPropertyError
 )
 
 
@@ -200,7 +200,9 @@ def set(name: str, *args) -> None:
             value = config
             for key in keys:
                 value = value[key]
-    except Exception:
+            if isinstance(value, omegaconf.dictconfig.DictConfig):
+                raise InvalidSetPropertyError(arg)
+    except omegaconf.errors.ConfigKeyError:
         raise InvalidPropertyError(arg)
 
     config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
