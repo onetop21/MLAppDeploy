@@ -53,7 +53,7 @@ class InvalidSetPropertyError(MLADException):
         self._arg = arg
 
     def __str__(self):
-        return f'Config set command should be applied the leaf key: {self._arg}'
+        return f'Config set command should be applied to the leaf keys: {self._arg}'
 
 
 class MLADBoardNotActivatedError(MLADException):
