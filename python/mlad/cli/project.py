@@ -15,7 +15,6 @@ from dictdiffer import diff
 from mlad.cli.libs import utils, interrupt_handler
 from mlad.cli.format import PROJECT
 from mlad.cli import config as config_core
-from mlad.cli.editor import run_editor
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
     MountError, PluginUninstalledError, InvalidUpdateOptionError, ProjectDeletedError
@@ -294,6 +293,7 @@ def ingress():
 def edit(file: Optional[str]):
     utils.process_file(file)
     file_path = utils.get_project_file()
+    from mlad.cli.editor import run_editor
     run_editor(file_path)
 
 
