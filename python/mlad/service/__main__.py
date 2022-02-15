@@ -5,7 +5,7 @@ from mlad.service.libs import utils
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mlad.service.routers import app as app_router, project, node
+from mlad.service.routers import app as app_router, project, node, check
 from mlad.core.default.config import service_config
 
 '''
@@ -76,6 +76,7 @@ def create_app():
     app.include_router(node.router, prefix=APIV1)
     app.include_router(app_router.router, prefix=APIV1)
     app.include_router(project.router, prefix=APIV1)
+    app.include_router(check.router, prefix=APIV1)
 
     print("Orchestrator : 'Kubernetes'")
     print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}")

@@ -1,5 +1,5 @@
 from mlad.core.docker import controller as ctlr
-from mlad.cli import board, context
+from mlad.cli import board, config
 from mlad.api import API
 
 
@@ -16,9 +16,9 @@ def list_component_names(ctx, args, incomplete):
     return [name for name in component_names if name.startswith(incomplete)]
 
 
-def list_context_names(ctx, args, incomplete):
-    config = context._load()
-    names = [context.name for context in config.contexts]
+def list_config_names(ctx, args, incomplete):
+    spec = config._load()
+    names = [conf.name for conf in spec.configs]
     return [name for name in names if name.startswith(incomplete)]
 
 

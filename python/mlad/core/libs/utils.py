@@ -3,7 +3,6 @@ import uuid
 import json
 import base64
 import jwt
-import hashlib
 from typing import Dict
 
 from mlad.cli.libs import utils
@@ -65,13 +64,6 @@ def generate_unique_id(length=None):
         return UUID
 
 
-def hash(body: str = None):
-    if body:
-        return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
-    else:
-        return uuid.uuid4().hex
-
-
 def encode_dict(body):
     return base64.urlsafe_b64encode(json.dumps(body or {}).encode()).decode()
 
@@ -108,10 +100,8 @@ def base_labels(workspace: str, session: str, project: Dict,
     kind = project['kind']
     version = str(project['version']).lower()
     repository = f"{username}/{project['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
-    if kind in ['Deployment', 'Train']:
+    if kind == 'Deployment':
         repository = f'{registry_address}/' + repository
-    if not build and kind == 'Deployment':
-        key = hash()
     basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}".lower()
 
     labels = {

@@ -15,10 +15,13 @@ from functools import lru_cache
 from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from getpass import getuser
-
-from mlad.cli.exceptions import InvalidURLError
+from contextlib import closing
 from datetime import datetime
 from dateutil import parser
+
+from mlad.cli.validator import validators
+from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
+
 
 if TYPE_CHECKING:
     from mlad.cli.context import Context
@@ -96,13 +99,82 @@ def convert_tag_only_image_prop(app_spec, image_tag):
     return app_spec
 
 
-@lru_cache(maxsize=None)
+def obtain_my_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
+
+
+def _find_free_port(used_ports: set, max_retries=100) -> str:
+    for _ in range(max_retries):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            s.bind(('', 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            port = str(s.getsockname()[1])
+            if port not in used_ports:
+                return port
+    raise RuntimeError('Cannot found the free port')
+
+
+def find_port_from_mount_options(mount) -> Optional[str]:
+    # ignore the registered port if a nfs value is assigned
+    if 'nfs' in mount:
+        return None
+    for option in mount.get('options', []):
+        if option.startswith('port='):
+            return option.replace('port=', '')
+    return None
+
+
+def bind_default_values_for_mounts(app_spec, app_specs, image):
+    if 'mounts' not in app_spec:
+        return app_spec
+
+    used_ports = set()
+    for spec in app_specs:
+        for mount in spec.get('mounts', []):
+            port = find_port_from_mount_options(mount)
+            if port is not None:
+                used_ports.add(port)
+
+    ip = obtain_my_ip()
+    for mount in app_spec['mounts']:
+        # Set the server and server path
+        if 'nfs' in mount:
+            mount['server'], mount['serverPath'] = mount['nfs'].split(':')
+        else:
+            mount['server'] = ip
+            mount['serverPath'] = '/'
+            if not mount['path'].startswith('/'):
+                mount['path'] = str(Path(get_project_file()).parent / Path(mount['path']))
+
+        # Set the mount path
+        if not mount['mountPath'].startswith('/'):
+            workdir = image.attrs['Config'].get('WorkingDir', '/workspace')
+            mount['mountPath'] = str(Path(workdir) / Path(mount['mountPath']))
+
+        # Set the options
+        if 'nfs' not in mount:
+            registered_port = find_port_from_mount_options(mount)
+            if registered_port is not None and registered_port in used_ports:
+                raise MountPortAlreadyUsedError(registered_port)
+            elif registered_port is None:
+                free_port = _find_free_port(used_ports)
+                used_ports.add(free_port)
+                mount['options'].append(f'port={free_port}')
+            else:
+                used_ports.add(registered_port)
+
+    return app_spec
+
+
 def get_project_file():
     # Patch for WSL2 (/home/... -> /mnt/c/Users...)
     return os.path.realpath(os.environ.get('MLAD_PRJFILE', DEFAULT_PROJECT_FILE))
 
 
-@lru_cache(maxsize=None)
 def read_project():
     project_file = get_project_file()
     if os.path.isfile(project_file):
@@ -112,17 +184,18 @@ def read_project():
         return None
 
 
-@lru_cache(maxsize=None)
-def get_project(default_project):
+def get_project():
     project = read_project()
     if not project:
         print('Need to generate project file before.', file=sys.stderr)
         print(f'$ {sys.argv[0]} --help', file=sys.stderr)
         sys.exit(1)
 
+    # validate project schema
+    project = validators.validate(project)
+
     # replace workdir to abspath
     project_file = get_project_file()
-    project = default_project(project)
     path = project.get('workdir', './')
     if not os.path.isabs(path):
         project['workdir'] = os.path.normpath(
@@ -131,11 +204,6 @@ def get_project(default_project):
                 path
             )
         )
-    if not check_podname_syntax(project['name']):
-        print('Syntax Error: Project and app require a name to '
-              'follow standard as defined in RFC1123.', file=sys.stderr)
-        sys.exit(1)
-
     return project
 
 
@@ -150,6 +218,7 @@ def print_table(data, no_data_msg=None, max_width=32, upper=True):
     for datum in data:
         datum = [_ if not isinstance(_, str) or len(_) <= w else f"{_[:w-3]}..."
                  for _, w in zip(datum, widths)]
+        datum = ['None' if _ is None else _ for _ in datum]
         if firstline:
             if upper:
                 print(format.format(*datum).upper())
@@ -227,6 +296,7 @@ def hash(body: str):
 CLEAR_COLOR = '\x1b[0m'
 ERROR_COLOR = '\x1b[1;31;40m'
 INFO_COLOR = '\033[38;2;255;140;26m'
+OK_COLOR = '\033[92m'
 
 
 @lru_cache(maxsize=None)

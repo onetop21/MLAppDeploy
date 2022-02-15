@@ -16,7 +16,7 @@ def ls(all, tail):
 
 
 @click.command()
-@click.option('--file', '-f', default=None, help=(
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
     'Specify an alternate project file\t\t\t\n'
     f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
 )

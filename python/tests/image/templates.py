@@ -73,8 +73,8 @@ name: template2
 version: 0.1.0
 workdir: .
 workspace:
-    kind: Dockerfile
-    script: | {INDENTED_DOCKERFILE}
+    kind: Buildscript
+    buildscript: | {INDENTED_DOCKERFILE}
 app:
     test:
         command: python templates.py
@@ -89,7 +89,7 @@ version: 1.0.0
 workdir: .
 workspace:
     kind: Dockerfile
-    dockerfile: mlad-test-dockerfile
+    filePath: mlad-test-dockerfile
 app:
     test:
         command: python templates.py

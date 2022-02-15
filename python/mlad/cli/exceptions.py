@@ -14,28 +14,28 @@ class ImageNotFoundError(MLADException):
         return f'Cannot find built image of the project [{self._name}].'
 
 
-class ContextAlreadyExistError(MLADException):
+class ConfigAlreadyExistError(MLADException):
 
     def __init__(self, name: str):
         self._name = name
 
     def __str__(self):
-        return f'The context [{self._name}] already exists.'
+        return f'The config [{self._name}] already exists.'
 
 
-class ContextNotFoundError(MLADException):
+class ConfigNotFoundError(MLADException):
 
     def __init__(self, name: str):
         self._name = name
 
     def __str__(self):
-        return f'There is no context [{self._name}] in contexts.'
+        return f'There is no config [{self._name}] in configs.'
 
 
-class CannotDeleteContextError(MLADException):
+class CannotDeleteConfigError(MLADException):
 
     def __str__(self):
-        return 'The current context cannot be delete, please change the context.'
+        return 'The current config cannot be deleted, please change the config.'
 
 
 class InvalidPropertyError(MLADException):
@@ -45,6 +45,15 @@ class InvalidPropertyError(MLADException):
 
     def __str__(self):
         return f'There is no matched key in "{self._arg}".'
+
+
+class InvalidSetPropertyError(MLADException):
+
+    def __init__(self, arg: str):
+        self._arg = arg
+
+    def __str__(self):
+        return f'Config set command should be applied to the leaf keys: {self._arg}'
 
 
 class MLADBoardNotActivatedError(MLADException):
@@ -57,12 +66,6 @@ class MLADBoardAlreadyActivatedError(MLADException):
 
     def __str__(self):
         return 'The MLAD dashboard is already activated at localhost:2021.'
-
-
-class BoardImageNotExistError(MLADException):
-
-    def __str__(self):
-        return 'The MLAD dashboard image does not exist.'
 
 
 class ComponentImageNotExistError(MLADException):
@@ -108,10 +111,36 @@ class InvalidUpdateOptionError(MLADException):
         return f'"{self.key}" cannot be updated. Check the schema for update.'
 
 
-class NotRunningTrainError(MLADException):
+class InvalidFileTypeError(MLADException):
+
+    def __init__(self, type: str):
+        self.type = type
+
+    def __str__(self):
+        return f'"{self.type}" is unsupported project file type.'
+
+
+class MountPortAlreadyUsedError(MLADException):
+
+    def __init__(self, port):
+        self.port = port
+
+    def __str__(self):
+        return f'A registered port [{self.port}] for mount options is already used.'
+
+
+class MountError(MLADException):
+    pass
+
+
+class PluginUninstalledError(MLADException):
+    pass
+
+
+class ProjectDeletedError(MLADException):
 
     def __init__(self, key: str):
         self.key = key
 
     def __str__(self):
-        return f'There is no running Train object (project key: {self.key})'
+        return f'Project [{self.key}] is deleted.'

@@ -16,7 +16,7 @@ def ls(no_trunc):
 @click.argument('node-name', autocompletion=list_node_names)
 @echo_exception
 def enable(node_name):
-    '''Enable to use node.'''
+    '''Enable the node.'''
     node.enable(node_name)
 
 
@@ -24,7 +24,7 @@ def enable(node_name):
 @click.argument('node-name', autocompletion=list_node_names)
 @echo_exception
 def disable(node_name):
-    '''Disable to unuse node.'''
+    '''Disable the node.'''
     node.disable(node_name)
 
 
@@ -56,7 +56,7 @@ def rm(id, key):
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output')
 @echo_exception
 def resource(names, no_trunc):
-    '''Show resource status of nodes.'''
+    '''Show the resource status of nodes.'''
     node.resource(names=names, no_trunc=no_trunc)
 
 
@@ -87,7 +87,7 @@ admin_cli.add_command(label)
 
 @click.group('node')
 def cli():
-    '''Show connected nodes'''
+    '''Show connected nodes.'''
 
 
 cli.add_command(ls)

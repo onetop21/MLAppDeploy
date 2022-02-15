@@ -1,5 +1,8 @@
 import sys
+
 from mlad.cli.libs import utils
+from mlad.cli.config import get_context
+from mlad.cli.exceptions import PluginUninstalledError
 from mlad.api import API
 from mlad.api.exceptions import APIError
 from mlad.core import exceptions as CoreException
@@ -27,11 +30,11 @@ def list(no_trunc):
 
 
 def resource(names=None, no_trunc=False):
-    try:
-        res = API.node.resource(names)
-    except APIError as e:
-        print(e)
-        sys.exit(1)
+    metrics_server_running = API.check.check_metrics_server()
+
+    if not metrics_server_running:
+        raise PluginUninstalledError('Metrics server must be installed to load resource information. Please contact the admin.')
+
     columns = [('HOSTNAME', 'TYPE', 'CAPACITY', 'USED', 'FREE(%)')]
 
     def get_unit(type):
@@ -44,6 +47,7 @@ def resource(names=None, no_trunc=False):
             res = f'{type}(#)'
         return res
 
+    res = API.node.resource(names)
     for name, resources in res.items():
         for i, type in enumerate(resources):
             status = resources[type]
@@ -69,7 +73,7 @@ def resource(names=None, no_trunc=False):
 
 
 def enable(name: str):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.enable_node(name, cli)
     except CoreException.NotFound as e:
@@ -82,7 +86,7 @@ def enable(name: str):
 
 
 def disable(name: str):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.disable_node(name, cli)
     except CoreException.NotFound as e:
@@ -95,7 +99,7 @@ def disable(name: str):
 
 
 def label_add(node, **kvs):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.add_node_labels(node, cli, **kvs)
     except CoreException.NotFound as e:
@@ -108,7 +112,7 @@ def label_add(node, **kvs):
 
 
 def label_rm(node, *keys):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    cli = ctlr.get_api_client(context=get_context())
     try:
         ctlr.remove_node_labels(node, cli, *keys)
     except CoreException.NotFound as e:

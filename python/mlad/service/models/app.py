@@ -10,10 +10,21 @@ class Quota(BaseModel):
 
 
 class Ingress(BaseModel):
-    name: str = None
-    path: str = None
+    path: Optional[str] = None
     rewritePath: bool = True
-    port: str = None
+
+
+class Expose(BaseModel):
+    port: int
+    ingress: Optional[Ingress] = None
+
+
+class Mount(BaseModel):
+    path: Optional[str] = None
+    mountPath: str
+    server: str
+    serverPath: str
+    options: Optional[List[str]]
 
 
 class Component(BaseModel):
@@ -21,12 +32,10 @@ class Component(BaseModel):
     name: str
     image: Optional[str] = None
     env: Optional[dict] = None
-    ports: Optional[list] = None
     command: Optional[Union[list, str]] = None
     args: Optional[Union[list, str]] = None
-    ports: Optional[list] = None
-    mounts: Optional[list] = None
-    ingress: Optional[Ingress] = None
+    mounts: Optional[List[Mount]] = None
+    expose: Optional[List[Expose]] = None
 
 
 class Constraint(BaseModel):

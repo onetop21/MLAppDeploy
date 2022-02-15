@@ -28,4 +28,4 @@ class AppUpdateSpec(BaseModel):
 
 class UpdateRequest(BaseModel):
     update_yaml: dict
-    apps: List[AppUpdateSpec]
+    update_specs: List[AppUpdateSpec]
