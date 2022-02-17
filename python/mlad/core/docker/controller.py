@@ -2,10 +2,8 @@ import os
 import pwd
 import json
 import base64
-import requests_unixsocket
 
 from typing import List, Optional
-
 import docker
 from docker.types import Mount
 from mlad.core.libs import utils
@@ -86,6 +84,7 @@ def build_image(base_labels, tar, dockerfile, no_cache=False, pull=False, stream
     host = utils.get_requests_host(cli)
 
     def _request_build(headers, params, tar):
+        import requests_unixsocket
         with requests_unixsocket.post(f"{host}/v1.24/build", headers=headers, params=params, data=tar, stream=True) as resp:
             for _ in resp.iter_lines(decode_unicode=True):
                 line = json.loads(_)

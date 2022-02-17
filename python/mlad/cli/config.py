@@ -2,6 +2,7 @@ import sys
 import os
 import omegaconf
 
+from functools import lru_cache
 from typing import Optional, Dict, Callable, List
 from pathlib import Path
 from omegaconf import OmegaConf
@@ -10,7 +11,6 @@ from mlad.cli.exceptions import (
     ConfigNotFoundError, CannotDeleteConfigError, InvalidPropertyError,
     ConfigAlreadyExistError, InvalidSetPropertyError
 )
-
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 CFG_PATH = f'{MLAD_HOME_PATH}/config.yml'
@@ -28,6 +28,7 @@ if not os.path.isfile(CFG_PATH):
     OmegaConf.save(config=boilerplate, f=CFG_PATH)
 
 
+@lru_cache()
 def _load():
     return OmegaConf.load(CFG_PATH)
 

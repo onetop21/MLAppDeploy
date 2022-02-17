@@ -19,7 +19,6 @@ from contextlib import closing
 from datetime import datetime
 from dateutil import parser
 
-from mlad.cli.validator import validators
 from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
 
 
@@ -192,6 +191,7 @@ def get_project():
         sys.exit(1)
 
     # validate project schema
+    from mlad.cli.validator import validators
     project = validators.validate(project)
 
     # replace workdir to abspath
