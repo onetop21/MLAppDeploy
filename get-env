@@ -1067,6 +1067,7 @@
             fi
         fi
     elif [ $STATUS ]
+    then
         DOCKER_STATUS=$(sudo systemctl | grep docker.service)
         # DOCKER_LOADED=$(echo ${DOCKER_STATUS} | awk '{print $2}')
         # DOCKER_ACTIVE=$(echo ${DOCKER_STATUS} | awk '{print $3}')
@@ -1077,7 +1078,6 @@
         # docker status
         # minio status
         # mongodb status
-    then
     elif [ $DEPLOY ]
     then
         GetPrivileged
