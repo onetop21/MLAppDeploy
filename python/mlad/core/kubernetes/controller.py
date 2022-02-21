@@ -34,9 +34,12 @@ def get_api_client(config_file='~/.kube/config', context=None):
             return config.new_client_from_config(config_file=config_file)
     except config.config_exception.ConfigException:
         pass
-    config.load_incluster_config()
-    # If Need, set configuration parameter from client.Configuration
-    return ApiClient()
+    try:
+        config.load_incluster_config()
+        # If Need, set configuration parameter from client.Configuration
+        return ApiClient()
+    except config.config_exception.ConfigException:
+        return None
 
 
 def get_current_context():

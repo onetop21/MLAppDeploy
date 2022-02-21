@@ -1,12 +1,11 @@
+from typing import Optional
+
 import click
 
-from typing import Optional
 from omegaconf import OmegaConf
-
 from mlad.cli import config
 from mlad.cli.libs.utils import obtain_my_ip
 from mlad.cli.autocompletion import list_config_names
-
 from . import echo_exception
 
 

@@ -25,8 +25,8 @@ jobs:
     - name: Build the Docker image
       id: build_image
       run: |
-        docker build . --file scripts/Dockerfile_CI
-        echo ::set-output name=id::$(docker build . --file scripts/Dockerfile_CI -q)
+        docker build . --file assets/Dockerfile
+        echo ::set-output name=id::$(docker build . --file assets/Dockerfile -q)
         
     - name: Log into registry
       run: >

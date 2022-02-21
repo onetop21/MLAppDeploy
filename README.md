@@ -7,20 +7,23 @@ Machine Learning Application Deployment Tool by Kubernetes
 ### 1. Install MLAppDeploy Environment
 You need docker to use MLAD.
 ``` bash
-$ bash scripts/docker-install.sh
+$ bash get-env
 ```
 Install MLAD environments as master node.
 ``` bash
-$ bash scripts/cluster-install.sh master
+$ bash get-env install
 ```
-You can install MLAD environments as worker node with master IP.
+You can install MLAD environments as worker node with generated token.
 ``` bash
-$ bash scripts/cluster-install.sh worker -i <Master node IP>
-```
-Build and deploy MLAD service with specified registry.
-``` bash
-$ bash scripts/cluster-install.sh build --registry <Registry>
-$ bash scripts/cluster-install.sh deploy --registry <Registry>
+# on master node
+$ bash get-env join-token
+Generated Token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6I...
+
+To add a worker to this cluster, run the following command in 30-mins :
+$ bash get-env install --join-token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6I...
+
+# on worker node
+$ bash get-env install --join-token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6I...
 ```
 
 ### ⚠ Deploy Released API-Server by Helm Charts [[View Page]](/MLAppDeploy/charts/api-server/)
@@ -38,14 +41,14 @@ $ source <EnvDir>/bin/activate # Enable
 ```
 ### 3. Install Python FrontEnd
 ``` bash
-(EnvDir) $ cd frontend
+(EnvDir) $ cd python
 (EnvDir) $ python setup.py install
 ```
 
 ## How to use MLAD Project
 ### 1. Initialize Configuration
 ``` bash
-(EnvDir) $ mlad config init
+(EnvDir) $ mlad config add
 MLAppDeploy Service Address [http://localhost:8440]:
 MLAppDeploy User Token:
 Docker Registry Host [docker.io]:

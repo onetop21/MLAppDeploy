@@ -1,0 +1,1258 @@
+    #!/bin/bash
+
+    PROJECT_NAME=MLAppDeploy
+    K3S_CHANNEL=v1.22
+    SECRET='MLAPPDEPLOY-SECRET'
+    REGISTRY_PORT=25000
+
+    if [ "$0" == "bash" ]
+    then
+        CMD="curl -sfL https://onetop21.github.io/MLAppDeploy/get-env | bash -s -"
+    else
+        CMD="bash $0"
+    fi
+
+    function ColorEcho {
+        COLOR="\033[0m"
+        if [[ "$1" == "ERROR" ]]; then
+            COLOR="\033[0;31m"
+            shift;
+        elif [[ "$1" == "WARN" ]]; then
+            COLOR="\033[0;33m"
+            shift;
+        elif [[ "$1" == "INFO" ]]; then
+            COLOR="\033[0;32m"
+            shift;
+        elif [[ "$1" == "DEBUG" ]]; then
+            COLOR="\033[0;34m"
+            shift;
+        fi
+
+        echo -e "$COLOR$@\033[0m"
+    }
+
+    # Base Functions
+    function Prompt {
+        local MESSAGE
+        local DEFAULT
+        local PASSWORD
+        local REGEX
+        local HIDDENDEF
+        for ARG in "$@"; do
+            local IDX=$((IDX+1))
+            if [[ $ARG =~ ^([a-z]+:)*(.*)$ ]]; then
+                case ${BASH_REMATCH[1]} in
+                message:) MESSAGE=${BASH_REMATCH[2]};;
+                default:) DEFAULT=${BASH_REMATCH[2]};;
+                password:) PASSWORD=${BASH_REMATCH[2]};;
+                regex:) REGEX=${BASH_REMATCH[2]};;
+                *)
+                    case $IDX in
+                    1) MESSAGE=$ARG;;
+                    2) DEFAULT=$ARG;;
+                    esac
+                    ;;
+                esac
+            fi
+        done
+        if [ ${DEFAULT:0:1} == "@" ]
+        then
+            DEFAULT=${DEFAULT:1}
+            HIDDENDEF=1
+        fi
+        while [[ ! "$RESULT" =~ $REGEX ]]
+        do 
+            read -p "$MESSAGE$([ ! $HIDDENDEF ] && [ $DEFAULT ] && echo " [$DEFAULT]"): " $([ $PASSWORD ] && echo -s) -e RESULT
+            [ -z $RESULT ] && RESULT=$DEFAULT
+        done
+        echo ${RESULT,,}
+    }
+
+    function PrintStep {
+        STEP=$((STEP+1))
+        ColorEcho INFO "[$STEP/$MAX_STEP] $@"
+    }
+
+    function GetPrivileged {
+        ColorEcho WARN "Request sudo privileged."
+        sudo ls >> /dev/null 2>&1
+        if [[ ! "$?" == "0" ]]; then
+            exit 1
+        fi
+    }
+
+    function IsInstalled {
+        which $1 >> /dev/null 2>&1
+    }
+
+    function IsInstalledAptPkg {
+        [ $(apt list --installed -a $1 2>&1 | grep installed | wc -l) -eq 0 ] && return 1
+        return 0
+    }
+
+    function IsInstalledPipPkg {
+        [ $(pip freeze | grep -E ^$1== 2>&1 | wc -l) -eq 0 ] && return 1
+        return 0
+    }
+
+    function IsWSL2 {
+        [ $(uname -r | grep microsoft-standard | wc -l) -eq 0 ] && return 1
+        return 0
+    }
+
+    function HostIP {
+        if IsWSL2
+        then
+        PS='(Get-NetIPConfiguration | Where-Object {
+                $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected"
+            }).IPv4Address.IPAddress' 
+        IP=$(powershell.exe -c $PS)
+        echo "${IP%%[[:cntrl:]]}"
+        else
+            hostname -I | awk '{print $1}'
+        fi
+    }
+
+    function RequiresFromApt {
+        [ ! $SILENT ] && printf "Check requires [$1]... "
+        if IsInstalledAptPkg $1 || IsInstalled ${2:-$1}
+        then
+            [ ! $SILENT ] && ColorEcho DEBUG OK
+        else
+            [ ! $SILENT ] && ColorEcho WARN Install $1.
+            sudo apt install -y $1
+        fi
+    }
+
+    function RequiresFromPip {
+        [ ! $SILENT ] && printf "Check requires [$1]... "
+        if IsInstalledPipPkg $1 || IsInstalled ${2:-$1}
+        then
+            [ ! $SILENT ] && ColorEcho DEBUG OK
+        else
+            [ ! $SILENT ] && ColorEcho WARN Install ${2:-$1}.
+            pip3 install ${2:-$1}
+        fi
+    }
+
+    function UninstallOnSnapWithWarning {
+        if IsInstalled snap
+        then
+            if [[ $(snap list $1 >> /dev/null 2>&1 ; echo $?) == '0' ]]; then
+                ColorEcho WARN "Need to remove $1 from Snapcraft."
+                read -n1 -r -p  "If you want to stop installation, Press CTRL+C to break, otherwise any key to continue."
+                sudo snap remove --purge $1
+            fi
+        fi
+    }
+
+    function InstallDocker {
+        if ! VerifyDocker
+        then
+            printf "Install Docker... "
+            #UninstallOnSnapWithWarning docker
+            if ! IsInstalled docker
+            then
+                # below script from https://docs.docker.com/engine/install/ubuntu/
+                # Uninstall old version
+                sudo apt-get remove -y docker docker-engine docker.io containerd runc
+
+                # Update package manager
+                sudo apt-get update
+
+                # Install package to use repository over HTTPS
+                sudo apt-get install -y \
+                    apt-transport-https \
+                    ca-certificates \
+                    curl \
+                    gnupg-agent \
+                    software-properties-common
+
+                # Add official GPG key
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+                # Verify fingerprint
+                sudo apt-key fingerprint 0EBFCD88
+
+                # Add docker repository
+                sudo add-apt-repository \
+                "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+                $(lsb_release -cs) \
+                stable"
+
+                # Update added docker repository
+                sudo apt-get update
+
+                # Install docker community version (latest)
+                sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+                
+                # Add user to docker group
+                sudo adduser $USER docker
+            fi
+
+            if ! VerifyDocker
+            then
+                ColorEcho WARN "Failed to operate docker."
+                sudo systemctl status docker.service
+                ColorEcho ERROR Failed
+                exit 1
+            fi
+            ColorEcho DEBUG Succeeded
+        fi
+    }
+
+    function RemoveDocker {
+        # Clean : https://docs.docker.com/engine/install/ubuntu/#uninstall-docker-engine
+        sudo apt-get purge docker-ce docker-ce-cli containerd.io -y
+        sudo rm -rf /var/lib/docker
+    }
+
+    function VerifyDocker {
+        sudo docker run -i --rm $@ hello-world >> /dev/null 2>&1
+    }
+
+    function InstallNVIDIAContainerRuntime {
+        # https://github.com/NVIDIA/nvidia-container-runtime
+
+        # Add the package repositories
+        curl -s -L https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
+        sudo apt-key add -
+        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+        curl -s -L https://nvidia.github.io/nvidia-container-runtime/$distribution/nvidia-container-runtime.list | \
+        sudo tee /etc/apt/sources.list.d/nvidia-container-runtime.list
+        sudo apt-get update
+
+        # Install nvidia-container-runtime
+        sudo apt-get install -y nvidia-container-runtime
+    }
+
+    function NVIDIAContainerRuntimeConfiguration {
+        sudo mkdir -p /etc/docker
+        # # Read Daemon.json
+        # CONFIG=`sudo cat /etc/docker/daemon.json`
+        # # Check nvidia runtime in daemon.json
+        # if [ "$(echo $CONFIG | jq '.runtimes.nvidia')" == "null" ];
+        # then
+        #     CONFIG=`echo $CONFIG | jq '.runtimes.nvidia={"path":"nvidia-container-runtime", "runtimeArgs":[]}'`
+        # fi
+        # #echo $CONFIG | jq . | sudo dd status=none of=/etc/docker/daemon.json
+        # echo $CONFIG | jq . | sudo sponge /etc/docker/daemon.json
+        ! sudo test -f /etc/docker/daemon.json && echo {} | sudo sponge /etc/docker/daemon.json
+        if [ ! $(sudo cat /etc/docker/daemon.json | jq '.runtimes.nvidia // empty' >> /dev/null 2>&1) ]
+        then
+            sudo cat /etc/docker/daemon.json | jq '.runtimes.nvidia={"path":"nvidia-container-runtime", "runtimeArgs":[]}' | sudo sponge /etc/docker/daemon.json
+        fi
+    }
+
+    function GetContainerdNVIDIATemplateFile {
+        #sudo wget https://raw.githubusercontent.com/baidu/ote-stack/master/deployments/k3s/config.toml.tmpl -O /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+        sudo mkdir -p /var/lib/rancher/k3s/agent/etc/containerd
+        if [ -f assets/nvidia-containerd.config.toml.tmpl ]
+        then
+            sudo cp assets/nvidia-containerd.config.toml.tmpl /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+        else
+            sudo wget https://onetop21.github.io/MLAppDeploy/assets/nvidia-containerd.config.toml.tmpl -O /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+            #sudo wget https://raw.githubusercontent.com/onetop21/MLAppDeploy/master/scripts/nvidia-containerd.config.toml.tmpl -O /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+        fi
+    }
+
+    function IsInstalledCluster {
+        HOST=$(HostIP)
+        if $(kubectl get node >> /dev/null 2>&1)
+        then
+            for IP in $(kubectl get node -o jsonpath="{range .items[*].status}{.addresses[?(.type=='InternalIP')].address}{end}")
+            do
+                if [ $IP == $HOST ]
+                then
+                    return 0
+                fi
+            done
+        fi
+        return 1
+    }
+
+    function IsDeployed {
+        local KIND=${1:-pod}; shift
+        local COUNT=0
+        for LABEL in $@
+        do
+            COUNT=$((COUNT+$(kubectl get -A $KIND -l $LABEL -o name | wc -l)))
+        done
+        [ "$COUNT" -eq 0 ] && return 1
+        return 0
+    }
+
+    function HasHelmRepo {
+        VALUE=$1
+        COUNT_NAME=$(helm repo list -o json | jq .[].name -r | grep -e ^${VALUE}$ | wc -l)
+        COUNT_REPO=$(helm repo list -o json | jq .[].url -r | grep -e ^${VALUE}$ | wc -l)
+        COUNT=$((COUNT_NAME+COUNT_REPO))
+        [ $COUNT -ne 0 ] && return 0 || return 1
+    }
+
+    # JWT
+    #
+    # JWT Encoder Bash Script
+    #
+
+    # Static header fields.
+    JWT_HEADER='{
+            "typ": "JWT",
+            "alg": "HS256",
+            "kid": "0001",
+            "iss": "Bash JWT Generator"
+    }'
+
+    Base64Encode()
+    {
+        declare input=${1:-$(</dev/stdin)}
+        # Use `tr` to URL encode the output from base64.
+        printf '%s' "${input}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n'
+    }
+
+    Base64Decode()
+    {
+        declare input=${1:-$(</dev/stdin)}
+        # A standard base64 string should always be `n % 4 == 0`. We made the base64
+        # string URL safe when we created the JWT, which meant removing the `=`
+        # signs that are there for padding. Now we must add them back to get the
+        # proper length.
+        remainder=$((${#input} % 4));
+        if [ $remainder -eq 1 ];
+        then
+            >2& echo "fatal error. base64 string is unexepcted length"
+        elif [[ $remainder -eq 2 || $remainder -eq 3 ]];
+        then
+            input="${input}$(for i in `seq $((4 - $remainder))`; do printf =; done)"
+        fi
+        printf '%s' "${input}" | base64 --decode
+    }
+
+    ToJSON() {
+        declare input=${1:-$(</dev/stdin)}
+        printf '%s' "${input}" | jq -c .
+    }
+
+    HMACSHA256Encode()
+    {
+        declare input=${1:-$(</dev/stdin)}
+        printf '%s' "${input}" | openssl dgst -binary -sha256 -hmac "${SECRET}"
+    }
+
+    VerifySignature()
+    {
+        declare header_and_payload=${1}
+        expected=$(echo "${header_and_payload}" | HMACSHA256Encode | Base64Encode)
+        actual=${2}
+
+        if [ "${expected}" = "${actual}" ]
+        then
+            return 0
+        else
+            return 1
+        fi
+    }
+
+    VerifyExpired()
+    {
+        exp=$(echo "${1}" | Base64Decode | jq .exp)
+        cur=$(date +%s)
+        if [ $cur -le $exp ]
+        then
+            return 0
+        else
+            return 1
+        fi
+    }
+
+    GenerateToken()
+    {
+        # Use jq to set the dynamic `iat` and `exp`
+        # fields on the header using the current time.
+        # `iat` is set to now, and `exp` is now + 180 seconds(3mins).
+        header=$(
+            echo "${JWT_HEADER}" | jq --arg time_str "$(date +%s)" \
+            '
+            ($time_str | tonumber) as $time_num
+            | .iat=$time_num
+            | .exp=($time_num + 180)
+            '
+        )
+        
+        CONTAINER_RUNTIME_VERSION=$(kubectl get node -o yaml | yq ".items[] | select(.metadata.name == \"$HOSTNAME\") | .status.nodeInfo.containerRuntimeVersion" -r)
+        CONTAINER_RUNTIME=${CONTAINER_RUNTIME_VERSION%://*}
+        RUNTIME_VERSION=${CONTAINER_RUNTIME_VERSION#*://}
+        payload="{
+            \"url\": \"$(HostIP)\",
+            \"token\": \"$(sudo cat /var/lib/rancher/k3s/server/node-token)\"
+        }"
+
+        # Encode
+        header_base64=$(echo "${header}" | ToJSON | Base64Encode)
+        payload_base64=$(echo "${payload}" | ToJSON | Base64Encode)
+
+        header_payload=$(echo "${header_base64}.${payload_base64}")
+        signature=$(echo "${header_payload}" | HMACSHA256Encode | Base64Encode)
+
+        if [[ "$CONTAINER_RUNTIME" == "docker" ]]
+        then
+            echo "${header_payload}.${signature}" --docker
+        else
+            echo "${header_payload}.${signature}"
+        fi
+    }
+
+    ParseToken()
+    {
+        # Read the token from stdin
+        declare token=${1:-$(</dev/stdin)};
+
+        IFS='.' read -ra pieces <<< "$token"
+
+        declare header=${pieces[0]}
+        declare payload=${pieces[1]}
+        declare signature=${pieces[2]}
+
+        if VerifySignature "${header}.${payload}" "${signature}"
+        then
+            if VerifyExpired "${header}"
+            then
+                #echo "Header"
+                #echo "${header}" | base64_decode | jq
+                #echo "Payload"
+                #echo "${payload}" | base64_decode | jq
+                echo "${payload}" | Base64Decode
+            else
+                echo {}
+            fi
+        else
+            echo {}
+        fi
+    }
+
+    # Usage/Help
+    function UsageHeader {
+        ColorEcho INFO "MLAppDeploy Environment Installer (based k3s)"
+        if [ $1 ]; then
+            ColorEcho WARN "Usage"
+            ColorEcho      "    $ $CMD $1 [ARGS...]"
+        fi
+    }
+
+    function MainUsage {
+        UsageHeader
+        ColorEcho WARN "Commands"
+        ColorEcho      "    install     : Install lightweight kubernetes(k3s) for MLAppDeploy."
+        ColorEcho      "    join-token  : Get token to join."
+        ColorEcho      "    uninstall   : Uninstall k3s."
+        ColorEcho      "    registry    : Install docker registry v2 (master node only)."
+        ColorEcho      "    docker      : Install docker community edition with gpu container runtime."
+        ColorEcho      "    datastore   : Install minio(s3 compatible)/mongodb server."
+        #ColorEcho      "    status      : Show MLAppDeploy environment status."
+        ColorEcho      "    help        : Print help message."
+        exit 1
+    }
+
+    function InstallUsage {
+        UsageHeader install
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    -t, --join-token=[TOKEN]      : Token to join as a worker node."
+        ColorEcho      "    --docker                      : Use docker runtime (default: containerd)."
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    function JoinTokenUsage {
+        UsageHeader join-token
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    function UninstallUsage {
+        UsageHeader uninstall
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    function DeployUsage {
+        UsageHeader deploy
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    function DockerUsage {
+        UsageHeader docker
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    function RegistryUsage {
+        UsageHeader registry
+        ColorEcho WARN "Arguments"
+        #ColorEcho      "    -p, --port                    : Port number of private docker registry."
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    function DatastoreUsage {
+        UsageHeader datastore
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    --install=[PRODUCT]           : Data storages to install. (default: all)."
+        ColorEcho      "                                    all, minio, mongo"
+        ColorEcho      "    --minio-port=[PORT]           : Port number of minio server(default: 9000)."
+        ColorEcho      "    --mongo-port=[PORT]           : Port number of mongodb server(default: 27017)."
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    function StatusUsage {
+        UsageHeader status
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
+    # Base Command
+    eval set -- "$@"
+    while [ $# -ne 0 ]; do
+        case "$1" in
+        install)
+            INSTALL=1
+            shift
+            break
+            ;;
+        join-token)
+            JOIN_TOKEN=1
+            shift
+            break
+            ;;
+        uninstall)
+            UNINSTALL=1
+            break
+            ;;
+        deploy)
+            DEPLOY=1
+            shift
+            break
+            ;;
+        docker)
+            DOCKER=1
+            shift
+            break
+            ;;
+        registry)
+            REGISTRY=1
+            shift
+            break
+            ;;
+        datastore)
+            DATASTORE=1
+            shift
+            break
+            ;;
+        # status)
+        #     STATUS=1
+        #     shift
+        #     break
+        #     ;;
+        esac
+        shift
+    done
+
+    if [ $INSTALL ]; then
+        OPTIONS=$(getopt -o t:h --long docker,join-token:,help -- "$@")
+        [ $? -eq 0 ] || InstallUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            --docker)
+                DOCKER_RUNTIME=1
+                ;;
+            -t|--join-token) shift
+                RAW_TOKEN=$1
+                ;;
+            -h|--help)
+                InstallUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+
+    elif [ $JOIN_TOKEN ]; then
+        OPTIONS=$(getopt -o h --long help -- "$@")
+        [ $? -eq 0 ] || JoinTokenUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            -h|--help)
+                JoinTokenUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+
+    elif [ $UNINSTALL ]; then
+        OPTIONS=$(getopt -o h --long help -- "$@")
+        [ $? -eq 0 ] || UninstallUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            -h|--help)
+                UninstallUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+
+    elif [ $DOCKER ]; then
+        OPTIONS=$(getopt -o h --long help -- "$@")
+        [ $? -eq 0 ] || DockerUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            -h|--help)
+                DockerUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+
+    elif [ $REGISTRY ]; then
+        OPTIONS=$(getopt -o h --long help -- "$@")
+        [ $? -eq 0 ] || RegistryUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            -h|--help)
+                RegistryUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+
+    elif [ $DATASTORE ]; then
+        declare -A DATASTORE_PORTS=(["minio"]=9000 ["mongo"]=27017)
+        DATASTORE_PRODUCTS=()
+        OPTIONS=$(getopt -o h --long install:,minio-port:,mongo-port:,help -- "$@")
+        [ $? -eq 0 ] || DatastoreUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            --install) shift
+                if [ -v DATASTORE_PORTS[$1] ]
+                then
+                    DATASTORE_PRODUCTS+=("$1")
+                else
+                    ColorEcho WARN "$1 is not support product."
+                fi
+                ;;
+            --minio-port) shift
+                DATASTORE_PORTS[minio]=$1
+                ;;
+            --mongo-port) shift
+                DATASTORE_PORTS[mongo]=$1
+                ;;
+            -h|--help)
+                DatastoreUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+        [ ${#DATASTORE_PRODUCTS[@]} -eq 0 ] && DATASTORE_PRODUCTS+=(${!DATASTORE_PORTS[@]})
+
+    elif [ $STATUS ]; then
+        OPTIONS=$(getopt -o h --long help -- "$@")
+        [ $? -eq 0 ] || StatusUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            -h|--help)
+                StatusUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+
+    else
+        MainUsage
+    fi
+
+    # Main Script
+
+    # Requires for environment installer
+    SILENT=1 RequiresFromApt jq
+    SILENT=1 RequiresFromApt moreutils sponge
+    SILENT=1 RequiresFromPip yq
+
+    # Parse join token
+    if [ $RAW_TOKEN ]; then
+        # Worker Mode
+        payload=$(ParseToken $RAW_TOKEN)
+        if [ $payload ]
+        then
+            MASTER_IP=$(echo $payload | jq .url -r)
+            TOKEN=$(echo $payload | jq .token -r)
+        else
+            ColorEcho ERROR "Failed to parse token. Invalid or expired token."
+            exit 1
+        fi
+    fi
+
+    STEP=0
+    if [ $INSTALL ]
+    then
+        if IsWSL2
+        then
+            MAX_STEP=3
+
+            if ! IsInstalled docker
+            then
+                ColorEcho INFO "Need to install Docker Desktop yourself on WSL2."
+                ColorEcho INFO "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
+                exit 1
+            fi
+            if IsInstalled kubectl
+            then
+                ColorEcho INFO "Need to install kubernetes on Docker Desktop yourself."
+                ColorEcho INFO "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/#kubernetes"
+                exit 1
+            fi
+            if IsInstalledCluster
+            then
+                ColorEcho WARN "Check kubernetes status or kubeconfig."
+                exit 1
+            fi
+            ColorEcho INFO "Ready to install MLAppDeploy on your WSL2."
+        else
+            GetPrivileged
+            MAX_STEP=$((DOCKER_RUNTIME+4))
+            [ $DOCKER_RUNTIME ] && {
+                PrintStep Install Docker Engine.
+                InstallDocker
+            }
+            # Step 2: Install NVIDIA Container Runtine
+            PrintStep Install NVIDIA Container Runtime.
+            # Check Nvidia Driver status
+            if ! IsInstalled nvidia-smi
+            then
+                ColorEcho WARN "Cannot find NVIDIA Graphic Card."
+            else
+                if IsInstalled nvidia-container-runtime
+                then
+                    ColorEcho INFO "Already installed NVIDIA container runtime."
+                else
+                    ColorEcho INFO "Install NVIDIA container runtime."
+
+                    InstallNVIDIAContainerRuntime
+                fi
+
+                if IsInstalled nvidia-container-runtime
+                then
+                    ColorEcho INFO "Configure to use NVIDIA container runtime."
+
+                    if [ $DOCKER_RUNTIME ]
+                    then
+                        # Register nvidia container runtime to docker
+                        NVIDIAContainerRuntimeConfiguration
+                    else
+                        # Register nvidia container runtime to containerd
+                        GetContainerdNVIDIATemplateFile
+                    fi
+                else
+                    ColorEcho ERROR "Failed to install NVIDIA container runtime."
+                    ColorEcho ERROR "Pass this installation..." 
+                    ColorEcho ERROR "If you want to use GPU on node, install NVIDIA container runtime at this node manually."
+                fi
+            fi
+
+            # Step 3: Install requires
+            PrintStep "Install required pacakges."
+            RequiresFromApt nfs-common
+
+            # Step 4: Prepare Insecure registy environment
+            PrintStep "Register insecure registry."
+            [ -z $MASTER_IP ] && MASTER_IP=$(HostIP)
+            if [ $DOCKER_RUNTIME ]
+            then
+                sudo mkdir -p /etc/docker
+                ! sudo test -f /etc/docker/daemon.json && echo {} | sudo sponge /etc/docker/daemon.json
+                if [ ! $(sudo cat /etc/docker/daemon.json | yq ".\"insecure-registries\" | index(\"$MASTER_IP:$REGISTRY_PORT\") // empty" >> /dev/null 2>&1) ]
+                then
+                    sudo cat /etc/docker/daemon.json | yq ".\"insecure-registries\"+=[\"$MASTER_IP:$REGISTRY_PORT\"]" | sudo sponge /etc/docker/daemon.json
+                fi
+            else
+                sudo mkdir -p /etc/rancher/k3s/
+                ! sudo test -f /etc/rancher/k3s/registries.yaml && echo {} | sudo sponge /etc/rancher/k3s/registries.yaml
+                if [ ! $(sudo cat /etc/rancher/k3s/registries.yaml | yq ".mirror.\"$MASTER_IP:$REGISTRY_PORT\".endpoint | index(\"http://$MASTER_IP:$REGISTRY_PORT\") // empty" >> /dev/null 2>&1) ]
+                then
+                    sudo cat /etc/rancher/k3s/registries.yaml | yq ".mirror.\"$MASTER_IP:$REGISTRY_PORT\".endpoint+=[\"http://$MASTER_IP:$REGISTRY_PORT\"]" -y | sudo sponge /etc/rancher/k3s/registries.yaml
+                fi
+            fi
+            [ $DOCKER_RUNTIME ] && sudo systemctl restart docker.service
+
+            # Step 4: Install Kubernetes
+            PrintStep "Install Kubernetes."
+            if ! IsInstalledCluster
+            then
+                if IsInstalled k3s
+                then
+                    bash $CMD uninstall
+                fi
+
+                if [ -z $RAW_TOKEN ]
+                then
+                    # # Add priviledged for getting token
+                    # ColorEcho INFO "Set priviledge for getting token by worker."
+                    # echo "$USER ALL=NOPASSWD: $(which cat)" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
+                    # Install k3s server
+                    INSTALL_K3S_EXEC="--disable=traefik --write-kubeconfig-mode 644"
+                    [ $DOCKER_RUNTIME ] && INSTALL_K3S_EXEC+=" --docker"
+                    curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=$K3S_CHANNEL \
+                        INSTALL_K3S_EXEC=$INSTALL_K3S_EXEC \
+                        sh -
+                    # Prepare kubeconfig
+                    KUBECONFIG_DIR=$HOME/.kube
+                    KUBECONFIG_PATH=$KUBECONFIG_DIR/config
+                    KUBECONFIG_MLAD=$KUBECONFIG_DIR/config.mlad
+                    sudo cat /etc/rancher/k3s/k3s.yaml | yq '.clusters[0].name="MLAppDeploy"|.users[0].name="MLAppDeploy"|.contexts[0].name="MLAppDeploy"|.contexts[0].context.cluster="MLAppDeploy"|.contexts[0].context.user="MLAppDeploy"' -y | sponge $KUBECONFIG_MLAD
+                    KUBECONFIG="$KUBECONFIG_MLAD:$KUBECONFIG_PATH" kubectl config view --flatten | sponge $KUBECONFIG_PATH
+                    kubectl config use-context MLAppDeploy
+                    kubectl config get-contexts
+                else
+                    # # Add priviledged for getting token
+                    # ColorEcho INFO "Set priviledge for getting token by worker."
+                    # echo "$USER ALL=NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USER-k3s-token >> /dev/null 2>&1
+                    # cat /dev/zero | ssh-keygen -q -N "" >> /dev/null 2>&1
+                    # ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $USER@127.0.0.1 >> /dev/null 2>&1
+                    # ssh-copy-id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' -f $MASTER_USER@$MASTER_IP >> /dev/null 2>&1
+                    # Install k3s agent
+                    INSTALL_K3S_EXEC=""
+                    [ $DOCKER_RUNTIME ] && INSTALL_K3S_EXEC+=" --docker"
+                    curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=$K3S_CHANNEL \
+                        INSTALL_K3S_EXEC=$INSTALL_K3S_EXEC K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$TOKEN \
+                        sh -
+                    ColorEcho INFO "Finish join worker node with $MASTER_IP."
+                fi
+            else
+                ColorEcho "Already installed kubernetes."
+            fi
+        fi
+    elif [ $JOIN_TOKEN ]
+    then
+        JWT_TOKEN=$(GenerateToken)
+        echo Generated Token: $JWT_TOKEN
+        echo
+        echo To add a worker to this cluster, run the following command in 30-mins :
+        echo $ $CMD install --join-token $JWT_TOKEN
+        echo 
+        exit 0
+    elif [ $UNINSTALL ]
+    then
+        if IsWSL2
+        then
+            ColorEcho ERROR "Cannot support remove kubernetes on WSL2."
+            exit 1
+        fi
+        
+        GetPrivileged
+        MAX_STEP=1
+        PrintStep "Uninstall Kubernetes."
+        if [[ $(which k3s-uninstall.sh >> /dev/null 2>&1; echo $?) == "0" ]]; then
+            ColorEcho INFO "Uninstall master node."
+            sudo k3s-uninstall.sh 
+        elif [[ $(which k3s-agent-uninstall.sh >> /dev/null 2>&1; echo $?) == "0" ]]; then
+            ColorEcho INFO "Uninstall worker node."
+            sudo k3s-agent-uninstall.sh 
+            echo "Need to run below command at master node:"
+            echo "$ kubectl delete node $HOSTNAME"
+        else
+            if [[ $(kubectl version >> /dev/null 2>&1; echo $?) == "0" ]]; then
+                ColorEcho ERROR "No have permission to remove kubernetes."
+            else
+                ColorEcho INFO "Already removed kubernetes."
+            fi
+        fi
+    elif [ $DOCKER ]
+    then
+        if IsWSL2
+        then
+            MAX_STEP=1
+
+            if ! IsInstalled docker
+            then
+                ColorEcho INFO "Need to install Docker Desktop yourself on WSL2."
+                ColorEcho INFO "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
+                exit 1
+            fi
+            ColorEcho INFO "Ready to run Docker on your WSL2."
+        else
+            GetPrivileged
+            MAX_STEP=2
+
+            PrintStep Install Docker Engine.
+            InstallDocker
+
+            # Step 2: Install NVIDIA Container Runtine
+            PrintStep Install NVIDIA Container Runtime.
+            # Check Nvidia Driver status
+            if ! IsInstalled nvidia-smi
+            then
+                ColorEcho WARN "Cannot find NVIDIA Graphic Card."
+            else
+                if IsInstalled nvidia-container-runtime
+                then
+                    ColorEcho INFO "Already installed NVIDIA container runtime."
+                else
+                    ColorEcho INFO "Install NVIDIA container runtime."
+
+                    InstallNVIDIAContainerRuntime
+                fi
+
+                if IsInstalled nvidia-container-runtime
+                then
+                    ColorEcho INFO "Configure to use NVIDIA container runtime."
+
+                    # Register nvidia container runtime to docker
+                    NVIDIAContainerRuntimeConfiguration
+                else
+                    ColorEcho ERROR "Failed to install NVIDIA container runtime."
+                    ColorEcho ERROR "Pass this installation..." 
+                    ColorEcho ERROR "If you want to use GPU on node, install NVIDIA container runtime at this node manually."
+                fi
+                sudo systemctl restart docker.service
+            fi
+        fi
+    elif [ $REGISTRY ]
+    then
+        MAX_STEP=1
+        if IsWSL2
+        then
+            MAX_STEP=3
+
+            if ! IsInstalled docker
+            then
+                ColorEcho INFO "Need to install Docker Desktop yourself on WSL2."
+                ColorEcho INFO "Visit and Refer this URL: https://docs.docker.com/docker-for-windows/wsl/"
+                exit 1
+            fi
+        fi
+        if ! IsInstalled docker
+        then
+            ColorEcho INFO "Need to install docker on your system."
+            ColorEcho INFO "$ $CMD install docker"
+            exit 1
+        fi
+        PrintStep Install Registry
+        RUNNING_CONTAINER=$(sudo docker ps -q -f label=mlappdeploy.type=registry | wc -l)
+        PORT_CONFLICTED_CONTAINERS=$(sudo docker ps -q -f publish=$REGISTRY_PORT --format {{.Names}})
+        #PORT_CONFLICTED_PROCESSES=$(sudo netstat -ap | grep -e :$REGISTRY_PORT[0-9\ .:*]*LISTEN | awk '{print $7}')
+        PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:$REGISTRY_PORT| grep -E "IPv4.*LISTEN")
+        if [ $RUNNING_CONTAINER -ne 0 ]; then
+            ColorEcho DEBUG "Already Installed."
+            ColorEcho INFO "To access registry, set repository name to below at image name."
+            ColorEcho WARN "Example: $(HostIP):$REGISTRY_PORT/[NAME]:[TAG]"
+        elif [ $PORT_CONFLICTED_CONTAINERS ]; then
+            ColorEcho WARN "Failed to install.\nAlready use $REGISTRY_PORT/tcp by [$PORT_CONFLICTED_CONTAINERS] container."
+        elif [ $PORT_CONFLICTED_PROCESSES ]; then
+            ColorEcho WARN "Failed to install.\nAlready use $REGISTRY_PORT/tcp by [$PORT_CONFLICTED_PROCESSES] process."
+        else
+            sudo docker pull registry:2
+            sudo docker run -d -p $REGISTRY_PORT:5000 --restart=always --name mlad-registry -v registry-data:/var/lib/registry \
+                --label mlappdeploy.type=registry \
+                registry:2
+            ColorEcho INFO "Succeed to install docker private registry."
+            ColorEcho INFO "To access registry, set repository name to below at image name."
+            ColorEcho WARN "Example: $(HostIP):$REGISTRY_PORT/[NAME]:[TAG]"
+        fi
+
+    elif [ $DATASTORE ]
+    then
+        MAX_STEP=${#DATASTORE_PRODUCTS[@]}
+
+        if ! IsInstalled docker
+        then
+            ColorEcho INFO "Need to install docker on your system."
+            ColorEcho INFO "$ $CMD install docker"
+            exit 1
+        fi
+
+        # MinIO
+        if [[ " ${DATASTORE_PRODUCTS[*]} " =~ " minio " ]]
+        then
+            PrintStep Install MinIO
+            
+            RUNNING_CONTAINER=$(sudo docker ps -q -f label=mlappdeploy.datastore=minio | wc -l)
+            PORT_CONFLICTED_CONTAINERS=$(sudo docker ps -q -f publish=${DATASTORE_PORTS[minio]} --format {{.Names}})
+            PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:${DATASTORE_PORTS[minio]}| grep -E "IPv4.*LISTEN")
+            
+            if [ $RUNNING_CONTAINER -ne 0 ]; then
+                ColorEcho DEBUG "Already Installed."
+                ColorEcho INFO "To connect minio server, go to http://$(HostIP):${DATASTORE_PORTS[minio]}."
+            elif [ $PORT_CONFLICTED_CONTAINERS ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$PORT_CONFLICTED_CONTAINERS] container."
+            elif [ $PORT_CONFLICTED_PROCESSES ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$PORT_CONFLICTED_PROCESSES] process."
+            else
+                read -p "Type Access Key of MinIO : " -ei MLAPPDEPLOY ACCESS_KEY
+                export ACCESS_KEY
+                read -p "Type Secret Key of MinIO : " -ei MLAPPDEPLOY SECRET_KEY
+                export SECRET_KEY
+                sudo docker run -d -p ${DATASTORE_PORTS[minio]}:9000 --restart=always --name mlad-minio -v minio-data:/data \
+                    --label mlappdeploy.type=datastore --label mlappdeploy.datastore=minio \
+                    -e MINIO_ACCESS_KEY $ACCESS_KEY -e MINIO_SECRET_KEY $SECRET_KEY \
+                    minio/minio server /data
+                ColorEcho INFO "Succeed to install minio server."
+                ColorEcho INFO "Connect to http://$(HostIP):${DATASTORE_PORTS[minio]}"
+            fi
+        fi
+        if [[ " ${DATASTORE_PRODUCTS[*]} " =~ " mongo " ]]
+        then
+            PrintStep Install MongoDB
+
+            RUNNING_CONTAINER=$(sudo docker ps -q -f label=mlappdeploy.datastore=mongodb | wc -l)
+            PORT_CONFLICTED_CONTAINERS=$(sudo docker ps -q -f publish=${DATASTORE_PORTS[mongo]} --format {{.Names}})
+            PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:${DATASTORE_PORTS[mongo]}| grep -E "IPv4.*LISTEN")
+
+            if [ $RUNNING_CONTAINER -ne 0 ]; then
+                ColorEcho DEBUG "Already Installed."
+                ColorEcho INFO "To access mongodb, run below command."
+                ColorEcho INFO "$ mongo $(HostIP):${DATASTORE_PORTS[mongo]}"
+            elif [ $PORT_CONFLICTED_CONTAINERS ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[mongo]}/tcp by [$PORT_CONFLICTED_CONTAINERS] container."
+            elif [ $PORT_CONFLICTED_PROCESSES ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[mongo]}/tcp by [$PORT_CONFLICTED_PROCESSES] process."
+            else
+                #read -p "Type Access Key of MinIO (Default: MLAPPDEPLOY) : " ACCESS_KEY
+                #export ACCESS_KEY
+                #read -p "Type Secret Key of MinIO (Default: MLAPPDEPLOY) : " SECRET_KEY
+                #export SECRET_KEY
+                sudo docker run -d -p ${DATASTORE_PORTS[mongo]}:27017 --restart=always --name mlad-mongodb -v mongo-data:/data/db \
+                    --label mlappdeploy.type=datastore --label mlappdeploy.datastore=mongodb \
+                    mongo
+                ColorEcho INFO "Succeed to install mongodb server."
+                ColorEcho INFO "You can access mongo by below command."
+                ColorEcho INFO "$ mongo $(HostIP):${DATASTORE_PORTS[mongo]}"
+            fi
+        fi
+    elif [ $STATUS ]
+    then
+        DOCKER_STATUS=$(sudo systemctl | grep docker.service)
+        # DOCKER_LOADED=$(echo ${DOCKER_STATUS} | awk '{print $2}')
+        # DOCKER_ACTIVE=$(echo ${DOCKER_STATUS} | awk '{print $3}')
+        # DOCKER_SUB=$(echo ${DOCKER_STATUS} | awk '{print $4}')
+        # DOCKER_DESC=$(echo ${DOCKER_STATUS} | awk '{print $}')
+        # k3s installed (master, slave)
+        # registry installed
+        # docker status
+        # minio status
+        # mongodb status
+    elif [ $DEPLOY ]
+    then
+        GetPrivileged
+        
+        INSTANCE=${PROJECT_NAME,,}
+        NAMESPACE=${PROJECT_NAME,,}
+
+        if ! IsInstalledCluster
+        then
+            ColorEcho ERROR "Need to install MLAppDeploy environment as master first."
+            ColorEcho ERROR "  $ $CMD master [ARGS...]."
+            exit 1
+        fi
+
+        (! IsInstalled helm) && HELM=1
+        [ $INGRESS ] && (IsDeployed deploy app.kubernetes.io/name=ingress-nginx app=ingress-nginx) && unset INGRESS
+        [ $MONITORING ] && (IsDeployed deploy app=kube-prometheus-stack-operator) && unset MONITORING
+        (! IsDeployed ds app.kubernetes.io/name=nvidia-device-plugin name=nvidia-device-plugin-ds app=nvidia-device-plugin-daemonset ||
+        ! IsDeployed pod app.kubernetes.io/name=nvidia-device-plugin name=nvidia-device-plugin-ds app=nvidia-device-plugin-daemonset) && NVDP=1
+        (! IsDeployed ds app.kubernetes.io/name=node-feature-discovery app=nfd) && NFD=1
+        (! IsDeployed ds app.kubernetes.io/name=gpu-feature-discovery app=gpu-feature-discovery) && GFD=1
+        (! IsDeployed ds app.kubernetes.io/component=dcgm-exporter app=nvidia-dcgm-exporter) && DCGM=1
+        (! IsDeployed deploy k8s-app=metrics-server) && METRICS=1
+
+        # Process Helm options
+        declare -A HELM_ARGS
+        [ $NVDP ] && {
+            [ "${HELM_ARGS_OVERRIDE[nvidia-device-plugine.enabled]}" == "false" ] && \
+                HELM_ARGS[nvidia-device-plugin.enabled]=false || HELM_ARGS[nvidia-device-plugin.enabled]=true
+        } || {
+            HELM_ARGS[nvidia-device-plugin.enabled]=false
+            ColorEcho WARN 'Already installed NVIDIA device plugin.'
+        }
+        [ $NFD ] && {
+            [ "${HELM_ARGS_OVERRIDE[gpu-feature-discovery.nfd.deploy]}" == "false" ] && \
+                HELM_ARGS[gpu-feature-discovery.nfd.deploy]=false || HELM_ARGS[gpu-feature-discovery.nfd.deploy]=true
+        } || {
+            HELM_ARGS[gpu-feature-discovery.nfd.deploy]=false
+            ColorEcho WARN 'Already installed node feature discovery.'
+        }
+        [ $GFD ] && {
+            [ "${HELM_ARGS_OVERRIDE[gpu-feature-discovery.enabled]}" == "false" ] && \
+                HELM_ARGS[gpu-feature-discovery.enabled]=false || HELM_ARGS[gpu-feature-discovery.enabled]=true
+        } || {
+            HELM_ARGS[gpu-feature-discovery.enabled]=false
+            ColorEcho WARN 'Already installed gpu feature discovery.'
+        }
+        [ $DCGM ] && {
+            [ "${HELM_ARGS_OVERRIDE[dcgm-exporter.enabled]}" == "false" ] && \
+                HELM_ARGS[dcgm-exporter.enabled]=false || HELM_ARGS[dcgm-exporter.enabled]=true
+        } || {
+            HELM_ARGS[dcgm-exporter.enabled]=false
+            ColorEcho WARN 'Already installed data center gpu monitor.'
+        }
+
+        # Merge Helm Args
+        for KEY in ${!HELM_ARGS_OVERRIDE[@]}
+        do
+            HELM_ARGS[$KEY]=${HELM_ARGS_OVERRIDE[$KEY]}
+        done
+
+        MAX_STEP=$((3+HELM+METRICS+INGRESS+MONITORING))
+
+        # Install Helm
+        [ $HELM ] && (
+            PrintStep "Install Helm."
+            curl -s https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+        )
+
+        # Install Metrics Server
+        [ $METRICS ] && (
+            PrintStep "Install Metrics Server."
+            ! HasHelmRepo metrics-server && helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+            helm repo update
+            helm install --set 'args={--kubelet-insecure-tls}' -n kube-system metrics-server metrics-server/metrics-server
+        )
+
+        # Install Ingress-NGINX
+        if [ $INGRESS ]
+        then
+            PrintStep "Install Ingress-NGINX."
+            ! HasHelmRepo ingress-nginx && helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+            helm repo update
+            [ $LOADBALANCER ] && \
+                helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx || \
+                helm install ingress-nginx ingress-nginx/ingress-nginx --create-namespace -n ingress-nginx --set controller.service.type=NodePort
+            ColorEcho INFO "Wait few minutes for available ingress controller."
+            kubectl wait --for=condition=available --timeout=600s -n ingress-nginx deployment.apps/ingress-nginx-controller || \
+                ColorEcho ERROR "Timeout waiting for ingress controller."
+        fi
+
+        # Install Prometheus Stack
+        [ $MONITORING ] && (
+            PrintStep "Install Prometheus Stack."
+            ! HasHelmRepo prometheus-community && helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+            helm repo update
+            helm install prometheus-stack prometheus-community/kube-prometheus-stack --create-namespace -n monitoring \
+                --set grafana.ingress.enabled=true \
+                --set grafana.ingress.path=/grafana \
+                --set grafana.'grafana\.ini'.server.root_url='%(protocol)s://%(domain)s:%(http_port)s/grafana' \
+                --set grafana.'grafana\.ini'.server.serve_from_sub_path=true \
+                --set prometheus.ingress.enabled=true \
+                --set prometheus.ingress.paths={/prometheus} \
+                --set prometheus.ingress.pathType=Prefix \
+                --set prometheus.prometheusSpec.routePrefix=/prometheus \
+                --set prometheus.prometheusSpec.externalUrl=/prometheus \
+                --set alertmanager.ingress.enabled=true \
+                --set alertmanager.ingress.annotations.'nginx\.ingress\.kubernetes\.io/rewrite-target'='/$2' \
+                --set alertmanager.ingress.paths='{/alertmanager(/|$)(.*)}'
+        )
+
+        # Find dcgm-exporter.serviceMonitor.additionalLabels and dcgm-exporter.serviceMonitor.namespace values
+        [ $DCGM ] && IsDeployed deploy app=kube-prometheus-stack-operator && {
+            # dcgm-exporter.serviceMonitor.additionalLabels
+            JSON=$(kubectl get prometheus -A -l app=kube-prometheus-stack-prometheus -o jsonpath="{.items[*].spec.serviceMonitorSelector.matchLabels}")
+            KEYS=$(echo $JSON | jq keys[] -r)
+            for KEY in $KEYS
+            do
+                HELM_ARGS[dcgm-exporter.serviceMonitor.additionalLabels.$KEY]=$(echo $JSON | jq .$KEY -r)
+            done
+
+            # dcgm-exporter.serviceMonitor.namespace
+            JSON_NAMES=$(kubectl get prometheus -A -l app=kube-prometheus-stack-prometheus -o jsonpath="{.items[*].spec.serviceMonitorNamespaceSelector.matchNames}")
+            NAMES_COUNT=$(echo $JSON_NAMES | jq length)
+            [ ${NAMES_COUNT:-0} -gt 0 ] && {
+                HELM_ARGS[dcgm-exporter.serviceMonitor.namespace]=$(echo $JSON_NAMES | jq .[0] -r)
+            }
+        } || {
+            HELM_ARGS[dcgm-exporter.serviceMonitor.enabled]=false
+        }
+
+        PrintStep "Deploy MLAppDeploy Service."
+        ! HasHelmRepo mlappdeploy && helm repo add mlappdeploy https://onetop21.github.io/MLAppDeploy/charts
+        helm repo update
+
+        SELECTOR=app.kubernetes.io/name=api-server
+        IMAGE_NAME=$REGISTRY_ADDR/mlappdeploy/$SERVICE_NAME
+        VERSION=$(sudo docker run -it --rm --entrypoint "mlad" $IMAGE_NAME --version | awk '{print $3}' | tr -d '\r')
+        HELM_ARGS[image.repository]=$IMAGE_NAME
+        HELM_ARGS[image.tag]=$VERSION
+
+        if [ $BETA ]
+        then
+            INSTANCE+='-beta'
+            HELM_ARGS[additionalLabels.app\.kubernetes\.io/beta]=true
+            HELM_ARGS[ingress.annotations.'nginx\.ingress\.kubernetes\.io/rewrite-target']='/$2'
+            HELM_ARGS[ingress.hosts[0].paths[0].path]='/beta(/|$)(.*)'
+            HELM_ARGS[env.ROOT_PATH]='/beta'
+            HELM_ARGS[image.tag]=latest
+        fi
+        SELECTOR+=",app.kubernetes.io/instance=$INSTANCE"
+        (IsDeployed deploy $SELECTOR) && ROLLOUT=1
+
+        # Generate Options
+        for KEY in ${!HELM_ARGS[@]}
+        do
+            HELM_OPTIONS+="--set $KEY=${HELM_ARGS[$KEY]} "
+        done
+
+        if [ $RESET ]
+        then
+            ColorEcho "Remove installed previous service."
+            (   # Scope
+                NAMESPACE=$(kubectl get -A deploy -l $SELECTOR -o jsonpath="{.items[*].metadata.annotations.meta\.helm\.sh/release-namespace}")
+                [ $NAMESPACE ] && helm uninstall -n $NAMESPACE $INSTANCE
+            )
+        fi
+
+        ColorEcho "Deploy MLAppDeploy service."
+        if [ $ROLLOUT ]
+        then
+            helm upgrade $INSTANCE mlappdeploy/api-server -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+        else
+            helm install $INSTANCE mlappdeploy/api-server --create-namespace -n $NAMESPACE --set imagePullSecrets[0].name=regcred $HELM_OPTIONS
+        fi
+        kubectl create secret -n $NAMESPACE generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson \
+            --save-config --dry-run=client -o yaml | kubectl apply -f -
+    fi

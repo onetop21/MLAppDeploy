@@ -16,8 +16,6 @@ from mlad.cli.exceptions import (
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
 
-from mlad.cli.validator import validators
-
 
 class ValueGenerator:
     def __init__(self, generator):
@@ -123,6 +121,8 @@ def install(file_path: str, no_build: bool):
         spec = OmegaConf.load(file_path)
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
+
+    from mlad.cli.validator import validators
     spec = validators.validate(OmegaConf.to_container(spec))
     if not no_build and 'workspace' not in spec:
         raise CannotBuildComponentError

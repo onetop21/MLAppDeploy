@@ -1,4 +1,5 @@
 import sys
+import fastentrypoints  # noqa: F401
 from setuptools import setup, find_packages
 from mlad import __version__
 

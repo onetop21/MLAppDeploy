@@ -9,6 +9,7 @@ import socket
 import hashlib
 import itertools
 import jwt
+import subprocess
 from typing import Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 from functools import lru_cache
@@ -19,7 +20,6 @@ from contextlib import closing
 from datetime import datetime
 from dateutil import parser
 
-from mlad.cli.validator import validators
 from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
 
 
@@ -99,11 +99,21 @@ def convert_tag_only_image_prop(app_spec, image_tag):
     return app_spec
 
 
+@lru_cache(maxsize=None)
 def obtain_my_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(('8.8.8.8', 80))
-    ip = s.getsockname()[0]
-    s.close()
+    if 'microsoft' in os.uname().release:
+        output = subprocess.check_output([
+            'powershell.exe',
+            '-Command',
+            ('(Get-NetIPConfiguration | '
+             'Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected" }).IPv4Address.IPAddress')
+        ])
+        ip = output.strip(b'\r\n').decode()
+    else:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
     return ip
 
 
@@ -192,6 +202,7 @@ def get_project():
         sys.exit(1)
 
     # validate project schema
+    from mlad.cli.validator import validators
     project = validators.validate(project)
 
     # replace workdir to abspath
