@@ -1257,6 +1257,20 @@ def disable_node(node_key, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
+def delete_node(node_name, cli=DEFAULT_CLI):
+    if not isinstance(cli, client.api_client.ApiClient):
+        raise TypeError('Parameter is not a valid type.')
+    api = client.CoreV1Api(cli)
+    try:
+        api.patch_node(node_name)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
+        else:
+            raise exceptions.APIError(msg, status)
+
+
 def add_node_labels(node_key, cli=DEFAULT_CLI, **kv):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
