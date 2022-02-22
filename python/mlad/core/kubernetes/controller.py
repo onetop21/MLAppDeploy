@@ -1262,7 +1262,7 @@ def delete_node(node_name, cli=DEFAULT_CLI):
         raise TypeError('Parameter is not a valid type.')
     api = client.CoreV1Api(cli)
     try:
-        api.patch_node(node_name)
+        api.delete_node(node_name)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
