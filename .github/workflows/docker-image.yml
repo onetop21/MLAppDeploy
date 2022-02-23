@@ -47,6 +47,7 @@ jobs:
         elif [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
         then
           VERSION=$(git rev-parse --short "$GITHUB_SHA")
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
           WITH_LATEST=1
         else
           ERROR=Not support ${{ github.event_name }} event.
@@ -56,6 +57,7 @@ jobs:
         then
           IMAGE_ID=${{ steps.build_image.outputs.id }}
           echo IMAGE_NAME=$IMAGE_NAME
+          echo BRANCH=$BRANCH
           echo VERSION=$VERSION
 
           docker tag $IMAGE_ID $IMAGE_NAME:$VERSION
