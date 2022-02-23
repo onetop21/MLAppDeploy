@@ -624,7 +624,7 @@ def _constraints_to_labels(constraints):
     return _constraints
 
 
-def _depends_to_init_container(project_key, depends, envs):
+def _depends_to_init_container(depends, envs):
     env = [*envs, _create_V1Env('DEPENDENCY_SPECS', json.dumps(depends))]
     return client.V1Container(
         name='dependency-check-container',
@@ -874,7 +874,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         quota = app['quota']
         init_containers = None
         if app['depends'] is not None:
-            init_containers = [_depends_to_init_container(namespace_spec['key'], app['depends'], envs)]
+            init_containers = [_depends_to_init_container(app['depends'], envs)]
 
         try:
             pvc_specs = []
