@@ -188,7 +188,7 @@ def validate_depends(app_specs):
     dependency_dict = defaultdict(lambda: set())
     for spec in app_specs:
         app_name = spec['name']
-        for depend in spec['depends']:
+        for depend in spec.get('depends', []):
             target_app_name = depend['appName']
             if target_app_name not in app_names:
                 raise InvalidDependsError(f'{target_app_name} is not in apps.')
