@@ -70,10 +70,11 @@ app:
     depends:
     - appName: service-1
       condition: Succeeded
-  job-8:
-    kind: Job
-    env:
-      WAIT_TIME: 10
-    depends:
-    - appName: service-2
-      condition: Running
+  # This job causes the InvalidDependsException
+  # job-8:
+  #   kind: Job
+  #   env:
+  #     WAIT_TIME: 10
+  #   depends:
+  #   - appName: service-2
+  #     condition: Running

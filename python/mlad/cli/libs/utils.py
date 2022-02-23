@@ -10,6 +10,7 @@ import hashlib
 import itertools
 import jwt
 import subprocess
+from collections import defaultdict
 from typing import Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 from functools import lru_cache
@@ -20,7 +21,9 @@ from contextlib import closing
 from datetime import datetime
 from dateutil import parser
 
-from mlad.cli.exceptions import InvalidURLError, MountPortAlreadyUsedError
+from mlad.cli.exceptions import (
+    InvalidURLError, MountPortAlreadyUsedError, InvalidDependsError
+)
 
 
 if TYPE_CHECKING:
@@ -178,6 +181,20 @@ def bind_default_values_for_mounts(app_spec, app_specs, image):
                 used_ports.add(registered_port)
 
     return app_spec
+
+
+def validate_depends(app_specs):
+    app_names = [spec['name'] for spec in app_specs]
+    dependency_dict = defaultdict(lambda: set())
+    for spec in app_specs:
+        app_name = spec['name']
+        for depend in spec['depends']:
+            target_app_name = depend['appName']
+            if target_app_name not in app_names:
+                raise InvalidDependsError(f'{target_app_name} is not in apps.')
+            if app_name in dependency_dict[target_app_name]:
+                raise InvalidDependsError(f'{app_name} is already in dependencies of {target_app_name}.') 
+            dependency_dict[app_name].add(target_app_name)
 
 
 def get_project_file():
