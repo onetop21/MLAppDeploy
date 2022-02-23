@@ -412,6 +412,7 @@ def get_pod_info(pod):
         'container_status': list(),
         'status': dict(),
         'node': pod.spec.node_name,
+        # Pending, Running, Succeeded, Failed, Unknown
         'phase': pod.status.phase,
         'events': get_pod_events(pod)
     }
@@ -621,9 +622,22 @@ def _constraints_to_labels(constraints):
     return _constraints
 
 
+def _depends_to_init_container(project_key, depends):
+    env = [
+        _create_V1Env('PROJECT_KEY', project_key),
+        _create_V1Env('DEPENDENCY_SPECS', json.dumps(depends))
+    ]
+    return client.V1Container(
+        name='dependency-check-container',
+        image='harbor.sailio.ncsoft.com/mlappdeploy/api-server-dev',
+        command=['python', '-m', 'mlad.core.dependency'],
+        env=env
+    )
+
+
 def _create_job(name, image, command, namespace='default', restart_policy='Never',
                 envs=None, mounts=None, pvc_specs=[], parallelism=None, completions=None, quota=None,
-                resources=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
+                resources=None, init_containers=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
         else _resources_to_V1Resource(resources=quota)
@@ -645,6 +659,7 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
                 spec=client.V1PodSpec(
                     restart_policy=restart_policy,
                     termination_grace_period_seconds=10,
+                    init_containers=init_containers,
                     containers=[
                         client.V1Container(
                             name=name,
@@ -670,7 +685,7 @@ def _create_job(name, image, command, namespace='default', restart_policy='Never
 
 def _create_deployment(name, image, command, namespace='default',
                        envs=None, mounts=None, pvc_specs=[], replicas=1, quota=None, resources=None,
-                       labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
+                       init_containers=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
 
     _resources = _resources_to_V1Resource(type='Resources', resources=resources) if resources \
         else _resources_to_V1Resource(resources=quota)
@@ -697,6 +712,7 @@ def _create_deployment(name, image, command, namespace='default',
                 ),
                 spec=client.V1PodSpec(
                     restart_policy='Always',
+                    init_containers=init_containers,
                     containers=[client.V1Container(
                         name=name,
                         image=image,
@@ -717,62 +733,6 @@ def _create_deployment(name, image, command, namespace='default',
 
     api_response = api.create_namespaced_deployment(namespace, body)
     return api_response
-
-
-def _create_kind_app(cli, name, image, command, namespace, restart_policy, envs, mounts,
-                     scale, quota, labels, constraints, secrets):
-
-    RESTART_POLICY_STORE = {
-        'never': 'Never',
-        'onfailure': 'OnFailure',
-        'always': 'Always',
-    }
-    CONTROLLER_STORE = {
-        'Never': 'Job',
-        'OnFailure': 'Job',
-        'Always': 'Deployment'
-    }
-
-    restart_policy = RESTART_POLICY_STORE.get(restart_policy.lower(), 'Never')
-    controller = CONTROLLER_STORE.get(restart_policy, 'Job')
-
-    if controller == 'Job':
-        res = _create_job(name, image, command, namespace, restart_policy, envs, mounts, scale,
-                          None, quota, None, labels, constraints, secrets, cli)
-    elif controller == 'Deployment':
-        res = _create_deployment(cli, name, image, command, namespace, envs, mounts, scale,
-                                 quota, None, labels, constraints, secrets)
-    return res, controller
-
-
-def _create_kind_job(cli, name, image, command, namespace, envs, mounts, run_spec, resources,
-                     labels, constraints, secrets):
-
-    RESTART_POLICY_STORE = {
-        'never': 'Never',
-        'onfailure': 'OnFailure',
-        'always': 'Always',
-    }
-
-    restart_policy = RESTART_POLICY_STORE.get(run_spec['restartPolicy'], 'Never') \
-        if run_spec else 'Never'
-    completions = run_spec['completion'] if run_spec else None
-    parallelism = run_spec['parallelism'] if run_spec else 1
-    res = _create_job(name, image, command, namespace, restart_policy, envs, mounts, parallelism,
-                      completions, None, resources, labels, constraints, secrets, cli)
-    return res
-
-
-def _create_kind_service(cli, name, image, command, namespace, envs, mounts, run_spec,
-                         resources, labels, constraints, secrets):
-    if run_spec:
-        replicas = run_spec['replicas']
-    else:
-        replicas = 1
-
-    res = _create_deployment(cli, name, image, command, namespace, envs, mounts, replicas,
-                             None, resources, labels, constraints, secrets)
-    return res
 
 
 def _create_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
@@ -910,8 +870,10 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         secrets = f"{project_base}-auth"
 
         restart_policy = RESTART_POLICY_STORE.get(app['restartPolicy'].lower(), 'Never')
-        scale = app['scale']
         quota = app['quota']
+        init_containers = None
+        if app['depends'] is not None:
+            init_containers = [_depends_to_init_container(namespace_spec['key'], app['depends'])]
 
         try:
             pvc_specs = []
@@ -924,10 +886,11 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
             if kind == 'Job':
                 ret = _create_job(name, image, command, namespace_name, restart_policy, envs, v_mounts, pvc_specs,
-                                  scale, None, quota, None, labels, constraints, secrets, cli)
+                                  1, None, quota, None, init_containers, labels, constraints, secrets, cli)
             elif kind == 'Service':
+                scale = app['scale']
                 ret = _create_deployment(name, image, command, namespace_name, envs, v_mounts, pvc_specs, scale,
-                                         quota, None, labels, constraints, secrets, cli)
+                                         quota, None, init_containers, labels, constraints, secrets, cli)
             else:
                 raise DeprecatedError
             instances.append(ret)

@@ -27,6 +27,11 @@ class Mount(BaseModel):
     options: Optional[List[str]]
 
 
+class Dependency(BaseModel):
+    appName: str
+    condition: str = 'Running'
+
+
 class Component(BaseModel):
     kind = 'Component'
     name: str
@@ -54,8 +59,8 @@ class AdvancedBase(AppBase):
 
 class App(AppBase):
     restartPolicy: Optional[str] = 'never'
-    scale: Optional[int] = 1
     quota: Optional[Quota] = None
+    depends: Optional[List[Dependency]] = None
 
 
 class JobRunSpec(BaseModel):
@@ -88,6 +93,7 @@ class AppJob(App):
 
 class AppService(App):
     kind = 'Service'
+    scale: Optional[int] = 1
     restartPolicy: Optional[str] = 'always'
 
 
@@ -105,8 +111,8 @@ class CreateRequest(BaseModel):
                 _ = AppJob(**_)
             elif kind == 'Service':
                 _ = AppService(**_)
-            service = json.loads(_.json())
-            targets[_.name] = service
+            app = json.loads(_.json())
+            targets[_.name] = app
             del targets[_.name]['name']
         return targets
 
