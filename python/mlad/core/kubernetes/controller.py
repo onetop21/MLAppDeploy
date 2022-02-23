@@ -4,7 +4,7 @@ import time
 import json
 import uuid
 
-from typing import Union
+from typing import Union, Optional
 
 from collections import defaultdict
 from mlad.core import exceptions
@@ -797,10 +797,10 @@ def _create_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_
     return pvc_name
 
 
-def _create_V1Env(name: str, value: Union[str, int] = None, field_path: str = None):
+def _create_V1Env(name: str, value: Optional[Union[str, int]] = None, field_path: str = None):
     return client.V1EnvVar(
         name=name,
-        value=str(value),
+        value=str(value) if value is not None else None,
         value_from=client.V1EnvVarSource(
             field_ref=client.V1ObjectFieldSelector(
                 field_path=field_path
