@@ -44,11 +44,11 @@ jobs:
 
           # Strip "v" prefix from tag name
           [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          WITH_LATEST=1
         elif [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
         then
           VERSION=$(git rev-parse --short "$GITHUB_SHA")
           BRANCH=$(git rev-parse --abbrev-ref HEAD | tr '!@#$%^&*()_+=[]{}\\|/?,.<>~' '-')
-          WITH_LATEST=1
         else
           ERROR=Not support ${{ github.event_name }} event.
         fi
