@@ -630,6 +630,7 @@ def _depends_to_init_container(project_key, depends):
     return client.V1Container(
         name='dependency-check-container',
         image='harbor.sailio.ncsoft.com/mlappdeploy/api-server-dev',
+        image_pull_policy='Always',
         command=['python', '-m', 'mlad.core.dependency'],
         env=env
     )
