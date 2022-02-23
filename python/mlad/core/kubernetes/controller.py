@@ -839,7 +839,8 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
             'USERNAME': namespace_spec['username'],
             'PROJECT_KEY': namespace_spec['key'],
             'PROJECT_ID': str(namespace_spec['id']),
-            'APP': name
+            'APP': name,
+            'PYTHONUNBUFFERED': 1
         })
         config_envs = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         config_envs = {env.split('=', 1)[0]: env.split('=', 1)[1] for env in config_envs}
