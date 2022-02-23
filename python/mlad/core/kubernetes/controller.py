@@ -624,11 +624,8 @@ def _constraints_to_labels(constraints):
     return _constraints
 
 
-def _depends_to_init_container(project_key, depends):
-    env = [
-        _create_V1Env('PROJECT_KEY', project_key),
-        _create_V1Env('DEPENDENCY_SPECS', json.dumps(depends))
-    ]
+def _depends_to_init_container(project_key, depends, envs):
+    env = [*envs, _create_V1Env('DEPENDENCY_SPECS', json.dumps(depends))]
     return client.V1Container(
         name='dependency-check-container',
         image='harbor.sailio.ncsoft.com/mlappdeploy/api-server-dev',
@@ -876,7 +873,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         quota = app['quota']
         init_containers = None
         if app['depends'] is not None:
-            init_containers = [_depends_to_init_container(namespace_spec['key'], app['depends'])]
+            init_containers = [_depends_to_init_container(namespace_spec['key'], app['depends'], envs)]
 
         try:
             pvc_specs = []
