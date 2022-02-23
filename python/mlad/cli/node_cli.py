@@ -17,7 +17,8 @@ def ls(no_trunc):
 @echo_exception
 def enable(node_name):
     '''Enable the node.'''
-    node.enable(node_name)
+    for line in node.enable(node_name):
+        click.echo(line)
 
 
 @click.command()
@@ -25,7 +26,17 @@ def enable(node_name):
 @echo_exception
 def disable(node_name):
     '''Disable the node.'''
-    node.disable(node_name)
+    for line in node.disable(node_name):
+        click.echo(line)
+
+
+@click.command()
+@click.argument('node-name', autocompletion=list_node_names)
+@echo_exception
+def delete(node_name: str):
+    '''Delete the node.'''
+    for line in node.delete(node_name):
+        click.echo(line)
 
 
 @click.command()
@@ -37,7 +48,8 @@ def add(id, kv):
     Format: mlad node label [NODE_NAME] add [KEY1]=[VALUE1] [KEY2]=[VALUE2]
     '''
     kvdict = dict([_.split('=') for _ in kv])
-    node.label_add(id, **kvdict)
+    for line in node.label_add(id, **kvdict):
+        click.echo(line)
 
 
 @click.command()
@@ -48,7 +60,8 @@ def rm(id, key):
     '''Remove labels from the node.\n
     Format: mlad node label [NODE_NAME] rm [KEY1]=[VALUE1] [KEY2]=[VALUE2]
     '''
-    node.label_rm(id, *key)
+    for line in node.label_rm(id, *key):
+        click.echo(line)
 
 
 @click.command()
@@ -83,6 +96,7 @@ admin_cli.add_command(resource)
 admin_cli.add_command(enable)
 admin_cli.add_command(disable)
 admin_cli.add_command(label)
+admin_cli.add_command(delete)
 
 
 @click.group('node')

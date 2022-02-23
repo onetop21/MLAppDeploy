@@ -74,51 +74,29 @@ def resource(names=None, no_trunc=False):
 
 def enable(name: str):
     cli = ctlr.get_api_client(context=get_context())
-    try:
-        ctlr.enable_node(name, cli)
-    except CoreException.NotFound as e:
-        print(e)
-        sys.exit(1)
-    except CoreException.APIError as e:
-        print(f'Cannot enable node {name} : {e}')
-        sys.exit(1)
-    print('Updated.')
+    ctlr.enable_node(name, cli)
+    yield f'Node [{name}] is enabled.'
 
 
 def disable(name: str):
     cli = ctlr.get_api_client(context=get_context())
-    try:
-        ctlr.disable_node(name, cli)
-    except CoreException.NotFound as e:
-        print(e)
-        sys.exit(1)
-    except CoreException.APIError as e:
-        print(f'Cannot disable node {name} : {e}')
-        sys.exit(1)
-    print('Updated.')
+    ctlr.disable_node(name, cli)
+    yield f'Node [{name}] is disabled.'
+
+
+def delete(node_name: str):
+    cli = ctlr.get_api_client(context=get_context())
+    ctlr.delete_node(node_name, cli)
+    yield f'Node [{node_name}] is deleted.'
 
 
 def label_add(node, **kvs):
     cli = ctlr.get_api_client(context=get_context())
-    try:
-        ctlr.add_node_labels(node, cli, **kvs)
-    except CoreException.NotFound as e:
-        print(e)
-        sys.exit(1)
-    except CoreException.APIError as e:
-        print(f'Cannot add label : {e}')
-        sys.exit(1)
-    print('Added.')
+    ctlr.add_node_labels(node, cli, **kvs)
+    yield f'Label {kvs} added.'
 
 
 def label_rm(node, *keys):
     cli = ctlr.get_api_client(context=get_context())
-    try:
-        ctlr.remove_node_labels(node, cli, *keys)
-    except CoreException.NotFound as e:
-        print(e)
-        sys.exit(1)
-    except CoreException.APIError as e:
-        print(f'Cannot remove label : {e}')
-        sys.exit(1)
-    print('Removed.')
+    ctlr.remove_node_labels(node, cli, *keys)
+    yield f'Label {keys} removed.'
