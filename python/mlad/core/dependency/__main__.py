@@ -4,7 +4,7 @@ import json
 
 from typing import Optional, Dict, List
 
-from mlad.core.kubernetes import controller as ctlr
+from mlad.api import API
 
 
 def _find_target_app_spec(target_app_name: str, app_specs: List[Dict]) -> Optional[Dict]:
@@ -29,8 +29,7 @@ if __name__ == '__main__':
     project_key = os.environ['PROJECT_KEY']
     dependency_specs = json.loads(os.environ['DEPENDENCY_SPECS'])
     while True:
-        apps = ctlr.get_apps(project_key)
-        app_specs = [ctlr.inspect_app(app) for app in apps]
+        app_specs = API.app.get(project_key=project_key)['specs']
         satisfied_count = 0
         for dependency_spec in dependency_specs:
             target_app_name = dependency_spec['appName']
