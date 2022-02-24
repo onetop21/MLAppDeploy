@@ -628,7 +628,7 @@ def _depends_to_init_container(depends, envs):
     env = [*envs, _create_V1Env('DEPENDENCY_SPECS', json.dumps(depends))]
     return client.V1Container(
         name='dependency-check-container',
-        image='harbor.sailio.ncsoft.com/mlappdeploy/api-server-dev',
+        image='ghcr.io/onetop21/mlappdeploy/api-server:4d98887',
         image_pull_policy='Always',
         command=['python', '-m', 'mlad.core.dependency'],
         env=env
