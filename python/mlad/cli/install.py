@@ -1,6 +1,5 @@
 from mlad.core import exceptions as core_exceptions
 from mlad.core.kubernetes import controller as ctlr
-from mlad.core.kubernetes import install as installer
 from mlad.cli.libs import utils
 
 
@@ -114,50 +113,3 @@ def check():
 
         if plugin == 'MLAD API Server' and status:
             yield f' · API Server Address : {address}'
-
-
-def _is_running_api_server(cli, beta: bool) -> bool:
-    try:
-        name = 'mlad-api-server' if not beta else 'mlad-api-server-beta'
-        ctlr.get_deployment(name, 'mlad', cli)
-    except core_exceptions.NotFound:
-        return False
-    return True
-
-
-def deploy_api_server(image_tag: str, ingress: bool, beta: bool):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
-    is_running = _is_running_api_server(cli, beta)
-    if not is_running:
-        yield 'Create docker registry secret named \'docker-mlad-sc\'.'
-        installer.create_docker_registry_secret(cli)
-
-        yield 'Create \'mlad\' namespace.'
-        installer.create_mlad_namespace(cli)
-
-        yield 'Create \'mlad-cluster-role\' cluster role.'
-        yield 'Create \'mlad-cluster-role-binding\' cluster role binding.'
-        installer.create_api_server_role_and_rolebinding(cli)
-        yield f'Create \'mlad-service{"-beta" if beta else ""}\' service.'
-        installer.create_mlad_service(cli, nodeport=not ingress, beta=beta)
-        if not ingress:
-            yield f'Check the node port value of the \'mlad-service{"-beta" if beta else ""}\'.'
-            yield 'Run \'kubectl get svc -n mlad\'.'
-        yield f'Create \'mlad-api-server{"-beta" if beta else ""}\' deployment.'
-        installer.create_mlad_api_server_deployment(cli, image_tag, beta=beta)
-    else:
-        yield f'Patch the \'mlad-service{"-beta" if beta else ""}\' service.'
-        installer.patch_mlad_service(cli, nodeport=not ingress, beta=beta)
-        if not ingress:
-            yield f'Check the NodePort value of the \'mlad-service{"-beta" if beta else ""}\'.'
-            yield 'Run \'kubectl get svc -n mlad\'.'
-
-        yield f'Patch the \'mlad-api-server{"-beta" if beta else ""}\' deployment.'
-        installer.patch_mlad_api_server_deployment(cli, beta=beta)
-
-    if ingress:
-        yield f'Create \'mlad-ingress{"-beta" if beta else ""}\' ingress.'
-        installer.create_mlad_ingress(cli, beta=beta)
-    else:
-        yield f'Delete running \'mlad-ingress{"-beta" if beta else ""}\' ingress.'
-        installer.delete_mlad_ingress(cli, beta=beta)
