@@ -133,6 +133,10 @@ class MountError(MLADException):
     pass
 
 
+class InvalidDependsError(MLADException):
+    pass
+
+
 class PluginUninstalledError(MLADException):
     pass
 

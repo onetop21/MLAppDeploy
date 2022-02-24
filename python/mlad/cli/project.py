@@ -356,6 +356,8 @@ def up(file: Optional[str]):
         app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs, images[0])
         app_specs.append(app_spec)
 
+    utils.validate_depends(app_specs)
+
     # Create a project
     yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()

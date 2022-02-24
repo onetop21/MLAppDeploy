@@ -1,0 +1,80 @@
+kind: Deployment
+apiVersion: v1
+name: depends
+version: 0.0.1
+maintainer: root
+workspace:
+  kind: Workspace
+  base: python:latest
+  ignores:
+  - '**/.*'
+  command: python entry.py
+app:
+  job-1:
+    kind: Job
+    env:
+      WAIT_TIME: 5
+  job-2:
+    kind: Job
+    env:
+      WAIT_TIME: 5
+      FAILED: 1
+    depends:
+    - appName: job-1
+      condition: Running
+  job-3:
+    kind: Job
+    env:
+      WAIT_TIME: 20
+    depends:
+    - appName: job-1
+      condition: Running
+    - appName: job-2
+      condition: Running
+  # Cannot start indefinitely
+  job-4:
+    kind: Job
+    env:
+      WAIT_TIME: 10
+    depends:
+    - appName: job-1
+      condition: Succeeded
+    - appName: job-2
+      condition: Succeeded
+  job-5:
+    kind: Job
+    env:
+      WAIT_TIME: 10
+    depends:
+    - appName: job-1
+      condition: Succeeded
+    - appName: job-3
+      condition: Succeeded
+  service-1:
+    kind: Service
+    env:
+      WAIT_TIME: 10
+    scale: 2
+  job-6:
+    kind: Job
+    env:
+      WAIT_TIME: 10
+    depends:
+    - appName: service-1
+      condition: Running
+  # Cannot start indefinitely
+  job-7:
+    kind: Job
+    env:
+      WAIT_TIME: 10
+    depends:
+    - appName: service-1
+      condition: Succeeded
+  # This job causes the InvalidDependsException
+  # job-8:
+  #   kind: Job
+  #   env:
+  #     WAIT_TIME: 10
+  #   depends:
+  #   - appName: service-2
+  #     condition: Running

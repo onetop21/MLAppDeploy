@@ -197,6 +197,19 @@ x-definitions:
             type: string
             regex: "^[0-9]+[GMK]?[i]?$"
         description: Required system resource quota.
+      depends:
+        type: list
+        description: The dependencies to start the app.
+        schema:
+          type: dict
+          schema:
+            appName:
+              type: string
+              description: The name of the app to apply the condition to.
+            condition:
+              allowed: [Running, Succeeded]
+              default: Running
+              description: Condition to run the app.
   - definition: &job
       <<: *app
       restartPolicy:
