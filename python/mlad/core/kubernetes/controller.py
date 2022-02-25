@@ -1185,7 +1185,7 @@ def inspect_node(node):
     }
 
 
-def enable_node(node_key, cli=DEFAULT_CLI):
+def enable_node(node_name, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -1193,16 +1193,16 @@ def enable_node(node_key, cli=DEFAULT_CLI):
         "spec": {"taints": None}
     }
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
 
-def disable_node(node_key, cli=DEFAULT_CLI):
+def disable_node(node_name, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
@@ -1212,11 +1212,11 @@ def disable_node(node_key, cli=DEFAULT_CLI):
                             "key": "node-role.kubernetes.io/worker"}]}
     }
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
@@ -1235,7 +1235,7 @@ def delete_node(node_name, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-def add_node_labels(node_key, cli=DEFAULT_CLI, **kv):
+def add_node_labels(node_name, cli=DEFAULT_CLI, **kv):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
@@ -1248,16 +1248,16 @@ def add_node_labels(node_key, cli=DEFAULT_CLI, **kv):
     for key in kv:
         body['metadata']['labels'][key] = kv[key]
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
 
-def remove_node_labels(node_key, cli=DEFAULT_CLI, *keys):
+def remove_node_labels(node_name, cli=DEFAULT_CLI, *keys):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
@@ -1270,11 +1270,11 @@ def remove_node_labels(node_key, cli=DEFAULT_CLI, *keys):
     for key in keys:
         body['metadata']['labels'][key] = None
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
