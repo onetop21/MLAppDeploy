@@ -416,7 +416,8 @@ def get_pod_info(pod):
         'node': pod.spec.node_name,
         # Pending, Running, Succeeded, Failed, Unknown
         'phase': pod.status.phase,
-        'events': get_pod_events(pod)
+        'events': get_pod_events(pod),
+        'restart': 0
     }
 
     def get_status(container_state):
@@ -465,6 +466,7 @@ def get_pod_info(pod):
                 'ready': container.ready
             }
             pod_info['container_status'].append(container_info)
+            pod_info['restart'] += container_info['restart']
         pod_info['status'] = parse_status(pod_info['container_status'])
     else:
         pod_info['container_status'] = None
