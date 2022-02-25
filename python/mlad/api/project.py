@@ -74,8 +74,9 @@ class Project(APIBase):
             except requests.exceptions.ChunkedEncodingError as e:
                 print(f"[Retry] {e}", file=sys.stderr)
 
-    def resource(self, project_key):
-        return self._get(f'/{project_key}/resource')
+    def resource(self, project_key, group_by='project', no_trunc=True):
+        params = {'group_by': group_by, 'no_trunc': no_trunc}
+        return self._get(f'/{project_key}/resource', params=params)
 
     def update(self, project_key, update_yaml, update_specs):
         body = {

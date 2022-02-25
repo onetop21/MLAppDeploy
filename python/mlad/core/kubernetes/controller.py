@@ -3,18 +3,19 @@ import copy
 import time
 import json
 import uuid
-
 from typing import Union, Optional
-
 from collections import defaultdict
+
+from kubernetes import client, config, watch
+from kubernetes.client.api_client import ApiClient
+from kubernetes.client.rest import ApiException
+
 from mlad.core import exceptions
 from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
-from kubernetes import client, config, watch
-from kubernetes.client.api_client import ApiClient
-from kubernetes.client.rest import ApiException
+
 
 # https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
 
@@ -1523,7 +1524,8 @@ def get_node_resources(node, cli=DEFAULT_CLI):
     }
 
 
-def get_project_resources(project_key, cli=DEFAULT_CLI):
+def get_project_resources(project_key: str, group_by: str = 'project', no_trunc: bool = True,
+                          cli=DEFAULT_CLI):
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
     res = {}
@@ -1540,6 +1542,7 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                 used += int(gpu)
         return used
 
+    project_res = {'cpu': 0, 'gpu': 0, 'mem': 0}
     for name, app in apps.items():
         res[name] = {}
         namespace = app.metadata.namespace
@@ -1567,6 +1570,20 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
             if pod_gpu_usage is not None:
                 resource['gpu'] += pod_gpu_usage
 
+            if group_by == 'project':
+                for k in project_res:
+                    project_res[k] += resource[k] if resource[k] is not None else 0
+
+            if not no_trunc:
+                for k in resource:
+                    resource[k] = round(resource[k], 1)
+
             res[name][pod_name] = resource
 
-    return res
+    if group_by == 'project':
+        if not no_trunc:
+            for k in project_res:
+                project_res[k] = round(project_res[k], 1)
+        return project_res
+    elif group_by == 'app':
+        return res
