@@ -1,11 +1,12 @@
 import traceback
-
 from typing import List
+
 from fastapi import APIRouter, Query, Header, HTTPException
+
 from mlad.core import exceptions
+from mlad.core.kubernetes import controller as ctlr
 from mlad.service.exceptions import exception_detail
 from mlad.service.libs.log import init_logger
-from mlad.core.kubernetes import controller as ctlr
 
 
 router = APIRouter()

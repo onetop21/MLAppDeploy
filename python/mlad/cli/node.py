@@ -1,11 +1,11 @@
 import sys
 
-from mlad.cli.libs import utils
-from mlad.cli.config import get_context
-from mlad.cli.exceptions import PluginUninstalledError
 from mlad.api import API
 from mlad.api.exceptions import APIError
 from mlad.core.kubernetes import controller as ctlr
+from mlad.cli.libs import utils
+from mlad.cli.config import get_context
+from mlad.cli.exceptions import PluginUninstalledError
 
 
 def list(no_trunc: bool):
