@@ -407,7 +407,7 @@ def up(file: Optional[str]):
                 yield utils.print_info(f'- port: {ingress["port"]} -> {ingress["path"]}')
 
 
-def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
+def down(file: Optional[str], project_key: Optional[str], dump: bool):
     utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
@@ -421,7 +421,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         app_names = [app['name'] for app in apps]
 
         # Dump logs
-        if not no_dump:
+        if dump:
             dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
             yield utils.print_info(f'Project Log Storage: {dirpath}')
@@ -454,7 +454,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     yield 'Done.'
 
 
-def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
+def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
     utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
@@ -468,7 +468,7 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
         app_names = [app['name'] for app in apps]
 
         # Dump logs
-        if not no_dump:
+        if dump:
             dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
             yield utils.print_info(f'Project Log Storage: {dirpath}')
