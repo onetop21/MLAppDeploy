@@ -531,7 +531,7 @@ def _dump_logs(app_name: str, project_key: str, dirpath: Path):
         try:
             logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
             for log in logs:
-                log = _format_log(log, pretty=False)
+                log = _format_log(log, pretty=False) + '\n'
             log_file.write(log)
         except InvalidLogRequest:
             return f'There is no log in [{app_name}].'
