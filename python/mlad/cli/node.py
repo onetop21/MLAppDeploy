@@ -5,7 +5,6 @@ from mlad.cli.config import get_context
 from mlad.cli.exceptions import PluginUninstalledError
 from mlad.api import API
 from mlad.api.exceptions import APIError
-from mlad.core import exceptions as CoreException
 from mlad.core.kubernetes import controller as ctlr
 
 

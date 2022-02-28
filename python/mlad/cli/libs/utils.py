@@ -2,32 +2,18 @@ from __future__ import annotations
 
 import sys
 import os
-import re
-import fnmatch
 import uuid
 import socket
 import hashlib
 import itertools
 import jwt
 import subprocess
-from collections import defaultdict
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional
 from pathlib import Path
 from functools import lru_cache
-from urllib.parse import urlparse
 from omegaconf import OmegaConf
-from getpass import getuser
-from contextlib import closing
 from datetime import datetime
 from dateutil import parser
-
-from mlad.cli.exceptions import (
-    InvalidURLError, MountPortAlreadyUsedError, InvalidDependsError
-)
-
-
-if TYPE_CHECKING:
-    from mlad.cli.context import Context
 
 
 HOME = str(Path.home())
@@ -40,14 +26,6 @@ DEFAULT_PROJECT_FILE = 'mlad-project.yml'
 DEFAULT_PLUGIN_FILE = 'mlad-plugin.yml'
 
 
-def create_session_key():
-    user = getuser()
-    hostname = socket.gethostname()
-    payload = {"user": user, "hostname": hostname, "uuid": str(uuid.uuid4())}
-    encode = jwt.encode(payload, "mlad", algorithm="HS256")
-    return encode
-
-
 def get_workspace():
     '''
     Project Hash: [HOSTNAME]@[PROJECT DIR]
@@ -57,49 +35,13 @@ def get_workspace():
 
 
 def workspace_key(workspace=None):
+
+    def _hash(body: str):
+        return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
+
     if workspace is not None:
-        return hash(workspace).hex
-    return hash(get_workspace()).hex
-
-
-def read_config():
-    try:
-        return OmegaConf.load(CONFIG_FILE)
-    except FileNotFoundError:
-        print('Need to initialize configuration before.\nTry to run "mlad config init"',
-              file=sys.stderr)
-        sys.exit(1)
-
-
-def get_completion(shell='bash'):
-    return os.popen(f"_MLAD_COMPLETE=source_{shell} mlad").read()
-
-
-def write_completion(shell='bash'):
-    with open(COMPLETION_FILE, 'wt') as f:
-        f.write(get_completion(shell))
-    if shell == 'bash':
-        with open(f"{HOME}/.bash_completion", 'wt') as f:
-            f.write(f". {COMPLETION_FILE}")
-
-
-def check_podname_syntax(obj):
-    if isinstance(obj, dict):
-        for _ in obj.keys():
-            if not re.match(r'^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', _):
-                return False
-    elif isinstance(obj, str):
-        if not re.match(r'^([a-z]+[a-z0-9\-]*[a-z0-9]+|[a-z0-9])$', obj):
-            return False
-    else:
-        return False
-    return True
-
-
-def convert_tag_only_image_prop(app_spec, image_tag):
-    if 'image' in app_spec and app_spec['image'].startswith(':'):
-        app_spec['image'] = image_tag.rsplit(':', 1)[0] + app_spec['image']
-    return app_spec
+        return _hash(workspace).hex
+    return _hash(get_workspace()).hex
 
 
 @lru_cache(maxsize=None)
@@ -118,83 +60,6 @@ def obtain_my_ip():
         ip = s.getsockname()[0]
         s.close()
     return ip
-
-
-def _find_free_port(used_ports: set, max_retries=100) -> str:
-    for _ in range(max_retries):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(('', 0))
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            port = str(s.getsockname()[1])
-            if port not in used_ports:
-                return port
-    raise RuntimeError('Cannot found the free port')
-
-
-def find_port_from_mount_options(mount) -> Optional[str]:
-    # ignore the registered port if a nfs value is assigned
-    if 'nfs' in mount:
-        return None
-    for option in mount.get('options', []):
-        if option.startswith('port='):
-            return option.replace('port=', '')
-    return None
-
-
-def bind_default_values_for_mounts(app_spec, app_specs, image):
-    if 'mounts' not in app_spec:
-        return app_spec
-
-    used_ports = set()
-    for spec in app_specs:
-        for mount in spec.get('mounts', []):
-            port = find_port_from_mount_options(mount)
-            if port is not None:
-                used_ports.add(port)
-
-    ip = obtain_my_ip()
-    for mount in app_spec['mounts']:
-        # Set the server and server path
-        if 'nfs' in mount:
-            mount['server'], mount['serverPath'] = mount['nfs'].split(':')
-        else:
-            mount['server'] = ip
-            mount['serverPath'] = '/'
-            if not mount['path'].startswith('/'):
-                mount['path'] = str(Path(get_project_file()).parent / Path(mount['path']))
-
-        # Set the mount path
-        if not mount['mountPath'].startswith('/'):
-            workdir = image.attrs['Config'].get('WorkingDir', '/workspace')
-            mount['mountPath'] = str(Path(workdir) / Path(mount['mountPath']))
-
-        # Set the options
-        if 'nfs' not in mount:
-            registered_port = find_port_from_mount_options(mount)
-            if registered_port is not None and registered_port in used_ports:
-                raise MountPortAlreadyUsedError(registered_port)
-            elif registered_port is None:
-                free_port = _find_free_port(used_ports)
-                used_ports.add(free_port)
-                mount['options'].append(f'port={free_port}')
-            else:
-                used_ports.add(registered_port)
-
-    return app_spec
-
-
-def validate_depends(app_specs):
-    app_names = [spec['name'] for spec in app_specs]
-    dependency_dict = defaultdict(lambda: set())
-    for spec in app_specs:
-        app_name = spec['name']
-        for depend in spec.get('depends', []):
-            target_app_name = depend['appName']
-            if target_app_name not in app_names:
-                raise InvalidDependsError(f'{target_app_name} is not in apps.')
-            if app_name in dependency_dict[target_app_name]:
-                raise InvalidDependsError(f'{app_name} is already in dependencies of {target_app_name}.') 
-            dependency_dict[app_name].add(target_app_name)
 
 
 def get_project_file():
@@ -259,67 +124,6 @@ def print_table(data, no_data_msg=None, max_width=32, upper=True):
         print(no_data_msg, file=sys.stderr)
 
 
-@lru_cache(maxsize=None)
-def get_advertise_addr():
-    # If this local machine is WSL2
-    if 'microsoft' in os.uname().release:
-        print("Wait for getting host IP address...")
-        import subprocess
-        output = subprocess.check_output(['powershell.exe', '-Command', '(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected" }).IPv4Address.IPAddress'])
-        addr = output.strip(b'\r\n').decode()
-        sys.stdout.write("\033[1A\033[K")
-    else:
-        import socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        addr = s.getsockname()[0]
-        s.close()
-    return addr
-
-
-def get_default_service_port(container_name, internal_port):
-    import docker
-    cli = docker.from_env()
-    external_port = None
-    for _ in [_.ports[f'{internal_port}/tcp'] for _ in cli.containers.list()
-              if _.name in [f'{container_name}']]:
-        external_port = _[0]['HostPort']
-    return external_port
-
-
-def parse_url(url):
-    try:
-        parsed_url = urlparse(url)
-        if not parsed_url.netloc:
-            raise InvalidURLError
-    except Exception:
-        raise InvalidURLError
-    return {
-        'scheme': parsed_url.scheme or 'http',
-        'username': parsed_url.username,
-        'password': parsed_url.password,
-        'hostname': parsed_url.hostname,
-        'port': parsed_url.port or (443 if parsed_url.scheme == 'https' else 80),
-        'path': parsed_url.path,
-        'query': parsed_url.query,
-        'params': parsed_url.params,
-        'url': url if parsed_url.scheme else f"http://{url}",
-        'address': url.replace(f"{parsed_url.scheme}://", "") if parsed_url.scheme else url
-    }
-
-
-def generate_unique_id(length=None):
-    UUID = uuid.uuid4()
-    if length:
-        return UUID.hex[:length]
-    else:
-        return UUID
-
-
-def hash(body: str):
-    return uuid.UUID(hashlib.md5(body.encode()).hexdigest())
-
-
 # for Log Coloring
 CLEAR_COLOR = '\x1b[0m'
 ERROR_COLOR = '\x1b[1;31;40m'
@@ -349,46 +153,8 @@ def color_index():
     return next(_color_counter) % len(color_table())
 
 
-def print_info(line):
+def info_msg(line):
     return f'{INFO_COLOR}{line}{CLEAR_COLOR}'
-
-
-###############
-def match(filepath, ignores):
-    result = False
-    normpath = os.path.normpath(filepath)
-
-    def matcher(path, pattern):
-        patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")]
-                                if '**/' in pattern else [])
-        result = map(lambda _: fnmatch.fnmatch(normpath, _) or fnmatch.fnmatch(
-            normpath, os.path.normpath(f"{_}/*")), patterns)
-        return sum(result) > 0
-    for ignore in ignores:
-        if ignore.startswith('#'):
-            pass
-        elif ignore.startswith('!'):
-            result &= not matcher(normpath, ignore[1:])
-        else:
-            result |= matcher(normpath, ignore)
-    return result
-
-
-def arcfiles(workspace='.', ignores=[]):
-    ignores = [os.path.join(os.path.abspath(workspace), _)for _ in ignores]
-    for root, dirs, files in os.walk(workspace):
-        for name in files:
-            filepath = os.path.join(root, name)
-            if not match(filepath, ignores):
-                yield filepath, os.path.relpath(os.path.abspath(filepath),
-                                                os.path.abspath(workspace))
-        prune_dirs = []
-        for name in dirs:
-            dirpath = os.path.join(root, name)
-            if match(dirpath, ignores):
-                prune_dirs.append(name)
-        for _ in prune_dirs:
-            dirs.remove(_)
 
 
 def prompt(msg, default='', ty=str):
@@ -404,6 +170,37 @@ def get_username(session):
         raise RuntimeError("Session key is invalid.")
 
 
+# Manage Project and Namespace
+def base_labels(workspace: str, session: str, project: Dict,
+                registry_address: str, build: bool = False):
+    # workspace = f"{hostname}:{workspace}"
+    # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
+    username = get_username(session)
+    key = workspace_key(workspace=workspace)
+    kind = project['kind']
+    version = str(project['version']).lower()
+    repository = f"{username}/{project['name']}-{key[:10]}:{version}".lower()
+    if kind == 'Deployment':
+        repository = f'{registry_address}/' + repository
+    basename = f"{username}-{project['name']}-{key[:10]}".lower()
+
+    labels = {
+        'MLAD.VERSION': '1',
+        'MLAD.PROJECT': key,
+        'MLAD.PROJECT.WORKSPACE': workspace,
+        'MLAD.PROJECT.USERNAME': username,
+        'MLAD.PROJECT.API_VERSION': project['apiVersion'],
+        'MLAD.PROJECT.NAME': project['name'].lower(),
+        'MLAD.PROJECT.MAINTAINER': project['maintainer'],
+        'MLAD.PROJECT.VERSION': str(project['version']).lower(),
+        'MLAD.PROJECT.BASE': basename,
+        'MLAD.PROJECT.IMAGE': repository,
+        'MLAD.PROJECT.SESSION': session,
+        'MLAD.PROJECT.KIND': project['kind']
+    }
+    return labels
+
+
 # Process file option for cli
 def process_file(file: Optional[str]):
     if file is not None and not os.path.isfile(file):
@@ -413,36 +210,8 @@ def process_file(file: Optional[str]):
         os.environ[PROJECT_FILE_ENV_KEY] = file
 
 
-# Pasre log output for cli
-def parse_log(log: Dict, max_name_width: int = 32, len_short_id: int = 20) -> str:
-    name = log['name']
-    name_width = min(max_name_width, log['name_width'])
-    if 'task_id' in log:
-        name = f'{name}.{log["task_id"][:len_short_id]}'
-        name_width = min(max_name_width, name_width + len_short_id + 1)
-    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
-    timestamp = f'[{log["timestamp"]}]' if 'timestamp' in log else None
-    if msg.startswith('Error'):
-        return msg
-    else:
-        if timestamp is not None:
-            return f'{timestamp} {name}: {msg}'
-        else:
-            return f'{name}: {msg}'
-
-
-def get_registry_address(config: Context):
-    parsed = parse_url(config.docker.registry.address)
-    registry_address = parsed['address']
-    namespace = config.docker.registry.namespace
-    if namespace is not None:
-        registry_address += f'/{namespace}'
-    return registry_address
-
-
 def created_to_age(created: str):
     # param created: str of datetime
-
     uptime = (datetime.utcnow() - parser.parse(created).replace(tzinfo=None)).total_seconds()
     if uptime > 24 * 60 * 60:
         uptime = f"{uptime // (24 * 60 * 60):.0f} days"
