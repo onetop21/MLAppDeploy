@@ -102,17 +102,13 @@ def ls(no_trunc: bool):
         projects[project_key].update(used)
 
     for project in projects.values():
-        if project['apps'] > 0:
-            running_tasks = f"{project['tasks']}/{project['replicas']}"
-            columns.append((project['username'], project['project'], project['key'],
-                            project['apps'], f"{running_tasks:>5}", project['hostname'],
-                            project['workspace'], project['age'],
-                            project['mem'], project['cpu'], project['gpu']))
-        else:
-            columns.append((project['username'], project['project'], project['key'],
-                            '-', '-', project['hostname'],
-                            project['workspace'], project['age'],
-                            project['mem'], project['cpu'], project['gpu']))
+        run_apps = project['apps'] > 0
+        task_info = f'{project["tasks"]}/{project["replicas"]}'
+        columns.append((project['username'], project['project'], project['key'],
+                        project['apps'] if run_apps else '-',
+                        task_info if run_apps else '-',
+                        project['hostname'], project['workspace'], project['age'],
+                        project['mem'], project['cpu'], project['gpu']))
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
