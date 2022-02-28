@@ -9,21 +9,14 @@ import itertools
 import jwt
 import subprocess
 from typing import Dict, Optional
-from pathlib import Path
 from functools import lru_cache
 from omegaconf import OmegaConf
 from datetime import datetime
 from dateutil import parser
 
 
-HOME = str(Path.home())
-
-CONFIG_PATH = f'{Path.home()}/.mlad'
-CONFIG_FILE = f'{CONFIG_PATH}/config.yml'
-COMPLETION_FILE = f'{CONFIG_PATH}/completion.sh'
 PROJECT_FILE_ENV_KEY = 'MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
-DEFAULT_PLUGIN_FILE = 'mlad-plugin.yml'
 
 
 def get_workspace():

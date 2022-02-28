@@ -71,7 +71,8 @@ def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, **kwargs):
     '''Display the project logs deployed on the cluster.'''
     filters = kwargs.get('apps|tasks')
-    project.logs(file, project_key, tail, follow, timestamps, filters)
+    for line in project.logs(file, project_key, tail, follow, timestamps, filters):
+        click.echo(line)
 
 
 @click.command()
