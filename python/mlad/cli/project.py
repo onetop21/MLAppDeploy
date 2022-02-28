@@ -78,9 +78,9 @@ def _format_log(log, colorkey=None, max_name_width=32, len_short_id=10, pretty=T
         if not msg.endswith('\n'):
             msg += '\n'
         if timestamp is not None:
-            return f'{colorkey[name]}{name:{namewidth}}{utils.CREAR_COLOR if pretty else ""} {timestamp} {msg}'
+            return f'{colorkey[name]}{name:{namewidth}}{utils.CLEAR_COLOR if pretty else ""} {timestamp} {msg}'
         else:
-            return f'{colorkey[name]}{name:{namewidth}}{utils.CREAR_COLOR if pretty else ""} {msg}'
+            return f'{colorkey[name]}{name:{namewidth}}{utils.CLEAR_COLOR if pretty else ""} {msg}'
 
 
 def init(name, version, maintainer):
