@@ -3,8 +3,8 @@ import sys
 import json
 import copy
 import socket
-import datetime
 
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Tuple, Union
 from pathlib import Path
 from contextlib import closing
@@ -34,53 +34,6 @@ config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY'
                'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
                'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
                'USERNAME'}
-
-
-def check_config_envs(name: str, app_spec: dict):
-    if 'env' in app_spec:
-        ignored = set(dict(app_spec['env'])).intersection(config_envs)
-        if len(ignored) > 0:
-            return utils.info_msg(f"Warning: '{name}' env {ignored} will be ignored for MLAD preferences.")
-
-
-def _parse_log(log, max_name_width=32, len_short_id=10):
-    name = log['name']
-    namewidth = min(max_name_width, log['name_width'])if 'name_width' in log else max_name_width
-    if 'task_id' in log:
-        name = f"{name}.{log['task_id'][:len_short_id]}"
-        namewidth = min(max_name_width, namewidth + len_short_id + 1)
-    if len(name) > max_name_width:
-        name = name[:max_name_width - 3] + '...'
-
-    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
-
-    dt = None
-    if 'timestamp' in log:
-        timestamp = f'{log["timestamp"]}'
-        dt = datetime.datetime.fromisoformat(timestamp) + datetime.timedelta(hours=9)
-        dt = f'[{dt.strftime("%Y-%m-%d %H:%M:%S")}]'
-    return name, namewidth, msg, dt
-
-
-def _format_log(log, colorkey=None, max_name_width=32, len_short_id=10, pretty=True):
-    name, namewidth, msg, timestamp = _parse_log(log, max_name_width, len_short_id)
-    if msg.startswith('Error'):
-        if pretty:
-            msg = f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}'
-            return msg
-    else:
-        if colorkey is not None:
-            colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
-        else:
-            colorkey = defaultdict(lambda: '')
-        if '\r' in msg:
-            msg = msg.split('\r')[-1] + '\n'
-        if msg.endswith('\n'):
-            msg = msg[:-1]
-        if timestamp is not None:
-            return f'{colorkey[name]}{name:{namewidth}}{utils.CLEAR_COLOR if pretty else ""} {timestamp} {msg}'
-        else:
-            return f'{colorkey[name]}{name:{namewidth}}{utils.CLEAR_COLOR if pretty else ""} {msg}'
 
 
 def init(name, version, maintainer):
@@ -345,7 +298,7 @@ def up(file: Optional[str]):
     app_dict = project.get('app', dict())
     for name, app_spec in app_dict.items():
         check_nvidia_plugin_installed(app_spec)
-        warning_msg = check_config_envs(name, app_spec)
+        warning_msg = _check_config_envs(name, app_spec)
         if warning_msg:
             yield warning_msg
         app_spec['name'] = name
@@ -742,3 +695,42 @@ def _validate_depends(app_specs):
             if app_name in dependency_dict[target_app_name]:
                 raise InvalidDependsError(f'{app_name} is already in dependencies of {target_app_name}.')
             dependency_dict[app_name].add(target_app_name)
+
+
+def _format_log(log, colorkey=None, max_name_width=32, len_short_id=10, pretty=True):
+    name = log['name']
+    name_width = min(max_name_width, log.get('name_width', max_name_width))
+    if len(name) > name_width:
+        name = name[:name_width - 3] + '...'
+
+    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
+
+    timestamp = None
+    if 'timestamp' in log:
+        dt = datetime.fromisoformat(log['timestamp']) + timedelta(hours=9)
+        timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    if msg.startswith('Error'):
+        if pretty:
+            msg = f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}'
+            return msg
+    else:
+        if colorkey is not None:
+            colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
+        else:
+            colorkey = defaultdict(lambda: '')
+        if '\r' in msg:
+            msg = msg.split('\r')[-1] + '\n'
+        if msg.endswith('\n'):
+            msg = msg[:-1]
+        if timestamp is not None:
+            return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} [{timestamp}] {msg}'
+        else:
+            return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} {msg}'
+
+
+def _check_config_envs(name: str, app_spec: dict):
+    if 'env' in app_spec:
+        ignored = set(dict(app_spec['env'])).intersection(config_envs)
+        if len(ignored) > 0:
+            return utils.info_msg(f"Warning: '{name}' env {ignored} will be ignored for MLAD preferences.")
