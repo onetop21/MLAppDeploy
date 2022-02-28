@@ -73,10 +73,6 @@ def _format_log(log, colorkey=None, max_name_width=32, len_short_id=10, pretty=T
             colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
         else:
             colorkey = defaultdict(lambda: '')
-        if '\r' in msg:
-            msg = msg.split('\r')[-1] + '\n'
-        if not msg.endswith('\n'):
-            msg += '\n'
         if timestamp is not None:
             return f'{colorkey[name]}{name:{namewidth}}{utils.CLEAR_COLOR if pretty else ""} {timestamp} {msg}'
         else:
