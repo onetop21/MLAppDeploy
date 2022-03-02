@@ -1602,11 +1602,11 @@ def get_project_resources(project_key: str, group_by: str = 'project', no_trunc:
 
                 if group_by == 'project':
                     for k in project_res:
-                        project_res[k] += resource[k] if isinstance(resource[k], float) else 0
+                        project_res[k] += resource[k] if not isinstance(resource[k], str) else 0
 
                 if not no_trunc:
                     for k in resource:
-                        resource[k] = round(resource[k], 1) if isinstance(resource[k], float) \
+                        resource[k] = round(resource[k], 1) if not isinstance(resource[k], str) \
                             else resource[k]
 
                 res[name][pod_name] = resource
@@ -1630,7 +1630,7 @@ def get_project_resources(project_key: str, group_by: str = 'project', no_trunc:
 
         if not no_trunc:
             for k in project_res:
-                project_res[k] = round(project_res[k], 1) if isinstance(project_res[k], float) \
+                project_res[k] = round(project_res[k], 1) if not isinstance(project_res[k], str) \
                     else project_res[k]
 
         return project_res
