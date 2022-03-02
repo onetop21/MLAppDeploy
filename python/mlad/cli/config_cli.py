@@ -19,7 +19,7 @@ def add(name, address, admin):
     """Add a new config."""
     ret = config.add(name, address, admin)
     click.echo('Config created successfully.')
-    click.echo(yaml.dump(ret))
+    click.echo(yaml.dump(ret, sort_keys=False))
 
 
 @click.command()
@@ -64,7 +64,7 @@ def get(name: str, key: Optional[str]):
     """Display the detail specification of the config."""
     ret = config.get(name, key)
     try:
-        click.echo(yaml.dump(ret)[:-1])
+        click.echo(yaml.dump(ret, sort_keys=False)[:-1])
     except ValueError:
         click.echo(ret)
 

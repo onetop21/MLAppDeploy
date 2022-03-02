@@ -35,7 +35,7 @@ if not os.path.isfile(CFG_PATH):
 @lru_cache()
 def _load():
     with open(CFG_PATH, 'r') as cfg_file:
-        return yaml.load(cfg_file)
+        return yaml.load(cfg_file, Loader=yaml.BaseLoader)
 
 
 def _save(spec: Dict):
@@ -174,6 +174,7 @@ def delete(name: str) -> None:
     _save(spec)
 
 
+@lru_cache()
 def get(name: Optional[str] = None, key: Optional[str] = None) -> Dict:
     if name is None:
         name = current()
@@ -277,7 +278,7 @@ def validate_kubeconfig() -> bool:
     context_name = config['context_name']
     try:
         with open(kubeconfig_path, 'r') as kubeconfig_file:
-            kubeconfig = yaml.load(kubeconfig_file)
+            kubeconfig = yaml.load(kubeconfig_file, Loader=yaml.BaseLoader)
     except Exception:
         return False
     return 'current-context' in kubeconfig and (context_name == kubeconfig['current-context'])
