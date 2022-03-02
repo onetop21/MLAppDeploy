@@ -1,12 +1,12 @@
 import os
 import errno
+import yaml
 import docker
 import requests
 from requests.exceptions import ConnectionError
 
 from docker.types import Mount
 from typing import List
-from omegaconf import OmegaConf
 from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
@@ -118,12 +118,13 @@ def install(file_path: str, no_build: bool):
     yield f'Read the component spec from {file_path or "./mlad-project.yml"}.'
 
     try:
-        spec = OmegaConf.load(file_path)
+        with open(file_path, 'r') as component_file:
+            spec = yaml.load(component_file)
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
 
     from mlad.cli.validator import validators
-    spec = validators.validate(OmegaConf.to_container(spec))
+    spec = validators.validate(spec)
     if not no_build and 'workspace' not in spec:
         raise CannotBuildComponentError
 
