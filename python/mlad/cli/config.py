@@ -235,7 +235,7 @@ def get_env(dict=False) -> List[str]:
     envs = []
 
     envs.append(f'MLAD_ADDRESS={config["apiserver"]["address"]}')
-    envs.append(f'MLAD_SESSION={config["session"]]}')
+    envs.append(f'MLAD_SESSION={config["session"]}')
 
     for k, v in config['datastore']['s3'].items():
         if v is None:
