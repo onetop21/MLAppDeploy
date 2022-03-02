@@ -1,14 +1,18 @@
 import json
 import traceback
+from typing import Optional
+
 from fastapi import APIRouter, Query, HTTPException, Header
 from fastapi.responses import StreamingResponse
-from mlad.service.models import project
+
+from mlad.core import exceptions
+from mlad.core.exceptions import InvalidProjectError, InvalidAppError
+from mlad.core.kubernetes import controller as ctlr
+
 from mlad.service.exceptions import (
     InvalidLogRequest, InvalidSessionError, exception_detail
 )
-from mlad.core.kubernetes import controller as ctlr
-from mlad.core.exceptions import InvalidProjectError, InvalidAppError
-from mlad.core import exceptions
+from mlad.service.models import project
 
 
 router = APIRouter()
@@ -156,9 +160,11 @@ def send_project_log(project_key: str, tail: str = Query('all'),
 
 
 @router.get("/project/{project_key}/resource")
-def send_resources(project_key: str, session: str = Header(None)):
+def send_resources(project_key: str, group_by: Optional[str] = Query('project'),
+                   no_trunc: bool = True,
+                   session: str = Header(None)):
     try:
-        return ctlr.get_project_resources(project_key)
+        return ctlr.get_project_resources(project_key, group_by, no_trunc)
     except Exception as e:
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))

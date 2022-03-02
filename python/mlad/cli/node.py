@@ -1,15 +1,14 @@
 import sys
 
+from mlad.api import API
+from mlad.api.exceptions import APIError
+from mlad.core.kubernetes import controller as ctlr
 from mlad.cli.libs import utils
 from mlad.cli.config import get_context
 from mlad.cli.exceptions import PluginUninstalledError
-from mlad.api import API
-from mlad.api.exceptions import APIError
-from mlad.core import exceptions as CoreException
-from mlad.core.kubernetes import controller as ctlr
 
 
-def list(no_trunc):
+def list(no_trunc: bool):
     try:
         nodes = API.node.list()
     except APIError as e:
@@ -29,7 +28,7 @@ def list(no_trunc):
     utils.print_table(columns, 'No attached node.', 0 if no_trunc else 32)
 
 
-def resource(names=None, no_trunc=False):
+def resource(names: list, no_trunc: bool):
     metrics_server_running = API.check.check_metrics_server()
 
     if not metrics_server_running:
@@ -47,23 +46,18 @@ def resource(names=None, no_trunc=False):
             res = f'{type}(#)'
         return res
 
-    res = API.node.resource(names)
+    res = API.node.resource(names, no_trunc)
     for name, resources in res.items():
         for i, type in enumerate(resources):
             status = resources[type]
             capacity = status['capacity']
             used = status['used']
-            free = status['allocatable']
-            if not no_trunc:
-                capacity = round(capacity, 1)
-                used = round(used, 1) if used is not None else 'NotReady'
-                free = round(free, 1)
-            else:
-                used = status['used'] if used is not None else 'NotReady'
-            percentage = int(free / capacity * 100) if capacity else 0
+            allocatable = status['allocatable']
+            percentage = int(allocatable / capacity * 100) \
+                if not isinstance(allocatable, str) and capacity else 0
             type = get_unit(type)
             columns.append([name if not i else '', type, capacity, used,
-                            f'{free} ({percentage}%)'])
+                            f'{allocatable} ({percentage}%)'])
         max_print_length = max([len(column[-1]) for column in columns])
     for column in columns[1:]:
         free_text, percentage_text = column[-1].split(' ')
@@ -84,19 +78,19 @@ def disable(name: str):
     yield f'Node [{name}] is disabled.'
 
 
-def delete(node_name: str):
+def delete(name: str):
     cli = ctlr.get_api_client(context=get_context())
-    ctlr.delete_node(node_name, cli)
-    yield f'Node [{node_name}] is deleted.'
+    ctlr.delete_node(name, cli)
+    yield f'Node [{name}] is deleted.'
 
 
-def label_add(node, **kvs):
+def label_add(name: str, **kvs):
     cli = ctlr.get_api_client(context=get_context())
-    ctlr.add_node_labels(node, cli, **kvs)
+    ctlr.add_node_labels(name, cli, **kvs)
     yield f'Label {kvs} added.'
 
 
-def label_rm(node, *keys):
+def label_rm(name: str, *keys):
     cli = ctlr.get_api_client(context=get_context())
-    ctlr.remove_node_labels(node, cli, *keys)
+    ctlr.remove_node_labels(name, cli, *keys)
     yield f'Label {keys} removed.'
