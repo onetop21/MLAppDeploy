@@ -712,7 +712,13 @@
     # Main Script
 
     # Requires for environment installer
-    SILENT=1 RequiresFromApt sudo && \
+    {
+        IsInstalled sudo || \
+        {
+            apt update &&
+            apt install sudo -y
+        }
+    } && \
     SILENT=1 RequiresFromApt curl && \
     SILENT=1 RequiresFromApt jq && \
     {
