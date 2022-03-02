@@ -6,14 +6,15 @@ import uuid
 import socket
 import hashlib
 import itertools
-import jwt
 import subprocess
+
+import jwt
+import yaml
+
 from typing import Dict, Optional
 from functools import lru_cache
-from omegaconf import OmegaConf
 from datetime import datetime
 from dateutil import parser
-
 
 PROJECT_FILE_ENV_KEY = 'MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
@@ -61,10 +62,10 @@ def get_project_file():
 
 
 def read_project():
-    project_file = get_project_file()
-    if os.path.isfile(project_file):
-        project = OmegaConf.to_container(OmegaConf.load(project_file), resolve=True)
-        return project
+    project_file_path = get_project_file()
+    if os.path.isfile(project_file_path):
+        with open(project_file_path, 'r') as project_file:
+            return yaml.load(project_file)
     else:
         return None
 

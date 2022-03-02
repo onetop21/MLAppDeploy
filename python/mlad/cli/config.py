@@ -4,13 +4,12 @@ import socket
 import uuid
 
 import jwt
-import omegaconf
+import yaml
 
 from functools import lru_cache
 from typing import Optional, Dict, Callable, List
 from pathlib import Path
 from urllib.parse import urlparse
-from omegaconf import OmegaConf
 from getpass import getuser
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
@@ -20,8 +19,6 @@ from mlad.cli.exceptions import (
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 CFG_PATH = f'{MLAD_HOME_PATH}/config.yml'
-ConfigSpec = omegaconf.Container
-Config = omegaconf.Container
 StrDict = Dict[str, str]
 
 boilerplate = {
@@ -31,21 +28,24 @@ boilerplate = {
 
 if not os.path.isfile(CFG_PATH):
     Path(MLAD_HOME_PATH).mkdir(exist_ok=True, parents=True)
-    OmegaConf.save(config=boilerplate, f=CFG_PATH)
+    with open(CFG_PATH, 'w') as cfg_file:
+        yaml.dump(boilerplate, cfg_file)
 
 
 @lru_cache()
 def _load():
-    return OmegaConf.load(CFG_PATH)
+    with open(CFG_PATH, 'r') as cfg_file:
+        return yaml.load(cfg_file)
 
 
-def _save(spec: ConfigSpec):
-    OmegaConf.save(config=spec, f=CFG_PATH)
+def _save(spec: Dict):
+    with open(CFG_PATH, 'w') as cfg_file:
+        yaml.dump(spec, cfg_file)
 
 
-def _find_config(name: str, spec: Optional[ConfigSpec] = None, index: bool = False) -> Optional[Config]:
+def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) -> Optional[Dict]:
     if spec is None:
-        spec = OmegaConf.load(CFG_PATH)
+        spec = _load(CFG_PATH)
 
     for i, config in enumerate(spec.configs):
         if config.name == name:
@@ -54,7 +54,7 @@ def _find_config(name: str, spec: Optional[ConfigSpec] = None, index: bool = Fal
     return None
 
 
-def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
+def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Dict:
 
     spec = _load()
     duplicated_index = _find_config(name, spec=spec, index=True)
@@ -85,7 +85,7 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
     registry_address = parsed_url['url']
     registry_namespace = utils.prompt('Docker Registry Namespace')
 
-    base_config = OmegaConf.from_dotlist([
+    base_config = _obtain_dict_from_dotlist([
         f'name={name}',
         f'session={session}',
         f'apiserver.address={address}',
@@ -93,10 +93,10 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
         f'docker.registry.namespace={registry_namespace}'
     ])
 
-    kube_config = OmegaConf.create({
+    kube_config = {
         'kubeconfig_path': kubeconfig_path,
         'context_name': context_name
-    })
+    }
 
     s3_prompts = {
         'endpoint': 'S3 Compatible Address',
@@ -113,7 +113,7 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
     }
     db_config = _parse_datastore('db', _db_initializer, _db_finalizer, db_prompts)
 
-    config = OmegaConf.merge(base_config, kube_config, s3_config, db_config)
+    config = _merge_dict(base_config, kube_config, s3_config, db_config)
     if duplicated_index is not None:
         spec.configs[duplicated_index] = config
     else:
@@ -131,7 +131,7 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
     return config
 
 
-def use(name: str) -> Config:
+def use(name: str) -> Dict:
     spec = _load()
     config = _find_config(name, spec=spec)
     if config is None:
@@ -174,7 +174,7 @@ def delete(name: str) -> None:
     _save(spec)
 
 
-def get(name: Optional[str] = None, key: Optional[str] = None) -> Config:
+def get(name: Optional[str] = None, key: Optional[str] = None) -> Dict:
     if name is None:
         name = current()
     spec = _load()
@@ -189,7 +189,7 @@ def get(name: Optional[str] = None, key: Optional[str] = None) -> Config:
             value = config
             for k in keys:
                 value = value[k]
-        except omegaconf.errors.ConfigKeyError:
+        except KeyError:
             raise InvalidPropertyError(key)
         return value
 
@@ -204,13 +204,13 @@ def set(name: str, *args) -> None:
             value = config
             for key in keys:
                 value = value[key]
-            if isinstance(value, omegaconf.dictconfig.DictConfig):
+            if isinstance(value, dict):
                 raise InvalidSetPropertyError(arg)
-    except omegaconf.errors.ConfigKeyError:
+    except KeyError:
         raise InvalidPropertyError(arg)
 
-    config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
-    OmegaConf.update(spec, f'configs.{index}', config)
+    config = _merge_dict(config, _obtain_dict_from_dotlist(args))
+    spec['configs'][index] = config
     _save(spec)
 
 
@@ -262,7 +262,7 @@ def get_env(dict=False) -> List[str]:
     return {env.split('=')[0]: env.split('=')[1] for env in envs} if dict else envs
 
 
-def get_registry_address(config: Config):
+def get_registry_address(config: Dict):
     parsed = _parse_url(config.docker.registry.address)
     registry_address = parsed['address']
     namespace = config.docker.registry.namespace
@@ -276,7 +276,8 @@ def validate_kubeconfig() -> bool:
     kubeconfig_path = config.kubeconfig_path
     context_name = config.context_name
     try:
-        kubeconfig = OmegaConf.load(kubeconfig_path)
+        with open(kubeconfig_path, 'r') as kubeconfig_file:
+            kubeconfig = yaml.load(kubeconfig_file)
     except Exception:
         return False
     return 'current-context' in kubeconfig and (context_name == kubeconfig['current-context'])
@@ -317,12 +318,12 @@ def _parse_url(url):
 
 
 def _parse_datastore(kind: str, initializer: Callable[[], StrDict],
-                     finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> omegaconf.Container:
+                     finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> Dict:
     config = initializer()
     for k, v in prompts.items():
         config[k] = utils.prompt(v, config[k])
     config = finalizer(config)
-    return OmegaConf.from_dotlist([
+    return _obtain_dict_from_dotlist([
         f'datastore.{kind}.{k}={v}' for k, v in config.items()
     ])
 
@@ -352,3 +353,25 @@ def _db_finalizer(datastore: StrDict) -> StrDict:
     parsed = _parse_url(datastore['address'])
     datastore['address'] = f'mongodb://{parsed["address"]}'
     return datastore
+
+
+def _obtain_dict_from_dotlist(dotlist):
+    ret = dict()
+    for elem in dotlist:
+        keychain, value = elem.split('=')
+        keys = keychain.split('.')
+        cursor = ret
+        for key in keys[:-1]:
+            if key not in cursor:
+                cursor[key] = dict()
+            cursor = cursor[key]
+        cursor[keys[-1]] = value
+    return ret
+
+
+def _merge_dict(*dicts):
+    ret = dict()
+    for elem in dicts:
+        for key, value in elem.items():
+            ret[key] = value
+    return ret
