@@ -5,23 +5,23 @@ all: $(TARGET)
 .PHONY: clean
 
 clean:
-	docker stop mlad-build-env | xargs docker rm
+	@docker stop mlad-build-env | xargs docker rm >> /dev/null 2>&1
+	@rm -rf dist
 
-$(TARGET): env build
+$(TARGET): chart cli
 
-env:
-	docker build -t mlappdeploy-build-env:latest -f assets/Dockerfile_CLI . || :
+chart:
+	@cd charts && bash update.sh
 
-build: clean
-	mkdir -p dist
-	docker run -it --name mlad-build-env -v ${PWD}/python:/build/python mlappdeploy-build-env:latest
-	docker cp mlad-build-env:/build/dist/mlad-static dist/$(TARGET)
-	docker stop mlad-build-env | xargs docker rm
+cli:
+	@mkdir -p bin
+	@docker build -t mlappdeploy-build-env:latest -f assets/Dockerfile_CLI . || :
+	@docker run -it --name mlad-build-env -v ${PWD}/python:/build/python:ro mlappdeploy-build-env:latest
+	@docker cp mlad-build-env:/build/dist/mlad-static bin/$(TARGET)
+	@docker stop mlad-build-env | xargs docker rm
 
 install:
-	cp dist/$(TARGET) ${HOME}/.local/bin/
+	@cp bin/$(TARGET) ${HOME}/.local/bin/
 
 debug:
-	docker run -it --rm -v ${PWD}/python:/build/python -v ${PWD}/debug:/build/dist mlappdeploy-build-env:latest /bin/bash
-
-	
+	@docker run -it --rm -v ${PWD}/python:/build/python -v ${PWD}/debug:/build/dist mlappdeploy-build-env:latest /bin/bash

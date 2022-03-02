@@ -447,6 +447,7 @@
         ColorEcho      "    registry    : Install docker registry v2 (master node only)."
         ColorEcho      "    docker      : Install docker community edition with gpu container runtime."
         ColorEcho      "    datastore   : Install minio(s3 compatible)/mongodb server."
+        ColorEcho      "    cli         : Install MLAD Command-Line Interface."
         #ColorEcho      "    status      : Show MLAppDeploy environment status."
         ColorEcho      "    help        : Print help message."
         exit 1
@@ -508,6 +509,13 @@
         exit 1
     }
 
+    function CLIUsage {
+        UsageHeader cli
+        ColorEcho WARN "Arguments"
+        ColorEcho      "    -h, --help                    : This page"
+        exit 1
+    }
+
     function StatusUsage {
         UsageHeader status
         ColorEcho WARN "Arguments"
@@ -550,6 +558,11 @@
             ;;
         datastore)
             DATASTORE=1
+            shift
+            break
+            ;;
+        cli)
+            CLI=1
             shift
             break
             ;;
@@ -687,6 +700,23 @@
         done
         [ ${#DATASTORE_PRODUCTS[@]} -eq 0 ] && DATASTORE_PRODUCTS+=(${!DATASTORE_PORTS[@]})
 
+    elif [ $CLI ]; then
+        OPTIONS=$(getopt -o h --long help -- "$@")
+        [ $? -eq 0 ] || CLIUsage
+        eval set -- "$OPTIONS"
+        while true; do
+            case "$1" in
+            -h|--help)
+                CLIUsage
+                ;;
+            --)
+                shift
+                break
+                ;;
+            esac
+            shift
+        done
+
     elif [ $STATUS ]; then
         OPTIONS=$(getopt -o h --long help -- "$@")
         [ $? -eq 0 ] || StatusUsage
@@ -719,17 +749,17 @@
         }
     } && \
     SILENT=1 RequiresFromApt curl && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata && \
+    DEBIAN_FRONTEND=noninteractive sudo apt-get install -y --no-install-recommends tzdata >> /dev/null 2>&1 && \
     SILENT=1 RequiresFromApt jq && \
     {
         IsInstalled python3 && \
-        [ $(python3 -c 'import sys; print(sys.version_info[1])') -ge 7 ] || \
+        [ $(python3 -c 'import sys; print(sys.version_info[1])') -lt 7 ] && \
         {
             SILENT=1 RequiresFromApt software-properties-common && \
             sudo add-apt-repository ppa:deadsnakes/ppa -y && \
             sudo apt update && \
             SILENT=1 RequiresFromApt python3.7 python3
-        }
+        } || :
     } && \
     {
         IsInstalled pip3 || \
@@ -1107,6 +1137,14 @@
                 ColorEcho INFO "$ mongo $(HostIP):${DATASTORE_PORTS[mongo]}"
             fi
         fi
+    elif [ $CLI ]
+    then
+        MAX_STEP=1
+        PrintStep Download Command-Line Interface.
+        mkdir -p ~/.local/bin
+        curl -o ~/.local/bin/mlad https://raw.githubusercontent.com/onetop21/MLAppDeploy/dev/bin/mlad
+        chmod +x ~/.local/bin/mlad
+        ColorEcho INFO Install Completed.
     elif [ $STATUS ]
     then
         DOCKER_STATUS=$(sudo systemctl | grep docker.service)
