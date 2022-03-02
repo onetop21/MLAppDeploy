@@ -1519,7 +1519,7 @@ def get_node_resources(node, no_trunc, cli=DEFAULT_CLI):
                 print(f"{body['status']} : {body['message']}")
             used_mem = 'NotReady'
             used_cpu = 'NotReady'
-        elif e.status == 404:
+        elif e.status == 404 or e.status == 503:
             print('Metrics server unavailable.')
             used_mem = '-'
             used_cpu = '-'
@@ -1617,7 +1617,7 @@ def get_project_resources(project_key: str, group_by: str = 'project', no_trunc:
                     if body['kind'] == 'Status':
                         print(f"{body['status']} : {body['message']}")
                     res[name][pod_name] = {'mem': 'NotReady', 'cpu': 'NotReady', 'gpu': 'NotReady'}
-                elif e.status == 503:
+                elif e.status == 404 or e.status == 503:
                     print('Metrics server unavailable.')
                     res[name][pod_name] = {'mem': '-', 'cpu': '-', 'gpu': '-'}
                 continue
