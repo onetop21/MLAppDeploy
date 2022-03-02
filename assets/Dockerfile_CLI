@@ -1,0 +1,24 @@
+# FROM python:3.9-alpine
+
+# RUN apk --update --no-cache add \
+#     zlib-dev \
+#     musl-dev \
+#     libc-dev \
+#     libffi-dev \
+#     gcc \
+#     g++ \
+#     git \
+#     pwgen \
+#     && pip install --upgrade pip
+
+FROM python:3.9-slim
+
+RUN apt update && apt install -y binutils
+RUN pip install pyinstaller staticx patchelf
+
+WORKDIR /build
+
+CMD pip install /build/python && \
+    pyinstaller -F -n mlad-dynamic --add-data /build/python/mlad/cli/validator/schema.yaml:mlad/cli/validator/schema.yaml --clean /build/python/mlad/cli/__main__.py && \
+    staticx dist/mlad-dynamic dist/mlad-static
+
