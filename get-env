@@ -178,7 +178,7 @@
                 sudo add-apt-repository \
                 "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
                 $(lsb_release -cs) \
-                stable"
+                stable" -y
 
                 # Update added docker repository
                 sudo apt-get update
@@ -720,13 +720,14 @@
         }
     } && \
     SILENT=1 RequiresFromApt curl && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata && \
     SILENT=1 RequiresFromApt jq && \
     {
         IsInstalled python3 && \
         [ $(python3 -c 'import sys; print(sys.version_info[1])') -ge 7 ] || \
         {
             SILENT=1 RequiresFromApt software-properties-common && \
-            sudo add-apt-repository ppa:deadsnakes/ppa && \
+            sudo add-apt-repository ppa:deadsnakes/ppa -y && \
             sudo apt update && \
             SILENT=1 RequiresFromApt python3.7 python3
         }
