@@ -117,7 +117,7 @@
         [ ! $SILENT ] && printf "Check requires [$1]... "
         if IsInstalledAptPkg $1 || IsInstalled ${2:-$1}
         then
-            [ ! $SILENT ] && ColorEcho DEBUG OK
+            [ ! $SILENT ] && ColorEcho DEBUG OK || :
         else
             [ ! $SILENT ] && ColorEcho WARN Install $1.
             sudo apt install -y $1
@@ -128,7 +128,7 @@
         [ ! $SILENT ] && printf "Check requires [$1]... "
         if IsInstalledPipPkg $1 || IsInstalled ${2:-$1}
         then
-            [ ! $SILENT ] && ColorEcho DEBUG OK
+            [ ! $SILENT ] && ColorEcho DEBUG OK || :
         else
             [ ! $SILENT ] && ColorEcho WARN Install ${2:-$1}.
             pip3 install ${2:-$1}
@@ -178,7 +178,7 @@
                 sudo add-apt-repository \
                 "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
                 $(lsb_release -cs) \
-                stable"
+                stable" -y
 
                 # Update added docker repository
                 sudo apt-get update
@@ -194,7 +194,6 @@
             then
                 ColorEcho WARN "Failed to operate docker."
                 sudo systemctl status docker.service
-                ColorEcho ERROR Failed
                 exit 1
             fi
             ColorEcho DEBUG Succeeded
@@ -712,9 +711,46 @@
     # Main Script
 
     # Requires for environment installer
-    SILENT=1 RequiresFromApt jq
-    SILENT=1 RequiresFromApt moreutils sponge
-    SILENT=1 RequiresFromPip yq
+    {
+        IsInstalled sudo || \
+        {
+            apt update &&
+            apt install sudo -y
+        }
+    } && \
+    SILENT=1 RequiresFromApt curl && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata && \
+    SILENT=1 RequiresFromApt jq && \
+    {
+        IsInstalled python3 && \
+        [ $(python3 -c 'import sys; print(sys.version_info[1])') -ge 7 ] || \
+        {
+            SILENT=1 RequiresFromApt software-properties-common && \
+            sudo add-apt-repository ppa:deadsnakes/ppa -y && \
+            sudo apt update && \
+            SILENT=1 RequiresFromApt python3.7 python3
+        }
+    } && \
+    {
+        IsInstalled pip3 || \
+        SILENT=1 RequiresFromApt python3-pip pip && \
+        python3 -m pip install -U pip
+    } && \
+    SILENT=1 RequiresFromPip yq && \
+    SILENT=1 RequiresFromApt moreutils sponge || \
+    {
+        ColorEcho ERROR "Failed to prepare requirements."
+        for REQ in sudo curl jq sponge yq
+        do
+            if IsInstalled $REQ
+            then
+                ColorEcho WARN  "[✔] $REQ is installed."
+            else
+                ColorEcho WARN  "[❌] $REQ is not installed."
+            fi
+        done
+        exit 1
+    }
 
     # Parse join token
     if [ $RAW_TOKEN ]; then
@@ -847,9 +883,14 @@
                     KUBECONFIG_PATH=$KUBECONFIG_DIR/config
                     KUBECONFIG_MLAD=$KUBECONFIG_DIR/config.mlad
                     sudo cat /etc/rancher/k3s/k3s.yaml | yq '.clusters[0].name="MLAppDeploy"|.users[0].name="MLAppDeploy"|.contexts[0].name="MLAppDeploy"|.contexts[0].context.cluster="MLAppDeploy"|.contexts[0].context.user="MLAppDeploy"' -y | sponge $KUBECONFIG_MLAD
-                    KUBECONFIG="$KUBECONFIG_MLAD:$KUBECONFIG_PATH" kubectl config view --flatten | sponge $KUBECONFIG_PATH
-                    kubectl config use-context MLAppDeploy
-                    kubectl config get-contexts
+                    [ $? -eq 0 ] && {
+                        KUBECONFIG="$KUBECONFIG_MLAD:$KUBECONFIG_PATH" kubectl config view --flatten | sponge $KUBECONFIG_PATH
+                        kubectl config use-context MLAppDeploy
+                        kubectl config get-contexts
+                    } || {
+                        ColorEcho ERROR "Failed to install lightweight kubernetes (k3s)."
+                        exit 1
+                    }
                 else
                     # # Add priviledged for getting token
                     # ColorEcho INFO "Set priviledge for getting token by worker."

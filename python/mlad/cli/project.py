@@ -86,20 +86,8 @@ def ls(no_trunc: bool):
             projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
 
-        if metrics_server_running:
-            used = {'cpu': 0, 'gpu': 0, 'mem': 0}
-            resources = API.project.resource(project_key)
-            for tasks in resources.values():
-                for resource in tasks.values():
-                    used['mem'] += resource['mem'] if resource['mem'] is not None else 0
-                    used['cpu'] += resource['cpu'] if resource['cpu'] is not None else 0
-                    used['gpu'] += resource['gpu'] if resource['gpu'] is not None else 0
-            for k in used:
-                used[k] = used[k] if no_trunc else round(used[k], 1)
-        else:
-            used = {'cpu': '-', 'gpu': '-', 'mem': '-'}
-
-        projects[project_key].update(used)
+        resource = API.project.resource(project_key, no_trunc=no_trunc)
+        projects[project_key].update(resource)
 
     for project in projects.values():
         run_apps = project['apps'] > 0
@@ -126,7 +114,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
         if metrics_server_running:
-            resources = API.project.resource(project_key)
+            resources = API.project.resource(project_key, group_by='app', no_trunc=no_trunc)
     except NotFound as e:
         raise e
 
@@ -142,21 +130,10 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         try:
             ports = ','.join(map(str, spec['ports']))
             for pod_name, pod in spec['tasks'].items():
-                ready_cnt = 0
-                restart_cnt = 0
-                if pod['container_status']:
-                    for _ in pod['container_status']:
-                        restart_cnt += _['restart']
-                        if _['ready']:
-                            ready_cnt += 1
-
                 age = utils.created_to_age(pod['created'])
 
-                if metrics_server_running and app_name in resources:
-                    res = resources[app_name][pod_name].copy()
-                    res['mem'] = 'NotReady' if res['mem'] is None else round(res['mem'], 1)
-                    res['cpu'] = 'NotReady' if res['cpu'] is None else round(res['cpu'], 1)
-                    res['gpu'] = 'NotReady' if res['gpu'] is None else res['gpu']
+                if app_name in resources:
+                    res = resources[app_name][pod_name]
                 else:
                     res = {'cpu': '-', 'gpu': '-', 'mem': '-'}
 
@@ -167,7 +144,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                     pod['phase'],
                     'Running' if pod['status']['state'] == 'Running' else
                     pod['status']['detail']['reason'],
-                    restart_cnt,
+                    pod['restart'],
                     age,
                     ports,
                     res['mem'],
@@ -353,7 +330,7 @@ def up(file: Optional[str]):
                 yield utils.info_msg(f'- port: {ingress["port"]} -> {ingress["path"]}')
 
 
-def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
+def down(file: Optional[str], project_key: Optional[str], dump: bool):
     utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
@@ -367,7 +344,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
         app_names = [app['name'] for app in apps]
 
         # Dump logs
-        if not no_dump:
+        if dump:
             dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
             yield utils.info_msg(f'Project Log Storage: {dirpath}')
@@ -400,7 +377,7 @@ def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
     yield 'Done.'
 
 
-def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
+def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
     utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
@@ -414,7 +391,7 @@ def down_force(file: Optional[str], project_key: Optional[str], no_dump: bool):
         app_names = [app['name'] for app in apps]
 
         # Dump logs
-        if not no_dump:
+        if dump:
             dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
             yield utils.info_msg(f'Project Log Storage: {dirpath}')
