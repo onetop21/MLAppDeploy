@@ -360,8 +360,7 @@ def _obtain_dict_from_dotlist(dotlist):
     ret = dict()
     for elem in dotlist:
         keychain, value = elem.split('=')
-        if value == '':
-            value = None
+        value = yaml.load(value, Loader=yaml.FullLoader)
         keys = keychain.split('.')
         cursor = ret
         for key in keys[:-1]:
