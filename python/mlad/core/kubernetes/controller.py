@@ -3,18 +3,20 @@ import copy
 import time
 import json
 import uuid
-
 from typing import Union, Optional
-
 from collections import defaultdict
-from mlad.core import exceptions
-from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError
-from mlad.core.libs import utils
-from mlad.core.kubernetes.monitor import DelMonitor, Collector
-from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
+
 from kubernetes import client, config, watch
 from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
+
+from mlad.core import exceptions
+from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError, \
+    InvalidMetricUnitError
+from mlad.core.libs import utils
+from mlad.core.kubernetes.monitor import DelMonitor, Collector
+from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
+
 
 # https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
 
@@ -416,7 +418,8 @@ def get_pod_info(pod):
         'node': pod.spec.node_name,
         # Pending, Running, Succeeded, Failed, Unknown
         'phase': pod.status.phase,
-        'events': get_pod_events(pod)
+        'events': get_pod_events(pod),
+        'restart': 0
     }
 
     def get_status(container_state):
@@ -465,6 +468,7 @@ def get_pod_info(pod):
                 'ready': container.ready
             }
             pod_info['container_status'].append(container_info)
+            pod_info['restart'] += container_info['restart']
         pod_info['status'] = parse_status(pod_info['container_status'])
     else:
         pod_info['container_status'] = None
@@ -1185,7 +1189,7 @@ def inspect_node(node):
     }
 
 
-def enable_node(node_key, cli=DEFAULT_CLI):
+def enable_node(node_name, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
@@ -1193,16 +1197,16 @@ def enable_node(node_key, cli=DEFAULT_CLI):
         "spec": {"taints": None}
     }
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
 
-def disable_node(node_key, cli=DEFAULT_CLI):
+def disable_node(node_name, cli=DEFAULT_CLI):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
@@ -1212,11 +1216,11 @@ def disable_node(node_key, cli=DEFAULT_CLI):
                             "key": "node-role.kubernetes.io/worker"}]}
     }
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
@@ -1235,7 +1239,7 @@ def delete_node(node_name, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-def add_node_labels(node_key, cli=DEFAULT_CLI, **kv):
+def add_node_labels(node_name, cli=DEFAULT_CLI, **kv):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
@@ -1248,16 +1252,16 @@ def add_node_labels(node_key, cli=DEFAULT_CLI, **kv):
     for key in kv:
         body['metadata']['labels'][key] = kv[key]
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
 
-def remove_node_labels(node_key, cli=DEFAULT_CLI, *keys):
+def remove_node_labels(node_name, cli=DEFAULT_CLI, *keys):
     if not isinstance(cli, client.api_client.ApiClient):
         raise TypeError('Parameter is not valid type.')
 
@@ -1270,11 +1274,11 @@ def remove_node_labels(node_key, cli=DEFAULT_CLI, *keys):
     for key in keys:
         body['metadata']['labels'][key] = None
     try:
-        api.patch_node(node_key, body)
+        api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_key}.')
+            raise exceptions.NotFound(f'Cannot find node {node_name}.')
         else:
             raise exceptions.APIError(msg, status)
 
@@ -1459,7 +1463,6 @@ def delete_ingress(cli, namespace, ingress_name):
 
 
 def parse_mem(str_mem):
-    # Ki to Mi
     if str_mem.endswith('Ki'):
         mem = float(str_mem[:-2]) / 1024
     elif str_mem.endswith('Mi'):
@@ -1468,26 +1471,30 @@ def parse_mem(str_mem):
         mem = float(str_mem[:-2]) * 1024
     else:
         # TODO Other units may need to be considered
-        mem = float(str_mem[:-2])
+        try:
+            mem = float(str_mem)
+        except ValueError:
+            raise InvalidMetricUnitError('mem', str_mem)
     return mem
 
 
 def parse_cpu(str_cpu):
-    # nano to core
     if str_cpu.endswith('n'):
         cpu = float(str_cpu[:-1]) / 1e9
     elif str_cpu.endswith('m'):
         cpu = float(str_cpu[:-1]) / 1e3
     else:
         # TODO Other units may need to be considered
-        cpu = float(str_cpu)
+        try:
+            cpu = float(str_cpu)
+        except ValueError:
+            raise InvalidMetricUnitError('cpu', str_cpu)
     return cpu
 
 
-def get_node_resources(node, cli=DEFAULT_CLI):
+def get_node_resources(node, no_trunc, cli=DEFAULT_CLI):
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
-    api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
     name = node.metadata.name
 
     allocatable = node.status.allocatable
@@ -1497,18 +1504,29 @@ def get_node_resources(node, cli=DEFAULT_CLI):
 
     try:
         metric = api.get_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes", name)
+        try:
+            used_mem = parse_mem(metric['usage']['memory'])
+        except InvalidMetricUnitError as e:
+            print(f'Node "{name}": {e}')
+            used_mem = 'UnitError'
+        try:
+            used_cpu = parse_cpu(metric['usage']['cpu'])
+        except InvalidMetricUnitError as e:
+            print(f'Node "{name}": {e}')
+            used_cpu = 'UnitError'
     except ApiException as e:
         if e.headers['Content-Type'] == 'application/json':
             body = json.loads(e.body)
             if body['kind'] == 'Status':
                 print(f"{body['status']} : {body['message']}")
-        used_mem = None
-        used_cpu = None
-    else:
-        used_mem = parse_mem(metric['usage']['memory'])
-        used_cpu = parse_cpu(metric['usage']['cpu'])
-    used_gpu = 0
+            used_mem = 'NotReady'
+            used_cpu = 'NotReady'
+        elif e.status == 404 or e.status == 503:
+            print('Metrics server unavailable.')
+            used_mem = '-'
+            used_cpu = '-'
 
+    used_gpu = 0
     selector = (f'spec.nodeName={name},status.phase!=Succeeded,status.phase!=Failed')
     pods = v1_api.list_pod_for_all_namespaces(field_selector=selector)
     for pod in pods.items:
@@ -1516,14 +1534,25 @@ def get_node_resources(node, cli=DEFAULT_CLI):
             requests = defaultdict(lambda: '0', container.resources.requests or {})
             used_gpu += int(requests['nvidia.com/gpu'])
 
-    return {
-        'mem': {'capacity': mem, 'used': used_mem, 'allocatable': mem - used_mem},
-        'cpu': {'capacity': cpu, 'used': used_cpu, 'allocatable': cpu - used_cpu},
+    res = {
+        'mem': {'capacity': mem, 'used': used_mem,
+                'allocatable': mem - used_mem if not isinstance(used_mem, str) else '-'},
+        'cpu': {'capacity': cpu, 'used': used_cpu,
+                'allocatable': cpu - used_cpu if not isinstance(used_cpu, str) else '-'},
         'gpu': {'capacity': gpu, 'used': used_gpu, 'allocatable': gpu - used_gpu},
     }
 
+    if not no_trunc:
+        for resource, value in res.items():
+            for k in value:
+                if not isinstance(res[resource][k], str):
+                    res[resource][k] = round(res[resource][k], 1)
 
-def get_project_resources(project_key, cli=DEFAULT_CLI):
+    return res
+
+
+def get_project_resources(project_key: str, group_by: str = 'project', no_trunc: bool = True,
+                          cli=DEFAULT_CLI):
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
     res = {}
@@ -1540,6 +1569,9 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
                 used += int(gpu)
         return used
 
+    project_res = {'cpu': 0, 'gpu': 0, 'mem': 0}
+    cpu_unit_error = False
+    mem_unit_error = False
     for name, app in apps.items():
         res[name] = {}
         namespace = app.metadata.namespace
@@ -1552,21 +1584,57 @@ def get_project_resources(project_key, cli=DEFAULT_CLI):
             try:
                 metric = api.get_namespaced_custom_object("metrics.k8s.io", "v1beta1", namespace,
                                                           "pods", pod_name)
+                for _ in metric['containers']:
+                    try:
+                        resource['cpu'] += parse_cpu(_['usage']['cpu'])
+                    except InvalidMetricUnitError as e:
+                        print(f'Pod "{pod_name}": {e}')
+                        resource['cpu'] = 'UnitError'
+                        cpu_unit_error = True
+                    try:
+                        resource['mem'] += parse_mem(_['usage']['memory'])
+                    except InvalidMetricUnitError as e:
+                        print(f'Pod "{pod_name}": {e}')
+                        resource['mem'] = 'UnitError'
+                        mem_unit_error = True
+
+                pod_gpu_usage = parse_gpu(pod)
+                if pod_gpu_usage is not None:
+                    resource['gpu'] += pod_gpu_usage
+
+                if group_by == 'project':
+                    for k in project_res:
+                        project_res[k] += resource[k] if not isinstance(resource[k], str) else 0
+
+                if not no_trunc:
+                    for k in resource:
+                        resource[k] = round(resource[k], 1) if not isinstance(resource[k], str) \
+                            else resource[k]
+
+                res[name][pod_name] = resource
+
             except ApiException as e:
                 if e.headers['Content-Type'] == 'application/json':
                     body = json.loads(e.body)
                     if body['kind'] == 'Status':
                         print(f"{body['status']} : {body['message']}")
-                res[name][pod_name] = {'mem': None, 'cpu': None, 'gpu': None}
+                    res[name][pod_name] = {'mem': 'NotReady', 'cpu': 'NotReady', 'gpu': 'NotReady'}
+                elif e.status == 404 or e.status == 503:
+                    print('Metrics server unavailable.')
+                    res[name][pod_name] = {'mem': '-', 'cpu': '-', 'gpu': '-'}
                 continue
 
-            for _ in metric['containers']:
-                resource['cpu'] += parse_cpu(_['usage']['cpu'])
-                resource['mem'] += parse_mem(_['usage']['memory'])
-            pod_gpu_usage = parse_gpu(pod)
-            if pod_gpu_usage is not None:
-                resource['gpu'] += pod_gpu_usage
+    if group_by == 'project':
+        if cpu_unit_error:
+            project_res['cpu'] = 'UnitError'
+        if mem_unit_error:
+            project_res['mem'] = 'UnitError'
 
-            res[name][pod_name] = resource
+        if not no_trunc:
+            for k in project_res:
+                project_res[k] = round(project_res[k], 1) if not isinstance(project_res[k], str) \
+                    else project_res[k]
 
-    return res
+        return project_res
+    elif group_by == 'app':
+        return res

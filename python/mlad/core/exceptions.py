@@ -79,3 +79,13 @@ class DockerNotFoundError(MLADException):
 
     def __str__(self):
         return 'Need to install the docker daemon.'
+
+
+class InvalidMetricUnitError(MLADException):
+
+    def __init__(self, metric, value: str):
+        self.metric = metric
+        self.value = value
+
+    def __str__(self):
+        return f'Metric {self.metric} \'{self.value}\' cannot be processed.'
