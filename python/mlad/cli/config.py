@@ -360,6 +360,8 @@ def _obtain_dict_from_dotlist(dotlist):
     ret = dict()
     for elem in dotlist:
         keychain, value = elem.split('=')
+        if value == '':
+            value = None
         keys = keychain.split('.')
         cursor = ret
         for key in keys[:-1]:
@@ -374,5 +376,8 @@ def _merge_dict(*dicts):
     ret = dict()
     for elem in dicts:
         for key, value in elem.items():
-            ret[key] = value
+            if key in ret and isinstance(ret[key], dict) and isinstance(value, dict):
+                ret[key] = _merge_dict(ret[key], value)
+            else:
+                ret[key] = value
     return ret
