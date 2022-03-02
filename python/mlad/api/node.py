@@ -8,5 +8,6 @@ class Node(APIBase):
     def list(self):
         return self._get('/list')
 
-    def resource(self, names):
-        return self._get('/resource', params={'names': names})
+    def resource(self, names, no_trunc):
+        params = {'names': names, 'no_trunc': no_trunc}
+        return self._get('/resource', params=params)

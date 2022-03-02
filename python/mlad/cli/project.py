@@ -136,11 +136,7 @@ def ls(no_trunc: bool):
             projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
 
-        if metrics_server_running:
-            resource = API.project.resource(project_key, no_trunc=no_trunc)
-        else:
-            resource = {'cpu': '-', 'gpu': '-', 'mem': '-'}
-
+        resource = API.project.resource(project_key, no_trunc=no_trunc)
         projects[project_key].update(resource)
 
     for project in projects.values():
@@ -198,10 +194,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
                 age = utils.created_to_age(pod['created'])
 
-                if metrics_server_running and app_name in resources:
-                    res = resources[app_name][pod_name].copy()
-                    for k in res:
-                        res[k] = 'NotReady' if res[k] is None else res[k]
+                if app_name in resources:
+                    res = resources[app_name][pod_name]
                 else:
                     res = {'cpu': '-', 'gpu': '-', 'mem': '-'}
 

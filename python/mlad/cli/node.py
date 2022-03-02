@@ -46,23 +46,18 @@ def resource(names: list, no_trunc: bool):
             res = f'{type}(#)'
         return res
 
-    res = API.node.resource(names)
+    res = API.node.resource(names, no_trunc)
     for name, resources in res.items():
         for i, type in enumerate(resources):
             status = resources[type]
             capacity = status['capacity']
             used = status['used']
-            free = status['allocatable']
-            if not no_trunc:
-                capacity = round(capacity, 1)
-                used = round(used, 1) if used is not None else 'NotReady'
-                free = round(free, 1)
-            else:
-                used = status['used'] if used is not None else 'NotReady'
-            percentage = int(free / capacity * 100) if capacity else 0
+            allocatable = status['allocatable']
+            percentage = int(allocatable / capacity * 100) \
+                if not isinstance(allocatable, str) and capacity else 0
             type = get_unit(type)
             columns.append([name if not i else '', type, capacity, used,
-                            f'{free} ({percentage}%)'])
+                            f'{allocatable} ({percentage}%)'])
         max_print_length = max([len(column[-1]) for column in columns])
     for column in columns[1:]:
         free_text, percentage_text = column[-1].split(' ')
