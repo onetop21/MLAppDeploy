@@ -6,7 +6,6 @@ import uuid
 import jwt
 import yaml
 
-from functools import lru_cache
 from typing import Optional, Dict, Callable, List
 from pathlib import Path
 from urllib.parse import urlparse
