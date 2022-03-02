@@ -32,7 +32,6 @@ if not os.path.isfile(CFG_PATH):
         yaml.dump(boilerplate, cfg_file)
 
 
-@lru_cache()
 def _load():
     with open(CFG_PATH, 'r') as cfg_file:
         return yaml.load(cfg_file, Loader=yaml.FullLoader)
@@ -174,7 +173,6 @@ def delete(name: str) -> None:
     _save(spec)
 
 
-@lru_cache()
 def get(name: Optional[str] = None, key: Optional[str] = None) -> Dict:
     if name is None:
         name = current()
