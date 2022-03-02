@@ -194,7 +194,6 @@
             then
                 ColorEcho WARN "Failed to operate docker."
                 sudo systemctl status docker.service
-                ColorEcho ERROR Failed
                 exit 1
             fi
             ColorEcho DEBUG Succeeded
