@@ -196,14 +196,6 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         try:
             ports = ','.join(map(str, spec['ports']))
             for pod_name, pod in spec['tasks'].items():
-                ready_cnt = 0
-                restart_cnt = 0
-                if pod['container_status']:
-                    for _ in pod['container_status']:
-                        restart_cnt += _['restart']
-                        if _['ready']:
-                            ready_cnt += 1
-
                 age = utils.created_to_age(pod['created'])
 
                 if metrics_server_running and app_name in resources:
@@ -221,7 +213,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                     pod['phase'],
                     'Running' if pod['status']['state'] == 'Running' else
                     pod['status']['detail']['reason'],
-                    restart_cnt,
+                    pod['restart'],
                     age,
                     ports,
                     res['mem'],
