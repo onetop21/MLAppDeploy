@@ -47,8 +47,8 @@ def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) ->
     if spec is None:
         spec = _load(CFG_PATH)
 
-    for i, config in enumerate(spec.configs):
-        if config.name == name:
+    for i, config in enumerate(spec['configs']):
+        if config['name'] == name:
             return config if not index else i
 
     return None
@@ -64,7 +64,7 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Dict:
         elif utils.prompt('Change the existing session key (Y/N)?', 'N') == 'Y':
             session = _create_session_key()
         else:
-            session = spec.configs[duplicated_index].session
+            session = spec['configs'][duplicated_index]['session']
     else:
         session = _create_session_key()
 
@@ -115,9 +115,9 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Dict:
 
     config = _merge_dict(base_config, kube_config, s3_config, db_config)
     if duplicated_index is not None:
-        spec.configs[duplicated_index] = config
+        spec['configs'][duplicated_index] = config
     else:
-        spec.configs.append(config)
+        spec['configs'].append(config)
     if spec['current-config'] is None:
         spec['current-config'] = name
 
@@ -146,10 +146,10 @@ def _switch(direction: int = 1) -> str:
     spec = _load()
     if spec['current-config'] is None:
         raise ConfigNotFoundError('Any Configs')
-    n_configs = len(spec.configs)
+    n_configs = len(spec['configs'])
     index = _find_config(spec['current-config'], spec=spec, index=True)
     next_index = (index + direction) % n_configs
-    name = spec.configs[next_index].name
+    name = spec['configs'][next_index]['name']
     use(name)
     return name
 
@@ -167,10 +167,10 @@ def delete(name: str) -> None:
     index = _find_config(name, spec=spec, index=True)
     if index is None:
         raise ConfigNotFoundError(name)
-    elif spec['current-config'] == spec.configs[index].name:
+    elif spec['current-config'] == spec['configs'][index]['name']:
         raise CannotDeleteConfigError
     else:
-        del spec.configs[index]
+        del spec['configs'][index]
     _save(spec)
 
 
@@ -197,7 +197,7 @@ def get(name: Optional[str] = None, key: Optional[str] = None) -> Dict:
 def set(name: str, *args) -> None:
     spec = _load()
     index = _find_config(name, spec=spec, index=True)
-    config = spec.configs[index]
+    config = spec['configs'][index]
     try:
         for arg in args:
             keys = arg.split('=')[0].split('.')
@@ -216,7 +216,7 @@ def set(name: str, *args) -> None:
 
 def ls():
     spec = _load()
-    names = [config.name for config in spec.configs]
+    names = [config['name'] for config in spec['configs']]
     table = [('  NAME',)]
     for name in names:
         table.append([f'  {name}' if spec['current-config'] != name else f'* {name}'])
@@ -234,8 +234,8 @@ def get_env(dict=False) -> List[str]:
     config = get()
     envs = []
 
-    envs.append(f'MLAD_ADDRESS={config.apiserver.address}')
-    envs.append(f'MLAD_SESSION={config.session}')
+    envs.append(f'MLAD_ADDRESS={config["apiserver"]["address"]}')
+    envs.append(f'MLAD_SESSION={config["session"]]}')
 
     for k, v in config['datastore']['s3'].items():
         if v is None:
@@ -263,9 +263,9 @@ def get_env(dict=False) -> List[str]:
 
 
 def get_registry_address(config: Dict):
-    parsed = _parse_url(config.docker.registry.address)
+    parsed = _parse_url(config['docker']['registry']['address'])
     registry_address = parsed['address']
-    namespace = config.docker.registry.namespace
+    namespace = config['docker']['registry']['namespace']
     if namespace is not None:
         registry_address += f'/{namespace}'
     return registry_address
@@ -273,8 +273,8 @@ def get_registry_address(config: Dict):
 
 def validate_kubeconfig() -> bool:
     config = get()
-    kubeconfig_path = config.kubeconfig_path
-    context_name = config.context_name
+    kubeconfig_path = config['kubeconfig_path']
+    context_name = config['context_name']
     try:
         with open(kubeconfig_path, 'r') as kubeconfig_file:
             kubeconfig = yaml.load(kubeconfig_file)
@@ -285,7 +285,7 @@ def validate_kubeconfig() -> bool:
 
 def get_context() -> str:
     config = get()
-    return config.context_name
+    return config['context_name']
 
 
 def _create_session_key():
