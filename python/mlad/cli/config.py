@@ -45,7 +45,7 @@ def _save(spec: Dict):
 
 def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) -> Optional[Dict]:
     if spec is None:
-        spec = _load(CFG_PATH)
+        spec = _load()
 
     for i, config in enumerate(spec['configs']):
         if config['name'] == name:
