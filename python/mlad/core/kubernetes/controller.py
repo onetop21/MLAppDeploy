@@ -3,6 +3,8 @@ import copy
 import time
 import json
 import uuid
+
+from multiprocessing.pool import ThreadPool
 from typing import Union, Optional
 from collections import defaultdict
 
@@ -539,6 +541,14 @@ def inspect_app(app, cli=DEFAULT_CLI):
     }
 
     return spec
+
+
+def inspect_apps(apps):
+    results = []
+    with ThreadPool(len(apps)) as pool:
+        for app in apps:
+            results.append(pool.apply_async(inspect_app, (app,)))
+        return [result.get() for result in results]
 
 
 def _mounts_to_V1Volume(name, mounts, pvc_specs):

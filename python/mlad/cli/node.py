@@ -2,7 +2,6 @@ import sys
 
 from mlad.api import API
 from mlad.api.exceptions import APIError
-from mlad.core.kubernetes import controller as ctlr
 from mlad.cli.libs import utils
 from mlad.cli.config import get_context
 from mlad.cli.exceptions import PluginUninstalledError
@@ -67,30 +66,35 @@ def resource(names: list, no_trunc: bool):
 
 
 def enable(name: str):
+    from mlad.core.kubernetes import controller as ctlr
     cli = ctlr.get_api_client(context=get_context())
     ctlr.enable_node(name, cli)
     yield f'Node [{name}] is enabled.'
 
 
 def disable(name: str):
+    from mlad.core.kubernetes import controller as ctlr
     cli = ctlr.get_api_client(context=get_context())
     ctlr.disable_node(name, cli)
     yield f'Node [{name}] is disabled.'
 
 
 def delete(name: str):
+    from mlad.core.kubernetes import controller as ctlr
     cli = ctlr.get_api_client(context=get_context())
     ctlr.delete_node(name, cli)
     yield f'Node [{name}] is deleted.'
 
 
 def label_add(name: str, **kvs):
+    from mlad.core.kubernetes import controller as ctlr
     cli = ctlr.get_api_client(context=get_context())
     ctlr.add_node_labels(name, cli, **kvs)
     yield f'Label {kvs} added.'
 
 
 def label_rm(name: str, *keys):
+    from mlad.core.kubernetes import controller as ctlr
     cli = ctlr.get_api_client(context=get_context())
     ctlr.remove_node_labels(name, cli, *keys)
     yield f'Label {keys} removed.'

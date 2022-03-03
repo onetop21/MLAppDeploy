@@ -24,7 +24,6 @@ from mlad.cli.exceptions import (
     MountPortAlreadyUsedError, InvalidDependsError
 )
 from mlad.core.docker import controller as docker_ctlr
-from mlad.core.kubernetes import controller as k8s_ctlr
 
 from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest, NotFound
@@ -54,6 +53,7 @@ def init(name, version, maintainer):
 def ls(no_trunc: bool):
     projects = {}
     project_specs = API.project.get()
+    app_specs = API.app.get()['specs']
     metrics_server_running = API.check.check_metrics_server()
 
     if not metrics_server_running:
@@ -77,9 +77,10 @@ def ls(no_trunc: bool):
         }
         projects[project_key] = projects[project_key] \
             if project_key in projects else default
-        apps = API.app.get(project_key=project_key)
+        target_app_specs = [spec for spec in app_specs
+                            if spec['key'] == project_key]
 
-        for spec in apps['specs']:
+        for spec in target_app_specs:
             tasks = spec['tasks'].values()
             tasks_state = [_['status']['state'] for _ in tasks]
             projects[project_key]['apps'] += 1
@@ -157,7 +158,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         except NotFound:
             pass
         columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
-    username = utils.get_username(config.session)
+    username = utils.get_username(config['session'])
     print(f"USERNAME: [{username}] / PROJECT: [{project['project']}]")
     utils.print_table(columns, 'Cannot find running apps.', 0 if no_trunc else 32, False)
 
@@ -241,7 +242,7 @@ def up(file: Optional[str]):
 
     base_labels = utils.base_labels(
         utils.get_workspace(),
-        config.session,
+        config['session'],
         project,
         config_core.get_registry_address(config)
     )
@@ -378,6 +379,7 @@ def down(file: Optional[str], project_key: Optional[str], dump: bool):
 
 
 def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
+    from mlad.core.kubernetes import controller as k8s_ctlr
     utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:

@@ -69,7 +69,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
     workspace = utils.get_workspace()
     registry_address = config_core.get_registry_address(config)
     base_labels = utils.base_labels(
-        workspace, config.session, project, registry_address, build=True)
+        workspace, config['session'], project, registry_address, build=True)
     project_key = base_labels['MLAD.PROJECT']
     version = base_labels['MLAD.PROJECT.VERSION']
     repository = base_labels['MLAD.PROJECT.IMAGE']

@@ -28,12 +28,9 @@ def send_apps_list(labels: List[str] = Query(None), session: str = Header(None))
     if labels is not None:
         labels_dict = {label.split('=')[0]: label.split('=')[1]
                        for label in labels}
-    specs = []
     try:
-        apps = ctlr.get_apps(extra_filters=labels_dict)
-        for app in apps.values():
-            spec = ctlr.inspect_app(app)
-            specs.append(spec)
+        app_dict = ctlr.get_apps(extra_filters=labels_dict)
+        specs = ctlr.inspect_apps(app_dict.values())
         return {'specs': specs}
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
@@ -48,16 +45,13 @@ def send_apps(project_key: str, labels: List[str] = Query(None), session: str = 
     if labels is not None:
         labels_dict = {label.split("=")[0]: label.split("=")[1]
                        for label in labels}
-    specs = []
     try:
         namespace = ctlr.get_namespace(project_key=project_key)
         if not namespace:
             raise InvalidProjectError(project_key)
 
-        apps = ctlr.get_apps(project_key, extra_filters=labels_dict)
-        for app in apps.values():
-            spec = ctlr.inspect_app(app)
-            specs.append(spec)
+        app_dict = ctlr.get_apps(project_key, extra_filters=labels_dict)
+        specs = ctlr.inspect_apps(app_dict.values())
         return {'specs': specs}
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
@@ -75,7 +69,7 @@ def create_app(project_key: str, req: app_models.CreateRequest,
         if not namespace:
             raise InvalidProjectError(project_key)
         apps = ctlr.create_apps(namespace, targets)
-        return [ctlr.inspect_app(_) for _ in apps]
+        return ctlr.inspect_apps(apps)
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except APIError as e:

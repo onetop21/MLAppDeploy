@@ -11,8 +11,8 @@ class APIBase:
 
     def __init__(self, config, prefix):
         if config is not None:
-            self.baseurl = f'{config.apiserver.address}/api/v1/{prefix}'
-            self.headers = {'session': config.session}
+            self.baseurl = f'{config["apiserver"]["address"]}/api/v1/{prefix}'
+            self.headers = {'session': config['session']}
         else:
             self.baseurl = f'{os.environ.get("MLAD_ADDRESS", "localhost:8440")}/api/v1/{prefix}'
             self.headers = {'session': os.environ.get('MLAD_SESSION', '')}
