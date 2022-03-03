@@ -670,7 +670,7 @@ def _validate_depends(app_specs):
             dependency_dict[app_name].add(target_app_name)
 
 
-def _format_log(log, colorkey=None, max_name_width=32, len_short_id=10, pretty=True):
+def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
     name = log['name']
     name_width = min(max_name_width, log.get('name_width', max_name_width))
     if len(name) > name_width:
