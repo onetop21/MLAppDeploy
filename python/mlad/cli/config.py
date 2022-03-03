@@ -1,15 +1,21 @@
 import sys
 import os
+import socket
+import uuid
+
+import jwt
 import omegaconf
 
 from functools import lru_cache
 from typing import Optional, Dict, Callable, List
 from pathlib import Path
+from urllib.parse import urlparse
 from omegaconf import OmegaConf
+from getpass import getuser
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
     ConfigNotFoundError, CannotDeleteConfigError, InvalidPropertyError,
-    ConfigAlreadyExistError, InvalidSetPropertyError
+    ConfigAlreadyExistError, InvalidSetPropertyError, InvalidURLError
 )
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
@@ -56,11 +62,11 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
         if not allow_duplicate:
             raise ConfigAlreadyExistError(name)
         elif utils.prompt('Change the existing session key (Y/N)?', 'N') == 'Y':
-            session = utils.create_session_key()
+            session = _create_session_key()
         else:
             session = spec.configs[duplicated_index].session
     else:
-        session = utils.create_session_key()
+        session = _create_session_key()
 
     kubeconfig_path = None
     context_name = None
@@ -68,15 +74,12 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
         kubeconfig_path = utils.prompt(
             'A Kubeconfig File Path', default=f'{Path.home()}/.kube/config')
         context_name = utils.prompt('A Current Kubernetes Context Name', None)
-    address = utils.parse_url(address)['url']
+    address = _parse_url(address)['url']
     registry_address = 'https://docker.io'
     warn_insecure = False
-    service_addr = utils.get_advertise_addr()
-    registry_port = utils.get_default_service_port('mlad_registry', 5000)
-    if registry_port:
-        registry_address = f'http://{service_addr}:{registry_port}'
-    registry_address = utils.prompt('Docker Registry Address', registry_address)
-    parsed_url = utils.parse_url(registry_address)
+    ip = utils.obtain_my_ip()
+    registry_address = utils.prompt('Docker Registry Address', f'http://{ip}:5000')
+    parsed_url = _parse_url(registry_address)
     if parsed_url['scheme'] != 'https':
         warn_insecure = True
     registry_address = parsed_url['url']
@@ -227,40 +230,6 @@ def current():
     return spec['current-config']
 
 
-def _parse_datastore(kind: str, initializer: Callable[[], StrDict],
-                     finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> omegaconf.Container:
-    config = initializer()
-    for k, v in prompts.items():
-        config[k] = utils.prompt(v, config[k])
-    config = finalizer(config)
-    return OmegaConf.from_dotlist([
-        f'datastore.{kind}.{k}={v}' for k, v in config.items()
-    ])
-
-
-def _s3_initializer() -> StrDict:
-    service_addr = utils.get_advertise_addr()
-    minio_port = utils.get_default_service_port('mlad_minio', 9000)
-    if minio_port:
-        endpoint = f'http://{service_addr}:{minio_port}'
-        region = 'ap-northeast-2'
-        access_key = 'MLAPPDEPLOY'
-        secret_key = 'MLAPPDEPLOY'
-    else:
-        endpoint = 'https://s3.amazonaws.com'
-        region = 'us-east-1'
-        access_key = None
-        secret_key = None
-    return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
-
-
-def _s3_finalizer(datastore: StrDict) -> StrDict:
-    parsed = utils.parse_url(datastore['endpoint'])
-    datastore['endpoint'] = parsed['url']
-    datastore['verify'] = parsed['scheme'] == 'https'
-    return datastore
-
-
 def get_env(dict=False) -> List[str]:
     config = get()
     envs = []
@@ -293,6 +262,15 @@ def get_env(dict=False) -> List[str]:
     return {env.split('=')[0]: env.split('=')[1] for env in envs} if dict else envs
 
 
+def get_registry_address(config: Config):
+    parsed = _parse_url(config.docker.registry.address)
+    registry_address = parsed['address']
+    namespace = config.docker.registry.namespace
+    if namespace is not None:
+        registry_address += f'/{namespace}'
+    return registry_address
+
+
 def validate_kubeconfig() -> bool:
     config = get()
     kubeconfig_path = config.kubeconfig_path
@@ -309,17 +287,68 @@ def get_context() -> str:
     return config.context_name
 
 
+def _create_session_key():
+    user = getuser()
+    hostname = socket.gethostname()
+    payload = {"user": user, "hostname": hostname, "uuid": str(uuid.uuid4())}
+    encode = jwt.encode(payload, "mlad", algorithm="HS256")
+    return encode
+
+
+def _parse_url(url):
+    try:
+        parsed_url = urlparse(url)
+        if not parsed_url.netloc:
+            raise InvalidURLError
+    except Exception:
+        raise InvalidURLError
+    return {
+        'scheme': parsed_url.scheme or 'http',
+        'username': parsed_url.username,
+        'password': parsed_url.password,
+        'hostname': parsed_url.hostname,
+        'port': parsed_url.port or (443 if parsed_url.scheme == 'https' else 80),
+        'path': parsed_url.path,
+        'query': parsed_url.query,
+        'params': parsed_url.params,
+        'url': url if parsed_url.scheme else f"http://{url}",
+        'address': url.replace(f"{parsed_url.scheme}://", "") if parsed_url.scheme else url
+    }
+
+
+def _parse_datastore(kind: str, initializer: Callable[[], StrDict],
+                     finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> omegaconf.Container:
+    config = initializer()
+    for k, v in prompts.items():
+        config[k] = utils.prompt(v, config[k])
+    config = finalizer(config)
+    return OmegaConf.from_dotlist([
+        f'datastore.{kind}.{k}={v}' for k, v in config.items()
+    ])
+
+
+def _s3_initializer() -> StrDict:
+    ip = utils.obtain_my_ip()
+    endpoint = f'http://{ip}:9000'
+    region = 'us-east-1'
+    access_key = 'minioadmin'
+    secret_key = 'minioadmin'
+    return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
+
+
+def _s3_finalizer(datastore: StrDict) -> StrDict:
+    parsed = _parse_url(datastore['endpoint'])
+    datastore['endpoint'] = parsed['url']
+    datastore['verify'] = parsed['scheme'] == 'https'
+    return datastore
+
+
 def _db_initializer() -> StrDict:
-    service_addr = utils.get_advertise_addr()
-    mongo_port = utils.get_default_service_port('mlad_mongodb', 27017)
-    if mongo_port:
-        address = f'mongodb://{service_addr}:{mongo_port}'
-    else:
-        address = f'mongodb://{utils.obtain_my_ip()}:27017'
+    address = f'mongodb://{utils.obtain_my_ip()}:27017'
     return {'address': address, 'username': '', 'password': ''}
 
 
 def _db_finalizer(datastore: StrDict) -> StrDict:
-    parsed = utils.parse_url(datastore['address'])
+    parsed = _parse_url(datastore['address'])
     datastore['address'] = f'mongodb://{parsed["address"]}'
     return datastore
