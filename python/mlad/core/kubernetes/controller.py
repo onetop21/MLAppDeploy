@@ -4,7 +4,7 @@ import time
 import json
 import uuid
 
-from multiprocessing import ThreadPool
+from multiprocessing.pool import ThreadPool
 from typing import Union, Optional
 from collections import defaultdict
 
