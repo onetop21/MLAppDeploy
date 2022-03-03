@@ -65,7 +65,7 @@ def read_project():
     project_file_path = get_project_file()
     if os.path.isfile(project_file_path):
         with open(project_file_path, 'r') as project_file:
-            return yaml.load(project_file)
+            return yaml.load(project_file, Loader=yaml.FullLoader)
     else:
         return None
 
