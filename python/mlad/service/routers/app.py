@@ -28,7 +28,6 @@ def send_apps_list(labels: List[str] = Query(None), session: str = Header(None))
     if labels is not None:
         labels_dict = {label.split('=')[0]: label.split('=')[1]
                        for label in labels}
-    specs = []
     try:
         app_dict = ctlr.get_apps(extra_filters=labels_dict)
         specs = ctlr.inspect_apps(app_dict.values())
