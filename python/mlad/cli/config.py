@@ -38,7 +38,7 @@ def _load():
 
 def _save(spec: Dict):
     with open(CFG_PATH, 'w') as cfg_file:
-        yaml.dump(spec, cfg_file)
+        yaml.dump(spec, cfg_file, sort_keys=False)
 
 
 def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) -> Optional[Dict]:
