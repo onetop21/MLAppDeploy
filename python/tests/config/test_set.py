@@ -1,6 +1,5 @@
 import pytest
 
-from omegaconf import OmegaConf
 from mlad.cli import config
 from mlad.cli.exceptions import InvalidPropertyError
 
@@ -46,7 +45,7 @@ def test_set():
             }
         }
     }
-    config_dict = OmegaConf.to_object(config.get('test1'))
+    config_dict = config.get('test1')
     del config_dict['session']
     assert expected == config_dict
 
