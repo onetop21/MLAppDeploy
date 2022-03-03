@@ -158,7 +158,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         except NotFound:
             pass
         columns += sorted([tuple(elem) for elem in task_info], key=lambda x: x[1])
-    username = utils.get_username(config.session)
+    username = utils.get_username(config['session'])
     print(f"USERNAME: [{username}] / PROJECT: [{project['project']}]")
     utils.print_table(columns, 'Cannot find running apps.', 0 if no_trunc else 32, False)
 
@@ -242,7 +242,7 @@ def up(file: Optional[str]):
 
     base_labels = utils.base_labels(
         utils.get_workspace(),
-        config.session,
+        config['session'],
         project,
         config_core.get_registry_address(config)
     )

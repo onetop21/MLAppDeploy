@@ -68,8 +68,8 @@ def activate(image_repository: str):
     cli.containers.run(
         image_repository,
         environment=[
-            f'MLAD_ADDRESS={config.apiserver.address}',
-            f'MLAD_SESSION={config.session}',
+            f'MLAD_ADDRESS={config["apiserver"]["address"]}',
+            f'MLAD_SESSION={config["session"]}',
         ] + config_core.get_env(),
         name='mlad-board',
         ports={'2021/tcp': '2021'},
