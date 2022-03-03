@@ -2,10 +2,13 @@ import os
 import sys
 import json
 import copy
-import datetime
+import socket
 
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Tuple, Union
 from pathlib import Path
+from contextlib import closing
+from collections import defaultdict
 
 import yaml
 import docker
@@ -17,11 +20,11 @@ from mlad.cli.format import PROJECT
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     ProjectAlreadyExistError, ImageNotFoundError, InvalidProjectKindError,
-    MountError, PluginUninstalledError, InvalidUpdateOptionError, ProjectDeletedError
+    MountError, PluginUninstalledError, InvalidUpdateOptionError, ProjectDeletedError,
+    MountPortAlreadyUsedError, InvalidDependsError
 )
 from mlad.core.docker import controller as docker_ctlr
 from mlad.core.kubernetes import controller as k8s_ctlr
-from mlad.core.libs import utils as core_utils
 
 from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest, NotFound
@@ -31,59 +34,6 @@ config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY'
                'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
                'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
                'USERNAME'}
-
-
-def check_config_envs(name: str, app_spec: dict):
-    if 'env' in app_spec:
-        ignored = set(dict(app_spec['env'])).intersection(config_envs)
-        if len(ignored) > 0:
-            return utils.print_info(f"Warning: '{name}' env {ignored} will be ignored for MLAD preferences.")
-
-
-def _parse_log(log, max_name_width=32, len_short_id=10):
-    name = log['name']
-    namewidth = min(max_name_width, log['name_width'])if 'name_width' in log else max_name_width
-    if 'task_id' in log:
-        name = f"{name}.{log['task_id'][:len_short_id]}"
-        namewidth = min(max_name_width, namewidth + len_short_id + 1)
-    if len(name) > max_name_width:
-        name = name[:max_name_width - 3] + '...'
-
-    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
-
-    dt = None
-    if 'timestamp' in log:
-        timestamp = f'{log["timestamp"]}'
-        dt = datetime.datetime.fromisoformat(timestamp) + datetime.timedelta(hours=9)
-        dt = f'[{dt.strftime("%Y-%m-%d %H:%M:%S")}]'
-    return name, namewidth, msg, dt
-
-
-def _print_log(log, colorkey, max_name_width=32, len_short_id=10):
-    name, namewidth, msg, timestamp = _parse_log(log, max_name_width, len_short_id)
-    if msg.startswith('Error'):
-        sys.stderr.write(f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}')
-    else:
-        colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
-        if '\r' in msg:
-            msg = msg.split('\r')[-1] + '\n'
-        if not msg.endswith('\n'):
-            msg += '\n'
-        if timestamp:
-            sys.stdout.write(("{}{:%d}{} {} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, timestamp, msg))
-        else:
-            sys.stdout.write(("{}{:%d}{} {}" % namewidth).format(colorkey[name], name, utils.CLEAR_COLOR, msg))
-
-
-def _get_default_logs(log):
-    name, _, msg, timestamp = _parse_log(log, len_short_id=20)
-    if msg.startswith('Error'):
-        return msg
-    else:
-        if timestamp:
-            return f'{timestamp} {name}: {msg}'
-        else:
-            return f'{name}: {msg}'
 
 
 def init(name, version, maintainer):
@@ -107,7 +57,7 @@ def ls(no_trunc: bool):
     metrics_server_running = API.check.check_metrics_server()
 
     if not metrics_server_running:
-        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
+        yield f'{utils.info_msg("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     columns = [('USERNAME', 'PROJECT', 'KEY', 'APPS',
                 'TASKS', 'HOSTNAME', 'WORKSPACE', 'AGE',
@@ -140,17 +90,13 @@ def ls(no_trunc: bool):
         projects[project_key].update(resource)
 
     for project in projects.values():
-        if project['apps'] > 0:
-            running_tasks = f"{project['tasks']}/{project['replicas']}"
-            columns.append((project['username'], project['project'], project['key'],
-                            project['apps'], f"{running_tasks:>5}", project['hostname'],
-                            project['workspace'], project['age'],
-                            project['mem'], project['cpu'], project['gpu']))
-        else:
-            columns.append((project['username'], project['project'], project['key'],
-                            '-', '-', project['hostname'],
-                            project['workspace'], project['age'],
-                            project['mem'], project['cpu'], project['gpu']))
+        run_apps = project['apps'] > 0
+        task_info = f'{project["tasks"]}/{project["replicas"]}'
+        columns.append((project['username'], project['project'], project['key'],
+                        project['apps'] if run_apps else '-',
+                        task_info if run_apps else '-',
+                        project['hostname'], project['workspace'], project['age'],
+                        project['mem'], project['cpu'], project['gpu']))
     utils.print_table(columns, 'Cannot find running projects.', 0 if no_trunc else 32, False)
 
 
@@ -173,7 +119,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         raise e
 
     if not metrics_server_running:
-        yield f'{utils.print_info("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
+        yield f'{utils.info_msg("Warning: Metrics server must be installed to load resource information. Please contact the admin.")}'
 
     events = []
     columns = [
@@ -222,7 +168,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         for event in sorted_events:
             event['timestamp'] = event.pop('datetime')
             event['stream'] = event.pop('message')
-            _print_log(event, colorkey, 32, 20)
+            yield _format_log(event, colorkey, 32, 20, pretty=True)
 
 
 def logs(file: Optional[str], project_key: Optional[str],
@@ -243,7 +189,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     for log in logs:
         if '[Ignored]' in log['stream']:
             continue
-        _print_log(log, colorkey, 32, 20)
+        yield _format_log(log, colorkey, 32, 20)
 
 
 def ingress():
@@ -252,7 +198,7 @@ def ingress():
     # check ingress controller
     ingress_ctrl_running = API.check.check_ingress_controller()
     if not ingress_ctrl_running:
-        yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
+        yield f'{utils.info_msg("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
 
     rows = [('USERNAME', 'PROJECT NAME', 'APP NAME', 'KEY', 'PORT', 'PATH')]
     for spec in specs:
@@ -293,11 +239,11 @@ def up(file: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
-    base_labels = core_utils.base_labels(
+    base_labels = utils.base_labels(
         utils.get_workspace(),
         config.session,
         project,
-        utils.get_registry_address(config)
+        config_core.get_registry_address(config)
     )
 
     # Check the project already exists
@@ -318,22 +264,22 @@ def up(file: Optional[str]):
     # check ingress controller
     ingress_ctrl_running = API.check.check_ingress_controller()
     if not ingress_ctrl_running:
-        yield f'{utils.print_info("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
+        yield f'{utils.info_msg("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
 
     # Check app specs
     app_specs = []
     app_dict = project.get('app', dict())
     for name, app_spec in app_dict.items():
         check_nvidia_plugin_installed(app_spec)
-        warning_msg = check_config_envs(name, app_spec)
+        warning_msg = _check_config_envs(name, app_spec)
         if warning_msg:
             yield warning_msg
         app_spec['name'] = name
-        app_spec = utils.convert_tag_only_image_prop(app_spec, image_tag)
-        app_spec = utils.bind_default_values_for_mounts(app_spec, app_specs, images[0])
+        app_spec = _convert_tag_only_image_prop(app_spec, image_tag)
+        app_spec = _bind_default_values_for_mounts(app_spec, app_specs, images[0])
         app_specs.append(app_spec)
 
-    utils.validate_depends(app_specs)
+    _validate_depends(app_specs)
 
     # Create a project
     yield 'Deploy apps to the cluster...'
@@ -354,7 +300,7 @@ def up(file: Optional[str]):
                 if 'nfs' in mount:
                     continue
                 path = mount['path']
-                port = utils.find_port_from_mount_options(mount)
+                port = _find_port_from_mount_options(mount)
                 yield 'Run NFS server container'
                 yield f'  Path: {path}'
                 yield f'  Port: {port}'
@@ -374,14 +320,14 @@ def up(file: Optional[str]):
         docker_ctlr.remove_nfs_containers(project_key)
         raise e
     yield 'Done.'
-    yield utils.print_info(f'Project key : {project_key}')
+    yield utils.info_msg(f'Project key : {project_key}')
 
     # Get ingress path for deployed app
     for app in res:
         if len(app['ingress']) > 0:
-            yield utils.print_info(f'[{app["name"]}] Ingress Path :')
+            yield utils.info_msg(f'[{app["name"]}] Ingress Path :')
             for ingress in app['ingress']:
-                yield utils.print_info(f'- port: {ingress["port"]} -> {ingress["path"]}')
+                yield utils.info_msg(f'- port: {ingress["port"]} -> {ingress["path"]}')
 
 
 def down(file: Optional[str], project_key: Optional[str], dump: bool):
@@ -401,7 +347,7 @@ def down(file: Optional[str], project_key: Optional[str], dump: bool):
         if dump:
             dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
-            yield utils.print_info(f'Project Log Storage: {dirpath}')
+            yield utils.info_msg(f'Project Log Storage: {dirpath}')
             if not os.path.isfile(filepath):
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
@@ -448,7 +394,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
         if dump:
             dirpath = _get_log_dirpath(project, project_key_assigned)
             filepath = dirpath / 'description.yml'
-            yield utils.print_info(f'Project Log Storage: {dirpath}')
+            yield utils.info_msg(f'Project Log Storage: {dirpath}')
             if not os.path.isfile(filepath):
                 with open(filepath, 'w') as log_file:
                     yaml.dump(project, log_file)
@@ -511,7 +457,7 @@ def _dump_logs(app_name: str, project_key: str, dirpath: Path):
         try:
             logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
             for log in logs:
-                log = utils.parse_log(log)
+                log = _format_log(log, pretty=False) + '\n'
                 log_file.write(log)
         except InvalidLogRequest:
             return f'There is no log in [{app_name}].'
@@ -585,7 +531,7 @@ def update(file: Optional[str], project_key: Optional[str]):
     diff_keys = {}
     for name, app in cur_apps.items():
         update_app = update_apps[name]
-        update_app = utils.convert_tag_only_image_prop(update_app, image_tag)
+        update_app = _convert_tag_only_image_prop(update_app, image_tag)
 
         update_spec = copy.deepcopy(default_update_spec)
         for key in update_app:
@@ -624,8 +570,8 @@ def update(file: Optional[str], project_key: Optional[str]):
                         diff_keys[name].add(root_key)
 
         if len(env_ignored) > 0:
-            yield utils.print_info(f"Warning: '{name}' env {env_ignored} "
-                                   f"will be ignored for MLAD preferences.")
+            yield utils.info_msg(f"Warning: '{name}' env {env_ignored} "
+                                 'will be ignored for MLAD preferences.')
 
         if len(diff_keys[name]) > 0:
             update_specs.append(update_spec)
@@ -639,3 +585,125 @@ def update(file: Optional[str], project_key: Optional[str]):
         yield 'Done.'
     else:
         yield 'No changes to update.'
+
+
+def _convert_tag_only_image_prop(app_spec, image_tag):
+    if 'image' in app_spec and app_spec['image'].startswith(':'):
+        app_spec['image'] = image_tag.rsplit(':', 1)[0] + app_spec['image']
+    return app_spec
+
+
+def _find_free_port(used_ports: set, max_retries=100) -> str:
+    for _ in range(max_retries):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            s.bind(('', 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            port = str(s.getsockname()[1])
+            if port not in used_ports:
+                return port
+    raise RuntimeError('Cannot found the free port')
+
+
+def _find_port_from_mount_options(mount) -> Optional[str]:
+    # ignore the registered port if a nfs value is assigned
+    if 'nfs' in mount:
+        return None
+    for option in mount.get('options', []):
+        if option.startswith('port='):
+            return option.replace('port=', '')
+    return None
+
+
+def _bind_default_values_for_mounts(app_spec, app_specs, image):
+    if 'mounts' not in app_spec:
+        return app_spec
+
+    used_ports = set()
+    for spec in app_specs:
+        for mount in spec.get('mounts', []):
+            port = _find_port_from_mount_options(mount)
+            if port is not None:
+                used_ports.add(port)
+
+    ip = utils.obtain_my_ip()
+    for mount in app_spec['mounts']:
+        # Set the server and server path
+        if 'nfs' in mount:
+            mount['server'], mount['serverPath'] = mount['nfs'].split(':')
+        else:
+            mount['server'] = ip
+            mount['serverPath'] = '/'
+            if not mount['path'].startswith('/'):
+                mount['path'] = str(Path(utils.get_project_file()).parent / Path(mount['path']))
+
+        # Set the mount path
+        if not mount['mountPath'].startswith('/'):
+            workdir = image.attrs['Config'].get('WorkingDir', '/workspace')
+            mount['mountPath'] = str(Path(workdir) / Path(mount['mountPath']))
+
+        # Set the options
+        if 'nfs' not in mount:
+            registered_port = _find_port_from_mount_options(mount)
+            if registered_port is not None and registered_port in used_ports:
+                raise MountPortAlreadyUsedError(registered_port)
+            elif registered_port is None:
+                free_port = _find_free_port(used_ports)
+                used_ports.add(free_port)
+                mount['options'].append(f'port={free_port}')
+            else:
+                used_ports.add(registered_port)
+
+    return app_spec
+
+
+def _validate_depends(app_specs):
+    app_names = [spec['name'] for spec in app_specs]
+    dependency_dict = defaultdict(lambda: set())
+    for spec in app_specs:
+        app_name = spec['name']
+        for depend in spec.get('depends', []):
+            target_app_name = depend['appName']
+            if target_app_name not in app_names:
+                raise InvalidDependsError(f'{target_app_name} is not in apps.')
+            if app_name in dependency_dict[target_app_name]:
+                raise InvalidDependsError(f'{app_name} is already in dependencies of {target_app_name}.')
+            dependency_dict[app_name].add(target_app_name)
+
+
+def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
+    name = log['name']
+    name_width = min(max_name_width, log.get('name_width', max_name_width))
+    if len(name) > name_width:
+        name = name[:name_width - 3] + '...'
+
+    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
+
+    timestamp = None
+    if 'timestamp' in log:
+        dt = datetime.fromisoformat(log['timestamp']) + timedelta(hours=9)
+        timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    if msg.startswith('Error'):
+        if pretty:
+            msg = f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}'
+            return msg
+    else:
+        if colorkey is not None:
+            colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
+        else:
+            colorkey = defaultdict(lambda: '')
+        if '\r' in msg:
+            msg = msg.split('\r')[-1] + '\n'
+        if msg.endswith('\n'):
+            msg = msg[:-1]
+        if timestamp is not None:
+            return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} [{timestamp}] {msg}'
+        else:
+            return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} {msg}'
+
+
+def _check_config_envs(name: str, app_spec: dict):
+    if 'env' in app_spec:
+        ignored = set(dict(app_spec['env'])).intersection(config_envs)
+        if len(ignored) > 0:
+            return utils.info_msg(f"Warning: '{name}' env {ignored} will be ignored for MLAD preferences.")
