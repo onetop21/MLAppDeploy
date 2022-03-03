@@ -1,8 +1,8 @@
 from typing import Optional
 
 import click
+import yaml
 
-from omegaconf import OmegaConf
 from mlad.cli import config
 from mlad.cli.libs.utils import obtain_my_ip
 from mlad.cli.autocompletion import list_config_names
@@ -19,7 +19,7 @@ def add(name, address, admin):
     """Add a new config."""
     ret = config.add(name, address, admin)
     click.echo('Config created successfully.')
-    click.echo(OmegaConf.to_yaml(ret))
+    click.echo(yaml.dump(ret, sort_keys=False))
 
 
 @click.command()
@@ -64,7 +64,7 @@ def get(name: str, key: Optional[str]):
     """Display the detail specification of the config."""
     ret = config.get(name, key)
     try:
-        click.echo(OmegaConf.to_yaml(ret)[:-1])
+        click.echo(yaml.dump(ret, sort_keys=False)[:-1])
     except ValueError:
         click.echo(ret)
 

@@ -2,7 +2,6 @@ import sys
 import io
 import pytest
 
-from omegaconf import OmegaConf
 from mlad.cli import config
 from mlad.cli.exceptions import ConfigAlreadyExistError, InvalidURLError
 
@@ -52,7 +51,7 @@ def test_valid_input():
             }
         }
     }
-    config_dict = OmegaConf.to_object(config.add('test-valid', inputs[0], False))
+    config_dict = config.add('test-valid', inputs[0], False)
     del config_dict['session']
     assert config_dict == expected
 
@@ -94,7 +93,7 @@ def test_valid_input2():
             }
         }
     }
-    config_dict = OmegaConf.to_object(config.add('test-valid2', inputs[0], True))
+    config_dict = config.add('test-valid2', inputs[0], True)
     del config_dict['session']
     expected == config_dict
 
@@ -178,8 +177,6 @@ def test_allow_duplicate():
             }
         }
     }
-    config_dict = OmegaConf.to_object(
-        config.add('test-allow-duplicate', inputs[0], False, allow_duplicate=True)
-    )
+    config_dict = config.add('test-allow-duplicate', inputs[0], False, allow_duplicate=True)
     del config_dict['session']
     assert expected == config_dict

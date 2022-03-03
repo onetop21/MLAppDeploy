@@ -35,7 +35,6 @@ def main():
             'uvicorn>=0.13.3,<1.0.0',
             'fastapi>=0.63.0,<1.0.0',
             'psutil>=5.8.0,<5.9.0',
-            'omegaconf>=2.0.6,<3.0.0',
             'kubernetes>=19.0.0,<20.0.0',
             'PyJWT>=2.1.0,<3.0.0',
             'dictdiffer==0.9.0',
