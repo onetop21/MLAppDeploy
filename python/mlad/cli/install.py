@@ -1,17 +1,15 @@
+import os
+
 from mlad.core import exceptions as core_exceptions
-from mlad.core.kubernetes import controller as ctlr
 from mlad.cli.libs import utils
 
 
 def has_kubeconfig() -> bool:
-    try:
-        ctlr.get_current_context()
-    except core_exceptions.APIError:
-        return False
-    return True
+    return os.path.isfile(os.environ.get('KUBECONFIG', '~/.kube/config'))
 
 
 def check():
+    from mlad.core.kubernetes import controller as ctlr
     checked = {
         'Ingress Controller': {
             'status': False,

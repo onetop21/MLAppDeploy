@@ -24,7 +24,6 @@ from mlad.cli.exceptions import (
     MountPortAlreadyUsedError, InvalidDependsError
 )
 from mlad.core.docker import controller as docker_ctlr
-from mlad.core.kubernetes import controller as k8s_ctlr
 
 from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest, NotFound
@@ -380,6 +379,7 @@ def down(file: Optional[str], project_key: Optional[str], dump: bool):
 
 
 def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
+    from mlad.core.kubernetes import controller as k8s_ctlr
     utils.process_file(file)
     project_key_assigned = project_key is not None
     if project_key is None:
