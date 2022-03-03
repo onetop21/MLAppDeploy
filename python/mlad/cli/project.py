@@ -54,6 +54,7 @@ def init(name, version, maintainer):
 def ls(no_trunc: bool):
     projects = {}
     project_specs = API.project.get()
+    app_specs = API.app.get()['specs']
     metrics_server_running = API.check.check_metrics_server()
 
     if not metrics_server_running:
@@ -77,9 +78,10 @@ def ls(no_trunc: bool):
         }
         projects[project_key] = projects[project_key] \
             if project_key in projects else default
-        apps = API.app.get(project_key=project_key)
+        target_app_specs = [spec for spec in app_specs
+                            if spec['key'] == project_key]
 
-        for spec in apps['specs']:
+        for spec in target_app_specs:
             tasks = spec['tasks'].values()
             tasks_state = [_['status']['state'] for _ in tasks]
             projects[project_key]['apps'] += 1
