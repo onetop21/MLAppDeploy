@@ -239,7 +239,7 @@
         ! sudo test -f /etc/docker/daemon.json && echo {} | sudo sponge /etc/docker/daemon.json
         if [ ! $(sudo cat /etc/docker/daemon.json | jq '.runtimes.nvidia // empty' >> /dev/null 2>&1) ]
         then
-            sudo cat /etc/docker/daemon.json | jq '.runtimes.nvidia={"path":"nvidia-container-runtime", "runtimeArgs":[]}' | sudo sponge /etc/docker/daemon.json
+            sudo cat /etc/docker/daemon.json | jq '.runtimes.nvidia={"path":"nvidia-container-runtime", "runtimeArgs":[]} | ."default-runtime"="nvidia"' | sudo sponge /etc/docker/daemon.json
         fi
     }
 
