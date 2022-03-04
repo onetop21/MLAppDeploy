@@ -859,6 +859,9 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         config_envs = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         config_envs = {env.split('=', 1)[0]: env.split('=', 1)[1] for env in config_envs}
         app_envs.update(config_envs)
+        quota = app['quota']
+        if quota['gpu'] == 0:
+            app_envs.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
         envs = [_create_V1Env(k, v) for k, v in app_envs.items()]
         envs.append(_create_V1Env('POD_NAME', field_path='metadata.name'))
 
@@ -885,7 +888,6 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         secrets = f"{project_base}-auth"
 
         restart_policy = RESTART_POLICY_STORE.get(app['restartPolicy'].lower(), 'Never')
-        quota = app['quota']
         init_containers = None
         if app['depends'] is not None:
             init_containers = [_depends_to_init_container(app['depends'], envs)]
