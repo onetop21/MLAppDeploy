@@ -1,12 +1,13 @@
 import os
 from distutils.util import strtobool
+from pathlib import Path
 
 service_config = {
     'docker': {
         'host': 'unix:///var/run/docker.sock',
     },
     'kubernetes': {
-        'config': '~/.kube/config'
+        'config': f'{Path.home()}/.kube/config'
     },
     'mlad': {
         'debug': False

@@ -2,10 +2,10 @@ import os
 
 from mlad.core import exceptions as core_exceptions
 from mlad.cli.libs import utils
-
+from pathlib import Path
 
 def has_kubeconfig() -> bool:
-    return os.path.isfile(os.environ.get('KUBECONFIG', '~/.kube/config'))
+    return os.path.isfile(os.environ.get('KUBECONFIG', f'{Path.home()}/.kube/config'))
 
 
 def check():

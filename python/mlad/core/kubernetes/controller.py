@@ -7,6 +7,7 @@ import uuid
 from multiprocessing.pool import ThreadPool
 from typing import Union, Optional
 from collections import defaultdict
+from pathlib import Path
 
 from kubernetes import client, config, watch
 from kubernetes.client.api_client import ApiClient
@@ -31,7 +32,7 @@ config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY'
                'USERNAME'}
 
 
-def get_api_client(config_file='~/.kube/config', context=None):
+def get_api_client(config_file=f'{Path.home()}/.kube/config', context=None):
     try:
         if context:
             return config.new_client_from_config(context=context)
