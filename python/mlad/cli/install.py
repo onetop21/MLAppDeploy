@@ -5,7 +5,7 @@ from mlad.cli.libs import utils
 
 
 def has_kubeconfig() -> bool:
-    return os.path.isfile(os.environ.get('KUBECONFIG', '~/.kube/config'))
+    return os.path.isfile(os.environ.get('KUBECONFIG', '~/.kube/config').split(':')[-1])
 
 
 def check():
