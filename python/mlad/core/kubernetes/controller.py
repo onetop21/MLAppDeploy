@@ -69,8 +69,6 @@ def check_project_key(project_key, app, cli=DEFAULT_CLI):
 
 
 def get_namespaces(extra_labels=[], cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     selector = ['MLAD.PROJECT'] + extra_labels
     namespaces = api.list_namespace(label_selector=','.join(selector))
@@ -78,8 +76,6 @@ def get_namespaces(extra_labels=[], cli=DEFAULT_CLI):
 
 
 def get_namespace(cli=DEFAULT_CLI, **kwargs):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     if kwargs.get('project_key'):
         namespaces = api.list_namespace(label_selector=f"MLAD.PROJECT={kwargs.get('project_key')}")
@@ -111,13 +107,11 @@ def get_labels(obj):
     elif isinstance(obj, client.models.v1_service.V1Service):
         return obj.metadata.labels
     else:
-        raise TypeError('Parameter is not valid type.')
+        raise TypeError('Parameter is not a valid type.')
 
 
 def get_config_labels(namespace, key, cli=DEFAULT_CLI):
     # key='project-labels', 'app-{name}-labels'
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     if isinstance(namespace, client.models.v1_namespace.V1Namespace):
         namespace = namespace.metadata.name
@@ -126,8 +120,6 @@ def get_config_labels(namespace, key, cli=DEFAULT_CLI):
 
 
 def create_config_labels(cli, key, namespace, labels):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     ret = api.create_namespaced_config_map(
         namespace,
@@ -140,8 +132,6 @@ def create_config_labels(cli, key, namespace, labels):
 
 
 def inspect_namespace(namespace, cli=DEFAULT_CLI):
-    if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not valid type.')
     labels = get_labels(namespace)
     if namespace.metadata.deletion_timestamp:
         return {'deleted': True, 'key': labels['MLAD.PROJECT']}
@@ -168,16 +158,12 @@ def inspect_namespace(namespace, cli=DEFAULT_CLI):
 
 
 def get_project_session(namespace, cli=DEFAULT_CLI):
-    if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not valid type.')
     config_labels = get_config_labels(namespace, 'project-labels', cli)
     return config_labels['MLAD.PROJECT.SESSION']
 
 
 def create_namespace(base_labels, extra_envs, project_yaml, credential,
                      allow_reuse=False, stream=False, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     project_key = base_labels['MLAD.PROJECT']
     namespace = get_namespace(cli, project_key=project_key)
@@ -245,10 +231,6 @@ def create_namespace(base_labels, extra_envs, project_yaml, credential,
 
 
 def remove_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-    if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     spec = inspect_namespace(namespace, cli)
     api.delete_namespace(namespace.metadata.name)
@@ -277,10 +259,6 @@ def remove_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
 
 
 def update_namespace(namespace, update_yaml, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-    if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     name = namespace.metadata.name
     namespace.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
@@ -321,8 +299,6 @@ def get_daemonset(name, namespace, cli=DEFAULT_CLI):
 
 
 def get_app(name, namespace, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     key = f'app-{name}-labels'
     config_labels = get_config_labels(namespace, key, cli)
     kind = config_labels['MLAD.PROJECT.APP.KIND']
@@ -332,8 +308,6 @@ def get_app(name, namespace, cli=DEFAULT_CLI):
 
 
 def get_apps(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     batch_api = client.BatchV1Api(cli)
     apps_api = client.AppsV1Api(cli)
     filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
@@ -351,8 +325,6 @@ def get_apps(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
 
 
 def get_service(name, namespace, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     try:
         res = api.read_namespaced_service(name, namespace)
@@ -366,8 +338,6 @@ def get_service(name, namespace, cli=DEFAULT_CLI):
 
 
 def get_app_service(cli, namespace, name):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     service = api.list_namespaced_service(
         namespace, label_selector=f"MLAD.PROJECT.APP={name}")
@@ -378,9 +348,6 @@ def get_app_service(cli, namespace, name):
 
 
 def get_app_from_kind(cli, app_name, namespace, kind):
-    # get job or rc of app
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     batch_api = client.BatchV1Api(cli)
     apps_api = client.AppsV1Api(cli)
     if kind == 'Job':
@@ -492,7 +459,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
     elif isinstance(app, client.models.v1_job.V1Job):
         kind = 'Job'
     else:
-        raise TypeError('Parameter is not valid type.')
+        raise TypeError('Parameter is not a valid type.')
 
     api = client.CoreV1Api(cli)
 
@@ -822,8 +789,6 @@ def _create_V1Env(name: str, value: Optional[Union[str, int]] = None, field_path
 
 
 def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
-    if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     namespace_name = namespace.metadata.name
     namespace_spec = inspect_namespace(namespace, cli)
@@ -948,10 +913,6 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
 
 def update_apps(namespace, update_yaml, update_specs, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not a valid type.')
-    if not isinstance(namespace, client.models.v1_namespace.V1Namespace):
-        raise TypeError('Parameter is not a valid type.')
     results = []
     for update_spec in update_specs:
         update_spec = update_spec.dict()
@@ -1088,15 +1049,11 @@ def _update_k8s_job(cli, namespace, update_spec):
 
 
 def _delete_job(cli, name, namespace):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.BatchV1Api(cli)
     return api.delete_namespaced_job(name, namespace, propagation_policy='Foreground')
 
 
 def _delete_deployment(cli, name, namespace):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.AppsV1Api(cli)
     return api.delete_namespaced_deployment(name, namespace, propagation_policy='Foreground')
 
@@ -1165,16 +1122,11 @@ def remove_apps(apps, namespace,
 
 
 def get_nodes(cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-
     api = client.CoreV1Api(cli)
     return {node.metadata.name: node for node in api.list_node().items}
 
 
 def inspect_node(node):
-    if not isinstance(node, client.models.v1_node.V1Node):
-        raise TypeError('Parameter is not valid type.')
     hostname = node.metadata.labels['kubernetes.io/hostname']
     availability = 'active' if node.spec.taints is None else 'pause'
     platform = node.metadata.labels['kubernetes.io/os']
@@ -1201,8 +1153,6 @@ def inspect_node(node):
 
 
 def enable_node(node_name, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
@@ -1218,9 +1168,6 @@ def enable_node(node_name, cli=DEFAULT_CLI):
 
 
 def disable_node(node_name, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": [{"effect": "NoSchedule",
@@ -1237,8 +1184,6 @@ def disable_node(node_name, cli=DEFAULT_CLI):
 
 
 def delete_node(node_name, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not a valid type.')
     api = client.CoreV1Api(cli)
     try:
         api.delete_node(node_name)
@@ -1251,9 +1196,6 @@ def delete_node(node_name, cli=DEFAULT_CLI):
 
 
 def add_node_labels(node_name, cli=DEFAULT_CLI, **kv):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1273,9 +1215,6 @@ def add_node_labels(node_name, cli=DEFAULT_CLI, **kv):
 
 
 def remove_node_labels(node_name, cli=DEFAULT_CLI, *keys):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1295,10 +1234,6 @@ def remove_node_labels(node_name, cli=DEFAULT_CLI, *keys):
 
 
 def scale_app(app, scale_spec, cli=DEFAULT_CLI):
-    if not isinstance(cli, client.api_client.ApiClient):
-        raise TypeError('Parameter is not valid type.')
-    if not isinstance(app, client.models.v1_deployment.V1Deployment):
-        raise TypeError('Target app is not a deployment object.')
     name = app.metadata.name
     namespace = app.metadata.namespace
     api = client.AppsV1Api(cli)
