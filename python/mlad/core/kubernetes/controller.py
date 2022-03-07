@@ -1014,6 +1014,8 @@ def _update_k8s_deployment(cli, namespace, update_spec):
         if key in config_envs:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
+    if 'gpu' in quota and quota['gpu'] == 0:
+        current.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
     envs = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
     body.append(_body("env", envs))
 
@@ -1059,6 +1061,8 @@ def _update_k8s_job(cli, namespace, update_spec):
         if key in config_envs:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
+    if 'gpu' in quota and quota['gpu'] == 0:
+        current.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
     env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
 
     container_spec.command = command
