@@ -20,7 +20,6 @@ from mlad.cli.exceptions import (
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 CFG_PATH = f'{MLAD_HOME_PATH}/config.yml'
-CACHE_PATH = f'{MLAD_HOME_PATH}/cache.yml'
 StrDict = Dict[str, str]
 
 boilerplate = {
