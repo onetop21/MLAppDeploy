@@ -6,6 +6,7 @@ import uuid
 import jwt
 import yaml
 
+from functools import lru_cache
 from typing import Optional, Dict, Callable, List
 from pathlib import Path
 from urllib.parse import urlparse
@@ -172,6 +173,7 @@ def delete(name: str) -> None:
     _save(spec)
 
 
+@lru_cache(maxsize=None)
 def get(name: Optional[str] = None, key: Optional[str] = None) -> Dict:
     if name is None:
         name = current()
