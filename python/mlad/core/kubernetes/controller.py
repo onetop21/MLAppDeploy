@@ -588,11 +588,12 @@ def _convert_constraints_to_k8s_node_selector(constraints):
         return selector
     for k, v in constraints.items():
         if k == 'hostname':
-            selector["kubernetes.io/hostname"] = v
-        else:
+            if v is not None:
+                selector["kubernetes.io/hostname"] = v
+        elif k == 'label':
             label_dict = v
-            for label_key in label_dict:
-                selector[label_key] = str(label_dict[label_key])
+            for label_key, label in label_dict.items():
+                selector[label_key] = str(label)
     return selector
 
 
