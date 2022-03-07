@@ -1312,21 +1312,6 @@ def scale_app(app, scale_spec, cli=DEFAULT_CLI):
     return ret
 
 
-def container_logs(cli, project_key, tail='all', follow=False, timestamps=False):
-    instances = cli.containers.list(all=True, filters={'label': f'MLAD.PROJECT={project_key}'})
-    logs = [(
-        inst.attrs['Config']['Labels']['MLAD.PROJECT.APP'],
-        inst.logs(follow=follow, tail=tail, timestamps=timestamps, stream=True)) for inst in instances]
-    if len(logs):
-        with LogCollector() as collector:
-            for name, log in logs:
-                collector.add_iterable(log, name=name, timestamps=timestamps)
-            for message in collector:
-                yield message
-    else:
-        print('Cannot find running containers.', file=sys.stderr)
-
-
 def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
     # get running apps with app or pod name
     api = client.CoreV1Api(cli)
@@ -1443,29 +1428,6 @@ def create_ingress(cli, namespace, app_name, ingress_name, port, base_path='/', 
         namespace=namespace,
         body=body
     )
-
-
-def check_ingress(ingress_name, namespace, cli=DEFAULT_CLI):
-    w = watch.Watch()
-    api = client.NetworkingV1Api(cli)
-    try:
-        res = api.read_namespaced_ingress(ingress_name, namespace)
-        status = res.status.load_balancer.ingress
-        if status is not None:
-            return True
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find ingress "{ingress_name}" in "{namespace}".')
-    for event in w.stream(func=api.list_namespaced_ingress,
-                          namespace=namespace,
-                          field_selector=f'metadata.name={ingress_name}',
-                          timeout_seconds=60):
-        if event['type'] == 'MODIFIED':
-            status = event['object'].status.load_balancer.ingress
-            if status is not None:
-                return True
-    return False
 
 
 def delete_ingress(cli, namespace, ingress_name):
