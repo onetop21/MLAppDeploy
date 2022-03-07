@@ -29,12 +29,10 @@ def test_valid_input():
         'dbadmin',
         'dbadmin'
     ]
-    sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
+    sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs]))
     expected = {
         'name': 'test-valid',
         'apiserver': {'address': inputs[0]},
-        'kubeconfig_path': None,
-        'context_name': None,
         'docker': {'registry': {'address': inputs[1], 'namespace': 'gameai'}},
         'datastore': {
             's3': {
@@ -51,14 +49,13 @@ def test_valid_input():
             }
         }
     }
-    config_dict = config.add('test-valid', inputs[0], False)
+    config_dict = config.add('test-valid', False)
     del config_dict['session']
     assert config_dict == expected
 
 
 def test_valid_input2():
     inputs = [
-        'https://abc.defg.com',
         '/home/.kube/config',
         'default',
         'https://abc.defg.com',
@@ -71,10 +68,9 @@ def test_valid_input2():
         '',
         ''
     ]
-    sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
+    sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs]))
     expected = {
         'name': 'test-valid2',
-        'apiserver': {'address': inputs[0]},
         'kubeconfig_path': inputs[1],
         'context_name': inputs[2],
         'docker': {'registry': {'address': inputs[3], 'namespace': None}},
@@ -93,9 +89,9 @@ def test_valid_input2():
             }
         }
     }
-    config_dict = config.add('test-valid2', inputs[0], True)
+    config_dict = config.add('test-valid2', True)
     del config_dict['session']
-    expected == config_dict
+    assert config_dict == expected
 
 
 def test_invalid_input():
@@ -112,8 +108,8 @@ def test_invalid_input():
         ''
     ]
     with pytest.raises(InvalidURLError):
-        sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
-        config.add('test-invalid', inputs[0], False)
+        sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs]))
+        config.add('test-invalid', False)
 
 
 def test_invalid_input2():
@@ -130,8 +126,8 @@ def test_invalid_input2():
         ''
     ]
     with pytest.raises(InvalidURLError):
-        sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
-        config.add('test-invalid2', inputs[0], False)
+        sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs]))
+        config.add('test-invalid2', False)
 
 
 def test_dupilicate():

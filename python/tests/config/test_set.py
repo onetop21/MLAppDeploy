@@ -24,8 +24,6 @@ def test_set():
     expected = {
         'name': 'test1',
         'apiserver': {'address': 'https://abc.defg.com'},
-        'kubeconfig_path': None,
-        'context_name': None,
         'docker': {'registry': {
             'address': 'https://abc.defg.com',
             'namespace': None

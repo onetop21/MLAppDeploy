@@ -38,5 +38,5 @@ def add(name):
         'dbadmin',
         'dbadmin'
     ]
-    sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs[1:]]))
-    return config.add(name, inputs[0], False)
+    sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs]))
+    return config.add(name, False)
