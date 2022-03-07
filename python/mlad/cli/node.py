@@ -1,18 +1,11 @@
-import sys
-
 from mlad.api import API
-from mlad.api.exceptions import APIError
 from mlad.cli.libs import utils
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import PluginUninstalledError
 
 
 def list(no_trunc: bool):
-    try:
-        nodes = API.node.list()
-    except APIError as e:
-        print(e)
-        sys.exit(1)
+    nodes = API.node.list()
     columns = [('ID', 'HOSTNAME', 'ADDRESS', 'ROLE', 'STATE', 'AVAILABILITY', 'ENGINE', 'LABELS')]
     for node in nodes:
         ID = node['id'][:10]

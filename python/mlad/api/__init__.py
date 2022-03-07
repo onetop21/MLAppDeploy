@@ -9,6 +9,7 @@ from .app import App
 from .check import Check
 
 from mlad.cli import config as config_core
+from mlad.cli.exceptions import APIServerNotInstalledError, ConfigNotFoundError
 from functools import lru_cache
 
 
@@ -51,7 +52,9 @@ class API:
         try:
             config = config_core.get()
             return config_core.obtain_server_address(config)
-        except Exception:
+        except APIServerNotInstalledError as e:
+            raise e
+        except ConfigNotFoundError:
             return None
 
     @classproperty
@@ -59,7 +62,7 @@ class API:
     def session(cls) -> Optional[str]:
         try:
             return config_core.get()['session']
-        except Exception:
+        except ConfigNotFoundError:
             return None
 
     @classproperty
