@@ -39,7 +39,8 @@ def check():
                      'helm repo update && helm install mlad mlad/api-server --create-namespace -n mlad\'.']
         },
     }
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    config = config_core.get()
+    cli = ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
 
     yield 'Check installed plugins...'
 
@@ -83,7 +84,6 @@ def check():
 
     # Check mlad api server
     try:
-        config = config_core.get()
         api_server_address = config_core.obtain_server_address(config)
     except APIServerNotInstalledError:
         pass
