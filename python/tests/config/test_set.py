@@ -23,6 +23,7 @@ def test_set():
 
     expected = {
         'name': 'test1',
+        'admin': False,
         'apiserver': {'address': 'https://abc.defg.com'},
         'docker': {'registry': {
             'address': 'https://abc.defg.com',

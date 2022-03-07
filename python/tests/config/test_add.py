@@ -32,6 +32,7 @@ def test_valid_input():
     sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs]))
     expected = {
         'name': 'test-valid',
+        'admin': False,
         'apiserver': {'address': inputs[0]},
         'docker': {'registry': {'address': inputs[1], 'namespace': 'gameai'}},
         'datastore': {
@@ -71,6 +72,7 @@ def test_valid_input2():
     sys.stdin = io.StringIO(''.join([f'{_}\n' for _ in inputs]))
     expected = {
         'name': 'test-valid2',
+        'admin': True,
         'kubeconfig_path': inputs[1],
         'context_name': inputs[2],
         'docker': {'registry': {'address': inputs[3], 'namespace': None}},
@@ -96,7 +98,7 @@ def test_valid_input2():
 
 def test_invalid_input():
     inputs = [
-        '',
+        'hi',
         'https://abc.defg.com',
         '',
         'http://localhost:9000',
