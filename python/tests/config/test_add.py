@@ -73,19 +73,19 @@ def test_valid_input2():
     expected = {
         'name': 'test-valid2',
         'admin': True,
-        'kubeconfig_path': inputs[1],
-        'context_name': inputs[2],
-        'docker': {'registry': {'address': inputs[3], 'namespace': None}},
+        'kubeconfig_path': inputs[0],
+        'context_name': inputs[1],
+        'docker': {'registry': {'address': inputs[2], 'namespace': None}},
         'datastore': {
             's3': {
-                'endpoint': inputs[5],
+                'endpoint': inputs[4],
                 'region': 'us-east-1',
-                'accesskey': inputs[7],
-                'secretkey': inputs[8],
+                'accesskey': inputs[6],
+                'secretkey': inputs[7],
                 'verify': False
             },
             'db': {
-                'address': inputs[9],
+                'address': inputs[8],
                 'username': None,
                 'password': None
             }

@@ -66,7 +66,7 @@ def add(name: str, admin: bool) -> Dict:
     if admin:
         kubeconfig_path = utils.prompt(
             'A Kubeconfig File Path', default=f'{Path.home()}/.kube/config')
-        context_name = utils.prompt('A Current Kubernetes Context Name', None)
+        context_name = utils.prompt('A Current Kubernetes Context Name', 'default')
         server_config['kubeconfig_path'] = kubeconfig_path
         server_config['context_name'] = context_name
     else:
