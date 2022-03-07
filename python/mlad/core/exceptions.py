@@ -101,6 +101,6 @@ class InvalidKubeConfigError(MLADException):
 
     def __str__(self):
         return (
-            f'Cannot load K8s API client from config file: {self.config_path} '
-            f'and context name: {self.context_name}'
+            f'Cannot load K8s API client from config file: \'{self.config_path}\' '
+            f'and context name: \'{self.context_name}\''
         )
