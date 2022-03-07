@@ -1,5 +1,7 @@
 import json
 
+from typing import Optional
+
 
 class MLADException(Exception):
     pass
@@ -89,3 +91,16 @@ class InvalidMetricUnitError(MLADException):
 
     def __str__(self):
         return f'Metric {self.metric} \'{self.value}\' cannot be processed.'
+
+
+class InvalidKubeConfigError(MLADException):
+
+    def __init__(self, config_path: str, context_name: Optional[str]):
+        self.config_path = config_path
+        self.context_name = context_name
+
+    def __str__(self):
+        return (
+            f'Cannot load K8s API client from config file: {self.config_path} '
+            f'and context name: {self.context_name}'
+        )

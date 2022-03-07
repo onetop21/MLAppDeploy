@@ -52,8 +52,6 @@ class API:
         try:
             config = config_core.get()
             return config_core.obtain_server_address(config)
-        except APIServerNotInstalledError as e:
-            raise e
         except ConfigNotFoundError:
             return None
 

@@ -31,7 +31,7 @@ config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY'
                'USERNAME'}
 
 
-def get_api_client(config_file='~/.kube/config', context=None):
+def get_api_client(config_file='~/.kube/config', context=None, validate=True):
     try:
         return config.new_client_from_config(context=context, config_file=config_file)
     except config.config_exception.ConfigException:
@@ -41,6 +41,8 @@ def get_api_client(config_file='~/.kube/config', context=None):
         # If Need, set configuration parameter from client.Configuration
         return ApiClient()
     except config.config_exception.ConfigException:
+        if validate:
+            raise exceptions.InvalidKubeConfigError(config_file, context)
         return None
 
 
@@ -52,7 +54,7 @@ def get_current_context():
     return current_context['name']
 
 
-DEFAULT_CLI = get_api_client()
+DEFAULT_CLI = get_api_client(validate=False)
 
 
 def check_project_key(project_key, app, cli=DEFAULT_CLI):
