@@ -14,7 +14,7 @@ router = APIRouter()
 def check_metrics_server():
     status = True
     try:
-        ctlr.get_deployment('metrics-server', 'kube-system')
+        ctlr.get_k8s_deployment('metrics-server', 'kube-system')
     except exceptions.NotFound:
         status = False
     except Exception as e:
@@ -27,7 +27,7 @@ def check_metrics_server():
 def check_nvidia_device_plugin():
     status = True
     try:
-        ctlr.get_daemonset('nvidia-device-plugin', 'kube-system')
+        ctlr.get_k8s_daemonset('nvidia-device-plugin', 'kube-system')
     except exceptions.NotFound:
         status = False
     except Exception as e:
@@ -40,7 +40,7 @@ def check_nvidia_device_plugin():
 def check_ingress_controller():
     status = True
     try:
-        ctlr.get_deployment('ingress-nginx-controller', 'ingress-nginx')
+        ctlr.get_k8s_deployment('ingress-nginx-controller', 'ingress-nginx')
     except exceptions.NotFound:
         status = False
     except Exception as e:

@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 def _check_session_key(project_key, session):
-    project = ctlr.get_namespace(project_key=project_key)
+    project = ctlr.get_k8s_namespace(project_key=project_key)
     project_session = ctlr.get_project_session(project)
     if project_session == session:
         return True
@@ -46,7 +46,7 @@ def send_apps(project_key: str, labels: List[str] = Query(None), session: str = 
         labels_dict = {label.split("=")[0]: label.split("=")[1]
                        for label in labels}
     try:
-        namespace = ctlr.get_namespace(project_key=project_key)
+        namespace = ctlr.get_k8s_namespace(project_key=project_key)
         if not namespace:
             raise InvalidProjectError(project_key)
 
@@ -65,7 +65,7 @@ def create_app(project_key: str, req: app_models.CreateRequest,
                session: str = Header(None)):
     targets = req.json
     try:
-        namespace = ctlr.get_namespace(project_key=project_key)
+        namespace = ctlr.get_k8s_namespace(project_key=project_key)
         if not namespace:
             raise InvalidProjectError(project_key)
         apps = ctlr.create_apps(namespace, targets)
@@ -82,7 +82,7 @@ def create_app(project_key: str, req: app_models.CreateRequest,
 @router.get('/project/{project_key}/app/{app_name}')
 def inspect_app(project_key: str, app_name: str, session: str = Header(None)):
     try:
-        namespace = ctlr.get_namespace(project_key=project_key).metadata.name
+        namespace = ctlr.get_k8s_namespace(project_key=project_key).metadata.name
         app = ctlr.get_app(app_name, namespace)
         ctlr.check_project_key(project_key, app)
         return ctlr.inspect_app(app)
@@ -96,7 +96,7 @@ def inspect_app(project_key: str, app_name: str, session: str = Header(None)):
 @router.get('/project/{project_key}/app/{app_name}/tasks')
 def inspect_tasks(project_key: str, app_name: str, session: str = Header(None)):
     try:
-        namespace = ctlr.get_namespace(project_key=project_key).metadata.name
+        namespace = ctlr.get_k8s_namespace(project_key=project_key).metadata.name
         app = ctlr.get_app(app_name, namespace)
         ctlr.check_project_key(project_key, app)
         return ctlr.inspect_app(app)['tasks']
@@ -110,7 +110,7 @@ def inspect_tasks(project_key: str, app_name: str, session: str = Header(None)):
 @router.put("/project/{project_key}/app/{app_name}/scale")
 def scale_app(project_key: str, app_name: str, req: app_models.ScaleRequest, session: str = Header(None)):
     try:
-        namespace = ctlr.get_namespace(project_key=project_key).metadata.name
+        namespace = ctlr.get_k8s_namespace(project_key=project_key).metadata.name
         app = ctlr.get_app(app_name, namespace)
         ctlr.check_project_key(project_key, app)
         ctlr.scale_app(app, req.scale_spec)
@@ -127,7 +127,7 @@ def remove_apps(project_key: str, req: app_models.RemoveRequest,
                 stream: bool = Query(False), session: str = Header(None)):
     try:
         _check_session_key(project_key, session)
-        namespace = ctlr.get_namespace(project_key=project_key).metadata.name
+        namespace = ctlr.get_k8s_namespace(project_key=project_key).metadata.name
         targets = [ctlr.get_app(name, namespace) for name in req.apps]
         for target in targets:
             ctlr.check_project_key(project_key, target)

@@ -34,7 +34,7 @@ def create_project(req: project.CreateRequest, allow_reuse: bool = Query(False),
     project_yaml = req.project_yaml
 
     try:
-        res = ctlr.create_namespace(
+        res = ctlr.create_k8s_namespace_with_data(
             base_labels, extra_envs, project_yaml, credential, allow_reuse=allow_reuse, stream=True)
 
         def create_project(gen):
@@ -52,10 +52,10 @@ def create_project(req: project.CreateRequest, allow_reuse: bool = Query(False),
 @router.get("/project")
 def projects(extra_labels: str = '', session: str = Header(None)):
     try:
-        namespaces = ctlr.get_namespaces(extra_labels.split(',') if extra_labels else [])
         projects = []
-        for k, v in namespaces.items():
-            spec = ctlr.inspect_namespace(v)
+        namespaces = ctlr.get_k8s_namespaces(extra_labels.split(',') if extra_labels else [])
+        for namespace in namespaces:
+            spec = ctlr.inspect_k8s_namespace(namespace)
             if not spec.get('deleted', False):
                 projects.append(spec)
         return projects
@@ -67,10 +67,10 @@ def projects(extra_labels: str = '', session: str = Header(None)):
 @router.get("/project/{project_key}")
 def inspect_project(project_key: str, session: str = Header(None)):
     try:
-        namespace = ctlr.get_namespace(project_key=project_key)
+        namespace = ctlr.get_k8s_namespace(project_key=project_key)
         if namespace is None:
             raise InvalidProjectError(project_key)
-        inspect = ctlr.inspect_namespace(namespace)
+        inspect = ctlr.inspect_k8s_namespace(namespace)
         return inspect
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
@@ -82,12 +82,12 @@ def inspect_project(project_key: str, session: str = Header(None)):
 @router.delete("/project/{project_key}")
 def remove_project(project_key: str, session: str = Header(None)):
     try:
-        namespace = ctlr.get_namespace(project_key=project_key)
+        namespace = ctlr.get_k8s_namespace(project_key=project_key)
         _check_session_key(namespace, session)
         if namespace is None:
             raise InvalidProjectError(project_key)
 
-        res = ctlr.remove_namespace(namespace, stream=True)
+        res = ctlr.delete_k8s_namespace(namespace, stream=True)
 
         def remove_project(gen):
             for _ in gen:
@@ -112,7 +112,7 @@ def send_project_log(project_key: str, tail: str = Query('all'),
 
     selected = True if names_or_ids else False
     try:
-        namespace = ctlr.get_namespace(project_key=project_key)
+        namespace = ctlr.get_k8s_namespace(project_key=project_key)
         if namespace is None:
             raise InvalidProjectError(project_key)
 
@@ -175,8 +175,8 @@ def update_project(project_key: str, req: project.UpdateRequest):
     update_yaml = req.update_yaml
     update_specs = req.update_specs
     try:
-        namespace = ctlr.get_namespace(project_key=project_key)
-        ctlr.update_namespace(namespace, update_yaml)
+        namespace = ctlr.get_k8s_namespace(project_key=project_key)
+        ctlr.update_k8s_namespace(namespace, update_yaml)
         res = ctlr.update_apps(namespace, update_yaml, update_specs)
         return [ctlr.inspect_app(_) for _ in res]
     except Exception as e:

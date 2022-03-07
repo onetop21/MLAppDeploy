@@ -405,7 +405,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
 
         # Remove the apps
         k8s_cli = k8s_ctlr.get_api_client(context=config_core.get_context())
-        namespace = k8s_ctlr.get_namespace(cli=k8s_cli, project_key=project_key)
+        namespace = k8s_ctlr.get_k8s_namespace(cli=k8s_cli, project_key=project_key)
         if namespace is None:
             raise ProjectNotFound(f'Cannot find project {project_key}')
         namespace_name = namespace.metadata.name
@@ -435,7 +435,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
         handler()
 
         # Remove the project
-        lines = k8s_ctlr.remove_namespace(namespace, stream=True, cli=k8s_cli)
+        lines = k8s_ctlr.delete_k8s_namespace(namespace, stream=True, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 sys.stdout.write(line['stream'])
