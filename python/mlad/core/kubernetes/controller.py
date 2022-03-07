@@ -33,11 +33,7 @@ config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY'
 
 def get_api_client(config_file='~/.kube/config', context=None):
     try:
-        if context:
-            return config.new_client_from_config(context=context)
-        else:
-
-            return config.new_client_from_config(config_file=config_file)
+        return config.new_client_from_config(context=context, config_file=config_file)
     except config.config_exception.ConfigException:
         pass
     try:
