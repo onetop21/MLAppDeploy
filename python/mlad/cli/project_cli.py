@@ -109,7 +109,7 @@ def up(file: Optional[str]):
 @echo_exception
 def down(file: Optional[str], project_key: Optional[str], dump: bool):
     '''Stop and remove the project deployed on the cluster.'''
-    lines = project.down_force(file, project_key, dump) if config.validate_kubeconfig() \
+    lines = project.down_force(file, project_key, dump) if config.is_admin() \
         else project.down(file, project_key, dump)
     for line in lines:
         click.echo(line)

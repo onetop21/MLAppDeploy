@@ -6,7 +6,6 @@ import uuid
 import jwt
 import yaml
 
-from datetime import datetime
 from typing import Optional, Dict, Callable, List
 from pathlib import Path
 from urllib.parse import urlparse
@@ -270,25 +269,8 @@ def get_registry_address(config: Dict):
     return registry_address
 
 
-def validate_kubeconfig() -> bool:
-    config = get()
-    kubeconfig_path = config['kubeconfig_path']
-    context_name = config['context_name']
-    try:
-        with open(kubeconfig_path, 'r') as kubeconfig_file:
-            kubeconfig = yaml.load(kubeconfig_file, Loader=yaml.FullLoader)
-    except Exception:
-        return False
-    return 'current-context' in kubeconfig and (context_name == kubeconfig['current-context'])
-
-
 def is_admin() -> bool:
     return get().get('admin', False)
-
-
-def get_context() -> str:
-    config = get()
-    return config['context_name']
 
 
 def obtain_server_address(config: Dict[str, object]) -> str:
