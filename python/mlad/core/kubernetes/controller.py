@@ -326,10 +326,10 @@ def get_k8s_service(name, namespace, cli=DEFAULT_CLI):
     return res
 
 
-def get_app_service(cli, namespace, name):
+def get_k8s_service_of_app(cli, namespace, app_name):
     api = client.CoreV1Api(cli)
     service = api.list_namespaced_service(
-        namespace, label_selector=f"MLAD.PROJECT.APP={name}")
+        namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
     if not service.items:
         return None
     elif len(service.items) == 1:
@@ -461,7 +461,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
-    service = get_app_service(cli, namespace, name)
+    service = get_k8s_service_of_app(cli, namespace, name)
     try:
         ingress = json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]'))
     except json.decoder.JSONDecodeError:
@@ -1081,7 +1081,7 @@ def remove_apps(apps, namespace,
             elif kind == 'Service':
                 _delete_k8s_deployment(cli, app_name, namespace)
 
-            if get_app_service(cli, namespace, app_name) is not None:
+            if get_k8s_service_of_app(cli, namespace, app_name) is not None:
                 api.delete_namespaced_service(app_name, namespace)
 
             ingress_list = network_api.list_namespaced_ingress(
