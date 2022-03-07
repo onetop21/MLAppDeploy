@@ -21,32 +21,28 @@ def test_set():
                'datastore.s3.endpoint=http://localhost:9000',
                'datastore.s3.verify=False')
 
-    expected = {
-        'name': 'test1',
-        'admin': False,
-        'apiserver': {'address': 'https://abc.defg.com'},
-        'docker': {'registry': {
-            'address': 'https://abc.defg.com',
-            'namespace': None
-        }},
-        'datastore': {
-            's3': {
-                'endpoint': 'http://localhost:9000',
-                'region': 'us-west-1',
-                'accesskey': 'minioadmin',
-                'secretkey': 'minioadmin',
-                'verify': False
-            },
-            'db': {
-                'address': 'mongodb://localhost:27017',
-                'username': 'dbadmin',
-                'password': 'dbadmin'
-            }
+    datastore_dict = config.get('test1', 'datastore')
+    assert datastore_dict == {
+        's3': {
+            'endpoint': 'http://localhost:9000',
+            'region': 'us-west-1',
+            'accesskey': 'minioadmin',
+            'secretkey': 'minioadmin',
+            'verify': False
+        },
+        'db': {
+            'address': 'mongodb://localhost:27017',
+            'username': 'dbadmin',
+            'password': 'dbadmin'
         }
     }
-    config_dict = config.get('test1')
-    del config_dict['session']
-    assert expected == config_dict
+    docker_dict = config.get('test1', 'docker')
+    assert docker_dict == {
+        'registry': {
+            'address': 'https://abc.defg.com',
+            'namespace': None
+        }
+    }
 
 
 def test_invalid_set():
