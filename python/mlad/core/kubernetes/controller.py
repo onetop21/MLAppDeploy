@@ -7,6 +7,7 @@ import uuid
 from multiprocessing.pool import ThreadPool
 from typing import Union, Optional
 from collections import defaultdict
+from pathlib import Path
 
 from kubernetes import client, config, watch
 from kubernetes.client.api_client import ApiClient
