@@ -284,6 +284,7 @@ def obtain_server_address(config: Dict[str, object]) -> str:
 
     cli = ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
     host = cli.configuration.host.rsplit(':', 1)[0]
+    host = host.replace('https', 'http')
     try:
         ctlr.get_deployment('mlad-api-server', 'mlad', cli=cli)
         service = ctlr.get_service('mlad-api-server', 'mlad', cli=cli)
