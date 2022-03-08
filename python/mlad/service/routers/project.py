@@ -166,7 +166,7 @@ def send_resources(project_key: str, group_by: Optional[str] = Query('project'),
 @router.post("/project/{project_key}")
 def update_project(project_key: str, req: project.UpdateRequest):
     update_yaml = req.update_yaml
-    update_specs = req.update_specs
+    update_specs = [update_spec.dict() for update_spec in req.update_specs]
     try:
         namespace = ctlr.get_k8s_namespace(project_key)
         ctlr.update_k8s_namespace(namespace, update_yaml)
