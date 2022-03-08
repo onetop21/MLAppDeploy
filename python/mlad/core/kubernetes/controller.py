@@ -77,11 +77,11 @@ def get_k8s_namespaces(extra_labels=[], cli=DEFAULT_CLI):
 
 def get_k8s_namespace(cli=DEFAULT_CLI, project_key=None):
     api = client.CoreV1Api(cli)
-    namespaces = api.list_namespace(label_selector=f'MLAD.PROJECT={project_key}')
-    if not namespaces.items:
+    resp = api.list_namespace(label_selector=f'MLAD.PROJECT={project_key}')
+    if len(resp.items) == 0:
         return None
-    elif len(namespaces.items) == 1:
-        return namespaces.items[0]
+    elif len(resp.items) == 1:
+        return resp.items[0]
     else:
         raise exceptions.Duplicated(
             "Need to remove namespaces or down project, because exists duplicated namespaces.")
@@ -104,20 +104,19 @@ def _get_k8s_config_map_data(namespace, key, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     if isinstance(namespace, client.models.v1_namespace.V1Namespace):
         namespace = namespace.metadata.name
-    ret = api.read_namespaced_config_map(key, namespace)
-    return ret.data
+    resp = api.read_namespaced_config_map(key, namespace)
+    return resp.data
 
 
 def _create_k8s_config_map(cli, key, namespace, labels):
     api = client.CoreV1Api(cli)
-    ret = api.create_namespaced_config_map(
+    return api.create_namespaced_config_map(
         namespace,
         client.V1ConfigMap(
             data=labels,
             metadata=client.V1ObjectMeta(name=key)
         )
     )
-    return ret.data
 
 
 def inspect_k8s_namespace(namespace, cli=DEFAULT_CLI):
@@ -252,39 +251,40 @@ def update_k8s_namespace(namespace, update_yaml, cli=DEFAULT_CLI):
     name = namespace.metadata.name
     namespace.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
     try:
-        api.patch_namespace(name, namespace)
+        resp = api.patch_namespace(name, namespace)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
             raise exceptions.NotFound(f'Cannot find namespace {name}.')
         else:
             raise exceptions.APIError(msg, status)
+    return resp
 
 
 def get_k8s_deployment(name, namespace, cli=DEFAULT_CLI):
     api = client.AppsV1Api(cli)
     try:
-        res = api.read_namespaced_deployment(name, namespace)
+        resp = api.read_namespaced_deployment(name, namespace)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
             raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
         else:
             raise exceptions.APIError(msg, status)
-    return res
+    return resp
 
 
 def get_k8s_daemonset(name, namespace, cli=DEFAULT_CLI):
     api = client.AppsV1Api(cli)
     try:
-        res = api.read_namespaced_daemon_set(name, namespace)
+        resp = api.read_namespaced_daemon_set(name, namespace)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
             raise exceptions.NotFound(f'Cannot find daemonset "{name}" in "{namespace}".')
         else:
             raise exceptions.APIError(msg, status)
-    return res
+    return resp
 
 
 def get_app(name, namespace, cli=DEFAULT_CLI):
@@ -305,12 +305,7 @@ def get_apps(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
     apps = []
     apps += batch_api.list_job_for_all_namespaces(label_selector=','.join(filters)).items
     apps += apps_api.list_deployment_for_all_namespaces(label_selector=','.join(filters)).items
-
-    if project_key:
-        return dict([(_.metadata.labels['MLAD.PROJECT.APP'], _) for _ in apps])
-    else:
-        return dict([(f'{_.metadata.labels["MLAD.PROJECT"]}/{_.metadata.name}', _)
-                     for _ in apps])
+    return apps
 
 
 def get_k8s_service(name, namespace, cli=DEFAULT_CLI):
@@ -330,26 +325,25 @@ def get_k8s_service_of_app(cli, namespace, app_name):
     api = client.CoreV1Api(cli)
     service = api.list_namespaced_service(
         namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
-    if not service.items:
+    if len(service.items) == 0:
         return None
     elif len(service.items) == 1:
         return service.items[0]
 
 
 def get_app_from_kind(cli, app_name, namespace, kind):
-    batch_api = client.BatchV1Api(cli)
-    apps_api = client.AppsV1Api(cli)
     if kind == 'Job':
-        app = batch_api.list_namespaced_job(
+        batch_api = client.BatchV1Api(cli)
+        resp = batch_api.list_namespaced_job(
             namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
     elif kind == 'Service':
-        app = apps_api.list_namespaced_deployment(
+        apps_api = client.AppsV1Api(cli)
+        resp = apps_api.list_namespaced_deployment(
             namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
-
-    if not app.items:
+    if len(resp.items) == 0:
         return None
-    elif len(app.items) == 1:
-        return app.items[0]
+    elif len(resp.items) == 1:
+        return resp.items[0]
     else:
         raise exceptions.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
 
@@ -365,9 +359,6 @@ def get_pod_events(pod, cli=DEFAULT_CLI):
 
 
 def get_pod_info(pod):
-    if not isinstance(pod, client.models.v1_pod.V1Pod):
-        raise TypeError('Parameter is not valid type.')
-
     pod_info = {
         'name': pod.metadata.name,
         'namespace': pod.metadata.namespace,
@@ -456,8 +447,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
     namespace = app.metadata.namespace
     config_labels = _get_k8s_config_map_data(namespace, f'app-{name}-labels', cli)
 
-    pod_ret = api.list_namespaced_pod(namespace,
-                                      label_selector=f'MLAD.PROJECT.APP={name}')
+    pods = api.list_namespaced_pod(namespace, label_selector=f'MLAD.PROJECT.APP={name}').items
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
@@ -490,7 +480,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
         'id': app.metadata.uid,
         'name': config_labels.get('MLAD.PROJECT.APP'),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
-        'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pod_ret.items]),
+        'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pods]),
         'ports': [port_spec.port for port_spec in service.spec.ports] if service is not None else [],
         'ingress': ingress,
         'created': app.metadata.creation_timestamp,
@@ -652,8 +642,7 @@ def _create_k8s_job(name, image, command, namespace='default', restart_policy='N
             )
         )
     )
-    api_response = api.create_namespaced_job(namespace, body)
-    return api_response
+    return api.create_namespaced_job(namespace, body)
 
 
 def _create_k8s_deployment(name, image, command, namespace='default',
@@ -704,13 +693,12 @@ def _create_k8s_deployment(name, image, command, namespace='default',
         )
     )
 
-    api_response = api.create_namespaced_deployment(namespace, body)
-    return api_response
+    return api.create_namespaced_deployment(namespace, body)
 
 
 def _create_k8s_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
-    api.create_persistent_volume(
+    return api.create_persistent_volume(
         client.V1PersistentVolume(
             api_version='v1',
             kind='PersistentVolume',
@@ -744,7 +732,7 @@ def _delete_k8s_pvs(name: str, cli=DEFAULT_CLI):
 def _create_k8s_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     pvc_name = f'{name}-{pv_index}-pvc'
-    api.create_namespaced_persistent_volume_claim(
+    return api.create_namespaced_persistent_volume_claim(
         namespace,
         client.V1PersistentVolumeClaim(
             api_version='v1',
@@ -764,7 +752,6 @@ def _create_k8s_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFA
             )
         )
     )
-    return pvc_name
 
 
 def _create_k8s_env(name: str, value: Optional[Union[str, int]] = None, field_path: str = None):
@@ -798,7 +785,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     instances = []
     for name, app in apps.items():
         # Check running already
-        if get_apps(namespace_spec['key'], extra_filters={'MLAD.PROJECT.APP': name}, cli=cli):
+        if len(get_apps(namespace_spec['key'], extra_filters={'MLAD.PROJECT.APP': name}, cli=cli)) > 0:
             raise exceptions.Duplicated('Already running app.')
 
         kind = app['kind']
@@ -852,7 +839,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
             for pv_index, pv_mount in enumerate(pv_mounts):
                 _create_k8s_pv(name, pv_index, pv_mount)
                 pvc_specs.append({
-                    'name': _create_k8s_pvc(name, pv_index, pv_mount, namespace_name),
+                    'name': _create_k8s_pvc(name, pv_index, pv_mount, namespace_name).metadata.name,
                     'mountPath': pv_mount['mountPath']
                 })
 
@@ -1114,7 +1101,7 @@ def remove_apps(apps, namespace,
 
 def get_k8s_nodes(cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
-    return {node.metadata.name: node for node in api.list_node().items}
+    return api.list_node().items
 
 
 def inspect_k8s_node(node):
@@ -1149,7 +1136,7 @@ def enable_k8s_node(node_name, cli=DEFAULT_CLI):
         "spec": {"taints": None}
     }
     try:
-        api.patch_node(node_name, body)
+        return api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
@@ -1165,7 +1152,7 @@ def disable_k8s_node(node_name, cli=DEFAULT_CLI):
                             "key": "node-role.kubernetes.io/worker"}]}
     }
     try:
-        api.patch_node(node_name, body)
+        return api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
@@ -1177,7 +1164,7 @@ def disable_k8s_node(node_name, cli=DEFAULT_CLI):
 def delete_k8s_node(node_name, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     try:
-        api.delete_node(node_name)
+        return api.delete_node(node_name)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
@@ -1196,7 +1183,7 @@ def add_k8s_node_labels(node_name, cli=DEFAULT_CLI, **kv):
     for key in kv:
         body['metadata']['labels'][key] = kv[key]
     try:
-        api.patch_node(node_name, body)
+        return api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
@@ -1215,7 +1202,7 @@ def remove_k8s_node_labels(node_name, cli=DEFAULT_CLI, *keys):
     for key in keys:
         body['metadata']['labels'][key] = None
     try:
-        api.patch_node(node_name, body)
+        return api.patch_node(node_name, body)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
@@ -1233,9 +1220,7 @@ def scale_app(app, scale_spec, cli=DEFAULT_CLI):
             "replicas": scale_spec
         }
     }
-    ret = api.patch_namespaced_deployment_scale(
-        name=name, namespace=namespace, body=body)
-    return ret
+    return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
 
 
 def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
@@ -1246,7 +1231,7 @@ def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
 
     selected = []
     sources = [(_['name'], list(_['tasks'].keys())) for _ in
-               [inspect_app(_, cli) for _ in apps.values()]]
+               [inspect_app(app, cli) for app in apps]]
     if names_or_ids:
         selected = []
         for _ in sources:
@@ -1428,7 +1413,7 @@ def get_k8s_node_resources(node, no_trunc, cli=DEFAULT_CLI):
             requests = defaultdict(lambda: '0', container.resources.requests or {})
             used_gpu += int(requests['nvidia.com/gpu'])
 
-    res = {
+    result = {
         'mem': {'capacity': mem, 'used': used_mem,
                 'allocatable': mem - used_mem if not isinstance(used_mem, str) else '-'},
         'cpu': {'capacity': cpu, 'used': used_cpu,
@@ -1437,19 +1422,20 @@ def get_k8s_node_resources(node, no_trunc, cli=DEFAULT_CLI):
     }
 
     if not no_trunc:
-        for resource, value in res.items():
+        for resource, value in result.items():
             for k in value:
-                if not isinstance(res[resource][k], str):
-                    res[resource][k] = round(res[resource][k], 1)
+                if not isinstance(result[resource][k], str):
+                    result[resource][k] = round(result[resource][k], 1)
 
-    return res
+    return result
 
 
 def get_project_resources(project_key: str, group_by: str = 'project', no_trunc: bool = True,
                           cli=DEFAULT_CLI):
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
-    res = {}
+    result = {}
+    project_result = {'cpu': 0, 'gpu': 0, 'mem': 0}
     apps = get_apps(project_key, cli=cli)
 
     def parse_gpu(pod):
@@ -1463,12 +1449,12 @@ def get_project_resources(project_key: str, group_by: str = 'project', no_trunc:
                 used += int(gpu)
         return used
 
-    project_res = {'cpu': 0, 'gpu': 0, 'mem': 0}
     cpu_unit_error = False
     mem_unit_error = False
-    for name, app in apps.items():
-        res[name] = {}
+    for app in apps:
+        name = app.metadata.labels['MLAD.PROJECT.APP']
         namespace = app.metadata.namespace
+        result[name] = {}
 
         pods = v1_api.list_namespaced_pod(namespace,
                                           label_selector=f'MLAD.PROJECT.APP={name}')
@@ -1497,38 +1483,38 @@ def get_project_resources(project_key: str, group_by: str = 'project', no_trunc:
                     resource['gpu'] += pod_gpu_usage
 
                 if group_by == 'project':
-                    for k in project_res:
-                        project_res[k] += resource[k] if not isinstance(resource[k], str) else 0
+                    for k in project_result:
+                        project_result[k] += resource[k] if not isinstance(resource[k], str) else 0
 
                 if not no_trunc:
                     for k in resource:
                         resource[k] = round(resource[k], 1) if not isinstance(resource[k], str) \
                             else resource[k]
 
-                res[name][pod_name] = resource
+                result[name][pod_name] = resource
 
             except ApiException as e:
                 if e.headers['Content-Type'] == 'application/json':
                     body = json.loads(e.body)
                     if body['kind'] == 'Status':
                         print(f"{body['status']} : {body['message']}")
-                    res[name][pod_name] = {'mem': 'NotReady', 'cpu': 'NotReady', 'gpu': 'NotReady'}
+                    result[name][pod_name] = {'mem': 'NotReady', 'cpu': 'NotReady', 'gpu': 'NotReady'}
                 elif e.status == 404 or e.status == 503:
                     print('Metrics server unavailable.')
-                    res[name][pod_name] = {'mem': '-', 'cpu': '-', 'gpu': '-'}
+                    result[name][pod_name] = {'mem': '-', 'cpu': '-', 'gpu': '-'}
                 continue
 
     if group_by == 'project':
         if cpu_unit_error:
-            project_res['cpu'] = 'UnitError'
+            project_result['cpu'] = 'UnitError'
         if mem_unit_error:
-            project_res['mem'] = 'UnitError'
+            project_result['mem'] = 'UnitError'
 
         if not no_trunc:
-            for k in project_res:
-                project_res[k] = round(project_res[k], 1) if not isinstance(project_res[k], str) \
-                    else project_res[k]
+            for k in project_result:
+                project_result[k] = round(project_result[k], 1) if not isinstance(project_result[k], str) \
+                    else project_result[k]
 
-        return project_res
+        return project_result
     elif group_by == 'app':
-        return res
+        return result

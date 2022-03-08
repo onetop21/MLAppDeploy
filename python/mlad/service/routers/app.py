@@ -29,8 +29,8 @@ def send_apps_list(labels: List[str] = Query(None), session: str = Header(None))
         labels_dict = {label.split('=')[0]: label.split('=')[1]
                        for label in labels}
     try:
-        app_dict = ctlr.get_apps(extra_filters=labels_dict)
-        specs = ctlr.inspect_apps(app_dict.values())
+        apps = ctlr.get_apps(extra_filters=labels_dict)
+        specs = ctlr.inspect_apps(apps)
         return {'specs': specs}
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
@@ -50,8 +50,8 @@ def send_apps(project_key: str, labels: List[str] = Query(None), session: str = 
         if not namespace:
             raise InvalidProjectError(project_key)
 
-        app_dict = ctlr.get_apps(project_key, extra_filters=labels_dict)
-        specs = ctlr.inspect_apps(app_dict.values())
+        apps = ctlr.get_apps(project_key, extra_filters=labels_dict)
+        specs = ctlr.inspect_apps(apps)
         return {'specs': specs}
     except InvalidProjectError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
