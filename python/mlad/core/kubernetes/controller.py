@@ -143,7 +143,8 @@ def get_project_session(namespace: client.V1Namespace, cli: ApiClient = DEFAULT_
 def create_k8s_namespace_with_data(
     base_labels: Dict[str, str], extra_envs: Dict[str, str],
     project_yaml: Dict, credential: str, allow_reuse: bool = False,
-    stream: bool = False, cli: ApiClient = DEFAULT_CLI) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
+    stream: bool = False, cli: ApiClient = DEFAULT_CLI
+) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
     api = client.CoreV1Api(cli)
     project_key = base_labels['MLAD.PROJECT']
     try:
@@ -214,10 +215,9 @@ def create_k8s_namespace_with_data(
 
 
 def delete_k8s_namespace(
-    namespace: client.V1Namespace,
-    timeout: int = 0xFFFF,
-    stream: bool = False,
-    cli: ApiClient = DEFAULT_CLI) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
+    namespace: client.V1Namespace, timeout: int = 0xFFFF, stream: bool = False,
+    cli: ApiClient = DEFAULT_CLI
+) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
     api = client.CoreV1Api(cli)
     spec = inspect_k8s_namespace(namespace, cli)
     api.delete_namespace(namespace.metadata.name)
@@ -248,7 +248,8 @@ def delete_k8s_namespace(
 
 
 def update_k8s_namespace(
-    namespace: client.V1Namespace, update_yaml: Dict, cli: ApiClient = DEFAULT_CLI) -> client.V1Namespace:
+    namespace: client.V1Namespace, update_yaml: Dict, cli: ApiClient = DEFAULT_CLI
+) -> client.V1Namespace:
     api = client.CoreV1Api(cli)
     name = namespace.metadata.name
     namespace.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
@@ -274,7 +275,7 @@ def get_k8s_deployment(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) 
             raise exceptions.APIError(msg, status)
 
 
-def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Daemonset:
+def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1DaemonSet:
     api = client.AppsV1Api(cli)
     try:
         return api.read_namespaced_daemon_set(name, namespace)
@@ -434,9 +435,9 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
 
 def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
     kind = None
-    if isinstance(app, client.models.v1_deployment.V1Deployment):
+    if isinstance(app, client.V1Deployment):
         kind = 'Service'
-    elif isinstance(app, client.models.v1_job.V1Job):
+    elif isinstance(app, client.V1Job):
         kind = 'Job'
     else:
         raise TypeError('Parameter is not a valid type.')
@@ -498,8 +499,8 @@ def inspect_apps(apps: List[App]) -> List[Dict]:
 
 
 def _convert_mounts_to_k8s_volume(
-    name: str,  mounts: List[str],
-    pvc_specs: List[Dict[str, str]]) -> Tuple[List[client.V1VolumeMount], List[client.V1Volume]]:
+    name: str, mounts: List[str], pvc_specs: List[Dict[str, str]]
+) -> Tuple[List[client.V1VolumeMount], List[client.V1Volume]]:
     _mounts = []
     _volumes = []
     if mounts:
@@ -541,7 +542,9 @@ def _convert_mounts_to_k8s_volume(
     return _mounts, _volumes
 
 
-def _convert_quota_to_k8s_resource(type='Quota', resources=None):
+def _convert_quota_to_k8s_resource(
+    type: str = 'Quota', resources: Optional[Dict] = None
+) -> client.V1ResourceRequirements:
     limits = {'nvidia.com/gpu': 0}
     requests = {'nvidia.com/gpu': 0}
     if type == 'Quota' and resources is not None:
@@ -573,7 +576,7 @@ def _convert_quota_to_k8s_resource(type='Quota', resources=None):
     return client.V1ResourceRequirements(limits=limits, requests=requests)
 
 
-def _convert_constraints_to_k8s_node_selector(constraints):
+def _convert_constraints_to_k8s_node_selector(constraints: Dict) -> Dict[str, str]:
     selector = {}
     if constraints is None:
         return selector
@@ -582,13 +585,15 @@ def _convert_constraints_to_k8s_node_selector(constraints):
             if v is not None:
                 selector["kubernetes.io/hostname"] = v
         elif k == 'label':
-            label_dict = v
+            label_dict: Dict = v
             for label_key, label in label_dict.items():
                 selector[label_key] = str(label)
     return selector
 
 
-def _convert_depends_to_k8s_init_container(depends, envs):
+def _convert_depends_to_k8s_init_container(
+    depends: Dict, envs: List[client.V1EnvVar]
+) -> client.V1Container:
     env = [*envs, _create_k8s_env('DEPENDENCY_SPECS', json.dumps(depends))]
     return client.V1Container(
         name='dependency-check-container',
@@ -599,9 +604,14 @@ def _convert_depends_to_k8s_init_container(depends, envs):
     )
 
 
-def _create_k8s_job(name, image, command, namespace='default', restart_policy='Never',
-                    envs=None, mounts=None, pvc_specs=[], parallelism=None, completions=None, quota=None,
-                    resources=None, init_containers=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
+def _create_k8s_job(
+    name: str, image: str, command: List[str], namespace: str = 'default',
+    restart_policy: str = 'Never', envs: List[client.V1EnvVar] = [], mounts: List[str] = [],
+    pvc_specs: List[Dict] = [], parallelism: int = 1, completions: int = 1,
+    quota: Optional[Dict[str, str]] = None, resources: Optional[Dict] = None,
+    init_containers: List[client.V1Container] = [], labels: Optional[Dict[str, str]] = None,
+    constraints: Optional[Dict] = None, secrets: str = '', cli: ApiClient = DEFAULT_CLI
+) -> client.V1Job:
 
     _resources = _convert_quota_to_k8s_resource(type='Resources', resources=resources) if resources \
         else _convert_quota_to_k8s_resource(resources=quota)
@@ -646,9 +656,13 @@ def _create_k8s_job(name, image, command, namespace='default', restart_policy='N
     return api.create_namespaced_job(namespace, body)
 
 
-def _create_k8s_deployment(name, image, command, namespace='default',
-                           envs=None, mounts=None, pvc_specs=[], replicas=1, quota=None, resources=None,
-                           init_containers=None, labels=None, constraints=None, secrets=None, cli=DEFAULT_CLI):
+def _create_k8s_deployment(
+    name: str, image: str, command: List[str], namespace: str = 'default',
+    envs: List[client.V1EnvVar] = [], mounts: List[str] = [], pvc_specs: List[Dict] = [],
+    replicas: int = 1, quota: Optional[Dict] = None, resources: Optional[Dict] = None,
+    init_containers: List[client.V1Container] = [], labels: Optional[Dict[str, str]] = None,
+    constraints: Optional[Dict] = None, secrets: str = '', cli: ApiClient = DEFAULT_CLI
+) -> client.V1Deployment:
 
     _resources = _convert_quota_to_k8s_resource(type='Resources', resources=resources) if resources \
         else _convert_quota_to_k8s_resource(resources=quota)
@@ -697,7 +711,9 @@ def _create_k8s_deployment(name, image, command, namespace='default',
     return api.create_namespaced_deployment(namespace, body)
 
 
-def _create_k8s_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
+def _create_k8s_pv(
+    name: str, pv_index: int, pv_mount: Dict, cli: ApiClient = DEFAULT_CLI
+) -> client.V1PersistentVolume:
     api = client.CoreV1Api(cli)
     return api.create_persistent_volume(
         client.V1PersistentVolume(
@@ -723,14 +739,16 @@ def _create_k8s_pv(name: str, pv_index: int, pv_mount, cli=DEFAULT_CLI):
     )
 
 
-def _delete_k8s_pvs(name: str, cli=DEFAULT_CLI):
+def _delete_k8s_pvs(name: str, cli: ApiClient = DEFAULT_CLI) -> None:
     api = client.CoreV1Api(cli)
     pvs = api.list_persistent_volume(label_selector=f'MLAD.PROJECT.APP={name}').items
     for pv in pvs:
         api.delete_persistent_volume(pv.metadata.name)
 
 
-def _create_k8s_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFAULT_CLI):
+def _create_k8s_pvc(
+    name: str, pv_index: int, namespace: str, cli: ApiClient = DEFAULT_CLI
+) -> client.V1PersistentVolumeClaim:
     api = client.CoreV1Api(cli)
     pvc_name = f'{name}-{pv_index}-pvc'
     return api.create_namespaced_persistent_volume_claim(
@@ -755,7 +773,9 @@ def _create_k8s_pvc(name: str, pv_index: int, pv_mount, namespace: str, cli=DEFA
     )
 
 
-def _create_k8s_env(name: str, value: Optional[Union[str, int]] = None, field_path: str = None):
+def _create_k8s_env(
+    name: str, value: Optional[Union[str, int]] = None, field_path: str = None
+) -> client.V1EnvVar:
     return client.V1EnvVar(
         name=name,
         value=str(value) if value is not None else None,
@@ -767,7 +787,10 @@ def _create_k8s_env(name: str, value: Optional[Union[str, int]] = None, field_pa
     )
 
 
-def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
+def create_apps(
+    namespace: client.V1Namespace, apps: List[App], extra_labels: Dict[str, str] = {},
+    cli: ApiClient = DEFAULT_CLI
+) -> List[App]:
     api = client.CoreV1Api(cli)
     namespace_name = namespace.metadata.name
     namespace_spec = inspect_k8s_namespace(namespace, cli)
@@ -831,7 +854,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
         restart_policy = RESTART_POLICY_STORE.get(app['restartPolicy'].lower(), 'Never')
         quota = app['quota']
-        init_containers = None
+        init_containers = []
         if app['depends'] is not None:
             init_containers = [_convert_depends_to_k8s_init_container(app['depends'], envs)]
 
@@ -840,7 +863,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
             for pv_index, pv_mount in enumerate(pv_mounts):
                 _create_k8s_pv(name, pv_index, pv_mount)
                 pvc_specs.append({
-                    'name': _create_k8s_pvc(name, pv_index, pv_mount, namespace_name).metadata.name,
+                    'name': _create_k8s_pvc(name, pv_index, namespace_name).metadata.name,
                     'mountPath': pv_mount['mountPath']
                 })
 
@@ -880,8 +903,8 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                         ingress_path = path if path is not None else \
                             f"/{namespace_spec['username']}/{namespace_spec['name']}/{name}"
                         ingress_specs.append({'port': port, 'path': ingress_path})
-                        _create_k8s_ingress(cli, namespace_name, name, ingress_name, port,
-                                            ingress_path, rewrite_path)
+                        _create_k8s_ingress(namespace_name, name, ingress_name, port,
+                                            ingress_path, rewrite_path, cli=cli)
             config_labels['MLAD.PROJECT.INGRESS'] = json.dumps(ingress_specs)
             _create_k8s_config_map(f'app-{name}-labels', namespace_name, config_labels, cli=cli)
         except ApiException as e:
@@ -891,19 +914,22 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     return instances
 
 
-def update_apps(namespace, update_yaml, update_specs, cli=DEFAULT_CLI):
+def update_apps(
+    namespace: client.V1Namespace, update_yaml: Dict, update_specs: List[Dict], cli: ApiClient = DEFAULT_CLI
+) -> List[App]:
     results = []
     for update_spec in update_specs:
-        update_spec = update_spec.dict()
         app_name = update_spec['name']
         if update_yaml['app'][app_name]['kind'] == 'Service':
-            results.append(_update_k8s_deployment(cli, namespace, update_spec))
+            results.append(_update_k8s_deployment(namespace, update_spec, cli=cli))
         else:
-            results.append(_update_k8s_job(cli, namespace, update_spec))
+            results.append(_update_k8s_job(namespace, update_spec, cli=cli))
     return results
 
 
-def _update_k8s_deployment(cli, namespace, update_spec):
+def _update_k8s_deployment(
+    namespace: client.V1Namespace, update_spec: Dict, cli: ApiClient = DEFAULT_CLI
+) -> client.V1Deployment:
     app_name = update_spec['name']
     scale = update_spec['scale']
     command = update_spec['command'] or []
@@ -967,7 +993,9 @@ def _update_k8s_deployment(cli, namespace, update_spec):
         raise exceptions.APIError(err_msg, status)
 
 
-def _update_k8s_job(cli, namespace, update_spec):
+def _update_k8s_job(
+    namespace: client.V1Namespace, update_spec: Dict, cli: ApiClient = DEFAULT_CLI
+) -> client.V1Job:
     app_name = update_spec['name']
     image = update_spec['image']
     command = update_spec['command'] or []
@@ -1027,18 +1055,22 @@ def _update_k8s_job(cli, namespace, update_spec):
         raise exceptions.APIError(err_msg, status)
 
 
-def _delete_k8s_job(cli, name, namespace):
+def _delete_k8s_job(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Job:
     api = client.BatchV1Api(cli)
     return api.delete_namespaced_job(name, namespace, propagation_policy='Foreground')
 
 
-def _delete_k8s_deployment(cli, name, namespace):
+def _delete_k8s_deployment(
+    name: str, namespace: str, cli: ApiClient = DEFAULT_CLI
+) -> client.V1Deployment:
     api = client.AppsV1Api(cli)
     return api.delete_namespaced_deployment(name, namespace, propagation_policy='Foreground')
 
 
-def remove_apps(apps, namespace,
-                disconnect_handler=None, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
+def remove_apps(
+    apps: List[App], namespace: str, disconnect_handler: Optional[object] = None,
+    stream: bool = False, cli: ApiClient = DEFAULT_CLI
+) -> Union[Generator[Dict, None, None], Tuple[bool, Tuple[Dict]]]:
     api = client.CoreV1Api(cli)
     network_api = client.NetworkingV1Api(cli)
 
@@ -1065,9 +1097,9 @@ def remove_apps(apps, namespace,
         try:
             _delete_k8s_pvs(app_name)
             if kind == 'Job':
-                _delete_k8s_job(cli, app_name, namespace)
+                _delete_k8s_job(app_name, namespace, cli=cli)
             elif kind == 'Service':
-                _delete_k8s_deployment(cli, app_name, namespace)
+                _delete_k8s_deployment(app_name, namespace, cli=cli)
 
             if get_k8s_service_of_app(namespace, app_name, cli=cli) is not None:
                 api.delete_namespaced_service(app_name, namespace)
@@ -1099,12 +1131,12 @@ def remove_apps(apps, namespace,
         return (removed, (_ for _ in resp_from_collector(collector)))
 
 
-def get_k8s_nodes(cli=DEFAULT_CLI):
+def get_k8s_nodes(cli: ApiClient = DEFAULT_CLI) -> List[client.V1Node]:
     api = client.CoreV1Api(cli)
     return api.list_node().items
 
 
-def inspect_k8s_node(node):
+def inspect_k8s_node(node: client.V1Node) -> Dict:
     hostname = node.metadata.labels['kubernetes.io/hostname']
     availability = 'active' if node.spec.taints is None else 'pause'
     platform = node.metadata.labels['kubernetes.io/os']
@@ -1130,7 +1162,7 @@ def inspect_k8s_node(node):
     }
 
 
-def enable_k8s_node(node_name, cli=DEFAULT_CLI):
+def enable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
@@ -1145,7 +1177,7 @@ def enable_k8s_node(node_name, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-def disable_k8s_node(node_name, cli=DEFAULT_CLI):
+def disable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": [{"effect": "NoSchedule",
@@ -1161,7 +1193,7 @@ def disable_k8s_node(node_name, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-def delete_k8s_node(node_name, cli=DEFAULT_CLI):
+def delete_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     try:
         return api.delete_node(node_name)
@@ -1173,7 +1205,7 @@ def delete_k8s_node(node_name, cli=DEFAULT_CLI):
             raise exceptions.APIError(msg, status)
 
 
-def add_k8s_node_labels(node_name, cli=DEFAULT_CLI, **kv):
+def add_k8s_node_labels(node_name: str, cli: ApiClient = DEFAULT_CLI, **kv: str) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1192,7 +1224,9 @@ def add_k8s_node_labels(node_name, cli=DEFAULT_CLI, **kv):
             raise exceptions.APIError(msg, status)
 
 
-def remove_k8s_node_labels(node_name, cli=DEFAULT_CLI, *keys):
+def remove_k8s_node_labels(
+    node_name: str, cli: ApiClient = DEFAULT_CLI, *keys: str
+) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1211,7 +1245,7 @@ def remove_k8s_node_labels(node_name, cli=DEFAULT_CLI, *keys):
             raise exceptions.APIError(msg, status)
 
 
-def scale_app(app, scale_spec, cli=DEFAULT_CLI):
+def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client.V1Scale:
     name = app.metadata.name
     namespace = app.metadata.namespace
     api = client.AppsV1Api(cli)
@@ -1223,7 +1257,9 @@ def scale_app(app, scale_spec, cli=DEFAULT_CLI):
     return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
 
 
-def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
+def get_app_with_names_or_ids(
+    project_key: str, names_or_ids: List[str] = [], cli: ApiClient = DEFAULT_CLI
+) -> List[Tuple[str, str]]:
     # get running apps with app or pod name
     api = client.CoreV1Api(cli)
     apps = get_apps(project_key, cli=cli)
@@ -1265,8 +1301,11 @@ def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
     return targets
 
 
-def get_project_logs(project_key, tail='all', follow=False, timestamps=False,
-                     selected=False, disconnect_handler=None, targets=[], cli=DEFAULT_CLI):
+def get_project_logs(
+    project_key: str, tail: str = 'all', follow: bool = False, timestamps: bool = False,
+    selected: bool = False, disconnect_handler: Optional[object] = None,
+    targets: List[Tuple[str, str]] = [], cli: ApiClient = DEFAULT_CLI
+) -> Generator[Dict, None, None]:
     get_apps(project_key, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
@@ -1295,7 +1334,10 @@ def get_project_logs(project_key, tail='all', follow=False, timestamps=False,
         print('Cannot find running containers.', file=sys.stderr)
 
 
-def _create_k8s_ingress(cli, namespace, app_name, ingress_name, port, base_path='/', rewrite=False):
+def _create_k8s_ingress(
+    namespace: str, app_name: str, ingress_name: str, port: int, base_path: str = '/',
+    rewrite: str = False, cli: ApiClient = DEFAULT_CLI
+) -> client.V1Ingress:
     api = client.NetworkingV1Api(cli)
     annotations = {
         "kubernetes.io/ingress.class": "nginx",
@@ -1341,7 +1383,7 @@ def _create_k8s_ingress(cli, namespace, app_name, ingress_name, port, base_path=
     )
 
 
-def parse_mem(str_mem):
+def parse_mem(str_mem: str) -> float:
     if str_mem.endswith('Ki'):
         mem = float(str_mem[:-2]) / 1024
     elif str_mem.endswith('Mi'):
@@ -1357,7 +1399,7 @@ def parse_mem(str_mem):
     return mem
 
 
-def parse_cpu(str_cpu):
+def parse_cpu(str_cpu: str) -> float:
     if str_cpu.endswith('n'):
         cpu = float(str_cpu[:-1]) / 1e9
     elif str_cpu.endswith('m'):
@@ -1371,7 +1413,9 @@ def parse_cpu(str_cpu):
     return cpu
 
 
-def get_k8s_node_resources(node, no_trunc, cli=DEFAULT_CLI):
+def get_k8s_node_resources(
+    node: client.V1Node, no_trunc: bool, cli: ApiClient = DEFAULT_CLI
+) -> Dict:
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
     name = node.metadata.name
@@ -1430,8 +1474,10 @@ def get_k8s_node_resources(node, no_trunc, cli=DEFAULT_CLI):
     return result
 
 
-def get_project_resources(project_key: str, group_by: str = 'project', no_trunc: bool = True,
-                          cli=DEFAULT_CLI):
+def get_project_resources(
+    project_key: str, group_by: str = 'project', no_trunc: bool = True,
+    cli: ApiClient = DEFAULT_CLI
+) -> Dict:
     api = client.CustomObjectsApi(cli)
     v1_api = client.CoreV1Api(cli)
     result = {}
