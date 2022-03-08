@@ -18,10 +18,9 @@ def exception_detail(e):
     exception = e.__class__.__name__
     msg = str(e)
 
-    if 'NotFound' in exception:
-        exception = 'NotFound'
-
-    if exception == 'InvalidAppError':
+    if exception == 'NotFound':
+        reason = 'NotFound'
+    elif exception == 'InvalidAppError':
         reason = 'AppNotFound'
     elif exception == 'ProjectNotFoundError':
         reason = 'ProjectNotFound'
