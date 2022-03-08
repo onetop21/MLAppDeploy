@@ -18,8 +18,8 @@ from mlad.service.models import project
 router = APIRouter()
 
 
-def _check_session_key(project, session):
-    project_session = ctlr.get_project_session(project)
+def _check_session_key(namespace, session):
+    project_session = ctlr.get_project_session(namespace)
     if project_session == session:
         return True
     else:

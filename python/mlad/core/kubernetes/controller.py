@@ -5,7 +5,7 @@ import json
 import uuid
 
 from multiprocessing.pool import ThreadPool
-from typing import Union, List, Dict, Optional
+from typing import Union, List, Dict, Optional, Tuple, Generator
 from collections import defaultdict
 from pathlib import Path
 
@@ -24,6 +24,8 @@ from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 
 
 App = Union[client.V1Job, client.V1Deployment]
+LogGenerator = Generator[Dict[str, str], None, None]
+LogTuple = Tuple[Dict[str, str]]
 
 SHORT_LEN = 10
 config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
@@ -87,28 +89,16 @@ def get_k8s_namespace(project_key: str, cli: ApiClient = DEFAULT_CLI) -> client.
             "Need to remove namespaces or down project, because exists duplicated namespaces.")
 
 
-def get_labels(obj):
-    # TODO to be modified
-    if isinstance(obj, client.models.v1_namespace.V1Namespace):
-        return obj.metadata.labels
-    elif isinstance(obj, client.models.v1_replication_controller.V1ReplicationController):
-        return obj.metadata.labels
-    elif isinstance(obj, client.models.v1_service.V1Service):
-        return obj.metadata.labels
-    else:
-        raise TypeError('Parameter is not a valid type.')
-
-
-def _get_k8s_config_map_data(namespace, key, cli=DEFAULT_CLI):
+def _get_k8s_config_map_data(namespace: Union[str, client.V1Namespace], key: str, cli: ApiClient = DEFAULT_CLI) -> Dict[str, str]:
     # key='project-labels', 'app-{name}-labels'
-    api = client.CoreV1Api(cli)
-    if isinstance(namespace, client.models.v1_namespace.V1Namespace):
+    if isinstance(namespace, client.V1Namespace):
         namespace = namespace.metadata.name
+    api = client.CoreV1Api(cli)
     resp = api.read_namespaced_config_map(key, namespace)
     return resp.data
 
 
-def _create_k8s_config_map(cli, key, namespace, labels):
+def _create_k8s_config_map(key: str, namespace: str, labels: Dict[str, str], cli: ApiClient = DEFAULT_CLI) -> client.V1ConfigMap:
     api = client.CoreV1Api(cli)
     return api.create_namespaced_config_map(
         namespace,
@@ -119,8 +109,8 @@ def _create_k8s_config_map(cli, key, namespace, labels):
     )
 
 
-def inspect_k8s_namespace(namespace, cli=DEFAULT_CLI):
-    labels = get_labels(namespace)
+def inspect_k8s_namespace(namespace: client.V1Namespace, cli: ApiClient = DEFAULT_CLI) -> Dict:
+    labels = namespace.metadata.labels
     if namespace.metadata.deletion_timestamp:
         return {'deleted': True, 'key': labels['MLAD.PROJECT']}
     config_labels = _get_k8s_config_map_data(namespace, 'project-labels', cli)
@@ -145,13 +135,15 @@ def inspect_k8s_namespace(namespace, cli=DEFAULT_CLI):
     }
 
 
-def get_project_session(namespace, cli=DEFAULT_CLI):
+def get_project_session(namespace: client.V1Namespace, cli: ApiClient = DEFAULT_CLI) -> str:
     config_labels = _get_k8s_config_map_data(namespace, 'project-labels', cli)
     return config_labels['MLAD.PROJECT.SESSION']
 
 
-def create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, credential,
-                                   allow_reuse=False, stream=False, cli=DEFAULT_CLI):
+def create_k8s_namespace_with_data(
+    base_labels: Dict[str, str], extra_envs: Dict[str, str],
+    project_yaml: Dict, credential: str, allow_reuse: bool = False,
+    stream: bool = False, cli: ApiClient = DEFAULT_CLI) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
     api = client.CoreV1Api(cli)
     project_key = base_labels['MLAD.PROJECT']
     try:
@@ -201,7 +193,7 @@ def create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, creden
                     )
                 )
             )
-            _create_k8s_config_map(cli, 'project-labels', namespace_name, labels)
+            _create_k8s_config_map('project-labels', namespace_name, labels, cli=cli)
             # AuthConfig
             api.create_namespaced_secret(
                 namespace_name,
@@ -221,7 +213,11 @@ def create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, creden
         return (get_k8s_namespace(project_key, cli=cli), stream_out)
 
 
-def delete_k8s_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
+def delete_k8s_namespace(
+    namespace: client.V1Namespace,
+    timeout: int = 0xFFFF,
+    stream: bool = False,
+    cli: ApiClient = DEFAULT_CLI) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
     api = client.CoreV1Api(cli)
     spec = inspect_k8s_namespace(namespace, cli)
     api.delete_namespace(namespace.metadata.name)
@@ -251,57 +247,57 @@ def delete_k8s_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
         return (not get_k8s_namespace(spec['key'], cli=cli), (_ for _ in resp_stream()))
 
 
-def update_k8s_namespace(namespace, update_yaml, cli=DEFAULT_CLI):
+def update_k8s_namespace(
+    namespace: client.V1Namespace, update_yaml: Dict, cli: ApiClient = DEFAULT_CLI) -> client.V1Namespace:
     api = client.CoreV1Api(cli)
     name = namespace.metadata.name
     namespace.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
     try:
-        resp = api.patch_namespace(name, namespace)
+        return api.patch_namespace(name, namespace)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
             raise exceptions.NotFound(f'Cannot find namespace {name}.')
         else:
             raise exceptions.APIError(msg, status)
-    return resp
 
 
-def get_k8s_deployment(name, namespace, cli=DEFAULT_CLI):
+def get_k8s_deployment(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Deployment:
     api = client.AppsV1Api(cli)
     try:
-        resp = api.read_namespaced_deployment(name, namespace)
+        return api.read_namespaced_deployment(name, namespace)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
             raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
         else:
             raise exceptions.APIError(msg, status)
-    return resp
 
 
-def get_k8s_daemonset(name, namespace, cli=DEFAULT_CLI):
+def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Daemonset:
     api = client.AppsV1Api(cli)
     try:
-        resp = api.read_namespaced_daemon_set(name, namespace)
+        return api.read_namespaced_daemon_set(name, namespace)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
             raise exceptions.NotFound(f'Cannot find daemonset "{name}" in "{namespace}".')
         else:
             raise exceptions.APIError(msg, status)
-    return resp
 
 
-def get_app(name, namespace, cli=DEFAULT_CLI):
+def get_app(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> App:
     key = f'app-{name}-labels'
     config_labels = _get_k8s_config_map_data(namespace, key, cli)
     kind = config_labels['MLAD.PROJECT.APP.KIND']
     name = config_labels['MLAD.PROJECT.APP']
-    app = get_app_from_kind(cli, name, namespace, kind)
+    app = get_app_from_kind(name, namespace, kind, cli=cli)
     return app
 
 
-def get_apps(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
+def get_apps(project_key: Optional[str] = None,
+             extra_filters: Dict[str, str] = {},
+             cli: ApiClient = DEFAULT_CLI) -> List[App]:
     batch_api = client.BatchV1Api(cli)
     apps_api = client.AppsV1Api(cli)
     filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
@@ -313,20 +309,19 @@ def get_apps(project_key=None, extra_filters={}, cli=DEFAULT_CLI):
     return apps
 
 
-def get_k8s_service(name, namespace, cli=DEFAULT_CLI):
+def get_k8s_service(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Service:
     api = client.CoreV1Api(cli)
     try:
-        res = api.read_namespaced_service(name, namespace)
+        return api.read_namespaced_service(name, namespace)
     except ApiException as e:
         msg, status = exceptions.handle_k8s_api_error(e)
         if status == 404:
             raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
         else:
             raise exceptions.APIError(msg, status)
-    return res
 
 
-def get_k8s_service_of_app(cli, namespace, app_name):
+def get_k8s_service_of_app(namespace: str, app_name: str, cli: ApiClient = DEFAULT_CLI) -> Optional[client.V1Service]:
     api = client.CoreV1Api(cli)
     service = api.list_namespaced_service(
         namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
@@ -336,7 +331,7 @@ def get_k8s_service_of_app(cli, namespace, app_name):
         return service.items[0]
 
 
-def get_app_from_kind(cli, app_name, namespace, kind):
+def get_app_from_kind(app_name: str, namespace: str, kind: str, cli: ApiClient = DEFAULT_CLI) -> Optional[App]:
     if kind == 'Job':
         batch_api = client.BatchV1Api(cli)
         resp = batch_api.list_namespaced_job(
@@ -353,7 +348,7 @@ def get_app_from_kind(cli, app_name, namespace, kind):
         raise exceptions.Duplicated(f"Duplicated {kind} exists in namespace {namespace}")
 
 
-def get_pod_events(pod, cli=DEFAULT_CLI):
+def get_pod_events(pod: client.V1Pod, cli: ApiClient = DEFAULT_CLI) -> List[Dict[str, str]]:
     api = client.CoreV1Api(cli)
     name = pod.metadata.name
     namespace = pod.metadata.namespace
@@ -363,7 +358,7 @@ def get_pod_events(pod, cli=DEFAULT_CLI):
             for e in events if e.involved_object.name == name]
 
 
-def get_pod_info(pod):
+def get_pod_info(pod: client.V1Pod) -> Dict:
     pod_info = {
         'name': pod.metadata.name,
         'namespace': pod.metadata.namespace,
@@ -437,7 +432,7 @@ def get_pod_info(pod):
     return pod_info
 
 
-def inspect_app(app, cli=DEFAULT_CLI):
+def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
     kind = None
     if isinstance(app, client.models.v1_deployment.V1Deployment):
         kind = 'Service'
@@ -456,7 +451,7 @@ def inspect_app(app, cli=DEFAULT_CLI):
 
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
-    service = get_k8s_service_of_app(cli, namespace, name)
+    service = get_k8s_service_of_app(namespace, name, cli=cli)
     try:
         ingress = json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]'))
     except json.decoder.JSONDecodeError:
@@ -491,11 +486,10 @@ def inspect_app(app, cli=DEFAULT_CLI):
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
     }
-
     return spec
 
 
-def inspect_apps(apps):
+def inspect_apps(apps: List[App]) -> List[Dict]:
     results = []
     with ThreadPool(len(apps)) as pool:
         for app in apps:
@@ -503,7 +497,9 @@ def inspect_apps(apps):
         return [result.get() for result in results]
 
 
-def _convert_mounts_to_k8s_volume(name, mounts, pvc_specs):
+def _convert_mounts_to_k8s_volume(
+    name: str,  mounts: List[str],
+    pvc_specs: List[Dict[str, str]]) -> Tuple[List[client.V1VolumeMount], List[client.V1Volume]]:
     _mounts = []
     _volumes = []
     if mounts:
@@ -776,7 +772,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
     namespace_name = namespace.metadata.name
     namespace_spec = inspect_k8s_namespace(namespace, cli)
     config_labels = _get_k8s_config_map_data(namespace, 'project-labels', cli)
-    namespace_labels = get_labels(namespace)
+    namespace_labels = namespace.metadata.labels
 
     image_name = namespace_spec['image']
     project_base = namespace_spec['base']
@@ -887,7 +883,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
                         _create_k8s_ingress(cli, namespace_name, name, ingress_name, port,
                                             ingress_path, rewrite_path)
             config_labels['MLAD.PROJECT.INGRESS'] = json.dumps(ingress_specs)
-            _create_k8s_config_map(cli, f'app-{name}-labels', namespace_name, config_labels)
+            _create_k8s_config_map(f'app-{name}-labels', namespace_name, config_labels, cli=cli)
         except ApiException as e:
             msg, status = exceptions.handle_k8s_api_error(e)
             err_msg = f'Failed to create apps: {msg}'
@@ -987,7 +983,7 @@ def _update_k8s_job(cli, namespace, update_spec):
         args = args.split()
     command += args
 
-    k8s_job = get_app_from_kind(cli, app_name, namespace_name, 'Job')
+    k8s_job = get_app_from_kind(app_name, namespace_name, 'Job', cli=cli)
     # remove invalid properties to re-run the job
     k8s_job.metadata = client.V1ObjectMeta(name=k8s_job.metadata.name, labels=k8s_job.metadata.labels)
     k8s_job.spec.selector = None
@@ -1073,7 +1069,7 @@ def remove_apps(apps, namespace,
             elif kind == 'Service':
                 _delete_k8s_deployment(cli, app_name, namespace)
 
-            if get_k8s_service_of_app(cli, namespace, app_name) is not None:
+            if get_k8s_service_of_app(namespace, app_name, cli=cli) is not None:
                 api.delete_namespaced_service(app_name, namespace)
 
             ingress_list = network_api.list_namespaced_ingress(
@@ -1095,8 +1091,7 @@ def remove_apps(apps, namespace,
         for app in apps:
             app_removed = False
             name, kind, _ = _get_app_spec(app)
-            if not get_app_from_kind(cli, name, namespace, kind) and \
-                    not get_app(name, namespace, cli):
+            if not get_app_from_kind(name, namespace, kind, cli=cli) and not get_app(name, namespace, cli):
                 app_removed = True
             else:
                 app_removed = False
