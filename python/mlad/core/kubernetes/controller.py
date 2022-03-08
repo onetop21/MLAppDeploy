@@ -230,7 +230,7 @@ def delete_k8s_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
         removed = False
         for tick in range(timeout):
             try:
-                get_k8s_namespace(spec['key'], cli=cli):
+                get_k8s_namespace(spec['key'], cli=cli)
             except ProjectNotFoundError:
                 removed = True
                 break
