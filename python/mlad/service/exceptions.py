@@ -23,7 +23,7 @@ def exception_detail(e):
 
     if exception == 'InvalidAppError':
         reason = 'AppNotFound'
-    elif exception == 'InvalidProjectError':
+    elif exception == 'ProjectNotFoundError':
         reason = 'ProjectNotFound'
     elif exception == 'InvalidLogRequest':
         reason = 'AppNotRunning'

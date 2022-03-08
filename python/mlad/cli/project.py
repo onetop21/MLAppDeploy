@@ -405,9 +405,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
 
         # Remove the apps
         k8s_cli = k8s_ctlr.get_api_client(context=config_core.get_context())
-        namespace = k8s_ctlr.get_k8s_namespace(cli=k8s_cli, project_key=project_key)
-        if namespace is None:
-            raise ProjectNotFound(f'Cannot find project {project_key}')
+        namespace = k8s_ctlr.get_k8s_namespace(project_key, cli=k8s_cli)
         namespace_name = namespace.metadata.name
         targets = [k8s_ctlr.get_app(name, namespace_name, cli=k8s_cli) for name in app_names]
         for target in targets:

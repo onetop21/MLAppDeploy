@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, HTTPException, Header
 from fastapi.responses import StreamingResponse
 
 from mlad.core import exceptions
-from mlad.core.exceptions import InvalidProjectError, InvalidAppError
+from mlad.core.exceptions import ProjectNotFoundError, InvalidAppError
 from mlad.core.kubernetes import controller as ctlr
 
 from mlad.service.exceptions import (
@@ -67,12 +67,10 @@ def projects(extra_labels: str = '', session: str = Header(None)):
 @router.get("/project/{project_key}")
 def inspect_project(project_key: str, session: str = Header(None)):
     try:
-        namespace = ctlr.get_k8s_namespace(project_key=project_key)
-        if namespace is None:
-            raise InvalidProjectError(project_key)
+        namespace = ctlr.get_k8s_namespace(project_key)
         inspect = ctlr.inspect_k8s_namespace(namespace)
         return inspect
-    except InvalidProjectError as e:
+    except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:
         print(traceback.format_exc())
@@ -82,10 +80,8 @@ def inspect_project(project_key: str, session: str = Header(None)):
 @router.delete("/project/{project_key}")
 def remove_project(project_key: str, session: str = Header(None)):
     try:
-        namespace = ctlr.get_k8s_namespace(project_key=project_key)
+        namespace = ctlr.get_k8s_namespace(project_key)
         _check_session_key(namespace, session)
-        if namespace is None:
-            raise InvalidProjectError(project_key)
 
         res = ctlr.delete_k8s_namespace(namespace, stream=True)
 
@@ -94,7 +90,7 @@ def remove_project(project_key: str, session: str = Header(None)):
                 yield json.dumps(_)
 
         return StreamingResponse(remove_project(res))
-    except InvalidProjectError as e:
+    except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidSessionError as e:
         raise HTTPException(status_code=401, detail=exception_detail(e))
@@ -112,10 +108,7 @@ def send_project_log(project_key: str, tail: str = Query('all'),
 
     selected = True if names_or_ids else False
     try:
-        namespace = ctlr.get_k8s_namespace(project_key=project_key)
-        if namespace is None:
-            raise InvalidProjectError(project_key)
-
+        ctlr.get_k8s_namespace(project_key)
         try:
             targets = ctlr.get_app_with_names_or_ids(project_key, names_or_ids)
         except exceptions.NotFound as e:
@@ -148,7 +141,7 @@ def send_project_log(project_key: str, tail: str = Query('all'),
                 yield json.dumps(_)
 
         return StreamingResponse(get_logs(logs), background=handler)
-    except InvalidProjectError as e:
+    except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidAppError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
@@ -175,7 +168,7 @@ def update_project(project_key: str, req: project.UpdateRequest):
     update_yaml = req.update_yaml
     update_specs = req.update_specs
     try:
-        namespace = ctlr.get_k8s_namespace(project_key=project_key)
+        namespace = ctlr.get_k8s_namespace(project_key)
         ctlr.update_k8s_namespace(namespace, update_yaml)
         res = ctlr.update_apps(namespace, update_yaml, update_specs)
         return [ctlr.inspect_app(_) for _ in res]

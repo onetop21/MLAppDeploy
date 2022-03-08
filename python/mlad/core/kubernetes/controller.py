@@ -5,7 +5,7 @@ import json
 import uuid
 
 from multiprocessing.pool import ThreadPool
-from typing import Union, Optional
+from typing import Union, List, Dict, Optional
 from collections import defaultdict
 from pathlib import Path
 
@@ -14,25 +14,25 @@ from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
 
 from mlad.core import exceptions
-from mlad.core.exceptions import NamespaceAlreadyExistError, DeprecatedError, InvalidAppError, \
-    InvalidMetricUnitError
+from mlad.core.exceptions import (
+    NamespaceAlreadyExistError, DeprecatedError, InvalidAppError, InvalidMetricUnitError,
+    ProjectNotFoundError
+)
 from mlad.core.libs import utils
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 
 
-# https://github.com/kubernetes-client/python/blob/release-11.0/kubernetes/docs/CoreV1Api.md
+App = Union[client.V1Job, client.V1Deployment]
 
 SHORT_LEN = 10
-
-
 config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
                'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
                'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
                'USERNAME'}
 
 
-def get_api_client(config_file=f'{Path.home()}/.kube/config', context=None):
+def get_api_client(config_file: str = f'{Path.home()}/.kube/config', context: Optional[str] = None) -> ApiClient:
     try:
         if context:
             return config.new_client_from_config(context=context)
@@ -49,7 +49,7 @@ def get_api_client(config_file=f'{Path.home()}/.kube/config', context=None):
         return None
 
 
-def get_current_context():
+def get_current_context() -> str:
     try:
         current_context = config.list_kube_config_contexts()[1]
     except config.config_exception.ConfigException as e:
@@ -60,26 +60,26 @@ def get_current_context():
 DEFAULT_CLI = get_api_client()
 
 
-def check_project_key(project_key, app, cli=DEFAULT_CLI):
-    inspect_key = str(inspect_app(app, cli=cli)['key'])
-    if project_key == inspect_key:
+def check_project_key(project_key: str, app: App, cli: ApiClient = DEFAULT_CLI) -> bool:
+    target_key = inspect_app(app, cli=cli)['key']
+    if project_key == target_key:
         return True
     else:
         raise InvalidAppError(project_key, app.metadata.name)
 
 
-def get_k8s_namespaces(extra_labels=[], cli=DEFAULT_CLI):
+def get_k8s_namespaces(extra_labels: List[str] = [], cli: ApiClient = DEFAULT_CLI) -> List[client.V1Namespace]:
     api = client.CoreV1Api(cli)
     selector = ['MLAD.PROJECT'] + extra_labels
     resp = api.list_namespace(label_selector=','.join(selector))
     return resp.items
 
 
-def get_k8s_namespace(cli=DEFAULT_CLI, project_key=None):
+def get_k8s_namespace(project_key: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Namespace:
     api = client.CoreV1Api(cli)
     resp = api.list_namespace(label_selector=f'MLAD.PROJECT={project_key}')
     if len(resp.items) == 0:
-        return None
+        raise ProjectNotFoundError(project_key)
     elif len(resp.items) == 1:
         return resp.items[0]
     else:
@@ -154,8 +154,11 @@ def create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, creden
                                    allow_reuse=False, stream=False, cli=DEFAULT_CLI):
     api = client.CoreV1Api(cli)
     project_key = base_labels['MLAD.PROJECT']
-    namespace = get_k8s_namespace(cli, project_key=project_key)
-    if namespace is not None:
+    try:
+        namespace = get_k8s_namespace(project_key, cli=cli)
+    except ProjectNotFoundError:
+        pass
+    else:
         if allow_reuse:
             if stream:
                 def resp_stream():
@@ -215,7 +218,7 @@ def create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, creden
         return resp_stream()
     else:
         stream_out = (_ for _ in resp_stream())
-        return (get_k8s_namespace(cli, project_key=project_key), stream_out)
+        return (get_k8s_namespace(project_key, cli=cli), stream_out)
 
 
 def delete_k8s_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CLI):
@@ -226,7 +229,9 @@ def delete_k8s_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
     def resp_stream():
         removed = False
         for tick in range(timeout):
-            if not get_k8s_namespace(cli, project_key=spec['key']):
+            try:
+                get_k8s_namespace(spec['key'], cli=cli):
+            except ProjectNotFoundError:
                 removed = True
                 break
             else:
@@ -243,7 +248,7 @@ def delete_k8s_namespace(namespace, timeout=0xFFFF, stream=False, cli=DEFAULT_CL
     if stream:
         return resp_stream()
     else:
-        return (not get_k8s_namespace(cli, project_key=spec['key']), (_ for _ in resp_stream()))
+        return (not get_k8s_namespace(spec['key'], cli=cli), (_ for _ in resp_stream()))
 
 
 def update_k8s_namespace(namespace, update_yaml, cli=DEFAULT_CLI):
@@ -1227,7 +1232,7 @@ def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
     # get running apps with app or pod name
     api = client.CoreV1Api(cli)
     apps = get_apps(project_key, cli=cli)
-    namespace = get_k8s_namespace(cli, project_key=project_key).metadata.name
+    namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
     selected = []
     sources = [(_['name'], list(_['tasks'].keys())) for _ in
@@ -1268,7 +1273,7 @@ def get_app_with_names_or_ids(project_key, names_or_ids=[], cli=DEFAULT_CLI):
 def get_project_logs(project_key, tail='all', follow=False, timestamps=False,
                      selected=False, disconnect_handler=None, targets=[], cli=DEFAULT_CLI):
     get_apps(project_key, cli=cli)
-    namespace = get_k8s_namespace(cli, project_key=project_key).metadata.name
+    namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
     handler = LogHandler(cli)
 
