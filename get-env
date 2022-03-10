@@ -1,7 +1,7 @@
     #!/bin/bash
 
     PROJECT_NAME=MLAppDeploy
-    K3S_CHANNEL=v1.22
+    K3S_CHANNEL=v1.21
     SECRET='MLAPPDEPLOY-SECRET'
     REGISTRY_PORT=25000
 
@@ -753,7 +753,7 @@
     SILENT=1 RequiresFromApt jq && \
     {
         IsInstalled python3 && \
-        [ $(python3 -c 'import sys; print(sys.version_info[1])') -lt 7 ] && \
+        [ $(python3 -c 'import sys; print(sys.version_info[1])') -lt 6 ] && \
         {
             SILENT=1 RequiresFromApt software-properties-common && \
             sudo add-apt-repository ppa:deadsnakes/ppa -y && \
@@ -762,9 +762,10 @@
         } || :
     } && \
     {
-        IsInstalled pip3 || \
-        SILENT=1 RequiresFromApt python3-pip pip && \
-        python3 -m pip install -U pip
+        IsInstalled pip3 || {
+            SILENT=1 RequiresFromApt python3-pip pip && \
+            python3 -m pip install -U pip
+        }
     } && \
     SILENT=1 RequiresFromPip yq && \
     SILENT=1 RequiresFromApt moreutils sponge || \
@@ -865,7 +866,11 @@
 
             # Step 3: Install requires
             PrintStep "Install required pacakges."
-            RequiresFromApt nfs-common
+            SILENT=1 RequiresFromApt nfs-common || {
+                ColorEcho WARN Failed to install requires [nfs-common].
+                ColorEcho INFO This system cannot use nfs-mount.
+                ColorEcho INFO If you want to use nfs-mount, install manually.
+            }
 
             # Step 4: Prepare Insecure registy environment
             PrintStep "Register insecure registry."
@@ -942,11 +947,13 @@
         fi
     elif [ $JOIN_TOKEN ]
     then
-        JWT_TOKEN=$(GenerateToken)
+        ALL_TOKENS=$(GenerateToken)
+        JWT_TOKEN=$(echo $ALL_TOKENS | cut -d ' ' -f1)
+        TOKEN_PARAMS=$(echo $ALL_TOKENS | cut -d ' ' -f2-)
         echo Generated Token: $JWT_TOKEN
         echo
         echo To add a worker to this cluster, run the following command in 30-mins :
-        echo $ $CMD install --join-token $JWT_TOKEN
+        echo $ $CMD install --join-token $JWT_TOKEN $TOKEN_PARAMS
         echo 
         exit 0
     elif [ $UNINSTALL ]
@@ -1102,7 +1109,7 @@
                 export SECRET_KEY
                 sudo docker run -d -p ${DATASTORE_PORTS[minio]}:9000 --restart=always --name mlad-minio -v minio-data:/data \
                     --label mlappdeploy.type=datastore --label mlappdeploy.datastore=minio \
-                    -e MINIO_ACCESS_KEY $ACCESS_KEY -e MINIO_SECRET_KEY $SECRET_KEY \
+                    -e MINIO_ACCESS_KEY=$ACCESS_KEY -e MINIO_SECRET_KEY=$SECRET_KEY \
                     minio/minio server /data
                 ColorEcho INFO "Succeed to install minio server."
                 ColorEcho INFO "Connect to http://$(HostIP):${DATASTORE_PORTS[minio]}"

@@ -8,20 +8,24 @@ clean:
 	@docker stop mlad-build-env | xargs docker rm >> /dev/null 2>&1
 	@rm -rf dist
 
-$(TARGET): chart cli
+$(TARGET): helm-charts cli
 
-chart:
+helm-charts:
 	@cd charts && bash update.sh
 
-cli:
-	@mkdir -p bin
+build:
 	@docker build -t mlappdeploy-build-env:latest -f assets/Dockerfile_CLI . || :
+
+cli: build
+	@mkdir -p bin
 	@docker run -it --name mlad-build-env -v ${PWD}/python:/build/python:ro mlappdeploy-build-env:latest
 	@docker cp mlad-build-env:/build/dist/mlad-static bin/$(TARGET)
 	@docker stop mlad-build-env | xargs docker rm
 
 install:
 	@cp bin/$(TARGET) ${HOME}/.local/bin/
+	@echo Install completed.
 
-debug:
-	@docker run -it --rm -v ${PWD}/python:/build/python -v ${PWD}/debug:/build/dist mlappdeploy-build-env:latest /bin/bash
+debug: build
+	@mkdir -p dist.tmp
+	@docker run -it --rm -v ${PWD}/python:/build/python -v ${PWD}/dist.tmp:/build/dist mlappdeploy-build-env:latest /bin/bash
