@@ -1,11 +1,15 @@
 import os
 import sys
+
+from typing import Optional
+
 from .node import Node
 from .project import Project
 from .app import App
 from .check import Check
 
 from mlad.cli import config as config_core
+from mlad.cli.exceptions import APIServerNotInstalledError, ConfigNotFoundError
 from functools import lru_cache
 
 
@@ -43,28 +47,38 @@ def classproperty(func):
 class API:
 
     @classproperty
-    def config(cls):
+    @lru_cache(maxsize=None)
+    def address(cls) -> Optional[str]:
         try:
-            return config_core.get()
-        except Exception:
+            config = config_core.get()
+            return config_core.obtain_server_address(config)
+        except ConfigNotFoundError:
             return None
 
     @classproperty
     @lru_cache(maxsize=None)
-    def node(cls):
-        return Node(cls.config)
+    def session(cls) -> Optional[str]:
+        try:
+            return config_core.get()['session']
+        except ConfigNotFoundError:
+            return None
 
     @classproperty
     @lru_cache(maxsize=None)
-    def project(cls):
-        return Project(cls.config)
+    def node(cls) -> Node:
+        return Node(cls.address, cls.session)
 
     @classproperty
     @lru_cache(maxsize=None)
-    def app(cls):
-        return App(cls.config)
+    def project(cls) -> Project:
+        return Project(cls.address, cls.session)
 
     @classproperty
     @lru_cache(maxsize=None)
-    def check(cls):
-        return Check(cls.config)
+    def app(cls) -> App:
+        return App(cls.address, cls.session)
+
+    @classproperty
+    @lru_cache(maxsize=None)
+    def check(cls) -> Check:
+        return Check(cls.address, cls.session)

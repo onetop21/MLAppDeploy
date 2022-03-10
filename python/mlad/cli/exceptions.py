@@ -56,6 +56,12 @@ class InvalidSetPropertyError(MLADException):
         return f'Config set command should be applied to the leaf keys: {self._arg}'
 
 
+class APIServerNotInstalledError(MLADException):
+
+    def __str__(self):
+        return 'MLAD API Server is not install in the current config.'
+
+
 class MLADBoardNotActivatedError(MLADException):
 
     def __str__(self):

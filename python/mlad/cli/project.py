@@ -169,7 +169,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         for event in sorted_events:
             event['timestamp'] = event.pop('datetime')
             event['stream'] = event.pop('message')
-            yield _format_log(event, colorkey, 32, 20, pretty=True)
+            yield _format_log(event, colorkey)
 
 
 def logs(file: Optional[str], project_key: Optional[str],
@@ -190,7 +190,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     for log in logs:
         if '[Ignored]' in log['stream']:
             continue
-        yield _format_log(log, colorkey, 32, 20)
+        yield _format_log(log, colorkey)
 
 
 def ingress():
@@ -404,7 +404,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
                 yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove the apps
-        k8s_cli = k8s_ctlr.get_api_client(context=config_core.get_context())
+        k8s_cli = config_core.get_admin_k8s_cli(k8s_ctlr)
         namespace = k8s_ctlr.get_k8s_namespace(project_key, cli=k8s_cli)
         namespace_name = namespace.metadata.name
         targets = [k8s_ctlr.get_app(name, namespace_name, cli=k8s_cli) for name in app_names]

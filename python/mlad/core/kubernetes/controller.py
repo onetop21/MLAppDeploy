@@ -34,13 +34,12 @@ config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY'
                'USERNAME'}
 
 
-def get_api_client(config_file: str = f'{Path.home()}/.kube/config', context: Optional[str] = None) -> ApiClient:
+def get_api_client(
+    config_file: str = f'{Path.home()}/.kube/config', context: Optional[str] = None,
+    validate: bool = True
+) -> ApiClient:
     try:
-        if context:
-            return config.new_client_from_config(context=context)
-        else:
-
-            return config.new_client_from_config(config_file=config_file)
+        return config.new_client_from_config(context=context, config_file=config_file)
     except config.config_exception.ConfigException:
         pass
     try:
@@ -48,18 +47,12 @@ def get_api_client(config_file: str = f'{Path.home()}/.kube/config', context: Op
         # If Need, set configuration parameter from client.Configuration
         return ApiClient()
     except config.config_exception.ConfigException:
+        if validate:
+            raise exceptions.InvalidKubeConfigError(config_file, context)
         return None
 
 
-def get_current_context() -> str:
-    try:
-        current_context = config.list_kube_config_contexts()[1]
-    except config.config_exception.ConfigException as e:
-        raise exceptions.APIError(str(e), 404)
-    return current_context['name']
-
-
-DEFAULT_CLI = get_api_client()
+DEFAULT_CLI = get_api_client(validate=False)
 
 
 def check_project_key(project_key: str, app: App, cli: ApiClient = DEFAULT_CLI) -> bool:

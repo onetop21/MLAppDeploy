@@ -4,20 +4,17 @@ import click
 import yaml
 
 from mlad.cli import config
-from mlad.cli.libs.utils import obtain_my_ip
 from mlad.cli.autocompletion import list_config_names
 from . import echo_exception
 
 
 @click.command()
 @click.argument('NAME', required=True)
-@click.option('--address', '-a', default=f'http://{obtain_my_ip()}:8440',
-              prompt='MLAD API Server Address', help='Set MLAD API server address.')
 @click.option('--admin', is_flag=True, help='Create a config with administrator privileges.')
 @echo_exception
-def add(name, address, admin):
+def add(name, admin):
     """Add a new config."""
-    ret = config.add(name, address, admin)
+    ret = config.add(name, admin)
     click.echo('Config created successfully.')
     click.echo(yaml.dump(ret, sort_keys=False))
 
