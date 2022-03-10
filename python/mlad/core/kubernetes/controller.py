@@ -847,7 +847,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
         kind = app['kind']
         image = app['image'] or image_name
-
+        quota = app['quota']
         app_envs = app['env'] or {}
         app_envs.update({
             'PROJECT': namespace_spec['project'],
@@ -860,6 +860,8 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         config_envs = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         config_envs = {env.split('=', 1)[0]: env.split('=', 1)[1] for env in config_envs}
         app_envs.update(config_envs)
+        if quota is not None and quota['gpu'] == 0:
+            app_envs.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
         envs = [_create_V1Env(k, v) for k, v in app_envs.items()]
         envs.append(_create_V1Env('POD_NAME', field_path='metadata.name'))
 
@@ -886,7 +888,6 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         secrets = f"{project_base}-auth"
 
         restart_policy = RESTART_POLICY_STORE.get(app['restartPolicy'].lower(), 'Never')
-        quota = app['quota']
         init_containers = None
         if app['depends'] is not None:
             init_containers = [_depends_to_init_container(app['depends'], envs)]
@@ -1013,6 +1014,10 @@ def _update_k8s_deployment(cli, namespace, update_spec):
         if key in config_envs:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
+    if 'gpu' in quota and quota['gpu'] == 0:
+        current.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
+    elif 'NVIDIA_VISIBLE_DEVICES' in current:
+        del current['NVIDIA_VISIBLE_DEVICES']
     envs = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
     body.append(_body("env", envs))
 
@@ -1058,6 +1063,10 @@ def _update_k8s_job(cli, namespace, update_spec):
         if key in config_envs:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
+    if 'gpu' in quota and quota['gpu'] == 0:
+        current.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
+    elif 'NVIDIA_VISIBLE_DEVICES' in current:
+        del current['NVIDIA_VISIBLE_DEVICES']
     env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
 
     container_spec.command = command
