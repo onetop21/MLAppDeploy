@@ -40,7 +40,7 @@ def check():
         },
     }
     config = config_core.get()
-    cli = config_core.get_admin_k8s_cli()
+    cli = config_core.get_admin_k8s_cli(ctlr)
 
     yield 'Check installed plugins...'
 
