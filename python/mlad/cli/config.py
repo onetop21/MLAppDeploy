@@ -281,20 +281,21 @@ def obtain_server_address(config: Dict[str, object]) -> str:
     from mlad.core.kubernetes import controller as ctlr
     from mlad.core.exceptions import NotFound
 
-    cli = ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
+    cli = get_admin_k8s_cli(ctlr, config=config)
     host = cli.configuration.host.rsplit(':', 1)[0]
     host = host.replace('https', 'http')
     try:
-        ctlr.get_deployment('mlad-api-server', 'mlad', cli=cli)
-        service = ctlr.get_service('mlad-api-server', 'mlad', cli=cli)
+        ctlr.get_k8s_deployment('mlad-api-server', 'mlad', cli=cli)
+        service = ctlr.get_k8s_service('mlad-api-server', 'mlad', cli=cli)
     except NotFound:
         raise APIServerNotInstalledError
     port = service.spec.ports[0].node_port
     return f'{host}:{port}'
 
 
-def get_admin_k8s_cli(ctlr):
-    config = get()
+def get_admin_k8s_cli(ctlr, config: Optional[Dict] = None):
+    if config is None:
+        config = get()
     return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
 
 
