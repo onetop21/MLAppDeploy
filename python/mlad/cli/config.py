@@ -6,6 +6,7 @@ import uuid
 import jwt
 import yaml
 
+from functools import lru_cache
 from typing import Optional, Dict, Callable, List
 from pathlib import Path
 from urllib.parse import urlparse
@@ -13,7 +14,8 @@ from getpass import getuser
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
     ConfigNotFoundError, CannotDeleteConfigError, InvalidPropertyError,
-    ConfigAlreadyExistError, InvalidSetPropertyError, InvalidURLError
+    ConfigAlreadyExistError, InvalidSetPropertyError, InvalidURLError,
+    APIServerNotInstalledError
 )
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
@@ -52,30 +54,33 @@ def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) ->
     return None
 
 
-def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Dict:
-
+def add(name: str, admin: bool) -> Dict:
     spec = _load()
     duplicated_index = _find_config(name, spec=spec, index=True)
     if duplicated_index is not None:
-        if not allow_duplicate:
-            raise ConfigAlreadyExistError(name)
-        elif utils.prompt('Change the existing session key (Y/N)?', 'N') == 'Y':
-            session = _create_session_key()
-        else:
-            session = spec['configs'][duplicated_index]['session']
-    else:
-        session = _create_session_key()
+        raise ConfigAlreadyExistError(name)
 
-    kubeconfig_path = None
-    context_name = None
+    ip = utils.obtain_my_ip()
+    server_config = dict()
     if admin:
         kubeconfig_path = utils.prompt(
             'A Kubeconfig File Path', default=f'{Path.home()}/.kube/config')
-        context_name = utils.prompt('A Current Kubernetes Context Name', None)
-    address = _parse_url(address)['url']
-    registry_address = 'https://docker.io'
+        context_name = utils.prompt('A Current Kubernetes Context Name', 'default')
+        server_config['kubeconfig_path'] = kubeconfig_path
+        server_config['context_name'] = context_name
+    else:
+        address = utils.prompt('MLAD API Server Address',
+                               default=f'http://{ip}:8440')
+        address = _parse_url(address)['url']
+        server_config = {
+            'apiserver': {
+                'address': address
+            }
+        }
+
+    session = _create_session_key()
+
     warn_insecure = False
-    ip = utils.obtain_my_ip()
     registry_address = utils.prompt('Docker Registry Address', f'http://{ip}:5000')
     parsed_url = _parse_url(registry_address)
     if parsed_url['scheme'] != 'https':
@@ -86,15 +91,10 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Dict:
     base_config = _obtain_dict_from_dotlist([
         f'name={name}',
         f'session={session}',
-        f'apiserver.address={address}',
         f'docker.registry.address={registry_address}',
-        f'docker.registry.namespace={registry_namespace}'
+        f'docker.registry.namespace={registry_namespace}',
+        f'admin={admin}'
     ])
-
-    kube_config = {
-        'kubeconfig_path': kubeconfig_path,
-        'context_name': context_name
-    }
 
     s3_prompts = {
         'endpoint': 'S3 Compatible Address',
@@ -111,7 +111,7 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Dict:
     }
     db_config = _parse_datastore('db', _db_initializer, _db_finalizer, db_prompts)
 
-    config = _merge_dict(base_config, kube_config, s3_config, db_config)
+    config = _merge_dict(base_config, server_config, s3_config, db_config)
     if duplicated_index is not None:
         spec['configs'][duplicated_index] = config
     else:
@@ -172,6 +172,7 @@ def delete(name: str) -> None:
     _save(spec)
 
 
+@lru_cache(maxsize=None)
 def get(name: Optional[str] = None, key: Optional[str] = None) -> Dict:
     if name is None:
         name = current()
@@ -232,7 +233,7 @@ def get_env(dict=False) -> List[str]:
     config = get()
     envs = []
 
-    envs.append(f'MLAD_ADDRESS={config["apiserver"]["address"]}')
+    envs.append(f'MLAD_ADDRESS={obtain_server_address(config)}')
     envs.append(f'MLAD_SESSION={config["session"]}')
 
     for k, v in config['datastore']['s3'].items():
@@ -269,21 +270,32 @@ def get_registry_address(config: Dict):
     return registry_address
 
 
-def validate_kubeconfig() -> bool:
-    config = get()
-    kubeconfig_path = config['kubeconfig_path']
-    context_name = config['context_name']
+def is_admin() -> bool:
+    return get().get('admin', False)
+
+
+def obtain_server_address(config: Dict[str, object]) -> str:
+    if not config.get('admin', False):
+        return config['apiserver']['address']
+
+    from mlad.core.kubernetes import controller as ctlr
+    from mlad.core.exceptions import NotFound
+
+    cli = ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
+    host = cli.configuration.host.rsplit(':', 1)[0]
+    host = host.replace('https', 'http')
     try:
-        with open(kubeconfig_path, 'r') as kubeconfig_file:
-            kubeconfig = yaml.load(kubeconfig_file, Loader=yaml.FullLoader)
-    except Exception:
-        return False
-    return 'current-context' in kubeconfig and (context_name == kubeconfig['current-context'])
+        ctlr.get_deployment('mlad-api-server', 'mlad', cli=cli)
+        service = ctlr.get_service('mlad-api-server', 'mlad', cli=cli)
+    except NotFound:
+        raise APIServerNotInstalledError
+    port = service.spec.ports[0].node_port
+    return f'{host}:{port}'
 
 
-def get_context() -> str:
+def get_admin_k8s_cli(ctlr):
     config = get()
-    return config['context_name']
+    return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
 
 
 def _create_session_key():

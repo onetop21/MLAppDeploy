@@ -1,9 +1,11 @@
+from typing import Optional
+
 from .base import APIBase
 
 
 class Node(APIBase):
-    def __init__(self, config):
-        super().__init__(config, 'node')
+    def __init__(self, address: Optional[str], session: Optional[str]):
+        super().__init__(address, session, 'node')
 
     def list(self):
         return self._get('/list')

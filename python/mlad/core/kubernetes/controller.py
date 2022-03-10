@@ -7,7 +7,6 @@ import uuid
 from multiprocessing.pool import ThreadPool
 from typing import Union, Optional
 from collections import defaultdict
-from pathlib import Path
 
 from kubernetes import client, config, watch
 from kubernetes.client.api_client import ApiClient
@@ -32,13 +31,9 @@ config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY'
                'USERNAME'}
 
 
-def get_api_client(config_file=f'{Path.home()}/.kube/config', context=None):
+def get_api_client(config_file='~/.kube/config', context=None, validate=True):
     try:
-        if context:
-            return config.new_client_from_config(context=context)
-        else:
-
-            return config.new_client_from_config(config_file=config_file)
+        return config.new_client_from_config(context=context, config_file=config_file)
     except config.config_exception.ConfigException:
         pass
     try:
@@ -46,6 +41,8 @@ def get_api_client(config_file=f'{Path.home()}/.kube/config', context=None):
         # If Need, set configuration parameter from client.Configuration
         return ApiClient()
     except config.config_exception.ConfigException:
+        if validate:
+            raise exceptions.InvalidKubeConfigError(config_file, context)
         return None
 
 
@@ -57,7 +54,7 @@ def get_current_context():
     return current_context['name']
 
 
-DEFAULT_CLI = get_api_client()
+DEFAULT_CLI = get_api_client(validate=False)
 
 
 def check_project_key(project_key, app, cli=DEFAULT_CLI):
@@ -847,7 +844,7 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
 
         kind = app['kind']
         image = app['image'] or image_name
-
+        quota = app['quota']
         app_envs = app['env'] or {}
         app_envs.update({
             'PROJECT': namespace_spec['project'],
@@ -860,6 +857,8 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         config_envs = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
         config_envs = {env.split('=', 1)[0]: env.split('=', 1)[1] for env in config_envs}
         app_envs.update(config_envs)
+        if quota is not None and quota['gpu'] == 0:
+            app_envs.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
         envs = [_create_V1Env(k, v) for k, v in app_envs.items()]
         envs.append(_create_V1Env('POD_NAME', field_path='metadata.name'))
 
@@ -886,7 +885,6 @@ def create_apps(namespace, apps, extra_labels={}, cli=DEFAULT_CLI):
         secrets = f"{project_base}-auth"
 
         restart_policy = RESTART_POLICY_STORE.get(app['restartPolicy'].lower(), 'Never')
-        quota = app['quota']
         init_containers = None
         if app['depends'] is not None:
             init_containers = [_depends_to_init_container(app['depends'], envs)]
@@ -1013,6 +1011,10 @@ def _update_k8s_deployment(cli, namespace, update_spec):
         if key in config_envs:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
+    if 'gpu' in quota and quota['gpu'] == 0:
+        current.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
+    elif 'NVIDIA_VISIBLE_DEVICES' in current:
+        del current['NVIDIA_VISIBLE_DEVICES']
     envs = [_create_V1Env(k, v).to_dict() for k, v in current.items()]
     body.append(_body("env", envs))
 
@@ -1058,6 +1060,10 @@ def _update_k8s_job(cli, namespace, update_spec):
         if key in config_envs:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
+    if 'gpu' in quota and quota['gpu'] == 0:
+        current.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
+    elif 'NVIDIA_VISIBLE_DEVICES' in current:
+        del current['NVIDIA_VISIBLE_DEVICES']
     env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
 
     container_spec.command = command
