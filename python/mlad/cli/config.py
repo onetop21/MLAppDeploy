@@ -293,6 +293,11 @@ def obtain_server_address(config: Dict[str, object]) -> str:
     return f'{host}:{port}'
 
 
+def get_admin_k8s_cli(ctlr):
+    config = get()
+    return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
+
+
 def _create_session_key():
     user = getuser()
     hostname = socket.gethostname()

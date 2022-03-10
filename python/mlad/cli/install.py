@@ -40,7 +40,7 @@ def check():
         },
     }
     config = config_core.get()
-    cli = ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
+    cli = config_core.get_admin_k8s_cli()
 
     yield 'Check installed plugins...'
 

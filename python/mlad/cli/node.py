@@ -60,39 +60,34 @@ def resource(names: list, no_trunc: bool):
 
 def enable(name: str):
     from mlad.core.kubernetes import controller as ctlr
-    cli = _get_admin_k8s_cli(ctlr)
+    cli = config_core.get_admin_k8s_cli(ctlr)
     ctlr.enable_node(name, cli)
     yield f'Node [{name}] is enabled.'
 
 
 def disable(name: str):
     from mlad.core.kubernetes import controller as ctlr
-    cli = _get_admin_k8s_cli(ctlr)
+    cli = config_core.get_admin_k8s_cli(ctlr)
     ctlr.disable_node(name, cli)
     yield f'Node [{name}] is disabled.'
 
 
 def delete(name: str):
     from mlad.core.kubernetes import controller as ctlr
-    cli = _get_admin_k8s_cli(ctlr)
+    cli = config_core.get_admin_k8s_cli(ctlr)
     ctlr.delete_node(name, cli)
     yield f'Node [{name}] is deleted.'
 
 
 def label_add(name: str, **kvs):
     from mlad.core.kubernetes import controller as ctlr
-    cli = _get_admin_k8s_cli(ctlr)
+    cli = config_core.get_admin_k8s_cli(ctlr)
     ctlr.add_node_labels(name, cli, **kvs)
     yield f'Label {kvs} added.'
 
 
 def label_rm(name: str, *keys):
     from mlad.core.kubernetes import controller as ctlr
-    cli = _get_admin_k8s_cli(ctlr)
+    cli = config_core.get_admin_k8s_cli(ctlr)
     ctlr.remove_node_labels(name, cli, *keys)
     yield f'Label {keys} removed.'
-
-
-def _get_admin_k8s_cli(ctlr):
-    config = config_core.get()
-    return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
