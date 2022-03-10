@@ -1,9 +1,11 @@
+from typing import Optional
+
 from .base import APIBase
 
 
 class Check(APIBase):
-    def __init__(self, config):
-        super().__init__(config, 'check')
+    def __init__(self, address: Optional[str], session: Optional[str]):
+        super().__init__(address, session, 'check')
 
     def check_metrics_server(self):
         return self._get('/metrics-server')

@@ -1,11 +1,7 @@
-import os
-
 from mlad.core import exceptions as core_exceptions
 from mlad.cli.libs import utils
-
-
-def has_kubeconfig() -> bool:
-    return os.path.isfile(os.environ.get('KUBECONFIG', '~/.kube/config').split(':')[-1])
+from mlad.cli.exceptions import APIServerNotInstalledError
+from mlad.cli import config as config_core
 
 
 def check():
@@ -43,7 +39,8 @@ def check():
                      'helm repo update && helm install mlad mlad/api-server --create-namespace -n mlad\'.']
         },
     }
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    config = config_core.get()
+    cli = config_core.get_admin_k8s_cli(ctlr)
 
     yield 'Check installed plugins...'
 
@@ -87,15 +84,11 @@ def check():
 
     # Check mlad api server
     try:
-        ctlr.get_deployment('mlad-api-server', 'mlad', cli)
-        service = ctlr.get_service('mlad-api-server', 'mlad', cli)
-    except core_exceptions.NotFound:
+        api_server_address = config_core.obtain_server_address(config)
+    except APIServerNotInstalledError:
         pass
     else:
         checked['MLAD API Server']['status'] = True
-        kube_host = cli.configuration.host.rsplit(':', 1)[0]
-        node_port = service.spec.ports[0].node_port
-        address = f'{kube_host}:{node_port}'
 
     for plugin, result in checked.items():
         status = result['status']
@@ -110,4 +103,4 @@ def check():
                 yield f' · {line}'
 
         if plugin == 'MLAD API Server' and status:
-            yield f' · API Server Address : {address}'
+            yield f' · API Server Address : {api_server_address}'

@@ -1,6 +1,9 @@
 import sys
 import json
 import requests
+
+from typing import Optional
+
 from .base import APIBase
 
 
@@ -20,8 +23,8 @@ def _parse_partial_json(value: str):
 
 
 class Project(APIBase):
-    def __init__(self, config):
-        super().__init__(config, 'project')
+    def __init__(self, address: Optional[str], session: Optional[str]):
+        super().__init__(address, session, 'project')
 
     def get(self, extra_labels=[]):
         params = {'extra_labels': ','.join(extra_labels)}

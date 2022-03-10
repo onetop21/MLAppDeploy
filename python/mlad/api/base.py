@@ -9,13 +9,15 @@ from .exceptions import raise_error
 
 class APIBase:
 
-    def __init__(self, config, prefix):
-        if config is not None:
-            self.baseurl = f'{config["apiserver"]["address"]}/api/v1/{prefix}'
-            self.headers = {'session': config['session']}
-        else:
+    def __init__(self, address: Optional[str], session: Optional[str], prefix: str):
+        if address is None:
             self.baseurl = f'{os.environ.get("MLAD_ADDRESS", "localhost:8440")}/api/v1/{prefix}'
+        else:
+            self.baseurl = f'{address}/api/v1/{prefix}'
+        if session is None:
             self.headers = {'session': os.environ.get('MLAD_SESSION', '')}
+        else:
+            self.headers = {'session': session}
         self.raise_error = raise_error
 
     def _get(self, path: str, params: Optional[Dict] = None,

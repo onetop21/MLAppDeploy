@@ -404,7 +404,8 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
                 yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove the apps
-        k8s_cli = k8s_ctlr.get_api_client(context=config_core.get_context())
+        config = config_core.get()
+        k8s_cli = k8s_ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
         namespace = k8s_ctlr.get_namespace(cli=k8s_cli, project_key=project_key)
         if namespace is None:
             raise ProjectNotFound(f'Cannot find project {project_key}')

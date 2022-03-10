@@ -1,10 +1,12 @@
 import json
+from typing import Optional
+
 from .base import APIBase
 
 
 class App(APIBase):
-    def __init__(self, config):
-        super().__init__(config, 'project')
+    def __init__(self, address: Optional[str], session: Optional[str]):
+        super().__init__(address, session, 'project')
 
     def get(self, project_key=None, labels=None):
         if project_key is not None:
