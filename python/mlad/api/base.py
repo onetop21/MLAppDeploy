@@ -7,6 +7,8 @@ from requests.exceptions import ConnectionError
 
 from .exceptions import raise_error, ConnectionRefusedError
 
+from mlad import __version__
+
 
 class APIBase:
 
@@ -16,9 +18,9 @@ class APIBase:
         else:
             self.baseurl = f'{address}/api/v1/{prefix}'
         if session is None:
-            self.headers = {'session': os.environ.get('MLAD_SESSION', '')}
+            self.headers = {'session': os.environ.get('MLAD_SESSION', ''), 'version': __version__}
         else:
-            self.headers = {'session': session}
+            self.headers = {'session': session, 'version': __version__}
         self.raise_error = raise_error
 
     def _get(self, path: str, params: Optional[Dict] = None,

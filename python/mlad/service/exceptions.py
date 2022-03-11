@@ -14,6 +14,16 @@ class InvalidLogRequest(MLADException):
     pass
 
 
+class VersionCompatabilityError(MLADException):
+
+    def __init__(self, client: str, server: str):
+        self.client = client
+        self.server = server
+
+    def __str__(self):
+        return f'The CLI version [{self.client}] is not compatible with the server version [{self.server}]'
+
+
 def exception_detail(e):
     exception = e.__class__.__name__
     msg = str(e)
