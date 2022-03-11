@@ -446,13 +446,6 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
     hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
     pod_spec = app.spec.template.spec
     service = get_k8s_service_of_app(namespace, name, cli=cli)
-    try:
-        ingress = json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]'))
-    except json.decoder.JSONDecodeError:
-        path = config_labels.get('MLAD.PROJECT.INGRESS', '')
-        ingress = []
-        if path != '':
-            ingress.append({'port': '-', 'path': path})
 
     spec = {
         'key': config_labels['MLAD.PROJECT'] if config_labels.get(
