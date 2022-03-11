@@ -188,36 +188,30 @@ def create_k8s_namespace_with_data(
 
 
 def delete_k8s_namespace(
-    namespace: client.V1Namespace, timeout: int = 0xFFFF, stream: bool = False,
+    namespace: client.V1Namespace, timeout: int = 0xFFFF,
     cli: ApiClient = DEFAULT_CLI
-) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
+) -> LogGenerator:
     api = client.CoreV1Api(cli)
     spec = inspect_k8s_namespace(namespace, cli)
     api.delete_namespace(namespace.metadata.name)
 
-    def resp_stream():
-        removed = False
-        for tick in range(timeout):
-            try:
-                get_k8s_namespace(spec['key'], cli=cli)
-            except ProjectNotFoundError:
-                removed = True
-                break
-            else:
-                padding = '\033[1A\033[K' if tick else ''
-                message = f"{padding}Wait for removing the namespace...[{tick}s]\n"
-                yield {'stream': message}
-                time.sleep(1)
-        if not removed:
-            message = 'Failed to remove namespace.\n'
-            yield {'result': 'failed', 'stream': message}
+    removed = False
+    for tick in range(timeout):
+        try:
+            get_k8s_namespace(spec['key'], cli=cli)
+        except ProjectNotFoundError:
+            removed = True
+            break
         else:
-            yield {'result': 'succeed'}
-
-    if stream:
-        return resp_stream()
+            padding = '\033[1A\033[K' if tick else ''
+            message = f"{padding}Wait for removing the namespace...[{tick}s]\n"
+            yield {'stream': message}
+            time.sleep(1)
+    if not removed:
+        message = 'Failed to remove namespace.\n'
+        yield {'result': 'failed', 'stream': message}
     else:
-        return (not get_k8s_namespace(spec['key'], cli=cli), (_ for _ in resp_stream()))
+        yield {'result': 'succeed'}
 
 
 def update_k8s_namespace(
@@ -1051,8 +1045,8 @@ def _delete_k8s_deployment(
 
 def remove_apps(
     apps: List[App], namespace: str, disconnect_handler: Optional[object] = None,
-    stream: bool = False, cli: ApiClient = DEFAULT_CLI
-) -> Union[Generator[Dict, None, None], Tuple[bool, Tuple[Dict]]]:
+    cli: ApiClient = DEFAULT_CLI
+) -> LogGenerator:
     api = client.CoreV1Api(cli)
     network_api = client.NetworkingV1Api(cli)
 
@@ -1094,23 +1088,8 @@ def remove_apps(
         except ApiException as e:
             print("Exception when calling ExtensionsV1beta1Api->delete_namespaced_ingress: %s\n" % e)
 
-    def resp_from_collector(collector):
-        for _ in collector:
-            yield _
-
-    if stream:
-        return resp_from_collector(collector)
-    else:
-        removed = False
-        for app in apps:
-            app_removed = False
-            name, kind, _ = _get_app_spec(app)
-            if not get_app_from_kind(name, namespace, kind, cli=cli) and not get_app(name, namespace, cli):
-                app_removed = True
-            else:
-                app_removed = False
-                removed &= app_removed
-        return (removed, (_ for _ in resp_from_collector(collector)))
+    for stream in collector:
+        yield stream
 
 
 def get_k8s_nodes(cli: ApiClient = DEFAULT_CLI) -> List[client.V1Node]:

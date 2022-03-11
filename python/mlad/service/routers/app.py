@@ -1,9 +1,8 @@
-import json
 import traceback
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
-from fastapi.responses import StreamingResponse
 from mlad.core.exceptions import APIError, InvalidAppError, ProjectNotFoundError
+from mlad.service.routers import DictStreamingResponse
 from mlad.service.models import app as app_models
 from mlad.service.exceptions import InvalidSessionError, exception_detail
 from mlad.core.kubernetes import controller as ctlr
@@ -118,8 +117,7 @@ def scale_app(project_key: str, app_name: str, req: app_models.ScaleRequest, ses
 
 
 @router.delete("/project/{project_key}/app")
-def remove_apps(project_key: str, req: app_models.RemoveRequest,
-                stream: bool = Query(False), session: str = Header(None)):
+def remove_apps(project_key: str, req: app_models.RemoveRequest, session: str = Header(None)):
     try:
         _check_session_key(project_key, session)
         namespace = ctlr.get_k8s_namespace(project_key).metadata.name
@@ -138,14 +136,9 @@ def remove_apps(project_key: str, req: app_models.RemoveRequest,
                 for cb in self._callbacks:
                     cb()
 
-        handler = DisconnectHandler() if stream else None
-        res = ctlr.remove_apps(targets, namespace,
-                               disconnect_handler=handler, stream=stream)
-
-        def stringify_response(gen):
-            for _ in gen:
-                yield json.dumps(_)
-
+        handler = DisconnectHandler()
+        res = ctlr.remove_apps(targets, namespace, disconnect_handler=handler)
+        return DictStreamingResponse(res, background=handler)
     except InvalidAppError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidSessionError as e:
@@ -153,7 +146,3 @@ def remove_apps(project_key: str, req: app_models.RemoveRequest,
     except Exception as e:
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
-    if stream:
-        return StreamingResponse(stringify_response(res), background=handler)
-    else:
-        return {'message': 'Apps removed'}

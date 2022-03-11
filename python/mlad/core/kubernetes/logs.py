@@ -97,15 +97,15 @@ class LogCollector():
                         _, timestamp, body = (*separated, '')
                     else:
                         _, timestamp, body = separated
-                    output['timestamp'] = parser.parse(timestamp).astimezone()
-                    output['stream'] = body.encode()
+                    output['timestamp'] = str(parser.parse(timestamp).astimezone())
+                    output['stream'] = body
                 else:
                     separated = stream.split(' ', 1)
                     if len(separated) < 2:
                         _, body = (*separated, '')
                     else:
                         _, body = separated
-                    output['stream'] = body.encode()
+                    output['stream'] = body
                 output['name'] = f"{_[_.rfind('=')+1:]}"
             else:
                 if self.threads[object_id]['timestamps']:
