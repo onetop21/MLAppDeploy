@@ -9,6 +9,7 @@ from mlad.core import exceptions
 from mlad.core.exceptions import ProjectNotFoundError, InvalidAppError
 from mlad.core.kubernetes import controller as ctlr
 
+from mlad.service.routers import DictStreamingResponse
 from mlad.service.exceptions import (
     InvalidLogRequest, InvalidSessionError, exception_detail
 )
@@ -35,7 +36,7 @@ def create_project(req: project.CreateRequest, session: str = Header(None)):
 
     try:
         res = ctlr.create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, credential)
-        return StreamingResponse(res)
+        return DictStreamingResponse(res)
     except TypeError as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     except Exception as e:
