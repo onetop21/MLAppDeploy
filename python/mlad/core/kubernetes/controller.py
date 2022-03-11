@@ -448,7 +448,7 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
         'id': app.metadata.uid,
         'name': config_labels.get('MLAD.PROJECT.APP'),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
-        'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pods]),
+        'task_dict': {pod.metadata.name: get_pod_info(pod) for pod in pods},
         'ports': [port_spec.port for port_spec in service.spec.ports] if service is not None else [],
         'ingress': ingress,
         'created': app.metadata.creation_timestamp,
@@ -457,11 +457,11 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
     return spec
 
 
-def inspect_apps(apps: List[App]) -> List[Dict]:
+def inspect_apps(apps: List[App], cli: ApiClient = DEFAULT_CLI) -> List[Dict]:
     results = []
     with ThreadPool(len(apps)) as pool:
         for app in apps:
-            results.append(pool.apply_async(inspect_app, (app,)))
+            results.append(pool.apply_async(inspect_app, (app, cli)))
         return [result.get() for result in results]
 
 
@@ -1053,7 +1053,7 @@ def remove_apps(
     def _get_app_spec(app):
         spec = inspect_app(app, cli)
         app_name = spec['name']
-        task_keys = list(spec['tasks'].keys())
+        task_keys = list(spec['task_dict'].keys())
 
         config_labels = _get_k8s_config_map_data(namespace, f'app-{app_name}-labels', cli)
         kind = config_labels['MLAD.PROJECT.APP.KIND']
@@ -1218,63 +1218,50 @@ def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client
     return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
 
 
-def get_app_with_names_or_ids(
-    project_key: str, names_or_ids: List[str] = [], cli: ApiClient = DEFAULT_CLI
+def _filter_pod_name_from_apps(
+    project_key: str, filters: Optional[List[str]], cli: ApiClient = DEFAULT_CLI
 ) -> List[Tuple[str, str]]:
-    # get running apps with app or pod name
     api = client.CoreV1Api(cli)
     apps = get_apps(project_key, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
-    selected = []
-    sources = [(_['name'], list(_['tasks'].keys())) for _ in
-               [inspect_app(app, cli) for app in apps]]
-    if names_or_ids:
-        selected = []
-        for _ in sources:
-            if _[0] in names_or_ids:
-                selected += [(_[0], __) for __ in _[1]]
-                names_or_ids.remove(_[0])
-            else:
-                # check task ids of svc
-                for __ in _[1]:
-                    if __ in names_or_ids:
-                        selected += [(_[0], __)]
-                        names_or_ids.remove(__)
-        if names_or_ids:
-            raise exceptions.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
-
-    else:
-        for _ in sources:
-            selected += [(_[0], __) for __ in _[1]]
+    selected_pod_names = []
+    app_and_pod_names = [(spec['name'], list(spec['task_dict'].keys())) for spec in inspect_apps(apps, cli)]
+    for app_name, pod_names in app_and_pod_names:
+        if filters is None or app_name in filters:
+            selected_pod_names += pod_names
+            continue
+        for pod_name in pod_names:
+            if pod_name in filters:
+                selected_pod_names.append(pod_name)
 
     # check whether targets are pending or not
-    targets = []
-    for target in selected:
-        pod = api.read_namespaced_pod(name=target[1], namespace=namespace)
+    filtered_pod_names = []
+    for pod_name in selected_pod_names:
+        pod = api.read_namespaced_pod(name=pod_name, namespace=namespace)
         phase = get_pod_info(pod)['phase']
         if not phase == 'Pending':
-            targets.append(target)
+            filtered_pod_names.append(pod_name)
 
-    if not targets:
-        raise exceptions.NotFound("Cannot find running apps")
+    if len(filtered_pod_names) == 0:
+        raise exceptions.NotFound('Cannot find a running app or tasks in project')
 
-    return targets
+    return filtered_pod_names
 
 
 def get_project_logs(
-    project_key: str, tail: str = 'all', follow: bool = False, timestamps: bool = False,
-    selected: bool = False, disconnect_handler: Optional[object] = None,
-    targets: List[Tuple[str, str]] = [], cli: ApiClient = DEFAULT_CLI
+    project_key: str, filters: Optional[List[str]] = None, tail: str = 'all', follow: bool = False,
+    timestamps: bool = False, disconnect_handler: Optional[object] = None, cli: ApiClient = DEFAULT_CLI
 ) -> Generator[Dict, None, None]:
     get_apps(project_key, cli=cli)
+    pod_names = _filter_pod_name_from_apps(project_key, filters, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
     handler = LogHandler(cli)
 
-    logs = [(target, handler.logs(namespace, target, details=True, follow=follow,
-                                  tail=tail, timestamps=timestamps, stdout=True, stderr=True))
-            for app_name, target in targets]
+    logs = [(pod_name, handler.logs(namespace, pod_name, details=True, follow=follow,
+                                    tail=tail, timestamps=timestamps, stdout=True, stderr=True))
+            for pod_name in pod_names]
 
     if len(logs):
         with LogCollector() as collector:
@@ -1283,7 +1270,7 @@ def get_project_logs(
             # Register Disconnect Callback
             if disconnect_handler:
                 disconnect_handler.add_callback(lambda: handler.close())
-            if follow and not selected:
+            if follow:
                 last_resource = None
                 monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
                                      follow=follow, tail=tail, timestamps=timestamps)

@@ -173,7 +173,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
 
 def logs(file: Optional[str], project_key: Optional[str],
-         tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
+         tail: bool, follow: bool, timestamps: bool, filters: Optional[List[str]]):
     utils.process_file(file)
     if project_key is None:
         project_key = utils.workspace_key()
@@ -184,7 +184,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     except NotFound as e:
         raise e
 
-    logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
+    logs = API.project.log(project_key, tail, follow, timestamps, filters)
 
     colorkey = {}
     for log in logs:
