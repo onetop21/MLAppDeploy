@@ -1,8 +1,9 @@
 import os
 
-import requests
-
 from typing import Optional, Dict
+
+import requests
+from requests.exceptions import ConnectionError
 
 from .exceptions import raise_error
 
@@ -25,8 +26,11 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.get(url=url, headers=self.headers, params=params,
-                           timeout=timeout, stream=stream)
+        try:
+            res = requests.get(url=url, headers=self.headers, params=params,
+                               timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -35,8 +39,11 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.post(url=url, headers=self.headers, params=params, json=body,
-                            timeout=timeout, stream=stream)
+        try:
+            res = requests.post(url=url, headers=self.headers, params=params, json=body,
+                                timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -45,8 +52,11 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.delete(url=url, headers=self.headers, params=params, json=body,
-                              timeout=timeout, stream=stream)
+        try:
+            res = requests.delete(url=url, headers=self.headers, params=params, json=body,
+                                  timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -55,7 +65,10 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.put(url=url, headers=self.headers, params=params, json=body,
-                           timeout=timeout, stream=stream)
+        try:
+            res = requests.put(url=url, headers=self.headers, params=params, json=body,
+                               timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()
