@@ -287,7 +287,7 @@ def up(file: Optional[str]):
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
     lines = API.project.create(base_labels, origin_project, extra_envs,
-                               credential=credential, allow_reuse=False)
+                               credential=credential)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])
@@ -356,7 +356,7 @@ def down(file: Optional[str], project_key: Optional[str], dump: bool):
                 yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove the apps
-        lines = API.app.remove(project_key, apps=app_names, stream=True)
+        lines = API.app.remove(project_key, apps=app_names)
         for line in lines:
             if 'stream' in line:
                 yield line['stream']
@@ -424,7 +424,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
 
         handler = DisconnectHandler()
         lines = k8s_ctlr.remove_apps(targets, namespace_name,
-                                     disconnect_handler=handler, stream=True, cli=k8s_cli)
+                                     disconnect_handler=handler, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 yield line['stream']

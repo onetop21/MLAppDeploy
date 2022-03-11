@@ -30,15 +30,14 @@ class Project(APIBase):
         params = {'extra_labels': ','.join(extra_labels)}
         return self._get('', params=params)
 
-    def create(self, base_labels, project_yaml, extra_envs=[], credential=None, allow_reuse=False):
+    def create(self, base_labels, project_yaml, extra_envs=[], credential=None):
         body = {
             'base_labels': base_labels,
             'extra_envs': extra_envs,
             'project_yaml': project_yaml,
             'credential': credential,
         }
-        params = {'allow_reuse': allow_reuse}
-        resp = self._post('', params=params, body=body, raw=True, stream=True)
+        resp = self._post('', body=body, raw=True, stream=True)
         res = ''
         for _ in resp.iter_content(1024):
             res += _.decode()

@@ -1,14 +1,13 @@
-import json
 import traceback
 from typing import Optional
 
 from fastapi import APIRouter, Query, HTTPException, Header
-from fastapi.responses import StreamingResponse
 
 from mlad.core import exceptions
 from mlad.core.exceptions import ProjectNotFoundError, InvalidAppError
 from mlad.core.kubernetes import controller as ctlr
 
+from mlad.service.routers import DictStreamingResponse
 from mlad.service.exceptions import (
     InvalidLogRequest, InvalidSessionError, exception_detail
 )
@@ -27,21 +26,15 @@ def _check_session_key(namespace, session):
 
 
 @router.post("/project")
-def create_project(req: project.CreateRequest, allow_reuse: bool = Query(False), session: str = Header(None)):
+def create_project(req: project.CreateRequest, session: str = Header(None)):
     base_labels = req.base_labels
     extra_envs = req.extra_envs
     credential = req.credential
     project_yaml = req.project_yaml
 
     try:
-        res = ctlr.create_k8s_namespace_with_data(
-            base_labels, extra_envs, project_yaml, credential, allow_reuse=allow_reuse, stream=True)
-
-        def create_project(gen):
-            for _ in gen:
-                yield json.dumps(_)
-
-        return StreamingResponse(create_project(res))
+        res = ctlr.create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, credential)
+        return DictStreamingResponse(res)
     except TypeError as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     except Exception as e:
@@ -82,14 +75,8 @@ def remove_project(project_key: str, session: str = Header(None)):
     try:
         namespace = ctlr.get_k8s_namespace(project_key)
         _check_session_key(namespace, session)
-
-        res = ctlr.delete_k8s_namespace(namespace, stream=True)
-
-        def remove_project(gen):
-            for _ in gen:
-                yield json.dumps(_)
-
-        return StreamingResponse(remove_project(res))
+        res = ctlr.delete_k8s_namespace(namespace)
+        return DictStreamingResponse(res)
     except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidSessionError as e:
@@ -131,16 +118,8 @@ def send_project_log(project_key: str, tail: str = Query('all'),
 
         handler = DisconnectHandler()
 
-        logs = ctlr.get_project_logs(project_key, tail, follow, timestamps, selected, handler, targets)
-
-        def get_logs(logs):
-            for _ in logs:
-                _['stream'] = _['stream'].decode()
-                if timestamps:
-                    _['timestamp'] = str(_['timestamp'])
-                yield json.dumps(_)
-
-        return StreamingResponse(get_logs(logs), background=handler)
+        res = ctlr.get_project_logs(project_key, tail, follow, timestamps, selected, handler, targets)
+        return DictStreamingResponse(res, background=handler)
     except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except InvalidAppError as e:
