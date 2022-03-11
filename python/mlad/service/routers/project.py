@@ -27,21 +27,15 @@ def _check_session_key(namespace, session):
 
 
 @router.post("/project")
-def create_project(req: project.CreateRequest, allow_reuse: bool = Query(False), session: str = Header(None)):
+def create_project(req: project.CreateRequest, session: str = Header(None)):
     base_labels = req.base_labels
     extra_envs = req.extra_envs
     credential = req.credential
     project_yaml = req.project_yaml
 
     try:
-        res = ctlr.create_k8s_namespace_with_data(
-            base_labels, extra_envs, project_yaml, credential, allow_reuse=allow_reuse, stream=True)
-
-        def create_project(gen):
-            for _ in gen:
-                yield json.dumps(_)
-
-        return StreamingResponse(create_project(res))
+        res = ctlr.create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, credential)
+        return StreamingResponse(res)
     except TypeError as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
     except Exception as e:

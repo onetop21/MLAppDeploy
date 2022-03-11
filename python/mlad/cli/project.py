@@ -287,7 +287,7 @@ def up(file: Optional[str]):
     credential = docker_ctlr.obtain_credential()
     extra_envs = config_core.get_env()
     lines = API.project.create(base_labels, origin_project, extra_envs,
-                               credential=credential, allow_reuse=False)
+                               credential=credential)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])

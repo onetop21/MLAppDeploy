@@ -135,76 +135,56 @@ def get_project_session(namespace: client.V1Namespace, cli: ApiClient = DEFAULT_
 
 def create_k8s_namespace_with_data(
     base_labels: Dict[str, str], extra_envs: Dict[str, str],
-    project_yaml: Dict, credential: str, allow_reuse: bool = False,
-    stream: bool = False, cli: ApiClient = DEFAULT_CLI
-) -> Union[LogGenerator, Tuple[client.V1Namespace, LogTuple]]:
+    project_yaml: Dict, credential: str, cli: ApiClient = DEFAULT_CLI
+) -> LogGenerator:
     api = client.CoreV1Api(cli)
     project_key = base_labels['MLAD.PROJECT']
     try:
-        namespace = get_k8s_namespace(project_key, cli=cli)
+        get_k8s_namespace(project_key, cli=cli)
     except ProjectNotFoundError:
         pass
     else:
-        if allow_reuse:
-            if stream:
-                def resp_stream():
-                    yield {
-                        'result': 'exists',
-                        'name': namespace.metadata.name,
-                        'id': namespace.metadata.uid
-                    }
-                return resp_stream()
-            else:
-                stream_out = (_ for _ in resp_stream())
-                return (namespace, stream_out)
         raise NamespaceAlreadyExistError(project_key)
     basename = base_labels['MLAD.PROJECT.BASE']
-
-    def resp_stream():
-        namespace_name = f"{basename}-cluster"
-        try:
-            message = f"Create a namespace [{namespace_name}]...\n"
-            yield {'stream': message}
-            labels = copy.deepcopy(base_labels)
-            labels.update({
-                'MLAD.PROJECT.NAMESPACE': namespace_name,
-                'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
-                'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
-            })
-            keys = {
-                'MLAD.PROJECT': labels['MLAD.PROJECT'],
-                'MLAD.PROJECT.NAME': labels['MLAD.PROJECT.NAME'],
-            }
-            annotations = {
-                'MLAD.PROJECT.YAML': json.dumps(project_yaml)
-            }
-            api.create_namespace(
-                client.V1Namespace(
-                    metadata=client.V1ObjectMeta(
-                        name=namespace_name,
-                        labels=keys,
-                        annotations=annotations
-                    )
+    namespace_name = f"{basename}-cluster"
+    try:
+        message = f"Create a namespace [{namespace_name}]...\n"
+        yield {'stream': message}
+        labels = copy.deepcopy(base_labels)
+        labels.update({
+            'MLAD.PROJECT.NAMESPACE': namespace_name,
+            'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
+            'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
+        })
+        keys = {
+            'MLAD.PROJECT': labels['MLAD.PROJECT'],
+            'MLAD.PROJECT.NAME': labels['MLAD.PROJECT.NAME'],
+        }
+        annotations = {
+            'MLAD.PROJECT.YAML': json.dumps(project_yaml)
+        }
+        api.create_namespace(
+            client.V1Namespace(
+                metadata=client.V1ObjectMeta(
+                    name=namespace_name,
+                    labels=keys,
+                    annotations=annotations
                 )
             )
-            _create_k8s_config_map('project-labels', namespace_name, labels, cli=cli)
-            # AuthConfig
-            api.create_namespaced_secret(
-                namespace_name,
-                client.V1Secret(
-                    metadata=client.V1ObjectMeta(name=f"{basename}-auth"),
-                    type='kubernetes.io/dockerconfigjson',
-                    data={'.dockerconfigjson': credential}
-                )
+        )
+        _create_k8s_config_map('project-labels', namespace_name, labels, cli=cli)
+        # AuthConfig
+        api.create_namespaced_secret(
+            namespace_name,
+            client.V1Secret(
+                metadata=client.V1ObjectMeta(name=f"{basename}-auth"),
+                type='kubernetes.io/dockerconfigjson',
+                data={'.dockerconfigjson': credential}
             )
-        except ApiException as e:
-            message = f"Failed to create namespace.\n{e}\n"
-            yield {'result': 'failed', 'stream': message}
-    if stream:
-        return resp_stream()
-    else:
-        stream_out = (_ for _ in resp_stream())
-        return (get_k8s_namespace(project_key, cli=cli), stream_out)
+        )
+    except ApiException as e:
+        message = f"Failed to create namespace.\n{e}\n"
+        yield {'result': 'failed', 'stream': message}
 
 
 def delete_k8s_namespace(
