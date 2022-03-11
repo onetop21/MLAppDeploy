@@ -15,7 +15,7 @@ def _find_target_app_spec(target_app_name: str, app_specs: List[Dict]) -> Option
 
 
 def _check_condition(target_app_spec: Dict, target_condition: str) -> bool:
-    pod_specs = target_app_spec['tasks'].values()
+    pod_specs = target_app_spec['task_dict'].values()
     if target_condition == 'Succeeded':
         return all([spec['phase'] == target_condition for spec in pod_specs])
     elif target_condition == 'Running':

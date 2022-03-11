@@ -81,7 +81,7 @@ def ls(no_trunc: bool):
                             if spec['key'] == project_key]
 
         for spec in target_app_specs:
-            tasks = spec['tasks'].values()
+            tasks = spec['task_dict'].values()
             tasks_state = [_['status']['state'] for _ in tasks]
             projects[project_key]['apps'] += 1
             projects[project_key]['replicas'] += spec['replicas']
@@ -130,7 +130,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         app_name = spec['name']
         try:
             ports = ','.join(map(str, spec['ports']))
-            for pod_name, pod in spec['tasks'].items():
+            for pod_name, pod in spec['task_dict'].items():
                 age = utils.created_to_age(pod['created'])
 
                 if app_name in resources:

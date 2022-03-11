@@ -93,7 +93,7 @@ def inspect_tasks(project_key: str, app_name: str, session: str = Header(None)):
         namespace = ctlr.get_k8s_namespace(project_key).metadata.name
         app = ctlr.get_app(app_name, namespace)
         ctlr.check_project_key(project_key, app)
-        return ctlr.inspect_app(app)['tasks']
+        return ctlr.inspect_app(app)['task_dict']
     except InvalidAppError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except Exception as e:

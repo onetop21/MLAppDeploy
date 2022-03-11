@@ -1,5 +1,5 @@
 import traceback
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Query, HTTPException, Header
 
@@ -90,7 +90,7 @@ def remove_project(project_key: str, session: str = Header(None)):
 def send_project_log(project_key: str, tail: str = Query('all'),
                      follow: bool = Query(False),
                      timestamps: bool = Query(False),
-                     filters: list = Query(None),
+                     filters: Optional[List[str]] = Query(None),
                      session: str = Header(None)):
 
     try:
