@@ -141,10 +141,9 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                 task_info.append((
                     pod_name,
                     app_name,
-                    pod['node'] if pod['node'] else '-',
+                    pod['node'] if pod['node'] is not None else '-',
                     pod['phase'],
-                    'Running' if pod['status']['state'] == 'Running' else
-                    pod['status']['detail']['reason'],
+                    pod['status'],
                     pod['restart'],
                     age,
                     ports,

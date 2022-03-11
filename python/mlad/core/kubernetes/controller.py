@@ -386,21 +386,21 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
             }
 
     def parse_status(containers):
-        status = {'state': 'Running', 'detail': None}
-        # if not running container exits, return that
+        status = 'Running'
         completed = 0
-        for _ in containers:
-            if _['status']['state'] == 'Waiting':
-                return _['status']
-            elif _['status']['state'] == 'Terminated':
-                if _['status']['detail']['reason'] == 'Completed':
+        for container in containers:
+            container_status = container['status']
+            if container_status['state'] == 'Waiting':
+                return container_status['detail']['reason']
+            elif container_status['state'] == 'Terminated':
+                if container_status['detail']['reason'] == 'Completed':
                     completed += 1
                     if completed == len(containers):
-                        return _['status']
+                        return 'Completed'
                     else:
                         pass
                 else:
-                    return _['status']
+                    return container_status['detail']['reason']
         return status
 
     if pod.status.container_statuses:
@@ -415,14 +415,8 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
             pod_info['restart'] += container_info['restart']
         pod_info['status'] = parse_status(pod_info['container_status'])
     else:
-        pod_info['container_status'] = None
-        pod_info['status'] = {
-            'state': 'Waiting',
-            'detail': {
-                'reason': pod.status.conditions[0].reason if pod.status.conditions
-                else pod.status.reason
-            }
-        }
+        pod_info['status'] = pod.status.conditions[0].reason if pod.status.conditions \
+            else pod.status.reason
     return pod_info
 
 
@@ -577,7 +571,7 @@ def _convert_constraints_to_k8s_node_selector(constraints: Dict) -> Dict[str, st
         if k == 'hostname':
             if v is not None:
                 selector["kubernetes.io/hostname"] = v
-        elif k == 'label':
+        elif k == 'label' and v is not None:
             label_dict: Dict = v
             for label_key, label in label_dict.items():
                 selector[label_key] = str(label)
