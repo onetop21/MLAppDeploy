@@ -4,6 +4,7 @@ from mlad import __version__
 from mlad.service.libs import utils
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mlad.service.exceptions import VersionCompatabilityError
 from mlad.service.routers import app as app_router, project, node, check
@@ -47,12 +48,15 @@ app = create_app()
 
 @app.middleware('http')
 async def check_version(request: Request, call_next):
-    client_version = request.headers.get('version', '0.3.1')
-    server_version = __version__
-    client_major, client_minor, client_patch = client_version.split('.', 2)
-    server_major, server_minor, server_patch = server_version.split('.', 2)
+    client_ver = request.headers.get('version', '0.3.1')
+    client_major, client_minor = client_ver.split('.', 2)[:2]
+    server_major, server_minor = __version__.split('.', 2)[:2]
     if client_major != server_major or client_minor != server_minor:
-        raise VersionCompatabilityError(client_version, server_version)
+        return JSONResponse(
+            status_code=400,
+            content={'detail': str(VersionCompatabilityError(client_ver, __version__))}
+        )
+
     return await call_next(request)
 
 
