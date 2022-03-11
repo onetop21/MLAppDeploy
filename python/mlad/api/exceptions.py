@@ -29,7 +29,7 @@ class ConnectionRefusedError(MLADException):
         self.url = url
 
     def __str__(self):
-        return 'Cannot connect to {self.url}, is it the right API server address?'
+        return f'Cannot connect to {self.url}, is it the right API server address?'
 
 
 class NotFound(APIError):
