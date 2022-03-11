@@ -390,17 +390,19 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
         completed = 0
         for container in containers:
             container_status = container['status']
+            detail = container_status['detail']['reason'] \
+                if container_status['detail'] is not None else None
             if container_status['state'] == 'Waiting':
-                return container_status['detail']['reason']
+                return detail
             elif container_status['state'] == 'Terminated':
-                if container_status['detail']['reason'] == 'Completed':
+                if detail == 'Completed':
                     completed += 1
                     if completed == len(containers):
-                        return 'Completed'
+                        return detail
                     else:
                         pass
                 else:
-                    return container_status['detail']['reason']
+                    return detail
         return status
 
     if pod.status.container_statuses:
