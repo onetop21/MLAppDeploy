@@ -46,7 +46,7 @@ def check():
 
     # Check ingress controller
     try:
-        ctlr.get_deployment('ingress-nginx-controller', 'ingress-nginx', cli)
+        ctlr.get_k8s_deployment('ingress-nginx-controller', 'ingress-nginx', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -54,7 +54,7 @@ def check():
 
     # Check metrics server
     try:
-        ctlr.get_deployment('metrics-server', 'kube-system', cli)
+        ctlr.get_k8s_deployment('metrics-server', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -62,7 +62,7 @@ def check():
 
     # Check nvidia device plugin
     try:
-        ctlr.get_daemonset('nvidia-device-plugin', 'kube-system', cli)
+        ctlr.get_k8s_daemonset('nvidia-device-plugin', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -70,13 +70,13 @@ def check():
 
     # Check node feature discovery
     try:
-        ctlr.get_daemonset('nfd', 'node-feature-discovery', cli)
+        ctlr.get_k8s_daemonset('nfd', 'node-feature-discovery', cli)
     except core_exceptions.NotFound:
         pass
     else:
         checked['Node Feature Discovery']['status'] = True
     try:
-        ctlr.get_daemonset('gpu-feature-discovery', 'node-feature-discovery', cli)
+        ctlr.get_k8s_daemonset('gpu-feature-discovery', 'node-feature-discovery', cli)
     except core_exceptions.NotFound:
         pass
     else:

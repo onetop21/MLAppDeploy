@@ -169,7 +169,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         for event in sorted_events:
             event['timestamp'] = event.pop('datetime')
             event['stream'] = event.pop('message')
-            yield _format_log(event, colorkey, 32, 20, pretty=True)
+            yield _format_log(event, colorkey)
 
 
 def logs(file: Optional[str], project_key: Optional[str],
@@ -190,7 +190,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     for log in logs:
         if '[Ignored]' in log['stream']:
             continue
-        yield _format_log(log, colorkey, 32, 20)
+        yield _format_log(log, colorkey)
 
 
 def ingress():
@@ -404,11 +404,8 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
                 yield _dump_logs(app_name, project_key, dirpath)
 
         # Remove the apps
-        config = config_core.get()
-        k8s_cli = k8s_ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
-        namespace = k8s_ctlr.get_namespace(cli=k8s_cli, project_key=project_key)
-        if namespace is None:
-            raise ProjectNotFound(f'Cannot find project {project_key}')
+        k8s_cli = config_core.get_admin_k8s_cli(k8s_ctlr)
+        namespace = k8s_ctlr.get_k8s_namespace(project_key, cli=k8s_cli)
         namespace_name = namespace.metadata.name
         targets = [k8s_ctlr.get_app(name, namespace_name, cli=k8s_cli) for name in app_names]
         for target in targets:
@@ -436,7 +433,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
         handler()
 
         # Remove the project
-        lines = k8s_ctlr.remove_namespace(namespace, stream=True, cli=k8s_cli)
+        lines = k8s_ctlr.delete_k8s_namespace(namespace, stream=True, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 sys.stdout.write(line['stream'])

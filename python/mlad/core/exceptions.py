@@ -41,12 +41,12 @@ def handle_k8s_api_error(e):
     return msg, status
 
 
-class InvalidProjectError(Exception):
-    def __init__(self, project_id):
-        self.project_id = project_id
+class ProjectNotFoundError(MLADException):
+    def __init__(self, project_key):
+        self.project_key = project_key
 
     def __str__(self):
-        return f'Cannot find project {self.project_id}'
+        return f'Cannot find a project [{self.project_key}]'
 
 
 class InvalidAppError(Exception):
