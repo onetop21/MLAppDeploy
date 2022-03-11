@@ -767,12 +767,6 @@ def create_apps(
     image_name = namespace_spec['image']
     project_base = namespace_spec['base']
 
-    RESTART_POLICY_STORE = {
-        'never': 'Never',
-        'onfailure': 'OnFailure',
-        'always': 'Always',
-    }
-
     instances = []
     for name, app in apps.items():
         # Check running already
@@ -821,7 +815,7 @@ def create_apps(
         # Secrets
         secrets = f"{project_base}-auth"
 
-        restart_policy = RESTART_POLICY_STORE.get(app['restartPolicy'].lower(), 'Never')
+        restart_policy = app['restartPolicy']
         init_containers = []
         if app['depends'] is not None:
             init_containers = [_convert_depends_to_k8s_init_container(app['depends'], envs)]

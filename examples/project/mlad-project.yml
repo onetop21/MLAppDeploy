@@ -16,13 +16,13 @@ workspace:
 app:
   server:
     kind: Job
-    restartPolicy: never
+    restartPolicy: Never
     command: python server.py
     expose:
     - port: 5555
   client:
     kind: Job
-    restartPolicy: never
+    restartPolicy: Never
     command: python client.py
     expose:
     - port: 5555
