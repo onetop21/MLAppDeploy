@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 
 def jsonify_response(generator):
     for elem in generator:
-        yield json.dump(elem)
+        yield json.dumps(elem)
 
 
 class DictStreamingResponse(StreamingResponse):
