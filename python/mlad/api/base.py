@@ -5,7 +5,7 @@ from typing import Optional, Dict
 import requests
 from requests.exceptions import ConnectionError
 
-from .exceptions import raise_error
+from .exceptions import raise_error, ConnectionRefusedError
 
 
 class APIBase:
