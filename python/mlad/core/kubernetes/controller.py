@@ -475,12 +475,26 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
         'name': config_labels.get('MLAD.PROJECT.APP'),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pods]),
-        'ports': [port_spec.port for port_spec in service.spec.ports] if service is not None else [],
-        'ingress': ingress,
+        'expose': _obtain_app_expose(service, config_labels),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
     }
     return spec
+
+
+def _obtain_app_expose(service: Optional[client.V1Service], config_labels: Dict[str, str]) -> List[Dict]:
+    if service is None:
+        return []
+    expose_dict = {str(spec.port): {'port': spec.port} for spec in service.spec.ports}
+    try:
+        ingresses = json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]'))
+    except json.decoder.JSONDecodeError:
+        ingresses = []
+    for ingress in ingresses:
+        ingress_port = str(ingress['port'])
+        if ingress_port in expose_dict:
+            expose_dict[ingress_port]['ingress'] = {'path': ingress['path']}
+    return expose_dict.values()
 
 
 def inspect_apps(apps: List[App]) -> List[Dict]:
