@@ -494,7 +494,7 @@ def _obtain_app_expose(service: Optional[client.V1Service], config_labels: Dict[
         ingress_port = str(ingress['port'])
         if ingress_port in expose_dict:
             expose_dict[ingress_port]['ingress'] = {'path': ingress['path']}
-    return expose_dict.values()
+    return list(expose_dict.values())
 
 
 def inspect_apps(apps: List[App]) -> List[Dict]:
