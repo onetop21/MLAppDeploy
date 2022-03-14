@@ -226,6 +226,8 @@ class LogMonitor(Thread):
                     phase = ev['object']['status']['phase']
 
                     if event == 'MODIFIED' and phase == 'Running':
+                        if 'deletionTimestamp' in ev['object']['metadata']:
+                            continue
                         container_status = ev['object']['status']['containerStatuses'][0]
                         restart = container_status['restartCount']
                         if restart:
