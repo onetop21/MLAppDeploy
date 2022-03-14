@@ -82,7 +82,7 @@ def ls(no_trunc: bool):
 
         for spec in target_app_specs:
             tasks = spec['tasks'].values()
-            tasks_state = [_['status']['state'] for _ in tasks]
+            tasks_state = [task['status'] for task in tasks]
             projects[project_key]['apps'] += 1
             projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
