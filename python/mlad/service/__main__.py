@@ -3,8 +3,10 @@ import uvicorn
 from mlad import __version__
 from mlad.service.libs import utils
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from mlad.service.exceptions import VersionCompatabilityError
 from mlad.service.routers import app as app_router, project, node, check
 from mlad.core.default.config import service_config
 
@@ -42,6 +44,20 @@ def create_app():
 
 
 app = create_app()
+
+
+@app.middleware('http')
+async def check_version(request: Request, call_next):
+    client_ver = request.headers.get('version', '0.3.1')
+    client_major, client_minor = client_ver.split('.', 2)[:2]
+    server_major, server_minor = __version__.split('.', 2)[:2]
+    if client_major != server_major or client_minor != server_minor:
+        return JSONResponse(
+            status_code=400,
+            content={'detail': str(VersionCompatabilityError(client_ver, __version__))}
+        )
+
+    return await call_next(request)
 
 
 if __name__ == '__main__':
