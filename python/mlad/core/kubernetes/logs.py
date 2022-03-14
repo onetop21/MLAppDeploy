@@ -228,16 +228,7 @@ class LogMonitor(Thread):
                     if event == 'MODIFIED' and phase == 'Running':
                         if 'deletionTimestamp' in ev['object']['metadata']:
                             continue
-                        container_status = ev['object']['status']['containerStatuses'][0]
-                        restart = container_status['restartCount']
-                        if restart:
-                            state = container_status['state']
-                            if 'running' in state.keys():
-                                created = state['running']['startedAt']
-                            else:
-                                continue
-                        else:
-                            created = ev['object']['metadata']['creationTimestamp']
+                        created = ev['object']['metadata']['creationTimestamp']
                         ts = time.mktime(datetime.strptime(created, '%Y-%m-%dT%H:%M:%SZ').timetuple())
                         since_seconds = math.ceil(datetime.utcnow().timestamp() - ts)
 
