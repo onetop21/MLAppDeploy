@@ -427,7 +427,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
         handler()
 
         # Remove the project
-        lines = k8s_ctlr.delete_k8s_namespace(namespace, stream=True, cli=k8s_cli)
+        lines = k8s_ctlr.delete_k8s_namespace(namespace, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 sys.stdout.write(line['stream'])

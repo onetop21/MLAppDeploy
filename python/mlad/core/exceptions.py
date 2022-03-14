@@ -1,6 +1,8 @@
 import json
+from inspect import signature
+from typing import Optional, Callable
 
-from typing import Optional
+from kubernetes.client.rest import ApiException
 
 
 class MLADException(Exception):
@@ -39,6 +41,31 @@ def handle_k8s_api_error(e):
             msg = str(e)
             status = 500
     return msg, status
+
+
+def handle_k8s_exception(obj: str):
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs):
+            name = args[0] if isinstance(args[0], str) else args[0].metadata.name
+            namespace = None
+            params = signature(func).parameters
+            if 'namespace' in params.keys():
+                ns_index = list(params.keys()).index('namespace')
+                namespace = args[ns_index] if isinstance(args[ns_index], str) else None
+            try:
+                resp = func(*args, **kwargs)
+                return resp
+            except ApiException as e:
+                msg, status = handle_k8s_api_error(e)
+                if status == 404:
+                    if namespace is not None:
+                        raise NotFound(f'Cannot find {obj} "{name}" in "{namespace}".')
+                    else:
+                        raise NotFound(f'Cannot find {obj} "{name}".')
+                else:
+                    raise APIError(msg, status)
+        return wrapper
+    return decorator
 
 
 class ProjectNotFoundError(MLADException):
