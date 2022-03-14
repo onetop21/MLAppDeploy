@@ -12,6 +12,7 @@ from dateutil import parser
 from threading import Thread
 from multiprocessing import Queue, Value
 from mlad.core.kubernetes import controller as ctrl
+from mlad.core.libs.constants import MLAD_PROJECT_APP
 from kubernetes import client, watch
 
 
@@ -187,13 +188,14 @@ class LogMonitor(Thread):
             return resp
         return inner
 
-    def __init__(self, cli, handler, collector, namespace, last_resource, **params):
+    def __init__(self, cli, handler, collector, namespace, app_names, last_resource, **params):
         Thread.__init__(self)
         self.daemon = True
         self.api = client.CoreV1Api(cli)
         self.handler = handler
         self.collector = collector
         self.namespace = namespace
+        self.app_names = app_names
         self.resource_version = last_resource
         self.params = params
         self.__stopped = False
@@ -213,7 +215,12 @@ class LogMonitor(Thread):
             try:
                 print(f'Watch Start [{namespace}]')
                 wrapped_api = LogMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
-                for ev in w.stream(wrapped_api, namespace=namespace, resource_version=self.resource_version):
+                if len(self.app_names) == 0:
+                    label_selector = None
+                else:
+                    label_selector = f'{MLAD_PROJECT_APP} in ({",".join(self.app_names)})'
+                for ev in w.stream(wrapped_api, namespace=namespace, resource_version=self.resource_version,
+                                   label_selector=label_selector):
                     event = ev['type']
                     pod = ev['object']['metadata']['name']
                     phase = ev['object']['status']['phase']

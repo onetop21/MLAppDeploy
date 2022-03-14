@@ -1203,35 +1203,38 @@ def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client
     return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
 
 
-def _filter_pod_name_from_apps(
+def _filter_app_and_pod_name_tuple_from_apps(
     project_key: str, filters: Optional[List[str]], cli: ApiClient = DEFAULT_CLI
-) -> List[Tuple[str, str]]:
+) -> List[Tuple[Optional[str], str]]:
     api = client.CoreV1Api(cli)
     apps = get_apps(project_key, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
-    selected_pod_names = []
+    selected_tuples = []
     app_and_pod_names = [(spec['name'], list(spec['task_dict'].keys())) for spec in inspect_apps(apps, cli)]
     for app_name, pod_names in app_and_pod_names:
-        if filters is None or app_name in filters:
-            selected_pod_names += pod_names
+        if filters is None:
+            selected_tuples += [(None, pod_name) for pod_name in pod_names]
+            continue
+        elif app_name in filters:
+            selected_tuples += [(app_name, pod_name) for pod_name in pod_names] 
             continue
         for pod_name in pod_names:
             if pod_name in filters:
-                selected_pod_names.append(pod_name)
+                selected_tuples.append((None, pod_name))
 
     # check whether targets are pending or not
-    filtered_pod_names = []
-    for pod_name in selected_pod_names:
+    filtered_tuples = []
+    for app_name, pod_name in selected_tuples:
         pod = api.read_namespaced_pod(name=pod_name, namespace=namespace)
         phase = get_pod_info(pod)['phase']
         if not phase == 'Pending':
-            filtered_pod_names.append(pod_name)
+            filtered_tuples.append((app_name, pod_name))
 
-    if len(filtered_pod_names) == 0:
+    if len(filtered_tuples) == 0:
         raise exceptions.NotFound('Cannot find a running app or tasks in project')
 
-    return filtered_pod_names
+    return filtered_tuples
 
 
 def get_project_logs(
@@ -1239,14 +1242,14 @@ def get_project_logs(
     timestamps: bool = False, disconnect_handler: Optional[object] = None, cli: ApiClient = DEFAULT_CLI
 ) -> Generator[Dict, None, None]:
     get_apps(project_key, cli=cli)
-    pod_names = _filter_pod_name_from_apps(project_key, filters, cli=cli)
+    app_and_pod_name_tuples = _filter_app_and_pod_name_tuple_from_apps(project_key, filters, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
     handler = LogHandler(cli)
-
+    monitoring_app_names = set([app_name for app_name, _ in app_and_pod_name_tuples if app_name is not None])
     logs = [(pod_name, handler.logs(namespace, pod_name, details=True, follow=follow,
                                     tail=tail, timestamps=timestamps, stdout=True, stderr=True))
-            for pod_name in pod_names]
+            for app_name, pod_name in app_and_pod_name_tuples]
 
     if len(logs):
         with LogCollector() as collector:
@@ -1257,8 +1260,8 @@ def get_project_logs(
                 disconnect_handler.add_callback(lambda: handler.close())
             if follow:
                 last_resource = None
-                monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
-                                     follow=follow, tail=tail, timestamps=timestamps)
+                monitor = LogMonitor(cli, handler, collector, namespace, monitoring_app_names,
+                                     last_resource=last_resource, follow=follow, tail=tail, timestamps=timestamps)
                 monitor.start()
                 if disconnect_handler:
                     disconnect_handler.add_callback(lambda: monitor.stop())
