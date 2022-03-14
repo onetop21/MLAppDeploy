@@ -366,7 +366,7 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
         'restart': 0
     }
 
-    def get_status(container_state):
+    def _get_status(container_state: client.V1ContainerState) -> Dict:
         if container_state.running:
             return {'state': 'Running', 'detail': None}
         if container_state.terminated:
@@ -385,37 +385,25 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
                 }
             }
 
-    def parse_status(containers):
-        status = 'Running'
-        completed = 0
-        for container in containers:
-            container_status = container['status']
-            detail = container_status['detail']['reason'] \
-                if container_status['detail'] is not None else None
-            if container_status['state'] == 'Waiting':
-                return detail
-            elif container_status['state'] == 'Terminated':
-                if detail == 'Completed':
-                    completed += 1
-                    if completed == len(containers):
-                        return detail
-                    else:
-                        pass
-                else:
-                    return detail
-        return status
+    def _parse_status(containers: List[Dict]) -> str:
+        container = containers[0]
+        container_status = container['status']
+        state = container_status['state']
+        reason = 'Running' if state == 'Running' else \
+            container_status['detail']['reason']
+        return reason
 
-    if pod.status.container_statuses:
+    if pod.status.container_statuses is not None:
         for container in pod.status.container_statuses:
             container_info = {
                 'container_id': container.container_id,
                 'restart': container.restart_count,
-                'status': get_status(container.state),
+                'status': _get_status(container.state),
                 'ready': container.ready
             }
             pod_info['container_status'].append(container_info)
             pod_info['restart'] += container_info['restart']
-        pod_info['status'] = parse_status(pod_info['container_status'])
+        pod_info['status'] = _parse_status(pod_info['container_status'])
     else:
         pod_info['status'] = pod.status.conditions[0].reason if pod.status.conditions \
             else pod.status.reason
