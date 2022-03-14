@@ -340,7 +340,7 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
         'restart': 0
     }
 
-    def get_status(container_state):
+    def _get_status(container_state: client.V1ContainerState) -> Dict:
         if container_state.running:
             return {'state': 'Running', 'detail': None}
         if container_state.terminated:
@@ -359,44 +359,28 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
                 }
             }
 
-    def parse_status(containers):
-        status = {'state': 'Running', 'detail': None}
-        # if not running container exits, return that
-        completed = 0
-        for _ in containers:
-            if _['status']['state'] == 'Waiting':
-                return _['status']
-            elif _['status']['state'] == 'Terminated':
-                if _['status']['detail']['reason'] == 'Completed':
-                    completed += 1
-                    if completed == len(containers):
-                        return _['status']
-                    else:
-                        pass
-                else:
-                    return _['status']
-        return status
+    def _parse_status(containers: List[Dict]) -> str:
+        container = containers[0]
+        container_status = container['status']
+        state = container_status['state']
+        reason = 'Running' if state == 'Running' else \
+            container_status['detail']['reason']
+        return reason
 
-    if pod.status.container_statuses:
+    if pod.status.container_statuses is not None:
         for container in pod.status.container_statuses:
             container_info = {
                 'container_id': container.container_id,
                 'restart': container.restart_count,
-                'status': get_status(container.state),
+                'status': _get_status(container.state),
                 'ready': container.ready
             }
             pod_info['container_status'].append(container_info)
             pod_info['restart'] += container_info['restart']
-        pod_info['status'] = parse_status(pod_info['container_status'])
+        pod_info['status'] = _parse_status(pod_info['container_status'])
     else:
-        pod_info['container_status'] = None
-        pod_info['status'] = {
-            'state': 'Waiting',
-            'detail': {
-                'reason': pod.status.conditions[0].reason if pod.status.conditions
-                else pod.status.reason
-            }
-        }
+        pod_info['status'] = pod.status.conditions[0].reason if pod.status.conditions \
+            else pod.status.reason
     return pod_info
 
 
@@ -558,7 +542,7 @@ def _convert_constraints_to_k8s_node_selector(constraints: Dict) -> Dict[str, st
         if k == 'hostname':
             if v is not None:
                 selector["kubernetes.io/hostname"] = v
-        elif k == 'label':
+        elif k == 'label' and v is not None:
             label_dict: Dict = v
             for label_key, label in label_dict.items():
                 selector[label_key] = str(label)
