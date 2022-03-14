@@ -77,7 +77,7 @@ def ls(no_trunc: bool):
 
         for spec in target_app_specs:
             tasks = spec['tasks'].values()
-            tasks_state = [_['status']['state'] for _ in tasks]
+            tasks_state = [task['status'] for task in tasks]
             projects[project_key]['apps'] += 1
             projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
@@ -136,10 +136,9 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                 task_info.append((
                     pod_name,
                     app_name,
-                    pod['node'] if pod['node'] else '-',
+                    pod['node'] if pod['node'] is not None else '-',
                     pod['phase'],
-                    'Running' if pod['status']['state'] == 'Running' else
-                    pod['status']['detail']['reason'],
+                    pod['status'],
                     pod['restart'],
                     age,
                     ports,
@@ -202,10 +201,11 @@ def ingress():
         project_name = spec['project']
         app_name = spec['name']
         key = spec['key']
-        for ingress in spec['ingress']:
-            port = ingress['port']
-            path = ingress['path']
-            rows.append((username, project_name, app_name, key, port, path))
+        for expose_spec in spec['expose']:
+            if 'ingress' in expose_spec:
+                port = expose_spec['port']
+                path = expose_spec['ingress']['path']
+                rows.append((username, project_name, app_name, key, port, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
 
@@ -320,10 +320,9 @@ def up(file: Optional[str]):
 
     # Get ingress path for deployed app
     for app in res:
-        if len(app['ingress']) > 0:
-            yield utils.info_msg(f'[{app["name"]}] Ingress Path :')
-            for ingress in app['ingress']:
-                yield utils.info_msg(f'- port: {ingress["port"]} -> {ingress["path"]}')
+        for expose_spec in app['expose']:
+            if 'ingress' in expose_spec:
+                yield utils.info_msg(f'Ingress: {expose_spec["ingress"]["path"]} -> {app["name"]}:{expose_spec["port"]}')
 
 
 def down(file: Optional[str], project_key: Optional[str], dump: bool):
