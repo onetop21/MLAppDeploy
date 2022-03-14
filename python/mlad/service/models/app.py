@@ -58,13 +58,13 @@ class AdvancedBase(AppBase):
 
 
 class App(AppBase):
-    restartPolicy: Optional[str] = 'never'
+    restartPolicy: Optional[str] = 'Never'
     quota: Optional[Quota] = None
     depends: Optional[List[Dependency]] = None
 
 
 class JobRunSpec(BaseModel):
-    restartPolicy: Optional[str] = 'never'
+    restartPolicy: Optional[str] = 'Never'
     parallelism: Optional[int] = 1
     completion: Optional[int] = 1
 
@@ -88,13 +88,13 @@ class Service(AdvancedBase):
 class AppJob(App):
     kind = 'Job'
     # Never | onFailure
-    restartPolicy: Optional[str] = 'never'
+    restartPolicy: Optional[str] = 'Never'
 
 
 class AppService(App):
     kind = 'Service'
     scale: Optional[int] = 1
-    restartPolicy: Optional[str] = 'always'
+    restartPolicy: Optional[str] = 'Always'
 
 
 class CreateRequest(BaseModel):
