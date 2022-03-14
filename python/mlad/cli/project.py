@@ -24,15 +24,10 @@ from mlad.cli.exceptions import (
     MountPortAlreadyUsedError, InvalidDependsError
 )
 from mlad.core.docker import controller as docker_ctlr
+from mlad.core.libs.constants import CONFIG_ENVS, MLAD_PROJECT, MLAD_PROJECT_IMAGE
 
 from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest, NotFound
-
-
-config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
-               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
-               'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
-               'USERNAME'}
 
 
 def init(name, version, maintainer):
@@ -82,7 +77,7 @@ def ls(no_trunc: bool):
 
         for spec in target_app_specs:
             tasks = spec['task_dict'].values()
-            tasks_state = [_['status']['state'] for _ in tasks]
+            tasks_state = [task['status'] for task in tasks]
             projects[project_key]['apps'] += 1
             projects[project_key]['replicas'] += spec['replicas']
             projects[project_key]['tasks'] += tasks_state.count('Running')
@@ -141,10 +136,9 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
                 task_info.append((
                     pod_name,
                     app_name,
-                    pod['node'] if pod['node'] else '-',
+                    pod['node'] if pod['node'] is not None else '-',
                     pod['phase'],
-                    'Running' if pod['status']['state'] == 'Running' else
-                    pod['status']['detail']['reason'],
+                    pod['status'],
                     pod['restart'],
                     age,
                     ports,
@@ -207,10 +201,11 @@ def ingress():
         project_name = spec['project']
         app_name = spec['name']
         key = spec['key']
-        for ingress in spec['ingress']:
-            port = ingress['port']
-            path = ingress['path']
-            rows.append((username, project_name, app_name, key, port, path))
+        for expose_spec in spec['expose']:
+            if 'ingress' in expose_spec:
+                port = expose_spec['port']
+                path = expose_spec['ingress']['path']
+                rows.append((username, project_name, app_name, key, port, path))
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
 
@@ -248,7 +243,7 @@ def up(file: Optional[str]):
     )
 
     # Check the project already exists
-    project_key = base_labels['MLAD.PROJECT']
+    project_key = base_labels[MLAD_PROJECT]
     try:
         API.project.inspect(project_key=project_key)
         raise ProjectAlreadyExistError(project_key)
@@ -256,7 +251,7 @@ def up(file: Optional[str]):
         pass
 
     # Find suitable image
-    image_tag = base_labels['MLAD.PROJECT.IMAGE']
+    image_tag = base_labels[MLAD_PROJECT_IMAGE]
     images = [image for image in docker_ctlr.get_images(project_key=project_key)
               if image_tag in image.tags]
     if len(images) == 0:
@@ -325,10 +320,9 @@ def up(file: Optional[str]):
 
     # Get ingress path for deployed app
     for app in res:
-        if len(app['ingress']) > 0:
-            yield utils.info_msg(f'[{app["name"]}] Ingress Path :')
-            for ingress in app['ingress']:
-                yield utils.info_msg(f'- port: {ingress["port"]} -> {ingress["path"]}')
+        for expose_spec in app['expose']:
+            if 'ingress' in expose_spec:
+                yield utils.info_msg(f'Ingress: {expose_spec["ingress"]["path"]} -> {app["name"]}:{expose_spec["port"]}')
 
 
 def down(file: Optional[str], project_key: Optional[str], dump: bool):
@@ -520,9 +514,9 @@ def update(file: Optional[str], project_key: Optional[str]):
         # Check env to protect MLAD config
         env_checked = set()
         if isinstance(env_key, list):
-            env_checked = set(env_key).intersection(config_envs)
+            env_checked = set(env_key).intersection(CONFIG_ENVS)
         elif isinstance(env_key, str):
-            if env_key in config_envs:
+            if env_key in CONFIG_ENVS:
                 env_checked.add(env_key)
         return env_checked
 
@@ -704,6 +698,6 @@ def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
 
 def _check_config_envs(name: str, app_spec: dict):
     if 'env' in app_spec:
-        ignored = set(dict(app_spec['env'])).intersection(config_envs)
+        ignored = set(dict(app_spec['env'])).intersection(CONFIG_ENVS)
         if len(ignored) > 0:
             return utils.info_msg(f"Warning: '{name}' env {ignored} will be ignored for MLAD preferences.")
