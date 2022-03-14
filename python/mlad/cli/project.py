@@ -24,15 +24,10 @@ from mlad.cli.exceptions import (
     MountPortAlreadyUsedError, InvalidDependsError
 )
 from mlad.core.docker import controller as docker_ctlr
+from mlad.core.libs.constants import CONFIG_ENVS, MLAD_PROJECT, MLAD_PROJECT_IMAGE
 
 from mlad.api import API
 from mlad.api.exceptions import ProjectNotFound, InvalidLogRequest, NotFound
-
-
-config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
-               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
-               'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
-               'USERNAME'}
 
 
 def init(name, version, maintainer):
@@ -248,7 +243,7 @@ def up(file: Optional[str]):
     )
 
     # Check the project already exists
-    project_key = base_labels['MLAD.PROJECT']
+    project_key = base_labels[MLAD_PROJECT]
     try:
         API.project.inspect(project_key=project_key)
         raise ProjectAlreadyExistError(project_key)
@@ -256,7 +251,7 @@ def up(file: Optional[str]):
         pass
 
     # Find suitable image
-    image_tag = base_labels['MLAD.PROJECT.IMAGE']
+    image_tag = base_labels[MLAD_PROJECT_IMAGE]
     images = [image for image in docker_ctlr.get_images(project_key=project_key)
               if image_tag in image.tags]
     if len(images) == 0:
@@ -520,9 +515,9 @@ def update(file: Optional[str], project_key: Optional[str]):
         # Check env to protect MLAD config
         env_checked = set()
         if isinstance(env_key, list):
-            env_checked = set(env_key).intersection(config_envs)
+            env_checked = set(env_key).intersection(CONFIG_ENVS)
         elif isinstance(env_key, str):
-            if env_key in config_envs:
+            if env_key in CONFIG_ENVS:
                 env_checked.add(env_key)
         return env_checked
 
@@ -704,6 +699,6 @@ def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
 
 def _check_config_envs(name: str, app_spec: dict):
     if 'env' in app_spec:
-        ignored = set(dict(app_spec['env'])).intersection(config_envs)
+        ignored = set(dict(app_spec['env'])).intersection(CONFIG_ENVS)
         if len(ignored) > 0:
             return utils.info_msg(f"Warning: '{name}' env {ignored} will be ignored for MLAD preferences.")

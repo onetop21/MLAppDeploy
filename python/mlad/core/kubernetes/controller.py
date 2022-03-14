@@ -19,6 +19,12 @@ from mlad.core.exceptions import (
     ProjectNotFoundError
 )
 from mlad.core.libs import utils
+from mlad.core.libs.constants import (
+    MLAD_PROJECT, MLAD_PROJECT_APP, MLAD_PROJECT_APP_KIND, MLAD_PROJECT_BASE, MLAD_PROJECT_ENV,
+    MLAD_PROJECT_ID, MLAD_PROJECT_IMAGE, MLAD_PROJECT_INGRESS, MLAD_PROJECT_KIND, MLAD_PROJECT_NAME,
+    MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_SESSION, MLAD_PROJECT_USERNAME,
+    MLAD_PROJECT_VERSION, MLAD_PROJECT_YAML
+)
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 
@@ -26,12 +32,6 @@ from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
 App = Union[client.V1Job, client.V1Deployment]
 LogGenerator = Generator[Dict[str, str], None, None]
 LogTuple = Tuple[Dict[str, str]]
-
-SHORT_LEN = 10
-config_envs = {'APP', 'AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY', 'DB_ADDRESS',
-               'DB_PASSWORD', 'DB_USERNAME', 'MLAD_ADDRESS', 'MLAD_SESSION', 'PROJECT',
-               'PROJECT_ID', 'PROJECT_KEY', 'S3_ENDPOINT', 'S3_USE_HTTPS', 'S3_VERIFY_SSL',
-               'USERNAME'}
 
 
 def get_api_client(
@@ -65,14 +65,14 @@ def check_project_key(project_key: str, app: App, cli: ApiClient = DEFAULT_CLI) 
 
 def get_k8s_namespaces(extra_labels: List[str] = [], cli: ApiClient = DEFAULT_CLI) -> List[client.V1Namespace]:
     api = client.CoreV1Api(cli)
-    selector = ['MLAD.PROJECT'] + extra_labels
+    selector = [MLAD_PROJECT] + extra_labels
     resp = api.list_namespace(label_selector=','.join(selector))
     return resp.items
 
 
 def get_k8s_namespace(project_key: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Namespace:
     api = client.CoreV1Api(cli)
-    resp = api.list_namespace(label_selector=f'MLAD.PROJECT={project_key}')
+    resp = api.list_namespace(label_selector=f'{MLAD_PROJECT}={project_key}')
     if len(resp.items) == 0:
         raise ProjectNotFoundError(project_key)
     elif len(resp.items) == 1:
@@ -105,32 +105,32 @@ def _create_k8s_config_map(key: str, namespace: str, labels: Dict[str, str], cli
 def inspect_k8s_namespace(namespace: client.V1Namespace, cli: ApiClient = DEFAULT_CLI) -> Dict:
     labels = namespace.metadata.labels
     if namespace.metadata.deletion_timestamp:
-        return {'deleted': True, 'key': labels['MLAD.PROJECT']}
+        return {'deleted': True, 'key': labels[MLAD_PROJECT]}
     config_labels = _get_k8s_config_map_data(namespace, 'project-labels', cli)
-    hostname, path = config_labels['MLAD.PROJECT.WORKSPACE'].split(':')
+    hostname, path = config_labels[MLAD_PROJECT_WORKSPACE].split(':')
 
     return {
-        'key': labels['MLAD.PROJECT'],
+        'key': labels[MLAD_PROJECT],
         'workspace': {
             'hostname': hostname,
             'path': path
         },
-        'username': config_labels['MLAD.PROJECT.USERNAME'],
-        'name': config_labels['MLAD.PROJECT.NAMESPACE'],
-        'project': labels['MLAD.PROJECT.NAME'],
-        'id': uuid.UUID(config_labels['MLAD.PROJECT.ID']),
-        'version': config_labels['MLAD.PROJECT.VERSION'],
-        'base': config_labels['MLAD.PROJECT.BASE'],
-        'image': config_labels['MLAD.PROJECT.IMAGE'],
-        'kind': config_labels.get('MLAD.PROJECT.KIND', 'Deployment'),
+        'username': config_labels[MLAD_PROJECT_USERNAME],
+        'name': config_labels[MLAD_PROJECT_NAMESPACE],
+        'project': labels[MLAD_PROJECT_NAME],
+        'id': uuid.UUID(config_labels[MLAD_PROJECT_ID]),
+        'version': config_labels[MLAD_PROJECT_VERSION],
+        'base': config_labels[MLAD_PROJECT_BASE],
+        'image': config_labels[MLAD_PROJECT_IMAGE],
+        'kind': config_labels.get(MLAD_PROJECT_KIND, 'Deployment'),
         'created': namespace.metadata.creation_timestamp,
-        'project_yaml': (namespace.metadata.annotations or dict()).get('MLAD.PROJECT.YAML', '{}')
+        'project_yaml': (namespace.metadata.annotations or dict()).get(MLAD_PROJECT_YAML, '{}')
     }
 
 
 def get_project_session(namespace: client.V1Namespace, cli: ApiClient = DEFAULT_CLI) -> str:
     config_labels = _get_k8s_config_map_data(namespace, 'project-labels', cli)
-    return config_labels['MLAD.PROJECT.SESSION']
+    return config_labels[MLAD_PROJECT_SESSION]
 
 
 def create_k8s_namespace_with_data(
@@ -138,30 +138,30 @@ def create_k8s_namespace_with_data(
     project_yaml: Dict, credential: str, cli: ApiClient = DEFAULT_CLI
 ) -> LogGenerator:
     api = client.CoreV1Api(cli)
-    project_key = base_labels['MLAD.PROJECT']
+    project_key = base_labels[MLAD_PROJECT]
     try:
         get_k8s_namespace(project_key, cli=cli)
     except ProjectNotFoundError:
         pass
     else:
         raise NamespaceAlreadyExistError(project_key)
-    basename = base_labels['MLAD.PROJECT.BASE']
+    basename = base_labels[MLAD_PROJECT_BASE]
     namespace_name = f"{basename}-cluster"
     try:
         message = f"Create a namespace [{namespace_name}]...\n"
         yield {'stream': message}
         labels = copy.deepcopy(base_labels)
         labels.update({
-            'MLAD.PROJECT.NAMESPACE': namespace_name,
-            'MLAD.PROJECT.ID': str(utils.generate_unique_id()),
-            'MLAD.PROJECT.ENV': utils.encode_dict(extra_envs),
+            MLAD_PROJECT_NAMESPACE: namespace_name,
+            MLAD_PROJECT_ID: str(utils.generate_unique_id()),
+            MLAD_PROJECT_ENV: utils.encode_dict(extra_envs),
         })
         keys = {
-            'MLAD.PROJECT': labels['MLAD.PROJECT'],
-            'MLAD.PROJECT.NAME': labels['MLAD.PROJECT.NAME'],
+            MLAD_PROJECT: labels[MLAD_PROJECT],
+            MLAD_PROJECT_NAME: labels[MLAD_PROJECT_NAME],
         }
         annotations = {
-            'MLAD.PROJECT.YAML': json.dumps(project_yaml)
+            MLAD_PROJECT_YAML: json.dumps(project_yaml)
         }
         api.create_namespace(
             client.V1Namespace(
@@ -219,7 +219,7 @@ def update_k8s_namespace(
 ) -> client.V1Namespace:
     api = client.CoreV1Api(cli)
     name = namespace.metadata.name
-    namespace.metadata.annotations['MLAD.PROJECT.YAML'] = json.dumps(update_yaml)
+    namespace.metadata.annotations[MLAD_PROJECT_YAML] = json.dumps(update_yaml)
     try:
         return api.patch_namespace(name, namespace)
     except ApiException as e:
@@ -257,8 +257,8 @@ def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -
 def get_app(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> App:
     key = f'app-{name}-labels'
     config_labels = _get_k8s_config_map_data(namespace, key, cli)
-    kind = config_labels['MLAD.PROJECT.APP.KIND']
-    name = config_labels['MLAD.PROJECT.APP']
+    kind = config_labels[MLAD_PROJECT_APP_KIND]
+    name = config_labels[MLAD_PROJECT_APP]
     app = get_app_from_kind(name, namespace, kind, cli=cli)
     return app
 
@@ -268,7 +268,7 @@ def get_apps(project_key: Optional[str] = None,
              cli: ApiClient = DEFAULT_CLI) -> List[App]:
     batch_api = client.BatchV1Api(cli)
     apps_api = client.AppsV1Api(cli)
-    filters = [f'MLAD.PROJECT={project_key}' if project_key else 'MLAD.PROJECT']
+    filters = [f'{MLAD_PROJECT}={project_key}' if project_key else MLAD_PROJECT]
     filters += [f'{key}={value}' for key, value in extra_filters.items()]
 
     apps = []
@@ -292,7 +292,7 @@ def get_k8s_service(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> 
 def get_k8s_service_of_app(namespace: str, app_name: str, cli: ApiClient = DEFAULT_CLI) -> Optional[client.V1Service]:
     api = client.CoreV1Api(cli)
     service = api.list_namespaced_service(
-        namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
+        namespace, label_selector=f"{MLAD_PROJECT_APP}={app_name}")
     if len(service.items) == 0:
         return None
     elif len(service.items) == 1:
@@ -303,11 +303,11 @@ def get_app_from_kind(app_name: str, namespace: str, kind: str, cli: ApiClient =
     if kind == 'Job':
         batch_api = client.BatchV1Api(cli)
         resp = batch_api.list_namespaced_job(
-            namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
+            namespace, label_selector=f"{MLAD_PROJECT_APP}={app_name}")
     elif kind == 'Service':
         apps_api = client.AppsV1Api(cli)
         resp = apps_api.list_namespaced_deployment(
-            namespace, label_selector=f"MLAD.PROJECT.APP={app_name}")
+            namespace, label_selector=f"{MLAD_PROJECT_APP}={app_name}")
     if len(resp.items) == 0:
         return None
     elif len(resp.items) == 1:
@@ -415,44 +415,44 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
     namespace = app.metadata.namespace
     config_labels = _get_k8s_config_map_data(namespace, f'app-{name}-labels', cli)
 
-    pods = api.list_namespaced_pod(namespace, label_selector=f'MLAD.PROJECT.APP={name}').items
+    pods = api.list_namespaced_pod(namespace, label_selector=f'{MLAD_PROJECT_APP}={name}').items
 
-    hostname, path = config_labels.get('MLAD.PROJECT.WORKSPACE', ':').split(':')
+    hostname, path = config_labels.get(MLAD_PROJECT_WORKSPACE, ':').split(':')
     pod_spec = app.spec.template.spec
     service = get_k8s_service_of_app(namespace, name, cli=cli)
     try:
-        ingress = json.loads(config_labels.get('MLAD.PROJECT.INGRESS', '[]'))
+        ingress = json.loads(config_labels.get(MLAD_PROJECT_INGRESS, '[]'))
     except json.decoder.JSONDecodeError:
-        path = config_labels.get('MLAD.PROJECT.INGRESS', '')
+        path = config_labels.get(MLAD_PROJECT_INGRESS, '')
         ingress = []
         if path != '':
             ingress.append({'port': '-', 'path': path})
 
     spec = {
-        'key': config_labels['MLAD.PROJECT'] if config_labels.get(
-            'MLAD.VERSION') else '',
+        'key': config_labels[MLAD_PROJECT] if config_labels.get(
+            MLAD_PROJECT) else '',
         'workspace': {
             'hostname': hostname,
             'path': path
         },
-        'username': config_labels.get('MLAD.PROJECT.USERNAME'),
-        'namespace': config_labels.get('MLAD.PROJECT.NAMESPACE'),
-        'project': config_labels.get('MLAD.PROJECT.NAME'),
-        'project_id': uuid.UUID(config_labels['MLAD.PROJECT.ID']) if config_labels.get(
-            'MLAD.VERSION') else '',
-        'version': config_labels.get('MLAD.PROJECT.VERSION'),
-        'base': config_labels.get('MLAD.PROJECT.BASE'),
+        'username': config_labels.get(MLAD_PROJECT_USERNAME),
+        'namespace': config_labels.get(MLAD_PROJECT_NAMESPACE),
+        'project': config_labels.get(MLAD_PROJECT_NAME),
+        'project_id': uuid.UUID(config_labels[MLAD_PROJECT_ID]) if config_labels.get(
+            MLAD_PROJECT_ID) else '',
+        'version': config_labels.get(MLAD_PROJECT_VERSION),
+        'base': config_labels.get(MLAD_PROJECT_BASE),
         # Replace from labels['MLAD.PROJECT.IMAGE']
         'image': pod_spec.containers[0].image,
         'env': [{'name': e.name, 'value': e.value} for e in pod_spec.containers[0].env],
         'id': app.metadata.uid,
-        'name': config_labels.get('MLAD.PROJECT.APP'),
+        'name': config_labels.get(MLAD_PROJECT_APP),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
         'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pods]),
         'ports': [port_spec.port for port_spec in service.spec.ports] if service is not None else [],
         'ingress': ingress,
         'created': app.metadata.creation_timestamp,
-        'kind': config_labels.get('MLAD.PROJECT.APP.KIND'),
+        'kind': config_labels.get(MLAD_PROJECT_APP_KIND),
     }
     return spec
 
@@ -594,7 +594,7 @@ def _create_k8s_job(
             backoff_limit=0,
             parallelism=parallelism,
             completions=completions,
-            selector={'MLAD.PROJECT.APP': name},
+            selector={MLAD_PROJECT_APP: name},
             template=client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(name=name, labels=labels),
                 spec=client.V1PodSpec(
@@ -647,7 +647,7 @@ def _create_k8s_deployment(
         spec=client.V1DeploymentSpec(
             replicas=replicas,
             selector=client.V1LabelSelector(
-                match_labels={'MLAD.PROJECT.APP': name}
+                match_labels={MLAD_PROJECT_APP: name}
             ),
             template=client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(
@@ -690,7 +690,7 @@ def _create_k8s_pv(
                 name=f'{name}-{pv_index}-pv',
                 labels={
                     'mount': f'{name}-{pv_index}',
-                    'MLAD.PROJECT.APP': name
+                    MLAD_PROJECT_APP: name
                 }
             ),
             spec=client.V1PersistentVolumeSpec(
@@ -708,7 +708,7 @@ def _create_k8s_pv(
 
 def _delete_k8s_pvs(name: str, cli: ApiClient = DEFAULT_CLI) -> None:
     api = client.CoreV1Api(cli)
-    pvs = api.list_persistent_volume(label_selector=f'MLAD.PROJECT.APP={name}').items
+    pvs = api.list_persistent_volume(label_selector=f'{MLAD_PROJECT_APP}={name}').items
     for pv in pvs:
         api.delete_persistent_volume(pv.metadata.name)
 
@@ -776,7 +776,7 @@ def create_apps(
     instances = []
     for name, app in apps.items():
         # Check running already
-        if len(get_apps(namespace_spec['key'], extra_filters={'MLAD.PROJECT.APP': name}, cli=cli)) > 0:
+        if len(get_apps(namespace_spec['key'], extra_filters={MLAD_PROJECT_APP: name}, cli=cli)) > 0:
             raise exceptions.Duplicated('Already running app.')
 
         kind = app['kind']
@@ -791,7 +791,7 @@ def create_apps(
             'APP': name,
             'PYTHONUNBUFFERED': 1
         })
-        config_envs = utils.decode_dict(config_labels['MLAD.PROJECT.ENV'])
+        config_envs = utils.decode_dict(config_labels[MLAD_PROJECT_ENV])
         config_envs = {env.split('=', 1)[0]: env.split('=', 1)[1] for env in config_envs}
         app_envs.update(config_envs)
         if quota is not None and quota['gpu'] == 0:
@@ -809,14 +809,14 @@ def create_apps(
 
         labels = copy.copy(namespace_labels) or {}
         labels.update(extra_labels)
-        labels['MLAD.PROJECT.APP'] = name
+        labels[MLAD_PROJECT_APP] = name
 
         constraints = app['constraints']
         pv_mounts = app['mounts'] or []
         v_mounts = ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
 
-        config_labels['MLAD.PROJECT.APP'] = name
-        config_labels['MLAD.PROJECT.APP.KIND'] = kind
+        config_labels[MLAD_PROJECT_APP] = name
+        config_labels[MLAD_PROJECT_APP_KIND] = kind
 
         # Secrets
         secrets = f"{project_base}-auth"
@@ -855,7 +855,7 @@ def create_apps(
                         labels=labels
                     ),
                     spec=client.V1ServiceSpec(
-                        selector={'MLAD.PROJECT.APP': name},
+                        selector={MLAD_PROJECT_APP: name},
                         ports=[client.V1ServicePort(port=port, name=f'port{port}')
                                for port in ports]
                     )
@@ -873,7 +873,7 @@ def create_apps(
                         ingress_specs.append({'port': port, 'path': ingress_path})
                         _create_k8s_ingress(namespace_name, name, ingress_name, port,
                                             ingress_path, rewrite_path, cli=cli)
-            config_labels['MLAD.PROJECT.INGRESS'] = json.dumps(ingress_specs)
+            config_labels[MLAD_PROJECT_INGRESS] = json.dumps(ingress_specs)
             _create_k8s_config_map(f'app-{name}-labels', namespace_name, config_labels, cli=cli)
         except ApiException as e:
             msg, status = exceptions.handle_k8s_api_error(e)
@@ -941,10 +941,10 @@ def _update_k8s_deployment(
     container_spec = deployment.spec.template.spec.containers[0]
     current = {env.name: env.value for env in container_spec.env}
     for key in list(update_spec['env']['current'].keys()):
-        if key not in config_envs:
+        if key not in CONFIG_ENVS:
             current.pop(key)
     for key in list(update_spec['env']['update'].keys()):
-        if key in config_envs:
+        if key in CONFIG_ENVS:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
     if 'gpu' in quota and quota['gpu'] == 0:
@@ -992,10 +992,10 @@ def _update_k8s_job(
     container_spec = k8s_job.spec.template.spec.containers[0]
     current = {env.name: env.value for env in container_spec.env}
     for key in list(update_spec['env']['current'].keys()):
-        if key not in config_envs:
+        if key not in CONFIG_ENVS:
             current.pop(key)
     for key in list(update_spec['env']['update'].keys()):
-        if key in config_envs:
+        if key in CONFIG_ENVS:
             update_spec['env']['update'].pop(key)
     current.update(update_spec['env']['update'])
     if 'gpu' in quota and quota['gpu'] == 0:
@@ -1056,7 +1056,7 @@ def remove_apps(
         task_keys = list(spec['tasks'].keys())
 
         config_labels = _get_k8s_config_map_data(namespace, f'app-{app_name}-labels', cli)
-        kind = config_labels['MLAD.PROJECT.APP.KIND']
+        kind = config_labels[MLAD_PROJECT_APP_KIND]
         return app_name, kind, task_keys
 
     app_specs = [_get_app_spec(app) for app in apps]
@@ -1081,7 +1081,7 @@ def remove_apps(
                 api.delete_namespaced_service(app_name, namespace)
 
             ingress_list = network_api.list_namespaced_ingress(
-                namespace, label_selector=f'MLAD.PROJECT.APP={app_name}').items
+                namespace, label_selector=f'{MLAD_PROJECT_APP}={app_name}').items
             if len(ingress_list) > 0:
                 ingress_name = ingress_list[0].metadata.name
                 network_api.delete_namespaced_ingress(ingress_name, namespace)
@@ -1314,7 +1314,7 @@ def _create_k8s_ingress(
         api_version="networking.k8s.io/v1",
         kind="Ingress",
         metadata=client.V1ObjectMeta(name=ingress_name, annotations=annotations,
-                                     labels={'MLAD.PROJECT.APP': app_name}),
+                                     labels={MLAD_PROJECT_APP: app_name}),
         spec=client.V1IngressSpec(
             rules=[
                 client.V1IngressRule(
@@ -1459,12 +1459,12 @@ def get_project_resources(
     cpu_unit_error = False
     mem_unit_error = False
     for app in apps:
-        name = app.metadata.labels['MLAD.PROJECT.APP']
+        name = app.metadata.labels[MLAD_PROJECT_APP]
         namespace = app.metadata.namespace
         result[name] = {}
 
         pods = v1_api.list_namespaced_pod(namespace,
-                                          label_selector=f'MLAD.PROJECT.APP={name}')
+                                          label_selector=f'{MLAD_PROJECT_APP}={name}')
         for pod in pods.items:
             resource = {'mem': 0, 'cpu': 0, 'gpu': 0}
             pod_name = pod.metadata.name

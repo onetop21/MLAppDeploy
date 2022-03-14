@@ -6,7 +6,12 @@ import base64
 from typing import List, Optional
 import docker
 from docker.types import Mount
+
 from mlad.core.libs import utils
+from mlad.core.libs.constants import (
+    MLAD_PROJECT, MLAD_PROJECT_VERSION, MLAD_PROJECT_IMAGE, MLAD_PROJECT_USERNAME,
+    MLAD_PROJECT_NAME, MLAD_PROJECT_WORKSPACE
+)
 from mlad.core.exceptions import (
     DockerNotFoundError
 )
@@ -53,23 +58,23 @@ def inspect_image(image: docker.models.images.Image):
         # For image
         'id': image.id.split(':', 1)[-1],
         'short_id': image.short_id.split(':', 1)[-1],
-        'tag': image.labels['MLAD.PROJECT.IMAGE'],
+        'tag': image.labels[MLAD_PROJECT_IMAGE],
         'tags': image.tags,
-        'version': image.labels['MLAD.PROJECT.VERSION'],
-        'username': image.labels['MLAD.PROJECT.USERNAME'],
+        'version': image.labels[MLAD_PROJECT_VERSION],
+        'username': image.labels[MLAD_PROJECT_USERNAME],
         'maintainer': image.attrs['Author'],
         # Trim meaningless decimals
         'created': image.attrs['Created'][:-7],
         # For project
         'api_version': image.labels['MLAD.PROJECT.API_VERSION'],
-        'workspace': image.labels['MLAD.PROJECT.WORKSPACE'] if 'MLAD.PROJECT.WORKSPACE' in image.labels else 'Not Supported',
-        'project_name': image.labels['MLAD.PROJECT.NAME'],
+        'workspace': image.labels[MLAD_PROJECT_WORKSPACE] if MLAD_PROJECT_WORKSPACE in image.labels else 'Not Supported',
+        'project_name': image.labels[MLAD_PROJECT_NAME],
     }
 
 
 def build_image(base_labels, tar, dockerfile, no_cache=False, pull=False, stream=False):
     cli = get_cli()
-    latest_name = base_labels['MLAD.PROJECT.IMAGE']
+    latest_name = base_labels[MLAD_PROJECT_IMAGE]
     headers = _get_auth_headers()
     headers['content-type'] = 'application/x-tar'
 
@@ -143,7 +148,7 @@ def run_nfs_container(project_key: str, path: str, port: str):
         mounts=[Mount(source=path, target='/shared', type='bind')],
         detach=True,
         labels={
-            'MLAD.PROJECT': project_key,
+            MLAD_PROJECT: project_key,
             'role': 'nfs-server'
         },
         restart_policy={'Name': 'always'}
@@ -153,7 +158,7 @@ def run_nfs_container(project_key: str, path: str, port: str):
 def remove_nfs_containers(project_key: str):
     cli = get_cli()
     containers = cli.containers.list(
-        filters={'label': [f'MLAD.PROJECT={project_key}', 'role=nfs-server']},
+        filters={'label': [f'{MLAD_PROJECT}={project_key}', 'role=nfs-server']},
         all=True)
     for container in containers:
         container.stop()
