@@ -102,7 +102,7 @@ async def request_projects(_, session: aiohttp.ClientSession):
         workspace = project['workspace']['path']
         apps = apps_list[i]
         for spec in apps['specs']:
-            tasks = spec['tasks'].values()
+            tasks = spec['task_dict'].values()
             states = [t['status']['state'] for t in tasks]
             n_apps += 1
             n_replicas += spec['replicas']
