@@ -1,4 +1,3 @@
-import sys
 import copy
 import time
 import json
@@ -1200,7 +1199,14 @@ def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client
             "replicas": scale_spec
         }
     }
-    return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
+    try:
+        return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find app {name} in {namespace}.')
+        else:
+            raise exceptions.APIError(msg, status)
 
 
 def _filter_app_and_pod_name_tuple_from_apps(
