@@ -220,7 +220,14 @@ def update_k8s_namespace(
     api = client.CoreV1Api(cli)
     name = namespace.metadata.name
     namespace.metadata.annotations[MLAD_PROJECT_YAML] = json.dumps(update_yaml)
-    return api.patch_namespace(name, namespace)
+    try:
+        return api.patch_namespace(name, namespace)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find namespace {name}.')
+        else:
+            raise exceptions.APIError(msg, status)
 
 
 @handle_k8s_exception('deployment', namespaced=True)
