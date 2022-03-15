@@ -214,7 +214,6 @@ def delete_k8s_namespace(
         yield {'result': 'succeed'}
 
 
-@handle_k8s_exception('namespace')
 def update_k8s_namespace(
     namespace: client.V1Namespace, update_yaml: Dict, cli: ApiClient = DEFAULT_CLI
 ) -> client.V1Namespace:
@@ -224,13 +223,13 @@ def update_k8s_namespace(
     return api.patch_namespace(name, namespace)
 
 
-@handle_k8s_exception('deployment')
+@handle_k8s_exception('deployment', namespaced=True)
 def get_k8s_deployment(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Deployment:
     api = client.AppsV1Api(cli)
     return api.read_namespaced_deployment(name, namespace)
 
 
-@handle_k8s_exception('daemonset')
+@handle_k8s_exception('daemonset', namespaced=True)
 def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1DaemonSet:
     api = client.AppsV1Api(cli)
     return api.read_namespaced_daemon_set(name, namespace)
@@ -259,7 +258,7 @@ def get_apps(project_key: Optional[str] = None,
     return apps
 
 
-@handle_k8s_exception('service')
+@handle_k8s_exception('service', namespaced=True)
 def get_k8s_service(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Service:
     api = client.CoreV1Api(cli)
     return api.read_namespaced_service(name, namespace)
@@ -1084,32 +1083,32 @@ def inspect_k8s_node(node: client.V1Node) -> Dict:
 
 
 @handle_k8s_exception('node')
-def enable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+def enable_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
     }
-    return api.patch_node(node_name, body)
+    return api.patch_node(name, body)
 
 
 @handle_k8s_exception('node')
-def disable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+def disable_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": [{"effect": "NoSchedule",
                             "key": "node-role.kubernetes.io/worker"}]}
     }
-    return api.patch_node(node_name, body)
+    return api.patch_node(name, body)
 
 
 @handle_k8s_exception('node')
-def delete_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+def delete_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
-    return api.delete_node(node_name)
+    return api.delete_node(name)
 
 
 @handle_k8s_exception('node')
-def add_k8s_node_labels(node_name: str, cli: ApiClient = DEFAULT_CLI, **kv: str) -> client.V1Node:
+def add_k8s_node_labels(name: str, cli: ApiClient = DEFAULT_CLI, **kv: str) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1118,12 +1117,12 @@ def add_k8s_node_labels(node_name: str, cli: ApiClient = DEFAULT_CLI, **kv: str)
     }
     for key in kv:
         body['metadata']['labels'][key] = kv[key]
-    return api.patch_node(node_name, body)
+    return api.patch_node(name, body)
 
 
 @handle_k8s_exception('node')
 def remove_k8s_node_labels(
-    node_name: str, cli: ApiClient = DEFAULT_CLI, *keys: str
+    name: str, cli: ApiClient = DEFAULT_CLI, *keys: str
 ) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
@@ -1133,7 +1132,7 @@ def remove_k8s_node_labels(
     }
     for key in keys:
         body['metadata']['labels'][key] = None
-    return api.patch_node(node_name, body)
+    return api.patch_node(name, body)
 
 
 def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client.V1Scale:

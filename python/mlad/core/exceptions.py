@@ -43,22 +43,20 @@ def handle_k8s_api_error(e):
     return msg, status
 
 
-def handle_k8s_exception(obj: str):
+def handle_k8s_exception(obj: str, namespaced: bool=False):
     def decorator(func: Callable):
         def wrapper(*args, **kwargs):
-            name = args[0] if isinstance(args[0], str) else args[0].metadata.name
-            namespace = None
-            params = signature(func).parameters
-            if 'namespace' in params.keys():
-                ns_index = list(params.keys()).index('namespace')
-                namespace = args[ns_index] if isinstance(args[ns_index], str) else None
+            params = list(signature(func).parameters.keys())
+            name = args[params.index('name')]
+            if namespaced:
+                namespace = args[params.index('namespace')]
             try:
                 resp = func(*args, **kwargs)
                 return resp
             except ApiException as e:
                 msg, status = handle_k8s_api_error(e)
                 if status == 404:
-                    if namespace is not None:
+                    if namespaced:
                         raise NotFound(f'Cannot find {obj} "{name}" in "{namespace}".')
                     else:
                         raise NotFound(f'Cannot find {obj} "{name}".')
