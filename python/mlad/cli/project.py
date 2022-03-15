@@ -109,8 +109,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
             raise ProjectDeletedError(project['key'])
         apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
-        if metrics_server_running:
-            resources = API.project.resource(project_key, group_by='app', no_trunc=no_trunc)
+        resources = API.project.resource(project_key, group_by='app', no_trunc=no_trunc) \
+            if metrics_server_running else {}
     except NotFound as e:
         raise e
 
