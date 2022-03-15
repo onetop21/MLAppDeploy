@@ -16,6 +16,9 @@ from functools import lru_cache
 from datetime import datetime
 from dateutil import parser
 
+from yaml.parser import ParserError
+from mlad.cli.exceptions import ProjectLoadError
+
 PROJECT_FILE_ENV_KEY = 'MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
 
@@ -65,7 +68,10 @@ def read_project():
     project_file_path = get_project_file()
     if os.path.isfile(project_file_path):
         with open(project_file_path, 'r') as project_file:
-            return yaml.load(project_file, Loader=yaml.FullLoader)
+            try:
+                return yaml.load(project_file, Loader=yaml.FullLoader)
+            except ParserError as e:
+                raise ProjectLoadError(str(e))
     else:
         return None
 
