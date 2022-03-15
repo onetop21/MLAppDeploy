@@ -76,7 +76,7 @@ def ls(no_trunc: bool):
                             if spec['key'] == project_key]
 
         for spec in target_app_specs:
-            tasks = spec['tasks'].values()
+            tasks = spec['task_dict'].values()
             tasks_state = [task['status'] for task in tasks]
             projects[project_key]['apps'] += 1
             projects[project_key]['replicas'] += spec['replicas']
@@ -124,8 +124,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         task_info = []
         app_name = spec['name']
         try:
-            ports = ','.join(map(str, spec['ports']))
-            for pod_name, pod in spec['tasks'].items():
+            ports = ports = ','.join(map(lambda expose: str(expose['port']), spec['expose']))
+            for pod_name, pod in spec['task_dict'].items():
                 age = utils.created_to_age(pod['created'])
 
                 if app_name in resources:
@@ -167,7 +167,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
 
 def logs(file: Optional[str], project_key: Optional[str],
-         tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
+         tail: bool, follow: bool, timestamps: bool, filters: Optional[List[str]]):
     utils.process_file(file)
     if project_key is None:
         project_key = utils.workspace_key()
@@ -178,7 +178,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     except NotFound as e:
         raise e
 
-    logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
+    logs = API.project.log(project_key, tail, follow, timestamps, filters)
 
     colorkey = {}
     for log in logs:

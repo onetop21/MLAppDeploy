@@ -60,9 +60,9 @@ class Project(APIBase):
             yield dict_res
 
     def log(self, project_key, tail='all',
-            follow=False, timestamps=False, names_or_ids=[]):
+            follow=False, timestamps=False, filters=None):
         params = {'tail': tail, 'follow': follow, 'timestamps': timestamps,
-                  'names_or_ids': names_or_ids}
+                  'filters': filters}
         while True:
             try:
                 resp = self._get(f'/{project_key}/logs', params=params, raw=True, stream=True)
