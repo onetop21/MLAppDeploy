@@ -1214,10 +1214,10 @@ def _filter_app_and_pod_name_tuple_from_apps(
     app_and_pod_names = [(spec['name'], list(spec['task_dict'].keys())) for spec in inspect_apps(apps, cli)]
     for app_name, pod_names in app_and_pod_names:
         if filters is None:
-            selected_tuples += [(None, pod_name) for pod_name in pod_names]
+            selected_tuples += [(app_name, pod_name) for pod_name in pod_names]
             continue
         elif app_name in filters:
-            selected_tuples += [(app_name, pod_name) for pod_name in pod_names] 
+            selected_tuples += [(app_name, pod_name) for pod_name in pod_names]
             continue
         for pod_name in pod_names:
             if pod_name in filters:
@@ -1249,7 +1249,7 @@ def get_project_logs(
     monitoring_app_names = set([app_name for app_name, _ in app_and_pod_name_tuples if app_name is not None])
     logs = [(pod_name, handler.logs(namespace, pod_name, details=True, follow=follow,
                                     tail=tail, timestamps=timestamps, stdout=True, stderr=True))
-            for app_name, pod_name in app_and_pod_name_tuples]
+            for _, pod_name in app_and_pod_name_tuples]
 
     if len(logs):
         with LogCollector() as collector:
@@ -1258,7 +1258,7 @@ def get_project_logs(
             # Register Disconnect Callback
             if disconnect_handler:
                 disconnect_handler.add_callback(lambda: handler.close())
-            if follow:
+            if follow and len(monitoring_app_names) > 0:
                 last_resource = None
                 monitor = LogMonitor(cli, handler, collector, namespace, monitoring_app_names,
                                      last_resource=last_resource, follow=follow, tail=tail, timestamps=timestamps)
