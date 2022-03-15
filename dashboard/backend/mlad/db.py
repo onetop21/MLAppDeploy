@@ -5,7 +5,7 @@ from pymongo import MongoClient
 from .model import ComponentPostModel
 
 
-os.environ['DB_ADDRESS'] = 'mongodb://172.20.41.35:27017'
+# os.environ['DB_ADDRESS'] = 'mongodb://172.20.41.35:27017'
 
 
 class DBClient:

@@ -4,6 +4,7 @@ import { AppSpec, TaskSpec } from './models';
 import ProjectDetailListItem from './ProjectDetailListItem';
 
 import styles from './AppDetail.module.css';
+import ExposeItem from './ExposeItem';
 
 
 const getTaskView = (task: TaskSpec) => {
@@ -36,11 +37,11 @@ export default function AppDetail({ spec }: ServiceDetailProps) {
 			{spec.name}
 		</div>
 		<ProjectDetailListItem name='status' value={spec.status} />
-		<ProjectDetailListItem name='ports' value={spec.ports.join(', ')} />
 		<ProjectDetailListItem name='environments' value={<EnvView env={spec.env} />} />
 		<ProjectDetailListItem name='CPU (Cores)' value={spec.cpu} />
 		<ProjectDetailListItem name='GPU (#)' value={spec.gpu} />
 		<ProjectDetailListItem name='Memory (MB)' value={spec.mem} />
 		{spec.taskSpecs.map(taskSpec => getTaskView(taskSpec))}
+    <ExposeItem exposes={spec.exposes} />
 	</>
 }
