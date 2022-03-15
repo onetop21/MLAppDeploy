@@ -124,7 +124,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         task_info = []
         app_name = spec['name']
         try:
-            ports = ports = ','.join(map(lambda expose: str(expose['port']), spec['expose']))
+            ports = ','.join(map(lambda expose: str(expose['port']), spec['expose']))
             for pod_name, pod in spec['task_dict'].items():
                 age = utils.created_to_age(pod['created'])
 
