@@ -1253,7 +1253,7 @@ def get_project_logs(
     with LogCollector() as collector:
         for name, log in logs:
             collector.add_iterable(log, name=name, timestamps=timestamps)
-        
+
         # Register Disconnection Callback
         if disconnect_handler is not None:
             disconnect_handler.add_callback(lambda: handler.close())
