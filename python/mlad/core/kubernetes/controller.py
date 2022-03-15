@@ -1241,7 +1241,6 @@ def get_project_logs(
     project_key: str, filters: Optional[List[str]] = None, tail: str = 'all', follow: bool = False,
     timestamps: bool = False, disconnect_handler: Optional[object] = None, cli: ApiClient = DEFAULT_CLI
 ) -> Generator[Dict, None, None]:
-    get_apps(project_key, cli=cli)
     app_and_pod_name_tuples = _filter_app_and_pod_name_tuple_from_apps(project_key, filters, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
@@ -1251,23 +1250,20 @@ def get_project_logs(
                                     tail=tail, timestamps=timestamps, stdout=True, stderr=True))
             for _, pod_name in app_and_pod_name_tuples]
 
-    if len(logs):
-        with LogCollector() as collector:
-            for name, log in logs:
-                collector.add_iterable(log, name=name, timestamps=timestamps)
-            # Register Disconnect Callback
-            if disconnect_handler:
-                disconnect_handler.add_callback(lambda: handler.close())
-            if follow and len(monitoring_app_names) > 0:
-                last_resource = None
-                monitor = LogMonitor(cli, handler, collector, namespace, monitoring_app_names,
-                                     last_resource=last_resource, follow=follow, tail=tail, timestamps=timestamps)
-                monitor.start()
-                if disconnect_handler:
-                    disconnect_handler.add_callback(lambda: monitor.stop())
-            yield from collector
-    else:
-        print('Cannot find running containers.', file=sys.stderr)
+    with LogCollector() as collector:
+        for name, log in logs:
+            collector.add_iterable(log, name=name, timestamps=timestamps)
+        
+        # Register Disconnection Callback
+        if disconnect_handler is not None:
+            disconnect_handler.add_callback(lambda: handler.close())
+        if follow and len(monitoring_app_names) > 0:
+            monitor = LogMonitor(cli, handler, collector, namespace, monitoring_app_names,
+                                 last_resource=None, follow=follow, tail=tail, timestamps=timestamps)
+            monitor.start()
+            if disconnect_handler is not None:
+                disconnect_handler.add_callback(lambda: monitor.stop())
+        yield from collector
 
 
 def _create_k8s_ingress(
