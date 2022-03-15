@@ -215,10 +215,7 @@ class LogMonitor(Thread):
             try:
                 print(f'Watch Start [{namespace}]')
                 wrapped_api = LogMonitor.api_wrapper(self.api.list_namespaced_pod, assign)
-                if len(self.app_names) == 0:
-                    label_selector = None
-                else:
-                    label_selector = f'{MLAD_PROJECT_APP} in ({",".join(self.app_names)})'
+                label_selector = f'{MLAD_PROJECT_APP} in ({",".join(self.app_names)})'
                 for ev in w.stream(wrapped_api, namespace=namespace, resource_version=self.resource_version,
                                    label_selector=label_selector):
                     event = ev['type']
