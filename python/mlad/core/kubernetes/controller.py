@@ -1,4 +1,3 @@
-import sys
 import copy
 import time
 import json
@@ -16,14 +15,14 @@ from kubernetes.client.rest import ApiException
 from mlad.core import exceptions
 from mlad.core.exceptions import (
     NamespaceAlreadyExistError, DeprecatedError, InvalidAppError, InvalidMetricUnitError,
-    ProjectNotFoundError
+    ProjectNotFoundError, handle_k8s_exception
 )
 from mlad.core.libs import utils
 from mlad.core.libs.constants import (
-    MLAD_PROJECT, MLAD_PROJECT_APP, MLAD_PROJECT_APP_KIND, MLAD_PROJECT_BASE, MLAD_PROJECT_ENV,
-    MLAD_PROJECT_ID, MLAD_PROJECT_IMAGE, MLAD_PROJECT_INGRESS, MLAD_PROJECT_KIND, MLAD_PROJECT_NAME,
-    MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_SESSION, MLAD_PROJECT_USERNAME,
-    MLAD_PROJECT_VERSION, MLAD_PROJECT_YAML
+    CONFIG_ENVS, MLAD_PROJECT, MLAD_PROJECT_APP, MLAD_PROJECT_APP_KIND, MLAD_PROJECT_BASE,
+    MLAD_PROJECT_ENV, MLAD_PROJECT_ID, MLAD_PROJECT_IMAGE, MLAD_PROJECT_INGRESS, MLAD_PROJECT_KIND,
+    MLAD_PROJECT_NAME, MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_SESSION,
+    MLAD_PROJECT_USERNAME, MLAD_PROJECT_VERSION, MLAD_PROJECT_YAML
 )
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
 from mlad.core.kubernetes.logs import LogHandler, LogCollector, LogMonitor
@@ -230,28 +229,16 @@ def update_k8s_namespace(
             raise exceptions.APIError(msg, status)
 
 
+@handle_k8s_exception('deployment', namespaced=True)
 def get_k8s_deployment(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Deployment:
     api = client.AppsV1Api(cli)
-    try:
-        return api.read_namespaced_deployment(name, namespace)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.read_namespaced_deployment(name, namespace)
 
 
+@handle_k8s_exception('daemonset', namespaced=True)
 def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1DaemonSet:
     api = client.AppsV1Api(cli)
-    try:
-        return api.read_namespaced_daemon_set(name, namespace)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find daemonset "{name}" in "{namespace}".')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.read_namespaced_daemon_set(name, namespace)
 
 
 def get_app(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> App:
@@ -277,16 +264,10 @@ def get_apps(project_key: Optional[str] = None,
     return apps
 
 
+@handle_k8s_exception('service', namespaced=True)
 def get_k8s_service(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Service:
     api = client.CoreV1Api(cli)
-    try:
-        return api.read_namespaced_service(name, namespace)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.read_namespaced_service(name, namespace)
 
 
 def get_k8s_service_of_app(namespace: str, app_name: str, cli: ApiClient = DEFAULT_CLI) -> Optional[client.V1Service]:
@@ -385,7 +366,6 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
 
 
 def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
-    kind = None
     if isinstance(app, client.V1Deployment):
         kind = 'Service'
     elif isinstance(app, client.V1Job):
@@ -425,7 +405,7 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
         'id': app.metadata.uid,
         'name': config_labels.get(MLAD_PROJECT_APP),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
-        'tasks': dict([(pod.metadata.name, get_pod_info(pod)) for pod in pods]),
+        'task_dict': {pod.metadata.name: get_pod_info(pod) for pod in pods},
         'expose': _obtain_app_expose(service, config_labels),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get(MLAD_PROJECT_APP_KIND),
@@ -448,11 +428,11 @@ def _obtain_app_expose(service: Optional[client.V1Service], config_labels: Dict[
     return list(expose_dict.values())
 
 
-def inspect_apps(apps: List[App]) -> List[Dict]:
+def inspect_apps(apps: List[App], cli: ApiClient = DEFAULT_CLI) -> List[Dict]:
     results = []
     with ThreadPool(len(apps)) as pool:
         for app in apps:
-            results.append(pool.apply_async(inspect_app, (app,)))
+            results.append(pool.apply_async(inspect_app, (app, cli)))
         return [result.get() for result in results]
 
 
@@ -1038,7 +1018,7 @@ def remove_apps(
     def _get_app_spec(app):
         spec = inspect_app(app, cli)
         app_name = spec['name']
-        task_keys = list(spec['tasks'].keys())
+        task_keys = list(spec['task_dict'].keys())
 
         config_labels = _get_k8s_config_map_data(namespace, f'app-{app_name}-labels', cli)
         kind = config_labels[MLAD_PROJECT_APP_KIND]
@@ -1108,50 +1088,33 @@ def inspect_k8s_node(node: client.V1Node) -> Dict:
     }
 
 
-def enable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+@handle_k8s_exception('node')
+def enable_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
     }
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
-def disable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+@handle_k8s_exception('node')
+def disable_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": [{"effect": "NoSchedule",
                             "key": "node-role.kubernetes.io/worker"}]}
     }
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
-def delete_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+@handle_k8s_exception('node')
+def delete_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
-    try:
-        return api.delete_node(node_name)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.delete_node(name)
 
 
-def add_k8s_node_labels(node_name: str, cli: ApiClient = DEFAULT_CLI, **kv: str) -> client.V1Node:
+@handle_k8s_exception('node')
+def add_k8s_node_labels(name: str, cli: ApiClient = DEFAULT_CLI, **kv: str) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1160,18 +1123,12 @@ def add_k8s_node_labels(node_name: str, cli: ApiClient = DEFAULT_CLI, **kv: str)
     }
     for key in kv:
         body['metadata']['labels'][key] = kv[key]
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
+@handle_k8s_exception('node')
 def remove_k8s_node_labels(
-    node_name: str, cli: ApiClient = DEFAULT_CLI, *keys: str
+    name: str, cli: ApiClient = DEFAULT_CLI, *keys: str
 ) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
@@ -1181,14 +1138,7 @@ def remove_k8s_node_labels(
     }
     for key in keys:
         body['metadata']['labels'][key] = None
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
 def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client.V1Scale:
@@ -1200,84 +1150,77 @@ def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client
             "replicas": scale_spec
         }
     }
-    return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
+    try:
+        return api.patch_namespaced_deployment_scale(name=name, namespace=namespace, body=body)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        if status == 404:
+            raise exceptions.NotFound(f'Cannot find app {name} in {namespace}.')
+        else:
+            raise exceptions.APIError(msg, status)
 
 
-def get_app_with_names_or_ids(
-    project_key: str, names_or_ids: List[str] = [], cli: ApiClient = DEFAULT_CLI
-) -> List[Tuple[str, str]]:
-    # get running apps with app or pod name
+def _filter_app_and_pod_name_tuple_from_apps(
+    project_key: str, filters: Optional[List[str]], cli: ApiClient = DEFAULT_CLI
+) -> List[Tuple[Optional[str], str]]:
     api = client.CoreV1Api(cli)
     apps = get_apps(project_key, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
-    selected = []
-    sources = [(_['name'], list(_['tasks'].keys())) for _ in
-               [inspect_app(app, cli) for app in apps]]
-    if names_or_ids:
-        selected = []
-        for _ in sources:
-            if _[0] in names_or_ids:
-                selected += [(_[0], __) for __ in _[1]]
-                names_or_ids.remove(_[0])
-            else:
-                # check task ids of svc
-                for __ in _[1]:
-                    if __ in names_or_ids:
-                        selected += [(_[0], __)]
-                        names_or_ids.remove(__)
-        if names_or_ids:
-            raise exceptions.NotFound(f"Cannot find name or task in project: {', '.join(names_or_ids)}")
-
-    else:
-        for _ in sources:
-            selected += [(_[0], __) for __ in _[1]]
+    selected_tuples = []
+    app_and_pod_names = [(spec['name'], list(spec['task_dict'].keys())) for spec in inspect_apps(apps, cli)]
+    for app_name, pod_names in app_and_pod_names:
+        if filters is None:
+            selected_tuples += [(app_name, pod_name) for pod_name in pod_names]
+            continue
+        elif app_name in filters:
+            selected_tuples += [(app_name, pod_name) for pod_name in pod_names]
+            continue
+        for pod_name in pod_names:
+            if pod_name in filters:
+                selected_tuples.append((None, pod_name))
 
     # check whether targets are pending or not
-    targets = []
-    for target in selected:
-        pod = api.read_namespaced_pod(name=target[1], namespace=namespace)
+    filtered_tuples = []
+    for app_name, pod_name in selected_tuples:
+        pod = api.read_namespaced_pod(name=pod_name, namespace=namespace)
         phase = get_pod_info(pod)['phase']
         if not phase == 'Pending':
-            targets.append(target)
+            filtered_tuples.append((app_name, pod_name))
 
-    if not targets:
-        raise exceptions.NotFound("Cannot find running apps")
+    if len(filtered_tuples) == 0:
+        raise exceptions.NotFound('Cannot find a running app or tasks in project')
 
-    return targets
+    return filtered_tuples
 
 
 def get_project_logs(
-    project_key: str, tail: str = 'all', follow: bool = False, timestamps: bool = False,
-    selected: bool = False, disconnect_handler: Optional[object] = None,
-    targets: List[Tuple[str, str]] = [], cli: ApiClient = DEFAULT_CLI
+    project_key: str, filters: Optional[List[str]] = None, tail: str = 'all', follow: bool = False,
+    timestamps: bool = False, disconnect_handler: Optional[object] = None, cli: ApiClient = DEFAULT_CLI
 ) -> Generator[Dict, None, None]:
-    get_apps(project_key, cli=cli)
+    app_and_pod_name_tuples = _filter_app_and_pod_name_tuple_from_apps(project_key, filters, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
     handler = LogHandler(cli)
+    monitoring_app_names = set([app_name for app_name, _ in app_and_pod_name_tuples if app_name is not None])
+    logs = [(pod_name, handler.logs(namespace, pod_name, details=True, follow=follow,
+                                    tail=tail, timestamps=timestamps, stdout=True, stderr=True))
+            for _, pod_name in app_and_pod_name_tuples]
 
-    logs = [(target, handler.logs(namespace, target, details=True, follow=follow,
-                                  tail=tail, timestamps=timestamps, stdout=True, stderr=True))
-            for app_name, target in targets]
+    with LogCollector() as collector:
+        for name, log in logs:
+            collector.add_iterable(log, name=name, timestamps=timestamps)
 
-    if len(logs):
-        with LogCollector() as collector:
-            for name, log in logs:
-                collector.add_iterable(log, name=name, timestamps=timestamps)
-            # Register Disconnect Callback
-            if disconnect_handler:
-                disconnect_handler.add_callback(lambda: handler.close())
-            if follow and not selected:
-                last_resource = None
-                monitor = LogMonitor(cli, handler, collector, namespace, last_resource=last_resource,
-                                     follow=follow, tail=tail, timestamps=timestamps)
-                monitor.start()
-                if disconnect_handler:
-                    disconnect_handler.add_callback(lambda: monitor.stop())
-            yield from collector
-    else:
-        print('Cannot find running containers.', file=sys.stderr)
+        # Register Disconnection Callback
+        if disconnect_handler is not None:
+            disconnect_handler.add_callback(lambda: handler.close())
+        if follow and len(monitoring_app_names) > 0:
+            monitor = LogMonitor(cli, handler, collector, namespace, monitoring_app_names,
+                                 last_resource=None, follow=follow, tail=tail, timestamps=timestamps)
+            monitor.start()
+            if disconnect_handler is not None:
+                disconnect_handler.add_callback(lambda: monitor.stop())
+        yield from collector
 
 
 def _create_k8s_ingress(

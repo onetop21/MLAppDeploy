@@ -1,6 +1,10 @@
 from mlad.core.exceptions import MLADException
 
 
+class ProjectLoadError(MLADException):
+    pass
+
+
 class InvalidURLError(MLADException):
     pass
 

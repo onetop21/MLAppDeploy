@@ -1,5 +1,5 @@
 import traceback
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Query, HTTPException, Header
 
@@ -90,20 +90,11 @@ def remove_project(project_key: str, session: str = Header(None)):
 def send_project_log(project_key: str, tail: str = Query('all'),
                      follow: bool = Query(False),
                      timestamps: bool = Query(False),
-                     names_or_ids: list = Query(None),
+                     filters: Optional[List[str]] = Query(None),
                      session: str = Header(None)):
 
-    selected = True if names_or_ids else False
     try:
         ctlr.get_k8s_namespace(project_key)
-        try:
-            targets = ctlr.get_app_with_names_or_ids(project_key, names_or_ids)
-        except exceptions.NotFound as e:
-            if 'running' in str(e):
-                raise InvalidLogRequest("Cannot find running apps.")
-            else:
-                apps = str(e).split(': ')[1]
-                raise InvalidAppError(project_key, apps)
 
         class DisconnectHandler:
             def __init__(self):
@@ -117,8 +108,10 @@ def send_project_log(project_key: str, tail: str = Query('all'),
                     cb()
 
         handler = DisconnectHandler()
-
-        res = ctlr.get_project_logs(project_key, tail, follow, timestamps, selected, handler, targets)
+        try:
+            res = ctlr.get_project_logs(project_key, filters, tail, follow, timestamps, handler)
+        except exceptions.NotFound as e:
+            raise InvalidLogRequest(str(e))
         return DictStreamingResponse(res, background=handler)
     except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))

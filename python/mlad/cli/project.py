@@ -76,7 +76,7 @@ def ls(no_trunc: bool):
                             if spec['key'] == project_key]
 
         for spec in target_app_specs:
-            tasks = spec['tasks'].values()
+            tasks = spec['task_dict'].values()
             tasks_state = [task['status'] for task in tasks]
             projects[project_key]['apps'] += 1
             projects[project_key]['replicas'] += spec['replicas']
@@ -109,8 +109,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
             raise ProjectDeletedError(project['key'])
         apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
-        if metrics_server_running:
-            resources = API.project.resource(project_key, group_by='app', no_trunc=no_trunc)
+        resources = API.project.resource(project_key, group_by='app', no_trunc=no_trunc) \
+            if metrics_server_running else {}
     except NotFound as e:
         raise e
 
@@ -124,8 +124,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         task_info = []
         app_name = spec['name']
         try:
-            ports = ','.join(map(str, spec['ports']))
-            for pod_name, pod in spec['tasks'].items():
+            ports = ','.join(map(lambda expose: str(expose['port']), spec['expose']))
+            for pod_name, pod in spec['task_dict'].items():
                 age = utils.created_to_age(pod['created'])
 
                 if app_name in resources:
@@ -167,7 +167,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
 
 def logs(file: Optional[str], project_key: Optional[str],
-         tail: bool, follow: bool, timestamps: bool, names_or_ids: List[str]):
+         tail: bool, follow: bool, timestamps: bool, filters: Optional[List[str]]):
     utils.process_file(file)
     if project_key is None:
         project_key = utils.workspace_key()
@@ -178,7 +178,7 @@ def logs(file: Optional[str], project_key: Optional[str],
     except NotFound as e:
         raise e
 
-    logs = API.project.log(project_key, tail, follow, timestamps, names_or_ids)
+    logs = API.project.log(project_key, tail, follow, timestamps, filters)
 
     colorkey = {}
     for log in logs:
@@ -427,7 +427,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
         handler()
 
         # Remove the project
-        lines = k8s_ctlr.delete_k8s_namespace(namespace, stream=True, cli=k8s_cli)
+        lines = k8s_ctlr.delete_k8s_namespace(namespace, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 sys.stdout.write(line['stream'])
