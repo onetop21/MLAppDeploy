@@ -15,36 +15,22 @@ from .db import DBClient
 
 # os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:30547/beta'
 # os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:8441'
-# os.environ['MLAD_SESSION'] = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiam9vb25ob2UiLCJob3N0bmFtZSI6Impvb29uaG9lLU1TLTdCMjMiLCJ1dWlkIjoiMmZjODk1ZTEtZDE2Zi00NTBiLWJkNmQtMTRiYzVmNjUwZjhkIn0.HAaCZEaXMe9mZ1hDUaMMnu5u5mxMRvhLJhlD5cnX7HI'
+# os.environ['MLAD_SESSION'] = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiam9vb25ob2UiLCJob3N0bmFtZSI6Impvb29uaG9lLU1TLTdCMjMiLCJ1dWlkIjoiYzY3ZDAzYzUtODQ1Mi00ZTliLWI4ZGUtYTg2NmQ5ZTBlNWRjIn0.DWj8Y_xQO6167rRyBgYrNVVaHzq6xDIqCNp458HkKsc'
 
 app = FastAPI()
 address = f'{os.environ["MLAD_ADDRESS"]}/api/v1'
 headers = {
-    'session': os.environ['MLAD_SESSION']
+    'session': os.environ['MLAD_SESSION'],
+    'version': '0.4.0'
 }
 db_client = DBClient()
 
 
-async def _request_resources(key: str, session: aiohttp.ClientSession):
-    total_cpu = 0
-    total_gpu = 0
-    total_mem = 0
-    resources = {}
-    async with session.get(f'{address}/project/{key}/resource', headers=headers) as resp:
+async def _request_resources(key: str, session: aiohttp.ClientSession, group_by: str = 'project'):
+    async with session.get(f'{address}/project/{key}/resource',
+                           headers=headers, params={'group_by': group_by}) as resp:
         resp.raise_for_status()
-        resources = await resp.json()
-    for tasks in resources.values():
-        for resource in tasks.values():
-            cpu = resource['cpu']
-            total_cpu += cpu if cpu is not None else 0
-            resource['cpu'] = cpu
-            gpu = resource['gpu']
-            total_gpu += gpu if gpu is not None else 0
-            resource['gpu'] = gpu
-            mem = resource['mem']
-            total_mem += mem if mem is not None else 0
-            resource['mem'] = mem
-    return {'cpu': total_cpu, 'gpu': total_gpu, 'mem': total_mem}, resources
+        return await resp.json()
 
 
 async def request_nodes(_, session: aiohttp.ClientSession):
@@ -103,17 +89,17 @@ async def request_projects(_, session: aiohttp.ClientSession):
         apps = apps_list[i]
         for spec in apps['specs']:
             tasks = spec['task_dict'].values()
-            states = [t['status']['state'] for t in tasks]
+            statuses = [task['status'] for task in tasks]
             n_apps += 1
             n_replicas += spec['replicas']
-            n_tasks += states.count('Running')
+            n_tasks += statuses.count('Running')
 
-        total_resource, _ = resource_responses[i]
+        resource_dict = resource_responses[i]
         ret.append({
             'key': key, 'username': username, 'name': name, 'image': image,
             'n_apps': n_apps, 'n_replicas': n_replicas, 'n_tasks': n_tasks,
             'hostname': hostname, 'workspace': workspace,
-            **total_resource
+            **resource_dict
         })
     return ret
 
@@ -128,19 +114,20 @@ async def request_project_detail(data: str, session: aiohttp.ClientSession):
         return {}
     key = data['key']
     ret = {}
-    async with session.get(f'{address}/project/{key}') as resp:
+    async with session.get(f'{address}/project/{key}', headers=headers) as resp:
         resp.raise_for_status()
         ret = await resp.json()
-    total_resource, resources = await _request_resources(key, session)
-    ret = {**ret, **total_resource}
+    total_resource_dict = await _request_resources(key, session)
+    resource_detail_dict = await _request_resources(key, session, group_by='app')
+    ret = {**ret, **total_resource_dict}
 
     specs = []
-    async with session.get(f'{address}/project/{key}/app') as resp:
+    async with session.get(f'{address}/project/{key}/app', headers=headers) as resp:
         resp.raise_for_status()
         apps = await resp.json()
         specs = apps['specs']
         for i, spec in enumerate(specs):
-            specs[i] = {**specs[i], 'resources': resources[spec['name']]}
+            specs[i] = {**specs[i], 'resources': resource_detail_dict[spec['name']]}
 
     ret = {**ret, 'apps': specs}
     return ret
