@@ -109,8 +109,8 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
             raise ProjectDeletedError(project['key'])
         apps = API.app.get(project_key)['specs']
         metrics_server_running = API.check.check_metrics_server()
-        if metrics_server_running:
-            resources = API.project.resource(project_key, group_by='app', no_trunc=no_trunc)
+        resources = API.project.resource(project_key, group_by='app', no_trunc=no_trunc) \
+            if metrics_server_running else {}
     except NotFound as e:
         raise e
 
@@ -124,7 +124,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
         task_info = []
         app_name = spec['name']
         try:
-            ports = ports = ','.join(map(lambda expose: str(expose['port']), spec['expose']))
+            ports = ','.join(map(lambda expose: str(expose['port']), spec['expose']))
             for pod_name, pod in spec['task_dict'].items():
                 age = utils.created_to_age(pod['created'])
 
@@ -427,7 +427,7 @@ def down_force(file: Optional[str], project_key: Optional[str], dump: bool):
         handler()
 
         # Remove the project
-        lines = k8s_ctlr.delete_k8s_namespace(namespace, stream=True, cli=k8s_cli)
+        lines = k8s_ctlr.delete_k8s_namespace(namespace, cli=k8s_cli)
         for line in lines:
             if 'stream' in line:
                 sys.stdout.write(line['stream'])

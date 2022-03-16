@@ -15,7 +15,7 @@ from kubernetes.client.rest import ApiException
 from mlad.core import exceptions
 from mlad.core.exceptions import (
     NamespaceAlreadyExistError, DeprecatedError, InvalidAppError, InvalidMetricUnitError,
-    ProjectNotFoundError
+    ProjectNotFoundError, handle_k8s_exception
 )
 from mlad.core.libs import utils
 from mlad.core.libs.constants import (
@@ -229,28 +229,16 @@ def update_k8s_namespace(
             raise exceptions.APIError(msg, status)
 
 
+@handle_k8s_exception('deployment', namespaced=True)
 def get_k8s_deployment(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Deployment:
     api = client.AppsV1Api(cli)
-    try:
-        return api.read_namespaced_deployment(name, namespace)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.read_namespaced_deployment(name, namespace)
 
 
+@handle_k8s_exception('daemonset', namespaced=True)
 def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1DaemonSet:
     api = client.AppsV1Api(cli)
-    try:
-        return api.read_namespaced_daemon_set(name, namespace)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find daemonset "{name}" in "{namespace}".')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.read_namespaced_daemon_set(name, namespace)
 
 
 def get_app(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> App:
@@ -276,16 +264,10 @@ def get_apps(project_key: Optional[str] = None,
     return apps
 
 
+@handle_k8s_exception('service', namespaced=True)
 def get_k8s_service(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Service:
     api = client.CoreV1Api(cli)
-    try:
-        return api.read_namespaced_service(name, namespace)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find deployment "{name}" in "{namespace}".')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.read_namespaced_service(name, namespace)
 
 
 def get_k8s_service_of_app(namespace: str, app_name: str, cli: ApiClient = DEFAULT_CLI) -> Optional[client.V1Service]:
@@ -384,7 +366,6 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
 
 
 def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
-    kind = None
     if isinstance(app, client.V1Deployment):
         kind = 'Service'
     elif isinstance(app, client.V1Job):
@@ -1107,50 +1088,33 @@ def inspect_k8s_node(node: client.V1Node) -> Dict:
     }
 
 
-def enable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+@handle_k8s_exception('node')
+def enable_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": None}
     }
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
-def disable_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+@handle_k8s_exception('node')
+def disable_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "spec": {"taints": [{"effect": "NoSchedule",
                             "key": "node-role.kubernetes.io/worker"}]}
     }
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
-def delete_k8s_node(node_name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
+@handle_k8s_exception('node')
+def delete_k8s_node(name: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Node:
     api = client.CoreV1Api(cli)
-    try:
-        return api.delete_node(node_name)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.delete_node(name)
 
 
-def add_k8s_node_labels(node_name: str, cli: ApiClient = DEFAULT_CLI, **kv: str) -> client.V1Node:
+@handle_k8s_exception('node')
+def add_k8s_node_labels(name: str, cli: ApiClient = DEFAULT_CLI, **kv: str) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
         "metadata": {
@@ -1159,18 +1123,12 @@ def add_k8s_node_labels(node_name: str, cli: ApiClient = DEFAULT_CLI, **kv: str)
     }
     for key in kv:
         body['metadata']['labels'][key] = kv[key]
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
+@handle_k8s_exception('node')
 def remove_k8s_node_labels(
-    node_name: str, cli: ApiClient = DEFAULT_CLI, *keys: str
+    name: str, cli: ApiClient = DEFAULT_CLI, *keys: str
 ) -> client.V1Node:
     api = client.CoreV1Api(cli)
     body = {
@@ -1180,14 +1138,7 @@ def remove_k8s_node_labels(
     }
     for key in keys:
         body['metadata']['labels'][key] = None
-    try:
-        return api.patch_node(node_name, body)
-    except ApiException as e:
-        msg, status = exceptions.handle_k8s_api_error(e)
-        if status == 404:
-            raise exceptions.NotFound(f'Cannot find node {node_name}.')
-        else:
-            raise exceptions.APIError(msg, status)
+    return api.patch_node(name, body)
 
 
 def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client.V1Scale:
