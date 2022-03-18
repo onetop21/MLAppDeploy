@@ -66,7 +66,7 @@ def inspect_image(image: docker.models.images.Image):
         # Trim meaningless decimals
         'created': image.attrs['Created'][:-7],
         # For project
-        'api_version': image.labels[MLAD_PROJECT_A PI_VERSION],
+        'api_version': image.labels[MLAD_PROJECT_API_VERSION],
         'workspace': image.labels[MLAD_PROJECT_WORKSPACE] if MLAD_PROJECT_WORKSPACE in image.labels else 'Not Supported',
         'project_name': image.labels[MLAD_PROJECT_NAME],
     }
