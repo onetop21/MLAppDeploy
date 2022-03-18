@@ -6,6 +6,7 @@ import ssl
 import urllib3
 import traceback
 
+from collections import defaultdict
 from dateutil import parser
 from threading import Thread
 from datetime import datetime
@@ -26,6 +27,7 @@ class LogHandler:
         self.responses = {}
         self.namespace = namespace
         self.tail = None if tail == 'all' else tail
+        self.last_timestamp_dict = defaultdict(str)
 
     def close(self, resp: str = None):
         for _ in ([self.responses.get(resp)] if resp else list(self.responses.values())):
@@ -58,6 +60,7 @@ class LogHandler:
                 timestamp, msg = self._parse_log(log)
                 if len(timestamp) == 0:
                     break
+                self.last_timestamp_dict[target] = timestamp
                 yield timestamp, target, msg
 
     def get_stream_logs(self, target: str, **params):
@@ -118,7 +121,6 @@ class LogCollector():
                     timestamp = str(parser.parse(msg['timestamp']).astimezone())
                     stream = msg['stream'].decode()
                     target = msg['target']
-                    # output['name'] = f"{_[_.rfind('=')+1:]}" # need??
                     return self._output_dict(target, stream, timestamp if self.timestamps else None)
                 elif 'status' in msg and msg['status'] == 'stopped':
                     del self.threads[object_id]
@@ -152,12 +154,19 @@ class LogCollector():
 
         if stream:
             self.streaming = True
+            logs = []
             last_timestamp = self.stacked_logs.queue[self.stacked_logs.qsize()-1][0]
-            ts = time.mktime(datetime.strptime(last_timestamp.split('.')[0],
-                                               '%Y-%m-%dT%H:%M:%S').timetuple())
-            since_seconds = math.ceil(datetime.utcnow().timestamp() - ts)
-            logs = [(target, handler.get_stream_logs(target, since_seconds=since_seconds))
-                    for target in names]
+            for target in names:
+                last_timestamp = handler.last_timestamp_dict.get(target, None)
+                if last_timestamp is not None:
+                    dt = datetime.strptime(last_timestamp[:len(last_timestamp)-4], '%Y-%m-%dT%H:%M:%S.%f')
+                    ms = dt.microsecond / 10**6
+                    ts = time.mktime(dt.timetuple())
+                    since_seconds = math.floor(datetime.utcnow().timestamp() - ts - ms)
+                else:
+                    since_seconds = None
+                log = (target, handler.get_stream_logs(target, since_seconds=since_seconds))
+                logs.append(log)
             for name, log in logs:
                 self.add_iterable(log, name)
 
