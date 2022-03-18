@@ -162,7 +162,9 @@ class LogCollector():
                     dt = datetime.strptime(last_timestamp[:len(last_timestamp)-4], '%Y-%m-%dT%H:%M:%S.%f')
                     ms = dt.microsecond / 10**6
                     ts = time.mktime(dt.timetuple())
-                    since_seconds = math.floor(datetime.utcnow().timestamp() - ts - ms)
+                    now = datetime.utcnow().timestamp()
+                    since_seconds = math.floor(now - ts - ms)
+                    since_seconds = since_seconds if since_seconds > 0 else 1
                 else:
                     since_seconds = None
                 log = (target, handler.get_stream_logs(target, since_seconds=since_seconds))
