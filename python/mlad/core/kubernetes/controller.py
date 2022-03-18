@@ -1160,7 +1160,7 @@ def scale_app(app: App, scale_spec: int, cli: ApiClient = DEFAULT_CLI) -> client
             raise exceptions.APIError(msg, status)
 
 
-def filter_app_and_pod_name_tuple_from_apps(
+def _filter_app_and_pod_name_tuple_from_apps(
     project_key: str, filters: Optional[List[str]], cli: ApiClient = DEFAULT_CLI
 ) -> List[Tuple[Optional[str], str]]:
     api = client.CoreV1Api(cli)
@@ -1195,10 +1195,10 @@ def filter_app_and_pod_name_tuple_from_apps(
 
 
 def get_project_logs(
-    project_key: str, app_and_pod_name_tuples: List[Tuple[Optional[str], str]], tail: str = 'all',
-    follow: bool = False, timestamps: bool = False, disconnect_handler: Optional[object] = None,
-    cli: ApiClient = DEFAULT_CLI
+    project_key: str, filters: Optional[List[str]] = None, tail: str = 'all', follow: bool = False,
+    timestamps: bool = False, disconnect_handler: Optional[object] = None, cli: ApiClient = DEFAULT_CLI
 ) -> Generator[Dict, None, None]:
+    app_and_pod_name_tuples = _filter_app_and_pod_name_tuple_from_apps(project_key, filters, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
     handler = LogHandler(cli, namespace, tail)
