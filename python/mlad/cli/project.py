@@ -665,35 +665,33 @@ def _validate_depends(app_specs):
 
 
 def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
-    name = log['name']
+    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
+
+    if log.get('error', False):
+        return msg
+
+    name = log.get('name', 'Unknown')
     name_width = min(max_name_width, log.get('name_width', max_name_width))
     if len(name) > name_width:
         name = name[:name_width - 3] + '...'
-
-    msg = log['stream'] if isinstance(log['stream'], str) else log['stream'].decode()
 
     timestamp = None
     if 'timestamp' in log:
         dt = datetime.fromisoformat(log['timestamp']) + timedelta(hours=9)
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    if log.get('error', False):
-        if pretty:
-            msg = f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}'
-            return msg
+    if colorkey is not None:
+        colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
     else:
-        if colorkey is not None:
-            colorkey[name] = colorkey[name] if name in colorkey else utils.color_table()[utils.color_index()]
-        else:
-            colorkey = defaultdict(lambda: '')
-        if '\r' in msg:
-            msg = msg.split('\r')[-1] + '\n'
-        if msg.endswith('\n'):
-            msg = msg[:-1]
-        if timestamp is not None:
-            return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} [{timestamp}] {msg}'
-        else:
-            return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} {msg}'
+        colorkey = defaultdict(lambda: '')
+    if '\r' in msg:
+        msg = msg.split('\r')[-1] + '\n'
+    if msg.endswith('\n'):
+        msg = msg[:-1]
+    if timestamp is not None:
+        return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} [{timestamp}] {msg}'
+    else:
+        return f'{colorkey[name]}{name:{name_width}}{utils.CLEAR_COLOR if pretty else ""} {msg}'
 
 
 def _check_config_envs(name: str, app_spec: dict):
