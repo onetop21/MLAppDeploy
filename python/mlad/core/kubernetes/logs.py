@@ -114,19 +114,15 @@ class LogCollector():
             if self.stream == True:
                 msg = self.stream_logs.get()
                 object_id = msg['object_id']
-                timestamp = msg['timestamp']
-                if 'stream' in msg:
-                    timestamp = str(parser.parse(msg['timestamp']).astimezone())
-                    stream = msg['stream'].decode()
-                    name = msg['name']
-                    return self._output_dict(name, stream, timestamp if self.with_timestamp else None)
-                elif 'status' in msg and msg['status'] == 'stopped':
+                timestamp = str(parser.parse(msg['timestamp']).astimezone())
+                if 'status' in msg and msg['status'] == 'stopped':
                     del self.thread_dict[object_id]
                     if len(self.thread_dict) == 0:
                         raise StopIteration
                     return self.__next__()
-                else:
-                    raise RuntimeError('Invalid stream type.')
+                stream = msg['stream'].decode()
+                name = msg['name']
+                return self._output_dict(name, stream, timestamp if self.with_timestamp else None)
             else:
                 raise StopIteration
 
