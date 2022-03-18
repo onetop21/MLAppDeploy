@@ -12,12 +12,11 @@ from threading import Thread
 from datetime import datetime
 from queue import PriorityQueue
 from multiprocessing import Queue, Value
-from typing import List, Dict, Callable, Tuple, Generator
+from typing import List, Callable, Generator
 
 from kubernetes import client, watch
 from kubernetes.client.api_client import ApiClient
 
-from mlad.core.kubernetes import controller as ctrl
 from mlad.core.libs.constants import MLAD_PROJECT_APP
 
 
@@ -111,7 +110,7 @@ class LogCollector():
             name, log = msg[1]
             return self._output_dict(name, log.decode(), timestamp if self.with_timestamp else None)
         else:
-            if self.stream == True:
+            if self.stream is True:
                 msg = self.stream_logs.get()
                 object_id = msg['object_id']
                 timestamp = str(parser.parse(msg['timestamp']).astimezone())
@@ -153,7 +152,8 @@ class LogCollector():
             for name in names:
                 last_timestamp = last_timestamp_dict.get(name, None)
                 if last_timestamp is not None:
-                    dt = datetime.strptime(last_timestamp[:len(last_timestamp)-4], '%Y-%m-%dT%H:%M:%S.%f')
+                    dt = datetime.strptime(last_timestamp[:len(last_timestamp) - 4],
+                                           '%Y-%m-%dT%H:%M:%S.%f')
                     ms = dt.microsecond / 10**6
                     ts = time.mktime(dt.timetuple())
                     now = datetime.utcnow().timestamp()
@@ -163,7 +163,6 @@ class LogCollector():
                     since_seconds = None
                 logs = handler.get_stream_logs(name, since_seconds=since_seconds)
                 self.add_iterable(logs, name)
-
 
     def add_iterable(self, iterable: Generator, name: str = None):
         self.name_width = max(self.name_width, len(name))
@@ -222,8 +221,6 @@ class LogMonitor(Thread):
 
     def run(self):
         namespace = self.namespace
-        follow = self.params['follow']
-        timestamps = self.params['timestamps']
 
         def assign(x):
             self.stream_resp = x

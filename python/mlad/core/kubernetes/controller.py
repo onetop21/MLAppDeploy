@@ -1193,6 +1193,7 @@ def _filter_app_and_pod_name_tuple_from_apps(
 
     return filtered_tuples
 
+
 def get_project_logs(
     project_key: str, filters: Optional[List[str]] = None, tail: str = 'all', follow: bool = False,
     timestamps: bool = False, disconnect_handler: Optional[object] = None, cli: ApiClient = DEFAULT_CLI
@@ -1220,7 +1221,7 @@ def get_project_logs(
 def _create_k8s_ingress(
     namespace: str, app_name: str, ingress_name: str, port: int, base_path: str = '/',
     rewrite: str = False, cli: ApiClient = DEFAULT_CLI
- ) -> client.V1Ingress:
+) -> client.V1Ingress:
     api = client.NetworkingV1Api(cli)
     annotations = {
         "kubernetes.io/ingress.class": "nginx",
