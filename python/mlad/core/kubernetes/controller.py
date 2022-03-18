@@ -1201,16 +1201,12 @@ def get_project_logs(
     app_and_pod_name_tuples = _filter_app_and_pod_name_tuple_from_apps(project_key, filters, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
-    handler = LogHandler(cli)
+    handler = LogHandler(cli, namespace, tail)
     monitoring_app_names = set([app_name for app_name, _ in app_and_pod_name_tuples if app_name is not None])
-    logs = [(pod_name, handler.logs(namespace, pod_name, details=True, follow=follow,
-                                    tail=tail, timestamps=timestamps, stdout=True, stderr=True))
-            for _, pod_name in app_and_pod_name_tuples]
 
-    with LogCollector() as collector:
-        for name, log in logs:
-            collector.add_iterable(log, name=name, timestamps=timestamps)
-
+    with LogCollector(timestamps) as collector:
+        collector.collect_logs([pod_name for _, pod_name in app_and_pod_name_tuples], follow,
+                               handler)
         # Register Disconnection Callback
         if disconnect_handler is not None:
             disconnect_handler.add_callback(lambda: handler.close())
@@ -1226,7 +1222,8 @@ def get_project_logs(
 def _create_k8s_ingress(
     namespace: str, app_name: str, ingress_name: str, port: int, base_path: str = '/',
     rewrite: str = False, cli: ApiClient = DEFAULT_CLI
-) -> client.V1Ingress:
+# ) -> client.V1Ingress:
+    ):
     api = client.NetworkingV1Api(cli)
     annotations = {
         "kubernetes.io/ingress.class": "nginx",
