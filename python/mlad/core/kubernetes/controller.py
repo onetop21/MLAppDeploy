@@ -1203,9 +1203,8 @@ def get_project_logs(
     handler = LogHandler(cli, namespace, tail)
     monitoring_app_names = set([app_name for app_name, _ in app_and_pod_name_tuples if app_name is not None])
 
-    with LogCollector(timestamps) as collector:
-        collector.collect_logs([pod_name for _, pod_name in app_and_pod_name_tuples], follow,
-                               handler)
+    with LogCollector(follow, timestamps) as collector:
+        collector.collect_logs([pod_name for _, pod_name in app_and_pod_name_tuples], handler)
         # Register Disconnection Callback
         if disconnect_handler is not None:
             disconnect_handler.add_callback(lambda: handler.close())

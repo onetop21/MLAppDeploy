@@ -27,7 +27,6 @@ class LogHandler:
         self.responses = {}
         self.namespace = namespace
         self.tail = None if tail == 'all' else tail
-        self.last_timestamp_dict = defaultdict(str)
 
     def close(self, resp: str = None):
         for _ in ([self.responses.get(resp)] if resp else list(self.responses.values())):
@@ -51,26 +50,25 @@ class LogHandler:
             msg += '\n'
         return timestamp, msg.encode()
 
-    def get_stacked_logs(self, targets: List):
-        for target in targets:
-            resp = self.api.read_namespaced_pod_log(name=target, namespace=self.namespace,
+    def get_stacked_logs(self, names: List):
+        for name in names:
+            resp = self.api.read_namespaced_pod_log(name=name, namespace=self.namespace,
                                                     tail_lines=self.tail, timestamps=True)
             logs = resp.split('\n')
             for log in logs:
                 timestamp, msg = self._parse_log(log)
                 if len(timestamp) == 0:
                     break
-                self.last_timestamp_dict[target] = timestamp
-                yield timestamp, target, msg
+                yield timestamp, name, msg
 
-    def get_stream_logs(self, target: str, **params):
+    def get_stream_logs(self, name: str, **params):
         since_seconds = params.get('since_seconds', None)
         try:
-            resp = self.api.read_namespaced_pod_log(name=target, namespace=self.namespace,
+            resp = self.api.read_namespaced_pod_log(name=name, namespace=self.namespace,
                                                     timestamps=True, follow=True,
                                                     since_seconds=since_seconds,
                                                     _preload_content=False)
-            self.responses[target] = resp
+            self.responses[name] = resp
             for line in resp:
                 try:
                     log = line.decode()
@@ -78,30 +76,30 @@ class LogHandler:
                     print(f"[Ignored] Log Decode Error : {e}")
                     continue
                 timestamp, msg = self._parse_log(log)
-                yield timestamp, target, msg
+                yield timestamp, name, msg
         except urllib3.exceptions.ProtocolError:
             pass
         except urllib3.exceptions.ReadTimeoutError:
             pass
-        if target in self.responses:
-            del self.responses[target]
+        if name in self.responses:
+            del self.responses[name]
 
 
 class LogCollector():
-    def __init__(self, timestamps: bool = False, maxbuffer: int = 65535,
-                 release_callback: Callable = None):
+    def __init__(self, stream: bool = False, with_timestamp: bool = False,
+                 maxbuffer: int = 65535, release_callback: Callable = None):
         self.name_width = 0
-        self.threads = {}
+        self.thread_dict = {}
         self.stream_logs = Queue(maxsize=maxbuffer)
         self.stacked_logs = PriorityQueue(maxsize=maxbuffer)
         self.release_callback = release_callback
         self.should_run = Value('b', True)
-        self.streaming = Value('b', False)
-        self.timestamps = timestamps
+        self.stream = stream
+        self.with_timestamp = with_timestamp
 
-    def _output_dict(self, target: str, log: str, timestamp: str = None):
-        self.name_width = max(self.name_width, len(target))
-        output = {'name': target, 'stream': log, 'name_width': self.name_width}
+    def _output_dict(self, name: str, log: str, timestamp: str = None):
+        self.name_width = max(self.name_width, len(name))
+        output = {'name': name, 'stream': log, 'name_width': self.name_width}
         if timestamp is not None:
             output['timestamp'] = str(parser.parse(timestamp).astimezone())
         return output
@@ -111,20 +109,20 @@ class LogCollector():
             msg = self.stacked_logs.get()
             timestamp = str(parser.parse(msg[0]).astimezone())
             name, log = msg[1]
-            return self._output_dict(name, log.decode(), timestamp if self.timestamps else None)
+            return self._output_dict(name, log.decode(), timestamp if self.with_timestamp else None)
         else:
-            if self.streaming == True:
+            if self.stream == True:
                 msg = self.stream_logs.get()
                 object_id = msg['object_id']
                 timestamp = msg['timestamp']
                 if 'stream' in msg:
                     timestamp = str(parser.parse(msg['timestamp']).astimezone())
                     stream = msg['stream'].decode()
-                    target = msg['target']
-                    return self._output_dict(target, stream, timestamp if self.timestamps else None)
+                    name = msg['name']
+                    return self._output_dict(name, stream, timestamp if self.with_timestamp else None)
                 elif 'status' in msg and msg['status'] == 'stopped':
-                    del self.threads[object_id]
-                    if len(self.threads) == 0:
+                    del self.thread_dict[object_id]
+                    if len(self.thread_dict) == 0:
                         raise StopIteration
                     return self.__next__()
                 else:
@@ -148,15 +146,16 @@ class LogCollector():
     def __del__(self):
         self.release()
 
-    def collect_logs(self, names: List, stream: bool = True, handler: LogHandler = None):
-        for timestamp, target, log in handler.get_stacked_logs(names):
-            self.stacked_logs.put((timestamp, (target, log)))
+    def collect_logs(self, names: List, handler: LogHandler = None):
+        last_timestamp_dict = defaultdict(str)
+        for timestamp, name, log in handler.get_stacked_logs(names):
+            self.stacked_logs.put((timestamp, (name, log)))
+            last_timestamp_dict[name] = timestamp
 
-        if stream:
-            self.streaming = True
+        if self.stream:
             logs = []
-            for target in names:
-                last_timestamp = handler.last_timestamp_dict.get(target, None)
+            for name in names:
+                last_timestamp = last_timestamp_dict.get(name, None)
                 if last_timestamp is not None:
                     dt = datetime.strptime(last_timestamp[:len(last_timestamp)-4], '%Y-%m-%dT%H:%M:%S.%f')
                     ms = dt.microsecond / 10**6
@@ -166,21 +165,19 @@ class LogCollector():
                     since_seconds = since_seconds if since_seconds > 0 else 1
                 else:
                     since_seconds = None
-                log = (target, handler.get_stream_logs(target, since_seconds=since_seconds))
-                logs.append(log)
-            for name, log in logs:
-                self.add_iterable(log, name)
+                logs = handler.get_stream_logs(name, since_seconds=since_seconds)
+                self.add_iterable(logs, name)
 
 
     def add_iterable(self, iterable: Generator, name: str = None):
         self.name_width = max(self.name_width, len(name))
-        if name not in [_['name'] for _ in self.threads.values()]:
-            self.threads[id(iterable)] = {
+        if name not in [_['name'] for _ in self.thread_dict.values()]:
+            self.thread_dict[id(iterable)] = {
                 'name': name,
                 'thread': Thread(target=LogCollector._read_stream,
                                  args=(iterable, self.stream_logs, self.should_run), daemon=True)
             }
-            self.threads[id(iterable)]['thread'].start()
+            self.thread_dict[id(iterable)]['thread'].start()
         else:
             print(f"Failed to add interable. Conflicted name [{name}].")
 
@@ -188,24 +185,20 @@ class LogCollector():
         self.should_run.value = False
         if self.release_callback:
             self.release_callback()
-        for _ in self.threads.values():
+        for _ in self.thread_dict.values():
             _['thread'].join()
-
-    thread_count = 0
 
     @classmethod
     def _read_stream(cls, iterable, queue: Queue, should_run: bool):
-        LogCollector.thread_count += 1
-        for timestamp, target, log in iterable:
+        for timestamp, name, log in iterable:
             if not should_run.value:
                 break
             if log:
-                queue.put({'timestamp': timestamp, 'target': target, 'stream': log,
+                queue.put({'timestamp': timestamp, 'name': name, 'stream': log,
                            'object_id': id(iterable)})
             time.sleep(.001)
         timestamp_now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
         queue.put({'timestamp': timestamp_now, 'status': 'stopped', 'object_id': id(iterable)})
-        LogCollector.thread_count -= 1
 
 
 class LogMonitor(Thread):
@@ -261,7 +254,7 @@ class LogMonitor(Thread):
                         log = self.handler.get_stream_logs(pod, since_seconds=since_seconds)
                         self.collector.add_iterable(log, pod)
                     elif event == 'DELETED':
-                        for oid in [k for k, v in self.collector.threads.items() if v['name'] == pod]:
+                        for oid in [k for k, v in self.collector.thread_dict.items() if v['name'] == pod]:
                             print(f'Register stopped [{oid}]')
                             self.handler.close(pod)
                 self.__stopped = True
