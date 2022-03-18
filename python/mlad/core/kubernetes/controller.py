@@ -1221,8 +1221,7 @@ def get_project_logs(
 def _create_k8s_ingress(
     namespace: str, app_name: str, ingress_name: str, port: int, base_path: str = '/',
     rewrite: str = False, cli: ApiClient = DEFAULT_CLI
-# ) -> client.V1Ingress:
-    ):
+ ) -> client.V1Ingress:
     api = client.NetworkingV1Api(cli)
     annotations = {
         "kubernetes.io/ingress.class": "nginx",
