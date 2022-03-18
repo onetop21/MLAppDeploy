@@ -68,7 +68,7 @@ def inspect_image(image: docker.models.images.Image):
         # For project
         'api_version': image.labels[MLAD_PROJECT_API_VERSION],
         'workspace': image.labels[MLAD_PROJECT_WORKSPACE] if MLAD_PROJECT_WORKSPACE in image.labels else 'Not Supported',
-        'project_name': image.labels[MLAD_PROJECT_NAME],
+        'project_name': image.labels.get(MLAD_PROJECT_NAME, '-'),
     }
 
 
