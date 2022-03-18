@@ -109,7 +109,8 @@ def send_project_log(project_key: str, tail: str = Query('all'),
 
         handler = DisconnectHandler()
         try:
-            res = ctlr.get_project_logs(project_key, filters, tail, follow, timestamps, handler)
+            filtered_tuples = ctlr.filter_app_and_pod_name_tuple_from_apps(project_key, filters)
+            res = ctlr.get_project_logs(project_key, filtered_tuples, tail, follow, timestamps, handler)
         except exceptions.NotFound as e:
             raise InvalidLogRequest(str(e))
         return DictStreamingResponse(res, background=handler)
