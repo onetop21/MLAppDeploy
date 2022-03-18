@@ -677,7 +677,7 @@ def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
         dt = datetime.fromisoformat(log['timestamp']) + timedelta(hours=9)
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    if msg.startswith('Error'):
+    if log.get('error', False):
         if pretty:
             msg = f'{utils.ERROR_COLOR}{msg}{utils.CLEAR_COLOR}'
             return msg

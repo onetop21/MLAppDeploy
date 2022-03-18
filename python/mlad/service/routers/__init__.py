@@ -5,8 +5,12 @@ from fastapi.responses import StreamingResponse
 
 
 def jsonify_response(generator):
-    for elem in generator:
-        yield json.dumps(elem)
+    try:
+        for elem in generator:
+            yield json.dumps(elem)
+    except Exception as e:
+        yield json.dumps({'error': True, 'stream': f'{e.__class__.__name__}: {e}'})
+        return
 
 
 class DictStreamingResponse(StreamingResponse):

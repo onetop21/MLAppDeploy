@@ -108,10 +108,7 @@ def send_project_log(project_key: str, tail: str = Query('all'),
                     cb()
 
         handler = DisconnectHandler()
-        try:
-            res = ctlr.get_project_logs(project_key, filters, tail, follow, timestamps, handler)
-        except exceptions.NotFound as e:
-            raise InvalidLogRequest(str(e))
+        res = ctlr.get_project_logs(project_key, filters, tail, follow, timestamps, handler)
         return DictStreamingResponse(res, background=handler)
     except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))

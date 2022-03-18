@@ -10,7 +10,7 @@ from docker.types import Mount
 from mlad.core.libs import utils
 from mlad.core.libs.constants import (
     MLAD_PROJECT, MLAD_PROJECT_VERSION, MLAD_PROJECT_IMAGE, MLAD_PROJECT_USERNAME,
-    MLAD_PROJECT_NAME, MLAD_PROJECT_WORKSPACE
+    MLAD_PROJECT_NAME, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_API_VERSION
 )
 from mlad.core.exceptions import (
     DockerNotFoundError
@@ -58,15 +58,15 @@ def inspect_image(image: docker.models.images.Image):
         # For image
         'id': image.id.split(':', 1)[-1],
         'short_id': image.short_id.split(':', 1)[-1],
-        'tag': image.labels[MLAD_PROJECT_IMAGE],
+        'tag': image.labels.get(MLAD_PROJECT_IMAGE, '-'),
         'tags': image.tags,
-        'version': image.labels[MLAD_PROJECT_VERSION],
-        'username': image.labels[MLAD_PROJECT_USERNAME],
+        'version': image.labels.get(MLAD_PROJECT_VERSION, '-'),
+        'username': image.labels.get(MLAD_PROJECT_USERNAME, '-'),
         'maintainer': image.attrs['Author'],
         # Trim meaningless decimals
         'created': image.attrs['Created'][:-7],
         # For project
-        'api_version': image.labels['MLAD.PROJECT.API_VERSION'],
+        'api_version': image.labels[MLAD_PROJECT_A PI_VERSION],
         'workspace': image.labels[MLAD_PROJECT_WORKSPACE] if MLAD_PROJECT_WORKSPACE in image.labels else 'Not Supported',
         'project_name': image.labels[MLAD_PROJECT_NAME],
     }
