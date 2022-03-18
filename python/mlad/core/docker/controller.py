@@ -47,7 +47,7 @@ def get_image(image_name: str):
 
 def get_images(project_key: str = None, extra_labels: List[str] = []):
     cli = get_cli()
-    filters = ['MLAD.PROJECT.API_VERSION=v1']
+    filters = [f'{MLAD_PROJECT_API_VERSION}=v1']
     if project_key:
         filters += [f'MLAD.PROJECT={project_key}']
     return cli.images.list(filters={'label': filters + extra_labels})
@@ -124,7 +124,7 @@ def remove_image(ids: List[str], force=False):
 
 def prune_images(project_key: Optional[str] = None):
     cli = get_cli()
-    filters = ['MLAD.PROJECT.API_VERSION=v1']
+    filters = [f'{MLAD_PROJECT_API_VERSION}=v1']
     if project_key is not None:
         filters += [f'MLAD.PROJECT={project_key}']
     return cli.images.prune(filters={'label': filters, 'dangling': True})
