@@ -155,7 +155,6 @@ class LogCollector():
         if stream:
             self.streaming = True
             logs = []
-            last_timestamp = self.stacked_logs.queue[self.stacked_logs.qsize()-1][0]
             for target in names:
                 last_timestamp = handler.last_timestamp_dict.get(target, None)
                 if last_timestamp is not None:
