@@ -17,9 +17,12 @@ from mlad.core.exceptions import (
 )
 
 
-def get_cli() -> docker.client.DockerClient:
+def get_cli(host=None) -> docker.client.DockerClient:
     try:
-        return docker.from_env()
+        if host:
+            return docker.DockerClient(base_url=host)
+        else:
+            return docker.from_env()
     except Exception:
         raise DockerNotFoundError
 

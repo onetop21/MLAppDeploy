@@ -448,7 +448,7 @@
         ColorEcho      "    docker      : Install docker community edition with gpu container runtime."
         ColorEcho      "    datastore   : Install minio(s3 compatible)/mongodb server."
         ColorEcho      "    cli         : Install MLAD Command-Line Interface."
-        #ColorEcho      "    status      : Show MLAppDeploy environment status."
+        ColorEcho      "    status      : Show MLAppDeploy environment status."
         ColorEcho      "    help        : Print help message."
         exit 1
     }
@@ -503,7 +503,8 @@
         ColorEcho WARN "Arguments"
         ColorEcho      "    --install=[PRODUCT]           : Data storages to install. (default: all)."
         ColorEcho      "                                    all, minio, mongo"
-        ColorEcho      "    --minio-port=[PORT]           : Port number of minio server(default: 9000)."
+        ColorEcho      "    --minio-port=[PORT]           : Port number of minio API server(default: 9000)."
+        ColorEcho      "    --console-port=[PORT]         : Port number of minio console UI(default: 9001)."
         ColorEcho      "    --mongo-port=[PORT]           : Port number of mongodb server(default: 27017)."
         ColorEcho      "    -h, --help                    : This page"
         exit 1
@@ -566,11 +567,11 @@
             shift
             break
             ;;
-        # status)
-        #     STATUS=1
-        #     shift
-        #     break
-        #     ;;
+        status)
+            STATUS=1
+            shift
+            break
+            ;;
         esac
         shift
     done
@@ -667,15 +668,16 @@
         done
 
     elif [ $DATASTORE ]; then
-        declare -A DATASTORE_PORTS=(["minio"]=9000 ["mongo"]=27017)
+        declare -A DATASTORE_PORTS=(["minio:server"]=9000 ["minio:console"]=9001 ["mongo"]=27017)
+        declare -A DATASTORE_AVAILABLES=(["minio"]= ["mongo"]=)
         DATASTORE_PRODUCTS=()
-        OPTIONS=$(getopt -o h --long install:,minio-port:,mongo-port:,help -- "$@")
+        OPTIONS=$(getopt -o h --long install:,minio-port:,console-port:,mongo-port:,help -- "$@")
         [ $? -eq 0 ] || DatastoreUsage
         eval set -- "$OPTIONS"
         while true; do
             case "$1" in
             --install) shift
-                if [ -v DATASTORE_PORTS[$1] ]
+                if [ -v DATASTORE_AVAILABLES[$1] ]
                 then
                     DATASTORE_PRODUCTS+=("$1")
                 else
@@ -683,7 +685,10 @@
                 fi
                 ;;
             --minio-port) shift
-                DATASTORE_PORTS[minio]=$1
+                DATASTORE_PORTS[minio:server]=$1
+                ;;
+            --console-port) shift
+                DATASTORE_PORTS[minio:console]=$1
                 ;;
             --mongo-port) shift
                 DATASTORE_PORTS[mongo]=$1
@@ -698,7 +703,7 @@
             esac
             shift
         done
-        [ ${#DATASTORE_PRODUCTS[@]} -eq 0 ] && DATASTORE_PRODUCTS+=(${!DATASTORE_PORTS[@]})
+        [ ${#DATASTORE_PRODUCTS[@]} -eq 0 ] && DATASTORE_PRODUCTS+=(${!DATASTORE_AVAILABLES[@]})
 
     elif [ $CLI ]; then
         OPTIONS=$(getopt -o h --long help -- "$@")
@@ -1058,9 +1063,12 @@
         #PORT_CONFLICTED_PROCESSES=$(sudo netstat -ap | grep -e :$REGISTRY_PORT[0-9\ .:*]*LISTEN | awk '{print $7}')
         PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:$REGISTRY_PORT| grep -E "IPv4.*LISTEN")
         if [ $RUNNING_CONTAINER -ne 0 ]; then
+            RUNNING_CONTAINER_ID=$(sudo docker ps -q -f label=mlappdeploy.type=registry)
+            REGISTRY_FILTER='{{ index .HostConfig.PortBindings "5000/tcp" 0 "HostPort" }}'
+            BINDING_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$REGISTRY_FILTER")
             ColorEcho DEBUG "Already Installed."
             ColorEcho INFO "To access registry, set repository name to below at image name."
-            ColorEcho WARN "Example: $(HostIP):$REGISTRY_PORT/[NAME]:[TAG]"
+            ColorEcho WARN "Example: $(HostIP):$BINDING_PORT/[NAME]:[TAG]"
         elif [ $PORT_CONFLICTED_CONTAINERS ]; then
             ColorEcho WARN "Failed to install.\nAlready use $REGISTRY_PORT/tcp by [$PORT_CONFLICTED_CONTAINERS] container."
         elif [ $PORT_CONFLICTED_PROCESSES ]; then
@@ -1092,27 +1100,41 @@
             PrintStep Install MinIO
             
             RUNNING_CONTAINER=$(sudo docker ps -q -f label=mlappdeploy.datastore=minio | wc -l)
-            PORT_CONFLICTED_CONTAINERS=$(sudo docker ps -q -f publish=${DATASTORE_PORTS[minio]} --format {{.Names}})
-            PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:${DATASTORE_PORTS[minio]}| grep -E "IPv4.*LISTEN")
+            SERVER_PORT_CONFLICTED_CONTAINERS=$(sudo docker ps -q -f publish=${DATASTORE_PORTS[minio:server]} --format {{.Names}})
+            CONSOLE_PORT_CONFLICTED_CONTAINERS=$(sudo docker ps -q -f publish=${DATASTORE_PORTS[minio:console]} --format {{.Names}})
+            SERVER_PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:${DATASTORE_PORTS[minio:server]}| grep -E "IPv4.*LISTEN")
+            CONSOLE_PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:${DATASTORE_PORTS[minio:console]}| grep -E "IPv4.*LISTEN")
             
             if [ $RUNNING_CONTAINER -ne 0 ]; then
+                RUNNING_CONTAINER_ID=$(sudo docker ps -q -f label=mlappdeploy.datastore=minio)
+                MINIO_SERVER_FILTER='{{ index .HostConfig.PortBindings "9000/tcp" 0 "HostPort" }}'
+                MINIO_CONSOLE_FILTER='{{ index .HostConfig.PortBindings "9001/tcp" 0 "HostPort" }}'
+                BINDING_SERVER_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MINIO_SERVER_FILTER")
+                BINDING_CONSOLE_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MINIO_CONSOLE_FILTER")
+                
                 ColorEcho DEBUG "Already Installed."
-                ColorEcho INFO "To connect minio server, go to http://$(HostIP):${DATASTORE_PORTS[minio]}."
-            elif [ $PORT_CONFLICTED_CONTAINERS ]; then
-                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$PORT_CONFLICTED_CONTAINERS] container."
-            elif [ $PORT_CONFLICTED_PROCESSES ]; then
-                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$PORT_CONFLICTED_PROCESSES] process."
+                ColorEcho INFO "- Endoint URL : http://$(HostIP):$BINDING_SERVER_PORT"
+                ColorEcho INFO "- Console UI  : http://$(HostIP):$BINDING_CONSOLE_PORT"
+            elif [ $SERVER_PORT_CONFLICTED_CONTAINERS ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$SERVER_PORT_CONFLICTED_CONTAINERS] container."
+            elif [ $CONSOLE_PORT_CONFLICTED_CONTAINERS ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$CONSOLE_PORT_CONFLICTED_CONTAINERS] container."
+            elif [ $SERVER_PORT_CONFLICTED_PROCESSES ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$SERVER_PORT_CONFLICTED_PROCESSES] process."
+            elif [ $CONSOLE_PORT_CONFLICTED_PROCESSES ]; then
+                ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[minio]}/tcp by [$CONSOLE_PORT_CONFLICTED_PROCESSES] process."
             else
-                read -p "Type Access Key of MinIO : " -ei MLAPPDEPLOY ACCESS_KEY
+                read -p "Type Access Key of MinIO : " -ei minioadmin ACCESS_KEY
                 export ACCESS_KEY
-                read -p "Type Secret Key of MinIO : " -ei MLAPPDEPLOY SECRET_KEY
+                read -p "Type Secret Key of MinIO : " -ei minioadmin SECRET_KEY
                 export SECRET_KEY
-                sudo docker run -d -p ${DATASTORE_PORTS[minio]}:9000 --restart=always --name mlad-minio -v minio-data:/data \
+                sudo docker run -d -p ${DATASTORE_PORTS[minio:server]}:9000 -p ${DATASTORE_PORTS[minio:console]}:9001 --restart=always --name mlad-minio -v minio-data:/data \
                     --label mlappdeploy.type=datastore --label mlappdeploy.datastore=minio \
                     -e MINIO_ACCESS_KEY=$ACCESS_KEY -e MINIO_SECRET_KEY=$SECRET_KEY \
-                    minio/minio server /data
+                    minio/minio server /data --console-address ":9001"
                 ColorEcho INFO "Succeed to install minio server."
-                ColorEcho INFO "Connect to http://$(HostIP):${DATASTORE_PORTS[minio]}"
+                ColorEcho INFO "- Endoint URL : http://$(HostIP):${DATASTORE_PORTS[minio:server]}"
+                ColorEcho INFO "- Console UI  : http://$(HostIP):${DATASTORE_PORTS[minio:console]}"
             fi
         fi
         if [[ " ${DATASTORE_PRODUCTS[*]} " =~ " mongo " ]]
@@ -1124,9 +1146,13 @@
             PORT_CONFLICTED_PROCESSES=$(sudo lsof -i:${DATASTORE_PORTS[mongo]}| grep -E "IPv4.*LISTEN")
 
             if [ $RUNNING_CONTAINER -ne 0 ]; then
+                RUNNING_CONTAINER_ID=$(sudo docker ps -q -f label=mlappdeploy.datastore=mongodb)
+                MONGODB_FILTER='{{ index .HostConfig.PortBindings "27017/tcp" 0 "HostPort" }}'
+                BINDING_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MONGODB_FILTER")
+                
                 ColorEcho DEBUG "Already Installed."
                 ColorEcho INFO "To access mongodb, run below command."
-                ColorEcho INFO "$ mongo $(HostIP):${DATASTORE_PORTS[mongo]}"
+                ColorEcho INFO "$ mongo $(HostIP):$BINDING_PORT"
             elif [ $PORT_CONFLICTED_CONTAINERS ]; then
                 ColorEcho WARN "Failed to install.\nAlready use ${DATASTORE_PORTS[mongo]}/tcp by [$PORT_CONFLICTED_CONTAINERS] container."
             elif [ $PORT_CONFLICTED_PROCESSES ]; then
@@ -1154,16 +1180,90 @@
         ColorEcho INFO Install Completed.
     elif [ $STATUS ]
     then
-        DOCKER_STATUS=$(sudo systemctl | grep docker.service)
-        # DOCKER_LOADED=$(echo ${DOCKER_STATUS} | awk '{print $2}')
-        # DOCKER_ACTIVE=$(echo ${DOCKER_STATUS} | awk '{print $3}')
-        # DOCKER_SUB=$(echo ${DOCKER_STATUS} | awk '{print $4}')
-        # DOCKER_DESC=$(echo ${DOCKER_STATUS} | awk '{print $}')
         # k3s installed (master, slave)
+        if IsInstalled kubectl
+        then
+            ColorEcho DEBUG "[✔] Kubernetes is installed."
+
+            CLIENT_INFO=$(kubectl version --client=true -o json | jq '{"version": .clientVersion.gitVersion, "platform": .clientVersion.platform}')
+            ColorEcho WARN "CLIENT"
+            ColorEcho INFO "  Version: $(echo $CLIENT_INFO | jq .version)"
+            ColorEcho INFO "  OS/Arch: $(echo $CLIENT_INFO | jq .platform)"
+
+            if kubectl version >> /dev/null 2>&1
+            then
+                SERVER_INFO=$(kubectl version -o json | jq '{"version": .serverVersion.gitVersion, "platform": .serverVersion.platform}')
+                ColorEcho WARN "SERVER (Context: $(kubectl config current-context))"
+                ColorEcho INFO "  Version: $(echo $SERVER_INFO | jq .version)"
+                ColorEcho INFO "  OS/Arch: $(echo $SERVER_INFO | jq .platform)"
+            else
+                ColorEcho ERROR "  kubernetes daemon(kubelet) is not activated."
+            fi           
+        else
+            ColorEcho ERROR "[❌] Kubernetes is not installed."
+        fi
+
         # registry installed
+        RUNNING_CONTAINER=$(sudo docker ps -q -f label=mlappdeploy.type=registry | wc -l)
+        if [ $RUNNING_CONTAINER -ne 0 ]; then
+            RUNNING_CONTAINER_ID=$(sudo docker ps -q -f label=mlappdeploy.type=registry)
+            REGISTRY_FILTER='{{ index .HostConfig.PortBindings "5000/tcp" 0 "HostPort" }}'
+            BINDING_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$REGISTRY_FILTER")
+
+            ColorEcho DEBUG "[✔] Datastore[Registry] is installed."
+            ColorEcho INFO  "  To access registry, set repository name to below at image name."
+            ColorEcho INFO  "  Example: $(HostIP):$BINDING_PORT/[NAME]:[TAG]"
+        else
+            ColorEcho ERROR "[❌] Datastore[Registry] is not installed."
+        fi
+
         # docker status
+        DOCKER_CLIENT_INFO=$(docker version -f '{{"  - Version: "}}{{.Client.Version}}{{"\n"}}{{"  - OS/Arch: "}}{{.Client.Os}}{{"/"}}{{.Client.Arch}}{{"\n"}}')
+        if [ $? -eq 0 ]; then
+            ColorEcho DEBUG "[✔] Docker is installed."
+            ColorEcho WARN "  CLIENT"
+            ColorEcho INFO "$DOCKER_CLIENT_INFO"
+            
+            DOCKER_SERVER_INFO=$(docker version -f '{{"  - Version: "}}{{.Server.Version}}{{"\n"}}{{"  - OS/Arch: "}}{{.Server.Os}}{{"/"}}{{.Server.Arch}}{{"\n"}}')
+            if [ $? -eq 0 ]; then
+                ColorEcho WARN "  SERVER (Context: $(docker version -f '{{.Client.Context}}'))"
+                ColorEcho INFO "$DOCKER_SERVER_INFO"
+            else
+                ColorEcho ERROR "  Docker daemon is not activated."
+            fi
+        else
+            ColorEcho ERROR "[❌] Docker is not installed."
+        fi
+
         # minio status
+        RUNNING_CONTAINER=$(sudo docker ps -q -f label=mlappdeploy.datastore=minio | wc -l)
+        if [ $RUNNING_CONTAINER -ne 0 ]; then
+            RUNNING_CONTAINER_ID=$(sudo docker ps -q -f label=mlappdeploy.datastore=minio)
+            MINIO_SERVER_FILTER='{{ index .HostConfig.PortBindings "9000/tcp" 0 "HostPort" }}'
+            MINIO_CONSOLE_FILTER='{{ index .HostConfig.PortBindings "9001/tcp" 0 "HostPort" }}'
+            BINDING_SERVER_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MINIO_SERVER_FILTER")
+            BINDING_CONSOLE_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MINIO_CONSOLE_FILTER")
+        
+            ColorEcho DEBUG "[✔] Datastore[MinIO] is installed."
+            ColorEcho INFO "  Endoint URL : http://$(HostIP):$BINDING_SERVER_PORT"
+            ColorEcho INFO "  Console UI  : http://$(HostIP):$BINDING_CONSOLE_PORT"
+        else
+            ColorEcho ERROR "[❌] Datastore[MinIO] is not installed."
+        fi
+
         # mongodb status
+        RUNNING_CONTAINER=$(sudo docker ps -q -f label=mlappdeploy.datastore=mongodb | wc -l)
+        if [ $RUNNING_CONTAINER -ne 0 ]; then
+            RUNNING_CONTAINER_ID=$(sudo docker ps -q -f label=mlappdeploy.datastore=mongodb)
+            MONGODB_FILTER='{{ index .HostConfig.PortBindings "27017/tcp" 0 "HostPort" }}'
+            BINDING_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MONGODB_FILTER")
+
+            ColorEcho DEBUG "[✔] Datastore[MongoDB] is installed."
+            ColorEcho INFO "  To access mongodb, run below command."
+            ColorEcho INFO "  $ mongo $(HostIP):$BINDING_PORT"
+        else
+            ColorEcho ERROR "[❌] Datastore[MongoDB] is not installed."
+        fi
     elif [ $DEPLOY ]
     then
         GetPrivileged
