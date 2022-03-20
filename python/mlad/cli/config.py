@@ -94,7 +94,7 @@ def add(name: str, address: str) -> Dict:
     group = pattern.match(spec['docker_host'])
     if group['SCHEME']:
         try:
-            cli = get_docker_cli(dockerctlr, spec)
+            cli = dockerctlr.get_cli(spec['docker_host'])
         except DockerNotFoundError:
             raise ValueError(f"Docker Host[{spec['docker_host']}] is not valid.")
     else:
@@ -116,11 +116,11 @@ def add(name: str, address: str) -> Dict:
     warn_insecure = False
     default_docker_registry = 'https://docker.io'
     if not address:
-        if requests.get(f'http://{ip}:25000/v2/_catalog'):
+        if requests.get(f'http://{ip}:25000/v2/_catalog', timeout=1):
             default_docker_registry = f'http://{ip}:25000'
     else:
         group = pattern.match(address)
-        if group['IP'] and requests.get(f"http://{group['IP']}:25000/v2/_catalog"):
+        if group['IP'] and requests.get(f"http://{group['IP']}:25000/v2/_catalog", timeout=1):
             default_docker_registry = f"http://{group['IP']}:25000"
     registry_address = utils.prompt('Docker Registry Address', default_docker_registry)
     
@@ -333,11 +333,6 @@ def obtain_server_address(config: Dict[str, object]) -> str:
         raise APIServerNotInstalledError
     port = service.spec.ports[0].node_port
     return f'{host}:{port}'
-
-def get_docker_cli(ctlr, config: Optional[Dict] = None):
-    if config is None:
-        config = get()
-    return ctlr.get_cli(host=config['docker_host'])
 
 def get_admin_k8s_cli(ctlr, config: Optional[Dict] = None):
     if config is None:

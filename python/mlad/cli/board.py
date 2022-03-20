@@ -15,6 +15,7 @@ from mlad.cli.exceptions import (
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
+from mlad.core.docker.controller import get_cli
 
 
 class ValueGenerator:
@@ -28,21 +29,6 @@ class ValueGenerator:
         for x in self:
             pass
         return self.value
-
-
-def get_cli():
-    try:
-        return docker.from_env()
-    except Exception:
-        raise DockerNotFoundError
-
-
-def get_lo_cli():
-    try:
-        return docker.APIClient()
-    except Exception:
-        raise DockerNotFoundError
-
 
 def activate(image_repository: str):
     cli = get_cli()
@@ -249,6 +235,6 @@ def _obtain_host():
 
 
 def _obtain_ports(container) -> List[str]:
-    lo_cli = get_lo_cli()
+    lo_cli = get_cli().api
     port_data = lo_cli.inspect_container(container.id)['NetworkSettings']['Ports']
     return [k.replace('/tcp', '') for k in port_data.keys()]
