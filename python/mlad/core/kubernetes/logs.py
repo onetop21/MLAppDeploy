@@ -27,11 +27,11 @@ class LogHandler:
         self.namespace = namespace
         self.tail = None if tail == 'all' else tail
 
-    def close(self, resp: str = None):
-        for _ in ([self.responses.get(resp)] if resp else list(self.responses.values())):
-            if _ and _._fp and _._fp.fp:
+    def close(self, name: str = None):
+        for resp in ([self.responses.get(name)] if name else list(self.responses.values())):
+            if resp and resp._fp and resp._fp.fp:
                 try:
-                    sock = _._fp.fp.raw._sock
+                    sock = resp._fp.fp.raw._sock
                     if isinstance(sock, ssl.SSLSocket):
                         sock.shutdown(socket.SHUT_RDWR)
                     else:
@@ -44,6 +44,10 @@ class LogHandler:
         # log response to timestamp & msg
         separated = log.split(' ', 1)
         timestamp = separated[0]
+        try:
+            parser.parse(timestamp)
+        except parser.ParserError as e:
+            timestamp = None
         msg = separated[1] if len(separated) > 1 else ''
         if not (msg.endswith('\n') or msg.endswith('\r')):
             msg += '\n'
@@ -56,7 +60,7 @@ class LogHandler:
             logs = resp.split('\n')
             for log in logs:
                 timestamp, msg = self._parse_log(log)
-                if len(timestamp) == 0:
+                if timestamp == None:
                     break
                 yield timestamp, name, msg
 
@@ -76,6 +80,7 @@ class LogHandler:
                     continue
                 timestamp, msg = self._parse_log(log)
                 yield timestamp, name, msg
+            self.close(name)
         except urllib3.exceptions.ProtocolError:
             pass
         except urllib3.exceptions.ReadTimeoutError:
@@ -99,29 +104,33 @@ class LogCollector():
     def _output_dict(self, name: str, log: str, timestamp: str = None):
         self.name_width = max(self.name_width, len(name))
         output = {'name': name, 'stream': log, 'name_width': self.name_width}
-        if timestamp is not None:
-            output['timestamp'] = str(parser.parse(timestamp).astimezone())
+        if self.with_timestamp:
+            output['timestamp'] = str(parser.parse(timestamp).astimezone()) if timestamp is not None\
+                else None
         return output
 
     def __next__(self):
         if not self.stacked_logs.empty():
             msg = self.stacked_logs.get()
-            timestamp = str(parser.parse(msg[0]).astimezone())
+            timestamp = msg[0]
             name, log = msg[1]
-            return self._output_dict(name, log.decode(), timestamp if self.with_timestamp else None)
+            return self._output_dict(name, log.decode(), timestamp)
         else:
-            if self.stream is True:
+            if self.stream:
                 msg = self.stream_logs.get()
-                object_id = msg['object_id']
-                timestamp = str(parser.parse(msg['timestamp']).astimezone())
+                name = msg['name']
+                timestamp = msg['timestamp']
                 if 'status' in msg and msg['status'] == 'stopped':
-                    del self.thread_dict[object_id]
+                    del self.thread_dict[name]
                     if len(self.thread_dict) == 0:
                         raise StopIteration
                     return self.__next__()
                 stream = msg['stream'].decode()
                 name = msg['name']
-                return self._output_dict(name, stream, timestamp if self.with_timestamp else None)
+                output_dict = self._output_dict(name, stream, timestamp)
+                if 'timestamp' in output_dict and output_dict['timestamp'] == None:
+                    return self.__next__()
+                return self._output_dict(name, stream, timestamp)
             else:
                 raise StopIteration
 
@@ -166,13 +175,11 @@ class LogCollector():
 
     def add_iterable(self, iterable: Generator, name: str = None):
         self.name_width = max(self.name_width, len(name))
-        if name not in [_['name'] for _ in self.thread_dict.values()]:
-            self.thread_dict[id(iterable)] = {
-                'name': name,
-                'thread': Thread(target=LogCollector._read_stream,
-                                 args=(iterable, self.stream_logs, self.should_run), daemon=True)
-            }
-            self.thread_dict[id(iterable)]['thread'].start()
+        if name not in self.thread_dict:
+            self.thread_dict[name] = Thread(target=LogCollector._read_stream,
+                                            args=(name, iterable, self.stream_logs, self.should_run),
+                                            daemon=True)
+            self.thread_dict[name].start()
         else:
             print(f"Failed to add interable. Conflicted name [{name}].")
 
@@ -180,20 +187,19 @@ class LogCollector():
         self.should_run.value = False
         if self.release_callback:
             self.release_callback()
-        for _ in self.thread_dict.values():
-            _['thread'].join()
+        for thread in self.thread_dict.values():
+            thread.join()
 
     @classmethod
-    def _read_stream(cls, iterable, queue: Queue, should_run: bool):
+    def _read_stream(cls, name: str, iterable: Generator, queue: Queue, should_run: bool):
         for timestamp, name, log in iterable:
             if not should_run.value:
                 break
             if log:
-                queue.put({'timestamp': timestamp, 'name': name, 'stream': log,
-                           'object_id': id(iterable)})
+                queue.put({'timestamp': timestamp, 'name': name, 'stream': log})
             time.sleep(.001)
         timestamp_now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-        queue.put({'timestamp': timestamp_now, 'status': 'stopped', 'object_id': id(iterable)})
+        queue.put({'timestamp': timestamp_now, 'name': name, 'status': 'stopped'})
 
 
 class LogMonitor(Thread):
@@ -234,7 +240,7 @@ class LogMonitor(Thread):
                 for ev in w.stream(wrapped_api, namespace=namespace, label_selector=label_selector,
                                    resource_version=self.resource_version):
                     event = ev['type']
-                    pod = ev['object']['metadata']['name']
+                    pod_name = ev['object']['metadata']['name']
                     phase = ev['object']['status']['phase']
 
                     if event == 'MODIFIED' and phase == 'Running':
@@ -244,12 +250,12 @@ class LogMonitor(Thread):
                         ts = time.mktime(datetime.strptime(created, '%Y-%m-%dT%H:%M:%SZ').timetuple())
                         since_seconds = math.ceil(datetime.utcnow().timestamp() - ts)
 
-                        log = self.handler.get_stream_logs(pod, since_seconds=since_seconds)
-                        self.collector.add_iterable(log, pod)
+                        log = self.handler.get_stream_logs(pod_name, since_seconds=since_seconds)
+                        self.collector.add_iterable(log, pod_name)
                     elif event == 'DELETED':
-                        for oid in [k for k, v in self.collector.thread_dict.items() if v['name'] == pod]:
-                            print(f'Register stopped [{oid}]')
-                            self.handler.close(pod)
+                        if pod_name in self.collector.thread_dict:
+                            self.handler.close(pod_name)
+                            print(f'Register stopped [{pod_name}]')
                 self.__stopped = True
             except urllib3.exceptions.ProtocolError:
                 print(f'Watch Stop [{namespace}]')
