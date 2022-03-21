@@ -126,7 +126,6 @@ class LogCollector():
                         raise StopIteration
                     return self.__next__()
                 stream = msg['stream'].decode()
-                name = msg['name']
                 output_dict = self._output_dict(name, stream, timestamp)
                 if 'timestamp' in output_dict and output_dict['timestamp'] == None:
                     return self.__next__()
