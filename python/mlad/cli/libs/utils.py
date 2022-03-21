@@ -18,6 +18,12 @@ from dateutil import parser
 
 from yaml.parser import ParserError
 from mlad.cli.exceptions import ProjectLoadError
+from mlad.core.libs.constants import (
+    MLAD_PROJECT, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_USERNAME,
+    MLAD_PROJECT_API_VERSION, MLAD_PROJECT_NAME, MLAD_PROJECT_MAINTAINER,
+    MLAD_PROJECT_VERSION, MLAD_PROJECT_BASE, MLAD_PROJECT_IMAGE, MLAD_PROJECT_SESSION,
+    MLAD_PROJECT_KIND
+)
 
 PROJECT_FILE_ENV_KEY = 'MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
@@ -185,18 +191,17 @@ def base_labels(workspace: str, session: str, project: Dict,
     basename = f"{username}-{project['name']}-{key[:10]}".lower()
 
     labels = {
-        'MLAD.VERSION': '1',
-        'MLAD.PROJECT': key,
-        'MLAD.PROJECT.WORKSPACE': workspace,
-        'MLAD.PROJECT.USERNAME': username,
-        'MLAD.PROJECT.API_VERSION': project['apiVersion'],
-        'MLAD.PROJECT.NAME': project['name'].lower(),
-        'MLAD.PROJECT.MAINTAINER': project['maintainer'],
-        'MLAD.PROJECT.VERSION': str(project['version']).lower(),
-        'MLAD.PROJECT.BASE': basename,
-        'MLAD.PROJECT.IMAGE': repository,
-        'MLAD.PROJECT.SESSION': session,
-        'MLAD.PROJECT.KIND': project['kind']
+        MLAD_PROJECT: key,
+        MLAD_PROJECT_WORKSPACE: workspace,
+        MLAD_PROJECT_USERNAME: username,
+        MLAD_PROJECT_API_VERSION: project['apiVersion'],
+        MLAD_PROJECT_NAME: project['name'].lower(),
+        MLAD_PROJECT_MAINTAINER: project['maintainer'],
+        MLAD_PROJECT_VERSION: str(project['version']).lower(),
+        MLAD_PROJECT_BASE: basename,
+        MLAD_PROJECT_IMAGE: repository,
+        MLAD_PROJECT_SESSION: session,
+        MLAD_PROJECT_KIND: project['kind']
     }
     return labels
 
