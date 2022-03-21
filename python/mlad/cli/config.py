@@ -2,6 +2,8 @@ import sys
 import os
 import socket
 import uuid
+import re
+import requests
 
 import jwt
 import yaml
@@ -12,13 +14,15 @@ from pathlib import Path
 from urllib.parse import urlparse
 from getpass import getuser
 from mlad.core.docker import controller as dockerctlr
-from mlad.core.kubernetes import controller as kubectlr
+from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
     ConfigNotFoundError, CannotDeleteConfigError, InvalidPropertyError,
     ConfigAlreadyExistError, InvalidSetPropertyError, InvalidURLError,
-    APIServerNotInstalledError
+    APIServerNotInstalledError, CannotFoundKubeconfigError, InvalidDockerHostError,
+    DockerHostSchemeError
 )
+    
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 CFG_PATH = f'{MLAD_HOME_PATH}/config.yml'
@@ -56,7 +60,7 @@ def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) ->
     return None
 
 
-def add(name: str, address: str) -> Dict:
+def add(name: str, address: Optional[str]) -> Dict:
     spec = _load()
     duplicated_index = _find_config(name, spec=spec, index=True)
     if duplicated_index is not None:
@@ -64,46 +68,46 @@ def add(name: str, address: str) -> Dict:
 
     ip = utils.obtain_my_ip()
     server_config = dict()
-    if not address:
+    if address is None:
         kubeconfig_path = utils.prompt(
             'A Kubeconfig File Path', default=f'{Path.home()}/.kube/config')
         if os.path.isfile(kubeconfig_path):
+            from mlad.core.kubernetes import controller as kubectlr
             contexts = kubectlr.get_contexts(kubeconfig_path)
             context_name = utils.prompt('A Current Kubernetes Context Name', contexts[1]['name'])
             server_config['kubeconfig_path'] = kubeconfig_path
             server_config['context_name'] = context_name
         else:
-            raise Exception("Cannot find kubeconfig file.")
-    else:
-        address = utils.prompt('MLAD API Server Address',
-                               default=f'http://{address}')
+            raise CannotFoundKubeconfigError(kubeconfig_path)
+    elif requests.get(f'http://{address}', timeout=1):
+        # address = utils.prompt('MLAD API Server Address',
+        #                        default=f'http://{address}')
         address = _parse_url(address)['url']
         server_config = {
             'apiserver': {
                 'address': address
             }
         }
+    else:
+        raise InvalidURLError
 
     # docker host
-    import re
-    from mlad.core.exceptions import DockerNotFoundError
     pattern = re.compile("(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(:[0-9]+)?")
 
     default_docker_host = os.getenv('DOCKER_HOST') or 'unix:///var/run/docker.sock'
-    spec['docker_host'] = utils.prompt('An Endpoint of Docker Host', default=default_docker_host)
-    group = pattern.match(spec['docker_host'])
+    server_config['docker_host'] = utils.prompt('An Endpoint of Docker Host', default=default_docker_host)
+    group = pattern.match(server_config['docker_host'])
     if group['SCHEME']:
         try:
-            cli = dockerctlr.get_cli(spec['docker_host'])
+            cli = dockerctlr.get_cli(server_config['docker_host'])
         except DockerNotFoundError:
-            raise ValueError(f"Docker Host[{spec['docker_host']}] is not valid.")
+            raise InvalidDockerHostError(server_config['docker_host'])
     else:
-        raise ValueError(f"Docker host is required a scheme.")
+        raise DockerHostSchemeError
 
-    if spec['docker_host'].startswith('unix:///'):
+    if server_config['docker_host'].startswith('unix:///'):
         DOCKER_IP = f'{ip}'
     else:
-        group = pattern.match(spec['docker_host'])
         DOCKER_IP = group['IP']
         if DOCKER_IP in ['localhost', '127.0.0.1']:
             DOCKER_IP = f'{ip}'
@@ -112,10 +116,9 @@ def add(name: str, address: str) -> Dict:
 
     session = _create_session_key()
 
-    import requests
     warn_insecure = False
     default_docker_registry = 'https://docker.io'
-    if not address:
+    if address is None:
         if requests.get(f'http://{ip}:25000/v2/_catalog', timeout=1):
             default_docker_registry = f'http://{ip}:25000'
     else:
@@ -384,10 +387,12 @@ def _s3_initializer(ip, cli) -> StrDict:
     if container_list:
         SERVER_PORT = container_list[0].attrs['HostConfig']['PortBindings']['9000/tcp'][0]['HostPort']
         CONSOLE_PORT = container_list[0].attrs['HostConfig']['PortBindings']['9001/tcp'][0]['HostPort']
+        ACCESS_KEY = [_ for _ in container_list[0].attrs['Config']['Env'] if _.startswith('MINIO_ACCESS_KEY=')]
+        SECRET_KEY = [_ for _ in container_list[0].attrs['Config']['Env'] if _.startswith('MINIO_SECRET_KEY=')]
         endpoint = f'http://{ip}:{SERVER_PORT}'
         region = 'us-east-1'
-        access_key = 'minioadmin'
-        secret_key = 'minioadmin'
+        access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=','') if len(ACCESS_KEY) else 'minioadmin'
+        secret_key = SECRET_KEY[0].replace('MINIO_SECRET_KEY=','') if len(SECRET_KEY) else 'minioadmin'
     else:
         endpoint = f'https://s3.amazonaws.com'
         region = 'us-east-1'

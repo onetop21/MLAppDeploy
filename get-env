@@ -1243,10 +1243,15 @@
             MINIO_CONSOLE_FILTER='{{ index .HostConfig.PortBindings "9001/tcp" 0 "HostPort" }}'
             BINDING_SERVER_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MINIO_SERVER_FILTER")
             BINDING_CONSOLE_PORT=$(sudo docker inspect $RUNNING_CONTAINER_ID -f "$MINIO_CONSOLE_FILTER")
+            DOCKER_ENV=$(docker inspect $(sudo docker ps -q -f label=mlappdeploy.datastore=minio) -f '{{json .Config.Env}}')
+            ACCESS_KEY=$(echo $DOCKER_ENV | jq '.[] | capture("MINIO_ACCESS_KEY=(?<ACCESS_KEY>.*)") | .ACCESS_KEY' -r)
+            SECRET_KEY=$(echo $DOCKER_ENV | jq '.[] | capture("MINIO_SECRET_KEY=(?<SESCRET_KEY>.*)") | .SESCRET_KEY' -r)
         
             ColorEcho DEBUG "[✔] Datastore[MinIO] is installed."
             ColorEcho INFO "  Endoint URL : http://$(HostIP):$BINDING_SERVER_PORT"
             ColorEcho INFO "  Console UI  : http://$(HostIP):$BINDING_CONSOLE_PORT"
+            ColorEcho INFO "  Access Key  : $ACCESS_KEY"
+            ColorEcho INFO "  Secret Key  : $SECRET_KEY"
         else
             ColorEcho ERROR "[❌] Datastore[MinIO] is not installed."
         fi
