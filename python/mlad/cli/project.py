@@ -670,7 +670,7 @@ def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
     if log.get('error', False):
         return msg
 
-    name = log.get('name', 'Unknown')
+    name = log['name']
     name_width = min(max_name_width, log.get('name_width', max_name_width))
     if len(name) > name_width:
         name = name[:name_width - 3] + '...'
