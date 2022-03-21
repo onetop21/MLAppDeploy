@@ -22,7 +22,7 @@ from mlad.cli.exceptions import (
     APIServerNotInstalledError, CannotFoundKubeconfigError, InvalidDockerHostError,
     DockerHostSchemeError
 )
-    
+
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 CFG_PATH = f'{MLAD_HOME_PATH}/config.yml'
@@ -66,6 +66,7 @@ def add(name: str, address: Optional[str]) -> Dict:
     if duplicated_index is not None:
         raise ConfigAlreadyExistError(name)
 
+    pattern = re.compile("(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(?P<PORT>:[0-9]+)?")
     ip = utils.obtain_my_ip()
     server_config = dict()
     if address is None:
@@ -79,20 +80,21 @@ def add(name: str, address: Optional[str]) -> Dict:
             server_config['context_name'] = context_name
         else:
             raise CannotFoundKubeconfigError(kubeconfig_path)
-    elif requests.get(f'http://{address}', timeout=1):
-        # address = utils.prompt('MLAD API Server Address',
-        #                        default=f'http://{address}')
-        address = _parse_url(address)['url']
-        server_config = {
-            'apiserver': {
-                'address': address
-            }
-        }
     else:
-        raise InvalidURLError
-
-    # docker host
-    pattern = re.compile("(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(:[0-9]+)?")
+        try:
+            group = pattern.match(address)
+            if group['SCHEME'] is None:
+                address = f"http://{address}"
+            if requests.get(f'{address}/docs', timeout=1):
+                server_config = {
+                    'apiserver': {
+                        'address': address
+                    }
+                }
+            else:
+                raise InvalidURLError("API Server")
+        except requests.exceptions.ConnectionError:
+            raise InvalidURLError("API Server")
 
     default_docker_host = os.getenv('DOCKER_HOST') or 'unix:///var/run/docker.sock'
     server_config['docker_host'] = utils.prompt('An Endpoint of Docker Host', default=default_docker_host)
@@ -118,13 +120,16 @@ def add(name: str, address: Optional[str]) -> Dict:
 
     warn_insecure = False
     default_docker_registry = 'https://docker.io'
-    if address is None:
-        if requests.get(f'http://{ip}:25000/v2/_catalog', timeout=1):
-            default_docker_registry = f'http://{ip}:25000'
-    else:
-        group = pattern.match(address)
-        if group['IP'] and requests.get(f"http://{group['IP']}:25000/v2/_catalog", timeout=1):
-            default_docker_registry = f"http://{group['IP']}:25000"
+    try:
+        if address is None:
+            if requests.get(f'http://{ip}:25000/v2/_catalog', timeout=1):
+                default_docker_registry = f'http://{ip}:25000'
+        else:
+            group = pattern.match(address)
+            if group['IP'] and requests.get(f"http://{group['IP']}:25000/v2/_catalog", timeout=1):
+                default_docker_registry = f"http://{group['IP']}:25000"
+    except requests.exceptions.ConnectionError:
+        ...
     registry_address = utils.prompt('Docker Registry Address', default_docker_registry)
     
     parsed_url = _parse_url(registry_address)
@@ -385,10 +390,12 @@ def _parse_datastore(kind: str, initializer: Callable[[], StrDict], args: Tuple[
 def _s3_initializer(ip, cli) -> StrDict:
     container_list = cli.containers.list(filters={'label': 'mlappdeploy.datastore=minio'})
     if container_list:
-        SERVER_PORT = container_list[0].attrs['HostConfig']['PortBindings']['9000/tcp'][0]['HostPort']
-        CONSOLE_PORT = container_list[0].attrs['HostConfig']['PortBindings']['9001/tcp'][0]['HostPort']
-        ACCESS_KEY = [_ for _ in container_list[0].attrs['Config']['Env'] if _.startswith('MINIO_ACCESS_KEY=')]
-        SECRET_KEY = [_ for _ in container_list[0].attrs['Config']['Env'] if _.startswith('MINIO_SECRET_KEY=')]
+        PORT_BINDINGS = container_list[0].attrs['HostConfig']['PortBindings']
+        SERVER_PORT = PORT_BINDINGS['9000/tcp'][0]['HostPort']
+        CONSOLE_PORT = PORT_BINDINGS['9001/tcp'][0]['HostPort']
+        CONFIG_ENV = container_list[0].attrs['Config']['Env']
+        ACCESS_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_ACCESS_KEY=')]
+        SECRET_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_SECRET_KEY=')]
         endpoint = f'http://{ip}:{SERVER_PORT}'
         region = 'us-east-1'
         access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=','') if len(ACCESS_KEY) else 'minioadmin'

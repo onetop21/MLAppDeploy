@@ -6,8 +6,15 @@ class ProjectLoadError(MLADException):
 
 
 class InvalidURLError(MLADException):
-    pass
+    
+    def __init__(self, name: str = None):
+        self._name = name
 
+    def __str__(self):
+        if self._name:
+            return f'URL is not valid to connect [{self._name}].'
+        else:
+            return super(MLADException, self).__str__()
 
 class ImageNotFoundError(MLADException):
 
