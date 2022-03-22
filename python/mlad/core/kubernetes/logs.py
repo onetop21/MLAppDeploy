@@ -25,7 +25,7 @@ class LogHandler:
         self.api = client.CoreV1Api(cli)
         self.responses = {}
         self.namespace = namespace
-        self.tail = None if tail == 'all' else tail
+        self.tail = 65535 if tail == 'all' else tail
 
     def close(self, name: str = None):
         for resp in ([self.responses.get(name)] if name else list(self.responses.values())):
@@ -54,15 +54,24 @@ class LogHandler:
         return timestamp, msg.encode()
 
     def get_stacked_logs(self, names: List):
+        logs_dict = {}
         for name in names:
             resp = self.api.read_namespaced_pod_log(name=name, namespace=self.namespace,
                                                     tail_lines=self.tail, timestamps=True)
             logs = resp.split('\n')
-            for log in logs:
-                timestamp, msg = self._parse_log(log)
-                if timestamp == None:
-                    break
-                yield timestamp, name, msg
+            logs_dict[name] = logs
+
+        while True:
+            if all([True if len(logs_dict[name]) == 0 else False for name in names]):
+                break
+            for name in names:
+                logs = logs_dict[name]
+                if len(logs) > 0 :
+                    timestamp, msg = self._parse_log(logs.pop(0))
+                    if timestamp is None:
+                        break
+                    yield timestamp, name, msg
+
 
     def get_stream_logs(self, name: str, **params):
         since_seconds = params.get('since_seconds', None)
@@ -127,7 +136,7 @@ class LogCollector():
                     return self.__next__()
                 stream = msg['stream'].decode()
                 output_dict = self._output_dict(name, stream, timestamp)
-                if 'timestamp' in output_dict and output_dict['timestamp'] == None:
+                if 'timestamp' in output_dict and output_dict['timestamp'] is None:
                     return self.__next__()
                 return self._output_dict(name, stream, timestamp)
             else:
