@@ -2,21 +2,27 @@ import sys
 import os
 import socket
 import uuid
+import re
+import requests
 
 import jwt
 import yaml
 
 from functools import lru_cache
-from typing import Optional, Dict, Callable, List
+from typing import Optional, Dict, Callable, List, Tuple, Any
 from pathlib import Path
 from urllib.parse import urlparse
 from getpass import getuser
+from mlad.core.docker import controller as dockerctlr
+from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
     ConfigNotFoundError, CannotDeleteConfigError, InvalidPropertyError,
     ConfigAlreadyExistError, InvalidSetPropertyError, InvalidURLError,
-    APIServerNotInstalledError
+    APIServerNotInstalledError, CannotFoundKubeconfigError, InvalidDockerHostError,
+    DockerHostSchemeError
 )
+
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 CFG_PATH = f'{MLAD_HOME_PATH}/config.yml'
@@ -54,34 +60,78 @@ def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) ->
     return None
 
 
-def add(name: str, admin: bool) -> Dict:
+def add(name: str, address: Optional[str]) -> Dict:
     spec = _load()
     duplicated_index = _find_config(name, spec=spec, index=True)
     if duplicated_index is not None:
         raise ConfigAlreadyExistError(name)
 
+    pattern = re.compile("(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(?P<PORT>:[0-9]+)?")
     ip = utils.obtain_my_ip()
     server_config = dict()
-    if admin:
+    if address is None:
         kubeconfig_path = utils.prompt(
             'A Kubeconfig File Path', default=f'{Path.home()}/.kube/config')
-        context_name = utils.prompt('A Current Kubernetes Context Name', 'default')
-        server_config['kubeconfig_path'] = kubeconfig_path
-        server_config['context_name'] = context_name
+        if os.path.isfile(kubeconfig_path):
+            from mlad.core.kubernetes import controller as kubectlr
+            contexts = kubectlr.get_contexts(kubeconfig_path)
+            context_name = utils.prompt('A Current Kubernetes Context Name', contexts[1]['name'])
+            server_config['kubeconfig_path'] = kubeconfig_path
+            server_config['context_name'] = context_name
+        else:
+            raise CannotFoundKubeconfigError(kubeconfig_path)
     else:
-        address = utils.prompt('MLAD API Server Address',
-                               default=f'http://{ip}:8440')
-        address = _parse_url(address)['url']
-        server_config = {
-            'apiserver': {
-                'address': address
-            }
-        }
+        try:
+            group = pattern.match(address)
+            if group['SCHEME'] is None:
+                address = f"http://{address}"
+            if requests.get(f'{address}/docs', timeout=1):
+                server_config = {
+                    'apiserver': {
+                        'address': address
+                    }
+                }
+            else:
+                raise InvalidURLError("API Server")
+        except requests.exceptions.ConnectionError:
+            raise InvalidURLError("API Server")
+
+    default_docker_host = os.getenv('DOCKER_HOST') or 'unix:///var/run/docker.sock'
+    server_config['docker_host'] = utils.prompt('An Endpoint of Docker Host', default=default_docker_host)
+    group = pattern.match(server_config['docker_host'])
+    if group['SCHEME']:
+        try:
+            cli = dockerctlr.get_cli(server_config['docker_host'])
+        except DockerNotFoundError:
+            raise InvalidDockerHostError(server_config['docker_host'])
+    else:
+        raise DockerHostSchemeError
+
+    if server_config['docker_host'].startswith('unix:///'):
+        DOCKER_IP = f'{ip}'
+    else:
+        DOCKER_IP = group['IP']
+        if DOCKER_IP in ['localhost', '127.0.0.1']:
+            DOCKER_IP = f'{ip}'
+        elif not DOCKER_IP:
+            raise ValueError(f"Cannot extract IP address.")
 
     session = _create_session_key()
 
     warn_insecure = False
-    registry_address = utils.prompt('Docker Registry Address', f'http://{ip}:5000')
+    default_docker_registry = 'https://docker.io'
+    try:
+        if address is None:
+            if requests.get(f'http://{ip}:25000/v2/_catalog', timeout=1):
+                default_docker_registry = f'http://{ip}:25000'
+        else:
+            group = pattern.match(address)
+            if group['IP'] and requests.get(f"http://{group['IP']}:25000/v2/_catalog", timeout=1):
+                default_docker_registry = f"http://{group['IP']}:25000"
+    except requests.exceptions.ConnectionError:
+        ...
+    registry_address = utils.prompt('Docker Registry Address', default_docker_registry)
+    
     parsed_url = _parse_url(registry_address)
     if parsed_url['scheme'] != 'https':
         warn_insecure = True
@@ -93,7 +143,7 @@ def add(name: str, admin: bool) -> Dict:
         f'session={session}',
         f'docker.registry.address={registry_address}',
         f'docker.registry.namespace={registry_namespace}',
-        f'admin={admin}'
+        f'admin={address is None}'
     ])
 
     s3_prompts = {
@@ -102,14 +152,14 @@ def add(name: str, admin: bool) -> Dict:
         'accesskey': 'Access Key ID',
         'secretkey': 'Secret Access Key'
     }
-    s3_config = _parse_datastore('s3', _s3_initializer, _s3_finalizer, s3_prompts)
+    s3_config = _parse_datastore('s3', _s3_initializer, (DOCKER_IP, cli), _s3_finalizer, s3_prompts)
 
     db_prompts = {
         'address': 'MongoDB Address',
         'username': 'MongoDB Username',
         'password': 'MongoDB Password'
     }
-    db_config = _parse_datastore('db', _db_initializer, _db_finalizer, db_prompts)
+    db_config = _parse_datastore('db', _db_initializer, (DOCKER_IP, cli), _db_finalizer, db_prompts)
 
     config = _merge_dict(base_config, server_config, s3_config, db_config)
     if duplicated_index is not None:
@@ -292,12 +342,10 @@ def obtain_server_address(config: Dict[str, object]) -> str:
     port = service.spec.ports[0].node_port
     return f'{host}:{port}'
 
-
 def get_admin_k8s_cli(ctlr, config: Optional[Dict] = None):
     if config is None:
         config = get()
     return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
-
 
 def _create_session_key():
     user = getuser()
@@ -328,9 +376,9 @@ def _parse_url(url):
     }
 
 
-def _parse_datastore(kind: str, initializer: Callable[[], StrDict],
+def _parse_datastore(kind: str, initializer: Callable[[], StrDict], args: Tuple[Any],
                      finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> Dict:
-    config = initializer()
+    config = initializer(*args)
     for k, v in prompts.items():
         config[k] = utils.prompt(v, config[k])
     config = finalizer(config)
@@ -339,12 +387,24 @@ def _parse_datastore(kind: str, initializer: Callable[[], StrDict],
     ])
 
 
-def _s3_initializer() -> StrDict:
-    ip = utils.obtain_my_ip()
-    endpoint = f'http://{ip}:9000'
-    region = 'us-east-1'
-    access_key = 'minioadmin'
-    secret_key = 'minioadmin'
+def _s3_initializer(ip, cli) -> StrDict:
+    container_list = cli.containers.list(filters={'label': 'mlappdeploy.datastore=minio'})
+    if container_list:
+        PORT_BINDINGS = container_list[0].attrs['HostConfig']['PortBindings']
+        SERVER_PORT = PORT_BINDINGS['9000/tcp'][0]['HostPort']
+        CONSOLE_PORT = PORT_BINDINGS['9001/tcp'][0]['HostPort']
+        CONFIG_ENV = container_list[0].attrs['Config']['Env']
+        ACCESS_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_ACCESS_KEY=')]
+        SECRET_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_SECRET_KEY=')]
+        endpoint = f'http://{ip}:{SERVER_PORT}'
+        region = 'us-east-1'
+        access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=','') if len(ACCESS_KEY) else 'minioadmin'
+        secret_key = SECRET_KEY[0].replace('MINIO_SECRET_KEY=','') if len(SECRET_KEY) else 'minioadmin'
+    else:
+        endpoint = f'https://s3.amazonaws.com'
+        region = 'us-east-1'
+        access_key = ''
+        secret_key = ''
     return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
 
 
@@ -355,9 +415,15 @@ def _s3_finalizer(datastore: StrDict) -> StrDict:
     return datastore
 
 
-def _db_initializer() -> StrDict:
-    address = f'mongodb://{utils.obtain_my_ip()}:27017'
-    return {'address': address, 'username': '', 'password': ''}
+def _db_initializer(ip, cli) -> StrDict:
+    container_list = cli.containers.list(filters={'label': 'mlappdeploy.datastore=mongodb'})
+    if container_list:
+        MONGODB_PORT = container_list[0].attrs['HostConfig']['PortBindings']['27017/tcp'][0]['HostPort']
+        address = f'mongodb://{ip}:{MONGODB_PORT}'
+        return {'address': address, 'username': '', 'password': ''}
+    else:
+        address = f'mongodb://{utils.obtain_my_ip()}:27017'
+        return {'address': address, 'username': '', 'password': ''}
 
 
 def _db_finalizer(datastore: StrDict) -> StrDict:

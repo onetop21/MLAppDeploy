@@ -10,11 +10,11 @@ from . import echo_exception
 
 @click.command()
 @click.argument('NAME', required=True)
-@click.option('--admin', is_flag=True, help='Create a config with administrator privileges.')
+@click.option('--address', required=False, help='Endpoint to connect MLAppDeploy API server.')
 @echo_exception
-def add(name, admin):
+def add(name, address):
     """Add a new config."""
-    ret = config.add(name, admin)
+    ret = config.add(name, address)
     click.echo('Config created successfully.')
     click.echo(yaml.dump(ret, sort_keys=False))
 
