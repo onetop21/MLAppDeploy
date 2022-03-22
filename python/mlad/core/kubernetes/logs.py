@@ -46,7 +46,7 @@ class LogHandler:
         timestamp = separated[0]
         try:
             timestamp = str(parser.parse(timestamp).astimezone())
-        except parser.ParserError as e:
+        except parser.ParserError:
             timestamp = None
         msg = separated[1] if len(separated) > 1 else ''
         if not (msg.endswith('\n') or msg.endswith('\r')):
@@ -66,12 +66,11 @@ class LogHandler:
                 break
             for name in names:
                 logs = logs_dict[name]
-                if len(logs) :
+                if len(logs):
                     timestamp, msg = self._parse_log(logs.pop(0))
                     if timestamp is None:
                         break
                     yield timestamp, name, msg
-
 
     def get_stream_logs(self, name: str, **params):
         since_seconds = params.get('since_seconds', None)
@@ -169,7 +168,7 @@ class LogCollector():
             for name in names:
                 last_timestamp = last_timestamp_dict.get(name, None)
                 if last_timestamp is not None:
-                    dt = datetime.strptime(last_timestamp.split('+')[0],'%Y-%m-%d %H:%M:%S.%f')
+                    dt = datetime.strptime(last_timestamp.split('+')[0], '%Y-%m-%d %H:%M:%S.%f')
                     ms = dt.microsecond / 10**6
                     ts = time.mktime(dt.timetuple())
                     now = datetime.utcnow().timestamp()
