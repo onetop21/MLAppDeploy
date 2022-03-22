@@ -1203,16 +1203,11 @@ def get_project_logs(
     app_and_pod_name_tuples = _filter_app_and_pod_name_tuple_from_apps(project_key, filters, cli=cli)
     namespace = get_k8s_namespace(project_key, cli=cli).metadata.name
 
-    handler = LogHandler(cli)
+    handler = LogHandler(cli, namespace, tail)
     monitoring_app_names = set([app_name for app_name, _ in app_and_pod_name_tuples if app_name is not None])
-    logs = [(pod_name, handler.logs(namespace, pod_name, details=True, follow=follow,
-                                    tail=tail, timestamps=timestamps, stdout=True, stderr=True))
-            for _, pod_name in app_and_pod_name_tuples]
 
-    with LogCollector() as collector:
-        for name, log in logs:
-            collector.add_iterable(log, name=name, timestamps=timestamps)
-
+    with LogCollector(follow, timestamps) as collector:
+        collector.collect_logs([pod_name for _, pod_name in app_and_pod_name_tuples], handler)
         # Register Disconnection Callback
         if disconnect_handler is not None:
             disconnect_handler.add_callback(lambda: handler.close())
