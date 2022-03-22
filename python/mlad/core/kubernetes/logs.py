@@ -62,11 +62,11 @@ class LogHandler:
             logs_dict[name] = logs
 
         while True:
-            if all([True if len(logs_dict[name]) == 0 else False for name in names]):
+            if all([not logs_dict[name] for name in names]):
                 break
             for name in names:
                 logs = logs_dict[name]
-                if len(logs) > 0 :
+                if len(logs) :
                     timestamp, msg = self._parse_log(logs.pop(0))
                     if timestamp is None:
                         break
