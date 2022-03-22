@@ -537,7 +537,7 @@ def _convert_depends_to_k8s_init_container(
     env = [*envs, _create_k8s_env('DEPENDENCY_SPECS', json.dumps(depends))]
     return client.V1Container(
         name='dependency-check-container',
-        image='ghcr.io/onetop21/mlappdeploy/api-server:4d98887',
+        image='ghcr.io/onetop21/mlappdeploy/api-server:dev',
         image_pull_policy='Always',
         command=['python', '-m', 'mlad.core.dependency'],
         env=env
