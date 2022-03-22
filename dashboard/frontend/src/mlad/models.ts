@@ -1,3 +1,5 @@
+import internal from "stream";
+
 export class Metric {
 	type: string;
 	capacity: number;
@@ -159,33 +161,39 @@ export class TaskSpec {
 	}
 
 	parseResource(resource: any, key: string, precision: number = 2) {
-		if (resource[key] === null) {
-			return '-'
-		} else {
-			return resource[key].toFixed(precision)
-		}
+        return typeof resource[key] === 'string'
+            ? resource[key]
+            : resource[key].toFixed(precision);
 	}
+}
+
+export class Expose {
+    port: number;
+    ingress?: { path: string }
+
+    constructor(raw: any) {
+        this.port = raw['port'];
+        this.ingress = raw['ingress'];
+    }
 }
 
 export class AppSpec {
 	name: string;
-	ingressPath: string;
 	cpu: string;
 	gpu: string;
 	mem: string;
 	env: {name: string, value: string}[];
-	ports: string[];
+    exposes: Expose[];
 	taskSpecs: TaskSpec[];
 
 	constructor(raw: any) {
 		this.name = raw['name'];
-		this.ingressPath = raw['ingress'];
 		this.cpu = this.parseResource(raw['resources'], 'cpu');
 		this.gpu = this.parseResource(raw['resources'], 'gpu', 0);
 		this.mem = this.parseResource(raw['resources'], 'mem');
 		this.env = raw['env'] || [];
-		this.ports = Object.keys(raw['ports']);
-		this.taskSpecs = Object.values(raw['tasks'] as any[]).map(d => new TaskSpec(d, raw['resources']));
+        this.exposes = (raw['expose'] as any[]).map(d => new Expose(d)); 
+		this.taskSpecs = Object.values(raw['task_dict'] as any[]).map(d => new TaskSpec(d, raw['resources']));
 	}
 
 	get statusColor(): string {
@@ -208,7 +216,13 @@ export class AppSpec {
 
 	parseResource(raw: any, key: string, precision: number = 2) {
 		return Object.values(raw)
-			.reduce<number>((acc, curr: any) => (curr[key] || 0) + acc, 0)
+			.reduce<number>((acc, curr: any) => {
+                let value = curr[key];
+                if (typeof value === 'string') {
+                    value = 0;
+                }
+                return value + acc;
+            }, 0)
 			.toFixed(precision);
 	}
 }

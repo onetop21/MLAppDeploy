@@ -71,7 +71,8 @@ def logs(file: Optional[str], project_key: Optional[str],
          tail: bool, follow: bool, timestamps: bool, **kwargs):
     '''Display the project logs deployed on the cluster.'''
     filters = kwargs.get('apps|tasks')
-    project.logs(file, project_key, tail, follow, timestamps, filters)
+    for line in project.logs(file, project_key, tail, follow, timestamps, filters):
+        click.echo(line)
 
 
 @click.command()
@@ -103,13 +104,13 @@ def up(file: Optional[str]):
 @click.option('--project-key', '-k', help='Project Key\t\t\t\t\t', default=None,
               cls=MutuallyExclusiveOption, mutually_exclusive=['file'],
               autocompletion=list_project_keys)
-@click.option('--no-dump', is_flag=True,
-              help='Don\'t save the log before shutting down the apps.')
+@click.option('--dump', '-d', is_flag=True,
+              help='Save the log before shutting down the apps.')
 @echo_exception
-def down(file: Optional[str], project_key: Optional[str], no_dump: bool):
+def down(file: Optional[str], project_key: Optional[str], dump: bool):
     '''Stop and remove the project deployed on the cluster.'''
-    lines = project.down_force(file, project_key, no_dump) if config.validate_kubeconfig() \
-        else project.down(file, project_key, no_dump)
+    lines = project.down_force(file, project_key, dump) if config.is_admin() \
+        else project.down(file, project_key, dump)
     for line in lines:
         click.echo(line)
 

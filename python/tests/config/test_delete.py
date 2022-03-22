@@ -23,7 +23,7 @@ def test_delete():
 
     assert config._find_config('test2') is None
     spec = config._load()
-    assert ['test1', 'test3'] == [conf.name for conf in spec.configs]
+    assert ['test1', 'test3'] == [conf['name'] for conf in spec['configs']]
     with pytest.raises(CannotDeleteConfigError):
         config.delete('test1')
 

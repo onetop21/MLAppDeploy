@@ -1,10 +1,12 @@
 import json
+from typing import Optional
+
 from .base import APIBase
 
 
 class App(APIBase):
-    def __init__(self, config):
-        super().__init__(config, 'project')
+    def __init__(self, address: Optional[str], session: Optional[str]):
+        super().__init__(address, session, 'project')
 
     def get(self, project_key=None, labels=None):
         if project_key is not None:
@@ -27,14 +29,11 @@ class App(APIBase):
                          body={'scale_spec': scale_spec})
 
     # remove multiple apps using json body
-    def remove(self, project_key, apps, stream=False):
+    def remove(self, project_key, apps):
         path = f'/{project_key}/app'
-        if stream:
-            resp = self._delete(path, params={'stream': stream}, body={'apps': apps},
-                                stream=True, raw=True, timeout=60)
-            for _ in resp.iter_content(1024):
-                res = _.decode()
-                dict_res = json.loads(res)
-                yield dict_res
-        else:
-            return self._delete(path, params={'stream': stream}, body={'apps': apps})
+        resp = self._delete(path, body={'apps': apps},
+                            stream=True, raw=True, timeout=60)
+        for _ in resp.iter_content(1024):
+            res = _.decode()
+            dict_res = json.loads(res)
+            yield dict_res

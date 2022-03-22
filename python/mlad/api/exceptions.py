@@ -23,6 +23,15 @@ class APIError(MLADException):
         return self.__class__.__name__
 
 
+class ConnectionRefusedError(MLADException):
+
+    def __init__(self, url: str):
+        self.url = url
+
+    def __str__(self):
+        return f'Cannot connect to [{self.url}]. Is that the right API server address?'
+
+
 class NotFound(APIError):
     pass
 

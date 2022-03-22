@@ -1,6 +1,7 @@
 import sys
 import os
 import io
+import fnmatch
 import tarfile
 
 from typing import Optional
@@ -13,7 +14,7 @@ from mlad.cli.format import (
 )
 
 from mlad.core.docker import controller as ctlr
-from mlad.core.libs import utils as core_utils
+from mlad.core.libs.constants import MLAD_PROJECT, MLAD_PROJECT_VERSION, MLAD_PROJECT_IMAGE
 
 
 PREP_KEY_TO_TEMPLATE = {
@@ -67,12 +68,12 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
 
     # Generate Base Labels
     workspace = utils.get_workspace()
-    registry_address = utils.get_registry_address(config)
-    base_labels = core_utils.base_labels(
-        workspace, config.session, project, registry_address, build=True)
-    project_key = base_labels['MLAD.PROJECT']
-    version = base_labels['MLAD.PROJECT.VERSION']
-    repository = base_labels['MLAD.PROJECT.IMAGE']
+    registry_address = config_core.get_registry_address(config)
+    base_labels = utils.base_labels(
+        workspace, config['session'], project, registry_address, build=True)
+    project_key = base_labels[MLAD_PROJECT]
+    version = base_labels[MLAD_PROJECT_VERSION]
+    repository = base_labels[MLAD_PROJECT_IMAGE]
 
     workspace = project['workspace']
     # For the workspace kind
@@ -96,7 +97,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(payload)
     with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
-        for name, arcname in utils.arcfiles(project['workdir'], workspace['ignores']):
+        for name, arcname in _get_arcfiles(project['workdir'], workspace['ignores']):
             tar.add(name, arcname)
         tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
     tarbytes.seek(0)
@@ -195,3 +196,40 @@ def prune(all):
         print(f'{reclaimed:.2f}{unit_list[unit]} Space Reclaimed.')
     else:
         print('Already cleared.', file=sys.stderr)
+
+
+def _get_arcfiles(workspace='.', ignores=[]):
+    ignores = [os.path.join(os.path.abspath(workspace), _)for _ in ignores]
+    for root, dirs, files in os.walk(workspace):
+        for name in files:
+            filepath = os.path.join(root, name)
+            if not _match_ignores(filepath, ignores):
+                yield filepath, os.path.relpath(os.path.abspath(filepath),
+                                                os.path.abspath(workspace))
+        prune_dirs = []
+        for name in dirs:
+            dirpath = os.path.join(root, name)
+            if _match_ignores(dirpath, ignores):
+                prune_dirs.append(name)
+        for _ in prune_dirs:
+            dirs.remove(_)
+
+
+def _match_ignores(filepath, ignores):
+    result = False
+    normpath = os.path.normpath(filepath)
+
+    def matcher(path, pattern):
+        patterns = [pattern] + ([os.path.normpath(f"{pattern.replace('**/','/')}")]
+                                if '**/' in pattern else [])
+        result = map(lambda _: fnmatch.fnmatch(normpath, _) or fnmatch.fnmatch(
+            normpath, os.path.normpath(f"{_}/*")), patterns)
+        return sum(result) > 0
+    for ignore in ignores:
+        if ignore.startswith('#'):
+            pass
+        elif ignore.startswith('!'):
+            result &= not matcher(normpath, ignore[1:])
+        else:
+            result |= matcher(normpath, ignore)
+    return result

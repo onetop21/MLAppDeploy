@@ -1,4 +1,8 @@
 import json
+from inspect import signature
+from typing import Optional, Callable
+
+from kubernetes.client.rest import ApiException
 
 
 class MLADException(Exception):
@@ -39,12 +43,35 @@ def handle_k8s_api_error(e):
     return msg, status
 
 
-class InvalidProjectError(Exception):
-    def __init__(self, project_id):
-        self.project_id = project_id
+def handle_k8s_exception(obj: str, namespaced: bool=False):
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs):
+            params = list(signature(func).parameters.keys())
+            name = args[params.index('name')]
+            if namespaced:
+                namespace = args[params.index('namespace')]
+            try:
+                resp = func(*args, **kwargs)
+                return resp
+            except ApiException as e:
+                msg, status = handle_k8s_api_error(e)
+                if status == 404:
+                    if namespaced:
+                        raise NotFound(f'Cannot find {obj} "{name}" in "{namespace}".')
+                    else:
+                        raise NotFound(f'Cannot find {obj} "{name}".')
+                else:
+                    raise APIError(msg, status)
+        return wrapper
+    return decorator
+
+
+class ProjectNotFoundError(MLADException):
+    def __init__(self, project_key):
+        self.project_key = project_key
 
     def __str__(self):
-        return f'Cannot find project {self.project_id}'
+        return f'Cannot find a project [{self.project_key}]'
 
 
 class InvalidAppError(Exception):
@@ -79,3 +106,26 @@ class DockerNotFoundError(MLADException):
 
     def __str__(self):
         return 'Need to install the docker daemon.'
+
+
+class InvalidMetricUnitError(MLADException):
+
+    def __init__(self, metric, value: str):
+        self.metric = metric
+        self.value = value
+
+    def __str__(self):
+        return f'Metric {self.metric} \'{self.value}\' cannot be processed.'
+
+
+class InvalidKubeConfigError(MLADException):
+
+    def __init__(self, config_path: str, context_name: Optional[str]):
+        self.config_path = config_path
+        self.context_name = context_name
+
+    def __str__(self):
+        return (
+            f'Cannot load K8s API client from config file: \'{self.config_path}\' '
+            f'and context name: \'{self.context_name}\''
+        )

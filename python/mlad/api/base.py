@@ -1,21 +1,26 @@
 import os
 
-import requests
-
 from typing import Optional, Dict
 
-from .exceptions import raise_error
+import requests
+from requests.exceptions import ConnectionError
+
+from .exceptions import raise_error, ConnectionRefusedError
+
+from mlad import __version__
 
 
 class APIBase:
 
-    def __init__(self, config, prefix):
-        if config is not None:
-            self.baseurl = f'{config.apiserver.address}/api/v1/{prefix}'
-            self.headers = {'session': config.session}
-        else:
+    def __init__(self, address: Optional[str], session: Optional[str], prefix: str):
+        if address is None:
             self.baseurl = f'{os.environ.get("MLAD_ADDRESS", "localhost:8440")}/api/v1/{prefix}'
-            self.headers = {'session': os.environ.get('MLAD_SESSION', '')}
+        else:
+            self.baseurl = f'{address}/api/v1/{prefix}'
+        if session is None:
+            self.headers = {'session': os.environ.get('MLAD_SESSION', ''), 'version': __version__}
+        else:
+            self.headers = {'session': session, 'version': __version__}
         self.raise_error = raise_error
 
     def _get(self, path: str, params: Optional[Dict] = None,
@@ -23,8 +28,11 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.get(url=url, headers=self.headers, params=params,
-                           timeout=timeout, stream=stream)
+        try:
+            res = requests.get(url=url, headers=self.headers, params=params,
+                               timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -33,8 +41,11 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.post(url=url, headers=self.headers, params=params, json=body,
-                            timeout=timeout, stream=stream)
+        try:
+            res = requests.post(url=url, headers=self.headers, params=params, json=body,
+                                timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -43,8 +54,11 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.delete(url=url, headers=self.headers, params=params, json=body,
-                              timeout=timeout, stream=stream)
+        try:
+            res = requests.delete(url=url, headers=self.headers, params=params, json=body,
+                                  timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()
 
@@ -53,7 +67,10 @@ class APIBase:
         url = f'{self.baseurl}{path}'
         if stream:
             timeout = 1e4
-        res = requests.put(url=url, headers=self.headers, params=params, json=body,
-                           timeout=timeout, stream=stream)
+        try:
+            res = requests.put(url=url, headers=self.headers, params=params, json=body,
+                               timeout=timeout, stream=stream)
+        except ConnectionError:
+            raise ConnectionRefusedError(url)
         self.raise_error(res)
         return res if raw else res.json()

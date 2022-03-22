@@ -1,11 +1,12 @@
 import traceback
-
 from typing import List
+
 from fastapi import APIRouter, Query, Header, HTTPException
+
 from mlad.core import exceptions
+from mlad.core.kubernetes import controller as ctlr
 from mlad.service.exceptions import exception_detail
 from mlad.service.libs.log import init_logger
-from mlad.core.kubernetes import controller as ctlr
 
 
 router = APIRouter()
@@ -15,8 +16,8 @@ logger = init_logger(__name__)
 @router.get("/node/list")
 def node_list(session: str = Header(None)):
     try:
-        nodes = ctlr.get_nodes()
-        return [ctlr.inspect_node(node) for node in nodes.values()]
+        nodes = ctlr.get_k8s_nodes()
+        return [ctlr.inspect_k8s_node(node) for node in nodes]
     except Exception as e:
         logger.error(e)
         print(traceback.format_exc())
@@ -24,14 +25,14 @@ def node_list(session: str = Header(None)):
 
 
 @router.get("/node/resource")
-def node_resource(names: List[str] = Query(None)):
+def node_resource(names: List[str] = Query(None), no_trunc: bool = Query(True)):
     res = {}
     try:
-        nodes = ctlr.get_nodes()
+        nodes = ctlr.get_k8s_nodes()
         if names is not None and len(names) > 0:
-            nodes = {name: node for name, node in nodes.items() if name in names}
-        for node in nodes.values():
-            resource = ctlr.get_node_resources(node)
+            nodes = [node for node in nodes if node.metadata.name in names]
+        for node in nodes:
+            resource = ctlr.get_k8s_node_resources(node, no_trunc)
             res[node.metadata.name] = resource
         return res
     except exceptions.NotFound as e:

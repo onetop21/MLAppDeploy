@@ -1,6 +1,9 @@
 import sys
 import json
 import requests
+
+from typing import Optional
+
 from .base import APIBase
 
 
@@ -20,22 +23,21 @@ def _parse_partial_json(value: str):
 
 
 class Project(APIBase):
-    def __init__(self, config):
-        super().__init__(config, 'project')
+    def __init__(self, address: Optional[str], session: Optional[str]):
+        super().__init__(address, session, 'project')
 
     def get(self, extra_labels=[]):
         params = {'extra_labels': ','.join(extra_labels)}
         return self._get('', params=params)
 
-    def create(self, base_labels, project_yaml, extra_envs=[], credential=None, allow_reuse=False):
+    def create(self, base_labels, project_yaml, extra_envs=[], credential=None):
         body = {
             'base_labels': base_labels,
             'extra_envs': extra_envs,
             'project_yaml': project_yaml,
             'credential': credential,
         }
-        params = {'allow_reuse': allow_reuse}
-        resp = self._post('', params=params, body=body, raw=True, stream=True)
+        resp = self._post('', body=body, raw=True, stream=True)
         res = ''
         for _ in resp.iter_content(1024):
             res += _.decode()
@@ -58,9 +60,9 @@ class Project(APIBase):
             yield dict_res
 
     def log(self, project_key, tail='all',
-            follow=False, timestamps=False, names_or_ids=[]):
+            follow=False, timestamps=False, filters=None):
         params = {'tail': tail, 'follow': follow, 'timestamps': timestamps,
-                  'names_or_ids': names_or_ids}
+                  'filters': filters}
         while True:
             try:
                 resp = self._get(f'/{project_key}/logs', params=params, raw=True, stream=True)
@@ -74,8 +76,9 @@ class Project(APIBase):
             except requests.exceptions.ChunkedEncodingError as e:
                 print(f"[Retry] {e}", file=sys.stderr)
 
-    def resource(self, project_key):
-        return self._get(f'/{project_key}/resource')
+    def resource(self, project_key, group_by='project', no_trunc=True):
+        params = {'group_by': group_by, 'no_trunc': no_trunc}
+        return self._get(f'/{project_key}/resource', params=params)
 
     def update(self, project_key, update_yaml, update_specs):
         body = {

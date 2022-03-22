@@ -1,18 +1,11 @@
 from mlad.core import exceptions as core_exceptions
-from mlad.core.kubernetes import controller as ctlr
-from mlad.core.kubernetes import install as installer
 from mlad.cli.libs import utils
-
-
-def has_kubeconfig() -> bool:
-    try:
-        ctlr.get_current_context()
-    except core_exceptions.APIError:
-        return False
-    return True
+from mlad.cli.exceptions import APIServerNotInstalledError
+from mlad.cli import config as config_core
 
 
 def check():
+    from mlad.core.kubernetes import controller as ctlr
     checked = {
         'Ingress Controller': {
             'status': False,
@@ -46,13 +39,14 @@ def check():
                      'helm repo update && helm install mlad mlad/api-server --create-namespace -n mlad\'.']
         },
     }
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
+    config = config_core.get()
+    cli = config_core.get_admin_k8s_cli(ctlr)
 
     yield 'Check installed plugins...'
 
     # Check ingress controller
     try:
-        ctlr.get_deployment('ingress-nginx-controller', 'ingress-nginx', cli)
+        ctlr.get_k8s_deployment('ingress-nginx-controller', 'ingress-nginx', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -60,7 +54,7 @@ def check():
 
     # Check metrics server
     try:
-        ctlr.get_deployment('metrics-server', 'kube-system', cli)
+        ctlr.get_k8s_deployment('metrics-server', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -68,7 +62,7 @@ def check():
 
     # Check nvidia device plugin
     try:
-        ctlr.get_daemonset('nvidia-device-plugin', 'kube-system', cli)
+        ctlr.get_k8s_daemonset('nvidia-device-plugin', 'kube-system', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -76,13 +70,13 @@ def check():
 
     # Check node feature discovery
     try:
-        ctlr.get_daemonset('nfd', 'node-feature-discovery', cli)
+        ctlr.get_k8s_daemonset('nfd', 'node-feature-discovery', cli)
     except core_exceptions.NotFound:
         pass
     else:
         checked['Node Feature Discovery']['status'] = True
     try:
-        ctlr.get_daemonset('gpu-feature-discovery', 'node-feature-discovery', cli)
+        ctlr.get_k8s_daemonset('gpu-feature-discovery', 'node-feature-discovery', cli)
     except core_exceptions.NotFound:
         pass
     else:
@@ -90,15 +84,11 @@ def check():
 
     # Check mlad api server
     try:
-        ctlr.get_deployment('mlad-api-server', 'mlad', cli)
-        service = ctlr.get_service('mlad-api-server', 'mlad', cli)
-    except core_exceptions.NotFound:
+        api_server_address = config_core.obtain_server_address(config)
+    except APIServerNotInstalledError:
         pass
     else:
         checked['MLAD API Server']['status'] = True
-        kube_host = cli.configuration.host.rsplit(':', 1)[0]
-        node_port = service.spec.ports[0].node_port
-        address = f'{kube_host}:{node_port}'
 
     for plugin, result in checked.items():
         status = result['status']
@@ -113,51 +103,4 @@ def check():
                 yield f' · {line}'
 
         if plugin == 'MLAD API Server' and status:
-            yield f' · API Server Address : {address}'
-
-
-def _is_running_api_server(cli, beta: bool) -> bool:
-    try:
-        name = 'mlad-api-server' if not beta else 'mlad-api-server-beta'
-        ctlr.get_deployment(name, 'mlad', cli)
-    except core_exceptions.NotFound:
-        return False
-    return True
-
-
-def deploy_api_server(image_tag: str, ingress: bool, beta: bool):
-    cli = ctlr.get_api_client(context=ctlr.get_current_context())
-    is_running = _is_running_api_server(cli, beta)
-    if not is_running:
-        yield 'Create docker registry secret named \'docker-mlad-sc\'.'
-        installer.create_docker_registry_secret(cli)
-
-        yield 'Create \'mlad\' namespace.'
-        installer.create_mlad_namespace(cli)
-
-        yield 'Create \'mlad-cluster-role\' cluster role.'
-        yield 'Create \'mlad-cluster-role-binding\' cluster role binding.'
-        installer.create_api_server_role_and_rolebinding(cli)
-        yield f'Create \'mlad-service{"-beta" if beta else ""}\' service.'
-        installer.create_mlad_service(cli, nodeport=not ingress, beta=beta)
-        if not ingress:
-            yield f'Check the node port value of the \'mlad-service{"-beta" if beta else ""}\'.'
-            yield 'Run \'kubectl get svc -n mlad\'.'
-        yield f'Create \'mlad-api-server{"-beta" if beta else ""}\' deployment.'
-        installer.create_mlad_api_server_deployment(cli, image_tag, beta=beta)
-    else:
-        yield f'Patch the \'mlad-service{"-beta" if beta else ""}\' service.'
-        installer.patch_mlad_service(cli, nodeport=not ingress, beta=beta)
-        if not ingress:
-            yield f'Check the NodePort value of the \'mlad-service{"-beta" if beta else ""}\'.'
-            yield 'Run \'kubectl get svc -n mlad\'.'
-
-        yield f'Patch the \'mlad-api-server{"-beta" if beta else ""}\' deployment.'
-        installer.patch_mlad_api_server_deployment(cli, beta=beta)
-
-    if ingress:
-        yield f'Create \'mlad-ingress{"-beta" if beta else ""}\' ingress.'
-        installer.create_mlad_ingress(cli, beta=beta)
-    else:
-        yield f'Delete running \'mlad-ingress{"-beta" if beta else ""}\' ingress.'
-        installer.delete_mlad_ingress(cli, beta=beta)
+            yield f' · API Server Address : {api_server_address}'

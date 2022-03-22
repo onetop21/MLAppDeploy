@@ -10,8 +10,7 @@ from mlad.cli import node_cli as node
 from mlad.cli import board_cli as board
 from mlad.cli.exceptions import ConfigNotFoundError
 from mlad.cli.config import get as check_config
-from mlad.cli.config import validate_kubeconfig as is_admin
-from mlad.cli.install import has_kubeconfig
+from mlad.cli.config import is_admin
 
 
 class EntryGroup(click.Group):
@@ -47,8 +46,6 @@ def main():
 
 
 main.add_command(config.cli, 'config')
-if has_kubeconfig():
-    main.add_command(install.cli, 'install')
 
 try:
     check_config()
@@ -59,6 +56,8 @@ else:
     main.add_command(project.cli, 'project')
     main.add_command(board.cli, 'board')
     main.add_command(node.admin_cli if is_admin() else node.cli, 'node')
+    if is_admin():
+        main.add_command(install.check, 'install-check')
 
     main.add_dummy_command()
     main.add_dummy_command('\b\bPrefer:')

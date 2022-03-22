@@ -1,9 +1,20 @@
 from mlad.core.exceptions import MLADException
 
 
-class InvalidURLError(MLADException):
+class ProjectLoadError(MLADException):
     pass
 
+
+class InvalidURLError(MLADException):
+    
+    def __init__(self, name: str = None):
+        self._name = name
+
+    def __str__(self):
+        if self._name:
+            return f'URL is not valid to connect [{self._name}].'
+        else:
+            return super(MLADException, self).__str__()
 
 class ImageNotFoundError(MLADException):
 
@@ -13,6 +24,25 @@ class ImageNotFoundError(MLADException):
     def __str__(self):
         return f'Cannot find built image of the project [{self._name}].'
 
+class InvalidDockerHostError(MLADException):
+    
+    def __init__(self, name: str):
+        self._name = name
+        
+    def __str__(self):
+        return f'Docker Host[{self.name}] is not valid.'
+
+class DockerHostSchemeError(MLADException):
+    def __str__(self):
+        return f"Docker host is required a scheme."
+
+class CannotFoundKubeconfigError(MLADException):
+    
+    def __init__(self, name: str):
+        self._name = name
+
+    def __str__(self):
+        return f'Cannot find kubeconfig file [{self._name}].'
 
 class ConfigAlreadyExistError(MLADException):
 
@@ -54,6 +84,12 @@ class InvalidSetPropertyError(MLADException):
 
     def __str__(self):
         return f'Config set command should be applied to the leaf keys: {self._arg}'
+
+
+class APIServerNotInstalledError(MLADException):
+
+    def __str__(self):
+        return 'MLAD API Server is not install in the current config.'
 
 
 class MLADBoardNotActivatedError(MLADException):
@@ -130,6 +166,10 @@ class MountPortAlreadyUsedError(MLADException):
 
 
 class MountError(MLADException):
+    pass
+
+
+class InvalidDependsError(MLADException):
     pass
 
 

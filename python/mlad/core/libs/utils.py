@@ -3,10 +3,7 @@ import uuid
 import json
 import base64
 import jwt
-from typing import Dict
 
-from mlad.cli.libs import utils
-from mlad.core.libs import constants as const
 from mlad.core import exceptions
 
 
@@ -88,34 +85,3 @@ def get_requests_host(cli):
 # Change Key Style (ex. task_template -> TaskTemplate)
 def change_key_style(dct):
     return dict((k.title().replace('_', ''), v) for k, v in dct.items())
-
-
-# Manage Project and Namespace
-def base_labels(workspace: str, session: str, project: Dict,
-                registry_address: str, build: bool = False):
-    # workspace = f"{hostname}:{workspace}"
-    # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
-    username = get_username(session)
-    key = utils.workspace_key(workspace=workspace)
-    kind = project['kind']
-    version = str(project['version']).lower()
-    repository = f"{username}/{project['name']}-{key[:const.SHORT_LEN]}:{version}".lower()
-    if kind == 'Deployment':
-        repository = f'{registry_address}/' + repository
-    basename = f"{username}-{project['name']}-{key[:const.SHORT_LEN]}".lower()
-
-    labels = {
-        'MLAD.VERSION': '1',
-        'MLAD.PROJECT': key,
-        'MLAD.PROJECT.WORKSPACE': workspace,
-        'MLAD.PROJECT.USERNAME': username,
-        'MLAD.PROJECT.API_VERSION': project['apiVersion'],
-        'MLAD.PROJECT.NAME': project['name'].lower(),
-        'MLAD.PROJECT.MAINTAINER': project['maintainer'],
-        'MLAD.PROJECT.VERSION': str(project['version']).lower(),
-        'MLAD.PROJECT.BASE': basename,
-        'MLAD.PROJECT.IMAGE': repository,
-        'MLAD.PROJECT.SESSION': session,
-        'MLAD.PROJECT.KIND': project['kind']
-    }
-    return labels

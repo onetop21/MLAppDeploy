@@ -1,12 +1,12 @@
 import os
 import errno
+import yaml
 import docker
 import requests
 from requests.exceptions import ConnectionError
 
 from docker.types import Mount
 from typing import List
-from omegaconf import OmegaConf
 from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
@@ -15,6 +15,7 @@ from mlad.cli.exceptions import (
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
+from mlad.core.docker.controller import get_cli
 
 
 class ValueGenerator:
@@ -28,21 +29,6 @@ class ValueGenerator:
         for x in self:
             pass
         return self.value
-
-
-def get_cli():
-    try:
-        return docker.from_env()
-    except Exception:
-        raise DockerNotFoundError
-
-
-def get_lo_cli():
-    try:
-        return docker.APIClient()
-    except Exception:
-        raise DockerNotFoundError
-
 
 def activate(image_repository: str):
     cli = get_cli()
@@ -68,8 +54,8 @@ def activate(image_repository: str):
     cli.containers.run(
         image_repository,
         environment=[
-            f'MLAD_ADDRESS={config.apiserver.address}',
-            f'MLAD_SESSION={config.session}',
+            f'MLAD_ADDRESS={config_core.obtain_server_address(config)}',
+            f'MLAD_SESSION={config["session"]}',
         ] + config_core.get_env(),
         name='mlad-board',
         ports={'2021/tcp': '2021'},
@@ -118,12 +104,13 @@ def install(file_path: str, no_build: bool):
     yield f'Read the component spec from {file_path or "./mlad-project.yml"}.'
 
     try:
-        spec = OmegaConf.load(file_path)
+        with open(file_path, 'r') as component_file:
+            spec = yaml.load(component_file)
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
 
     from mlad.cli.validator import validators
-    spec = validators.validate(OmegaConf.to_container(spec))
+    spec = validators.validate(spec)
     if not no_build and 'workspace' not in spec:
         raise CannotBuildComponentError
 
@@ -248,6 +235,6 @@ def _obtain_host():
 
 
 def _obtain_ports(container) -> List[str]:
-    lo_cli = get_lo_cli()
+    lo_cli = get_cli().api
     port_data = lo_cli.inspect_container(container.id)['NetworkSettings']['Ports']
     return [k.replace('/tcp', '') for k in port_data.keys()]

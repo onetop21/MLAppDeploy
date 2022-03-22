@@ -1,25 +1,22 @@
 from typing import Optional
 
 import click
+import yaml
 
-from omegaconf import OmegaConf
 from mlad.cli import config
-from mlad.cli.libs.utils import obtain_my_ip
 from mlad.cli.autocompletion import list_config_names
 from . import echo_exception
 
 
 @click.command()
 @click.argument('NAME', required=True)
-@click.option('--address', '-a', default=f'http://{obtain_my_ip()}:8440',
-              prompt='MLAD API Server Address', help='Set MLAD API server address.')
-@click.option('--admin', is_flag=True, help='Create a config with administrator privileges.')
+@click.option('--address', required=False, help='Endpoint to connect MLAppDeploy API server.')
 @echo_exception
-def add(name, address, admin):
+def add(name, address):
     """Add a new config."""
-    ret = config.add(name, address, admin)
+    ret = config.add(name, address)
     click.echo('Config created successfully.')
-    click.echo(OmegaConf.to_yaml(ret))
+    click.echo(yaml.dump(ret, sort_keys=False))
 
 
 @click.command()
@@ -64,7 +61,7 @@ def get(name: str, key: Optional[str]):
     """Display the detail specification of the config."""
     ret = config.get(name, key)
     try:
-        click.echo(OmegaConf.to_yaml(ret)[:-1])
+        click.echo(yaml.dump(ret, sort_keys=False)[:-1])
     except ValueError:
         click.echo(ret)
 

@@ -44,10 +44,11 @@ jobs:
 
           # Strip "v" prefix from tag name
           [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          WITH_LATEST=1
         elif [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
         then
           VERSION=$(git rev-parse --short "$GITHUB_SHA")
-          WITH_LATEST=1
+          BRANCH=$(git rev-parse --abbrev-ref HEAD | tr '!@#$%^&*()_+=[]{}\\|/?,.<>~' '-')
         else
           ERROR=Not support ${{ github.event_name }} event.
         fi
@@ -56,9 +57,11 @@ jobs:
         then
           IMAGE_ID=${{ steps.build_image.outputs.id }}
           echo IMAGE_NAME=$IMAGE_NAME
+          echo BRANCH=$BRANCH
           echo VERSION=$VERSION
 
           docker tag $IMAGE_ID $IMAGE_NAME:$VERSION
+          [ $BRANCH ] && docker tag $IMAGE_ID $IMAGE_NAME:$BRANCH
           [ $WITH_LATEST ] && docker tag $IMAGE_ID $IMAGE_NAME:latest
           docker push $IMAGE_NAME --all-tags
         else

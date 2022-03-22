@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class Quota(BaseModel):
     cpu: Optional[int] = None
-    gpu: int = 0
+    gpu: Optional[int] = None
     mem: Optional[str] = None
 
 
@@ -25,6 +25,11 @@ class Mount(BaseModel):
     server: str
     serverPath: str
     options: Optional[List[str]]
+
+
+class Dependency(BaseModel):
+    appName: str
+    condition: str = 'Running'
 
 
 class Component(BaseModel):
@@ -53,13 +58,13 @@ class AdvancedBase(AppBase):
 
 
 class App(AppBase):
-    restartPolicy: Optional[str] = 'never'
-    scale: Optional[int] = 1
+    restartPolicy: Optional[str] = 'Never'
     quota: Optional[Quota] = None
+    depends: Optional[List[Dependency]] = None
 
 
 class JobRunSpec(BaseModel):
-    restartPolicy: Optional[str] = 'never'
+    restartPolicy: Optional[str] = 'Never'
     parallelism: Optional[int] = 1
     completion: Optional[int] = 1
 
@@ -83,12 +88,13 @@ class Service(AdvancedBase):
 class AppJob(App):
     kind = 'Job'
     # Never | onFailure
-    restartPolicy: Optional[str] = 'never'
+    restartPolicy: Optional[str] = 'Never'
 
 
 class AppService(App):
     kind = 'Service'
-    restartPolicy: Optional[str] = 'always'
+    scale: Optional[int] = 1
+    restartPolicy: Optional[str] = 'Always'
 
 
 class CreateRequest(BaseModel):
@@ -105,8 +111,8 @@ class CreateRequest(BaseModel):
                 _ = AppJob(**_)
             elif kind == 'Service':
                 _ = AppService(**_)
-            service = json.loads(_.json())
-            targets[_.name] = service
+            app = json.loads(_.json())
+            targets[_.name] = app
             del targets[_.name]['name']
         return targets
 

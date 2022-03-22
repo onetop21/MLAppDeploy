@@ -1,21 +1,31 @@
 import sys
 import os
-import omegaconf
+import socket
+import uuid
+import re
+import requests
+
+import jwt
+import yaml
 
 from functools import lru_cache
-from typing import Optional, Dict, Callable, List
+from typing import Optional, Dict, Callable, List, Tuple, Any
 from pathlib import Path
-from omegaconf import OmegaConf
+from urllib.parse import urlparse
+from getpass import getuser
+from mlad.core.docker import controller as dockerctlr
+from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import (
     ConfigNotFoundError, CannotDeleteConfigError, InvalidPropertyError,
-    ConfigAlreadyExistError, InvalidSetPropertyError
+    ConfigAlreadyExistError, InvalidSetPropertyError, InvalidURLError,
+    APIServerNotInstalledError, CannotFoundKubeconfigError, InvalidDockerHostError,
+    DockerHostSchemeError
 )
+
 
 MLAD_HOME_PATH = f'{Path.home()}/.mlad'
 CFG_PATH = f'{MLAD_HOME_PATH}/config.yml'
-ConfigSpec = omegaconf.Container
-Config = omegaconf.Container
 StrDict = Dict[str, str]
 
 boilerplate = {
@@ -25,75 +35,116 @@ boilerplate = {
 
 if not os.path.isfile(CFG_PATH):
     Path(MLAD_HOME_PATH).mkdir(exist_ok=True, parents=True)
-    OmegaConf.save(config=boilerplate, f=CFG_PATH)
+    with open(CFG_PATH, 'w') as cfg_file:
+        yaml.dump(boilerplate, cfg_file)
 
 
-@lru_cache()
 def _load():
-    return OmegaConf.load(CFG_PATH)
+    with open(CFG_PATH, 'r') as cfg_file:
+        return yaml.load(cfg_file, Loader=yaml.FullLoader)
 
 
-def _save(spec: ConfigSpec):
-    OmegaConf.save(config=spec, f=CFG_PATH)
+def _save(spec: Dict):
+    with open(CFG_PATH, 'w') as cfg_file:
+        yaml.dump(spec, cfg_file, sort_keys=False)
 
 
-def _find_config(name: str, spec: Optional[ConfigSpec] = None, index: bool = False) -> Optional[Config]:
+def _find_config(name: str, spec: Optional[Dict] = None, index: bool = False) -> Optional[Dict]:
     if spec is None:
-        spec = OmegaConf.load(CFG_PATH)
+        spec = _load()
 
-    for i, config in enumerate(spec.configs):
-        if config.name == name:
+    for i, config in enumerate(spec['configs']):
+        if config['name'] == name:
             return config if not index else i
 
     return None
 
 
-def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
-
+def add(name: str, address: Optional[str]) -> Dict:
     spec = _load()
     duplicated_index = _find_config(name, spec=spec, index=True)
     if duplicated_index is not None:
-        if not allow_duplicate:
-            raise ConfigAlreadyExistError(name)
-        elif utils.prompt('Change the existing session key (Y/N)?', 'N') == 'Y':
-            session = utils.create_session_key()
-        else:
-            session = spec.configs[duplicated_index].session
-    else:
-        session = utils.create_session_key()
+        raise ConfigAlreadyExistError(name)
 
-    kubeconfig_path = None
-    context_name = None
-    if admin:
+    pattern = re.compile("(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(?P<PORT>:[0-9]+)?")
+    ip = utils.obtain_my_ip()
+    server_config = dict()
+    if address is None:
         kubeconfig_path = utils.prompt(
             'A Kubeconfig File Path', default=f'{Path.home()}/.kube/config')
-        context_name = utils.prompt('A Current Kubernetes Context Name', None)
-    address = utils.parse_url(address)['url']
-    registry_address = 'https://docker.io'
+        if os.path.isfile(kubeconfig_path):
+            from mlad.core.kubernetes import controller as kubectlr
+            contexts = kubectlr.get_contexts(kubeconfig_path)
+            context_name = utils.prompt('A Current Kubernetes Context Name', contexts[1]['name'])
+            server_config['kubeconfig_path'] = kubeconfig_path
+            server_config['context_name'] = context_name
+        else:
+            raise CannotFoundKubeconfigError(kubeconfig_path)
+    else:
+        try:
+            group = pattern.match(address)
+            if group['SCHEME'] is None:
+                address = f"http://{address}"
+            if requests.get(f'{address}/docs', timeout=1):
+                server_config = {
+                    'apiserver': {
+                        'address': address
+                    }
+                }
+            else:
+                raise InvalidURLError("API Server")
+        except requests.exceptions.ConnectionError:
+            raise InvalidURLError("API Server")
+
+    default_docker_host = os.getenv('DOCKER_HOST') or 'unix:///var/run/docker.sock'
+    server_config['docker_host'] = utils.prompt('An Endpoint of Docker Host', default=default_docker_host)
+    group = pattern.match(server_config['docker_host'])
+    if group['SCHEME']:
+        try:
+            cli = dockerctlr.get_cli(server_config['docker_host'])
+        except DockerNotFoundError:
+            raise InvalidDockerHostError(server_config['docker_host'])
+    else:
+        raise DockerHostSchemeError
+
+    if server_config['docker_host'].startswith('unix:///'):
+        DOCKER_IP = f'{ip}'
+    else:
+        DOCKER_IP = group['IP']
+        if DOCKER_IP in ['localhost', '127.0.0.1']:
+            DOCKER_IP = f'{ip}'
+        elif not DOCKER_IP:
+            raise ValueError(f"Cannot extract IP address.")
+
+    session = _create_session_key()
+
     warn_insecure = False
-    service_addr = utils.get_advertise_addr()
-    registry_port = utils.get_default_service_port('mlad_registry', 5000)
-    if registry_port:
-        registry_address = f'http://{service_addr}:{registry_port}'
-    registry_address = utils.prompt('Docker Registry Address', registry_address)
-    parsed_url = utils.parse_url(registry_address)
+    default_docker_registry = 'https://docker.io'
+    try:
+        if address is None:
+            if requests.get(f'http://{ip}:25000/v2/_catalog', timeout=1):
+                default_docker_registry = f'http://{ip}:25000'
+        else:
+            group = pattern.match(address)
+            if group['IP'] and requests.get(f"http://{group['IP']}:25000/v2/_catalog", timeout=1):
+                default_docker_registry = f"http://{group['IP']}:25000"
+    except requests.exceptions.ConnectionError:
+        ...
+    registry_address = utils.prompt('Docker Registry Address', default_docker_registry)
+    
+    parsed_url = _parse_url(registry_address)
     if parsed_url['scheme'] != 'https':
         warn_insecure = True
     registry_address = parsed_url['url']
     registry_namespace = utils.prompt('Docker Registry Namespace')
 
-    base_config = OmegaConf.from_dotlist([
+    base_config = _obtain_dict_from_dotlist([
         f'name={name}',
         f'session={session}',
-        f'apiserver.address={address}',
         f'docker.registry.address={registry_address}',
-        f'docker.registry.namespace={registry_namespace}'
+        f'docker.registry.namespace={registry_namespace}',
+        f'admin={address is None}'
     ])
-
-    kube_config = OmegaConf.create({
-        'kubeconfig_path': kubeconfig_path,
-        'context_name': context_name
-    })
 
     s3_prompts = {
         'endpoint': 'S3 Compatible Address',
@@ -101,20 +152,20 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
         'accesskey': 'Access Key ID',
         'secretkey': 'Secret Access Key'
     }
-    s3_config = _parse_datastore('s3', _s3_initializer, _s3_finalizer, s3_prompts)
+    s3_config = _parse_datastore('s3', _s3_initializer, (DOCKER_IP, cli), _s3_finalizer, s3_prompts)
 
     db_prompts = {
         'address': 'MongoDB Address',
         'username': 'MongoDB Username',
         'password': 'MongoDB Password'
     }
-    db_config = _parse_datastore('db', _db_initializer, _db_finalizer, db_prompts)
+    db_config = _parse_datastore('db', _db_initializer, (DOCKER_IP, cli), _db_finalizer, db_prompts)
 
-    config = OmegaConf.merge(base_config, kube_config, s3_config, db_config)
+    config = _merge_dict(base_config, server_config, s3_config, db_config)
     if duplicated_index is not None:
-        spec.configs[duplicated_index] = config
+        spec['configs'][duplicated_index] = config
     else:
-        spec.configs.append(config)
+        spec['configs'].append(config)
     if spec['current-config'] is None:
         spec['current-config'] = name
 
@@ -128,7 +179,7 @@ def add(name: str, address: str, admin: bool, allow_duplicate=False) -> Config:
     return config
 
 
-def use(name: str) -> Config:
+def use(name: str) -> Dict:
     spec = _load()
     config = _find_config(name, spec=spec)
     if config is None:
@@ -143,10 +194,10 @@ def _switch(direction: int = 1) -> str:
     spec = _load()
     if spec['current-config'] is None:
         raise ConfigNotFoundError('Any Configs')
-    n_configs = len(spec.configs)
+    n_configs = len(spec['configs'])
     index = _find_config(spec['current-config'], spec=spec, index=True)
     next_index = (index + direction) % n_configs
-    name = spec.configs[next_index].name
+    name = spec['configs'][next_index]['name']
     use(name)
     return name
 
@@ -164,14 +215,15 @@ def delete(name: str) -> None:
     index = _find_config(name, spec=spec, index=True)
     if index is None:
         raise ConfigNotFoundError(name)
-    elif spec['current-config'] == spec.configs[index].name:
+    elif spec['current-config'] == spec['configs'][index]['name']:
         raise CannotDeleteConfigError
     else:
-        del spec.configs[index]
+        del spec['configs'][index]
     _save(spec)
 
 
-def get(name: Optional[str] = None, key: Optional[str] = None) -> Config:
+@lru_cache(maxsize=None)
+def get(name: Optional[str] = None, key: Optional[str] = None) -> Dict:
     if name is None:
         name = current()
     spec = _load()
@@ -186,7 +238,7 @@ def get(name: Optional[str] = None, key: Optional[str] = None) -> Config:
             value = config
             for k in keys:
                 value = value[k]
-        except omegaconf.errors.ConfigKeyError:
+        except KeyError:
             raise InvalidPropertyError(key)
         return value
 
@@ -194,26 +246,26 @@ def get(name: Optional[str] = None, key: Optional[str] = None) -> Config:
 def set(name: str, *args) -> None:
     spec = _load()
     index = _find_config(name, spec=spec, index=True)
-    config = spec.configs[index]
+    config = spec['configs'][index]
     try:
         for arg in args:
             keys = arg.split('=')[0].split('.')
             value = config
             for key in keys:
                 value = value[key]
-            if isinstance(value, omegaconf.dictconfig.DictConfig):
+            if isinstance(value, dict):
                 raise InvalidSetPropertyError(arg)
-    except omegaconf.errors.ConfigKeyError:
+    except KeyError:
         raise InvalidPropertyError(arg)
 
-    config = OmegaConf.merge(config, OmegaConf.from_dotlist(args))
-    OmegaConf.update(spec, f'configs.{index}', config)
+    config = _merge_dict(config, _obtain_dict_from_dotlist(args))
+    spec['configs'][index] = config
     _save(spec)
 
 
 def ls():
     spec = _load()
-    names = [config.name for config in spec.configs]
+    names = [config['name'] for config in spec['configs']]
     table = [('  NAME',)]
     for name in names:
         table.append([f'  {name}' if spec['current-config'] != name else f'* {name}'])
@@ -227,46 +279,12 @@ def current():
     return spec['current-config']
 
 
-def _parse_datastore(kind: str, initializer: Callable[[], StrDict],
-                     finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> omegaconf.Container:
-    config = initializer()
-    for k, v in prompts.items():
-        config[k] = utils.prompt(v, config[k])
-    config = finalizer(config)
-    return OmegaConf.from_dotlist([
-        f'datastore.{kind}.{k}={v}' for k, v in config.items()
-    ])
-
-
-def _s3_initializer() -> StrDict:
-    service_addr = utils.get_advertise_addr()
-    minio_port = utils.get_default_service_port('mlad_minio', 9000)
-    if minio_port:
-        endpoint = f'http://{service_addr}:{minio_port}'
-        region = 'ap-northeast-2'
-        access_key = 'MLAPPDEPLOY'
-        secret_key = 'MLAPPDEPLOY'
-    else:
-        endpoint = 'https://s3.amazonaws.com'
-        region = 'us-east-1'
-        access_key = None
-        secret_key = None
-    return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
-
-
-def _s3_finalizer(datastore: StrDict) -> StrDict:
-    parsed = utils.parse_url(datastore['endpoint'])
-    datastore['endpoint'] = parsed['url']
-    datastore['verify'] = parsed['scheme'] == 'https'
-    return datastore
-
-
 def get_env(dict=False) -> List[str]:
     config = get()
     envs = []
 
-    envs.append(f'MLAD_ADDRESS={config.apiserver.address}')
-    envs.append(f'MLAD_SESSION={config.session}')
+    envs.append(f'MLAD_ADDRESS={obtain_server_address(config)}')
+    envs.append(f'MLAD_SESSION={config["session"]}')
 
     for k, v in config['datastore']['s3'].items():
         if v is None:
@@ -293,33 +311,148 @@ def get_env(dict=False) -> List[str]:
     return {env.split('=')[0]: env.split('=')[1] for env in envs} if dict else envs
 
 
-def validate_kubeconfig() -> bool:
-    config = get()
-    kubeconfig_path = config.kubeconfig_path
-    context_name = config.context_name
+def get_registry_address(config: Dict):
+    parsed = _parse_url(config['docker']['registry']['address'])
+    registry_address = parsed['address']
+    namespace = config['docker']['registry']['namespace']
+    if namespace is not None:
+        registry_address += f'/{namespace}'
+    return registry_address
+
+
+def is_admin() -> bool:
+    return get().get('admin', False)
+
+
+def obtain_server_address(config: Dict[str, object]) -> str:
+    if not config.get('admin', False):
+        return config['apiserver']['address']
+
+    from mlad.core.kubernetes import controller as ctlr
+    from mlad.core.exceptions import NotFound
+
+    cli = get_admin_k8s_cli(ctlr, config=config)
+    host = cli.configuration.host.rsplit(':', 1)[0]
+    host = host.replace('https', 'http')
     try:
-        kubeconfig = OmegaConf.load(kubeconfig_path)
+        ctlr.get_k8s_deployment('mlad-api-server', 'mlad', cli=cli)
+        service = ctlr.get_k8s_service('mlad-api-server', 'mlad', cli=cli)
+    except NotFound:
+        raise APIServerNotInstalledError
+    port = service.spec.ports[0].node_port
+    return f'{host}:{port}'
+
+def get_admin_k8s_cli(ctlr, config: Optional[Dict] = None):
+    if config is None:
+        config = get()
+    return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
+
+def _create_session_key():
+    user = getuser()
+    hostname = socket.gethostname()
+    payload = {"user": user, "hostname": hostname, "uuid": str(uuid.uuid4())}
+    encode = jwt.encode(payload, "mlad", algorithm="HS256")
+    return encode
+
+
+def _parse_url(url):
+    try:
+        parsed_url = urlparse(url)
+        if not parsed_url.netloc:
+            raise InvalidURLError
     except Exception:
-        return False
-    return 'current-context' in kubeconfig and (context_name == kubeconfig['current-context'])
+        raise InvalidURLError
+    return {
+        'scheme': parsed_url.scheme or 'http',
+        'username': parsed_url.username,
+        'password': parsed_url.password,
+        'hostname': parsed_url.hostname,
+        'port': parsed_url.port or (443 if parsed_url.scheme == 'https' else 80),
+        'path': parsed_url.path,
+        'query': parsed_url.query,
+        'params': parsed_url.params,
+        'url': url if parsed_url.scheme else f"http://{url}",
+        'address': url.replace(f"{parsed_url.scheme}://", "") if parsed_url.scheme else url
+    }
 
 
-def get_context() -> str:
-    config = get()
-    return config.context_name
+def _parse_datastore(kind: str, initializer: Callable[[], StrDict], args: Tuple[Any],
+                     finalizer: Callable[[StrDict], StrDict], prompts: StrDict) -> Dict:
+    config = initializer(*args)
+    for k, v in prompts.items():
+        config[k] = utils.prompt(v, config[k])
+    config = finalizer(config)
+    return _obtain_dict_from_dotlist([
+        f'datastore.{kind}.{k}={v}' for k, v in config.items()
+    ])
 
 
-def _db_initializer() -> StrDict:
-    service_addr = utils.get_advertise_addr()
-    mongo_port = utils.get_default_service_port('mlad_mongodb', 27017)
-    if mongo_port:
-        address = f'mongodb://{service_addr}:{mongo_port}'
+def _s3_initializer(ip, cli) -> StrDict:
+    container_list = cli.containers.list(filters={'label': 'mlappdeploy.datastore=minio'})
+    if container_list:
+        PORT_BINDINGS = container_list[0].attrs['HostConfig']['PortBindings']
+        SERVER_PORT = PORT_BINDINGS['9000/tcp'][0]['HostPort']
+        CONSOLE_PORT = PORT_BINDINGS['9001/tcp'][0]['HostPort']
+        CONFIG_ENV = container_list[0].attrs['Config']['Env']
+        ACCESS_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_ACCESS_KEY=')]
+        SECRET_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_SECRET_KEY=')]
+        endpoint = f'http://{ip}:{SERVER_PORT}'
+        region = 'us-east-1'
+        access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=','') if len(ACCESS_KEY) else 'minioadmin'
+        secret_key = SECRET_KEY[0].replace('MINIO_SECRET_KEY=','') if len(SECRET_KEY) else 'minioadmin'
+    else:
+        endpoint = f'https://s3.amazonaws.com'
+        region = 'us-east-1'
+        access_key = ''
+        secret_key = ''
+    return {'endpoint': endpoint, 'region': region, 'accesskey': access_key, 'secretkey': secret_key}
+
+
+def _s3_finalizer(datastore: StrDict) -> StrDict:
+    parsed = _parse_url(datastore['endpoint'])
+    datastore['endpoint'] = parsed['url']
+    datastore['verify'] = parsed['scheme'] == 'https'
+    return datastore
+
+
+def _db_initializer(ip, cli) -> StrDict:
+    container_list = cli.containers.list(filters={'label': 'mlappdeploy.datastore=mongodb'})
+    if container_list:
+        MONGODB_PORT = container_list[0].attrs['HostConfig']['PortBindings']['27017/tcp'][0]['HostPort']
+        address = f'mongodb://{ip}:{MONGODB_PORT}'
+        return {'address': address, 'username': '', 'password': ''}
     else:
         address = f'mongodb://{utils.obtain_my_ip()}:27017'
-    return {'address': address, 'username': '', 'password': ''}
+        return {'address': address, 'username': '', 'password': ''}
 
 
 def _db_finalizer(datastore: StrDict) -> StrDict:
-    parsed = utils.parse_url(datastore['address'])
+    parsed = _parse_url(datastore['address'])
     datastore['address'] = f'mongodb://{parsed["address"]}'
     return datastore
+
+
+def _obtain_dict_from_dotlist(dotlist):
+    ret = dict()
+    for elem in dotlist:
+        keychain, value = elem.split('=')
+        value = yaml.load(value, Loader=yaml.FullLoader)
+        keys = keychain.split('.')
+        cursor = ret
+        for key in keys[:-1]:
+            if key not in cursor:
+                cursor[key] = dict()
+            cursor = cursor[key]
+        cursor[keys[-1]] = value
+    return ret
+
+
+def _merge_dict(*dicts):
+    ret = dict()
+    for elem in dicts:
+        for key, value in elem.items():
+            if key in ret and isinstance(ret[key], dict) and isinstance(value, dict):
+                ret[key] = _merge_dict(ret[key], value)
+            else:
+                ret[key] = value
+    return ret
