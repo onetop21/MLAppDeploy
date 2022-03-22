@@ -45,7 +45,7 @@ class LogHandler:
         separated = log.split(' ', 1)
         timestamp = separated[0]
         try:
-            parser.parse(timestamp)
+            timestamp = str(parser.parse(timestamp).astimezone())
         except parser.ParserError as e:
             timestamp = None
         msg = separated[1] if len(separated) > 1 else ''
@@ -169,8 +169,7 @@ class LogCollector():
             for name in names:
                 last_timestamp = last_timestamp_dict.get(name, None)
                 if last_timestamp is not None:
-                    dt = datetime.strptime(last_timestamp[:len(last_timestamp) - 4],
-                                           '%Y-%m-%dT%H:%M:%S.%f')
+                    dt = datetime.strptime(last_timestamp.split('+')[0],'%Y-%m-%d %H:%M:%S.%f')
                     ms = dt.microsecond / 10**6
                     ts = time.mktime(dt.timetuple())
                     now = datetime.utcnow().timestamp()

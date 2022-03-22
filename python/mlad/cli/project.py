@@ -674,7 +674,7 @@ def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
 
     timestamp = None
     if 'timestamp' in log:
-        dt = datetime.fromisoformat(log['timestamp']) + timedelta(hours=9)
+        dt = datetime.fromisoformat(log['timestamp'])
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
 
     if msg.startswith('Error'):
