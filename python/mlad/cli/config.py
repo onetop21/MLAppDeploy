@@ -13,6 +13,7 @@ from typing import Optional, Dict, Callable, List, Tuple, Any
 from pathlib import Path
 from urllib.parse import urlparse
 from getpass import getuser
+from mlad import __version__
 from mlad.core.docker import controller as dockerctlr
 from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli.libs import utils
@@ -85,7 +86,7 @@ def add(name: str, address: Optional[str]) -> Dict:
             group = pattern.match(address)
             if group['SCHEME'] is None:
                 address = f"http://{address}"
-            if requests.get(f'{address}/docs', timeout=1):
+            if requests.get(f'{address}/docs', timeout=1, headers={'version': __version__}):
                 server_config = {
                     'apiserver': {
                         'address': address
@@ -114,7 +115,7 @@ def add(name: str, address: Optional[str]) -> Dict:
         if DOCKER_IP in ['localhost', '127.0.0.1']:
             DOCKER_IP = f'{ip}'
         elif not DOCKER_IP:
-            raise ValueError(f"Cannot extract IP address.")
+            raise ValueError('Cannot extract IP address.')
 
     session = _create_session_key()
 
@@ -342,10 +343,12 @@ def obtain_server_address(config: Dict[str, object]) -> str:
     port = service.spec.ports[0].node_port
     return f'{host}:{port}'
 
+
 def get_admin_k8s_cli(ctlr, config: Optional[Dict] = None):
     if config is None:
         config = get()
     return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
+
 
 def _create_session_key():
     user = getuser()
@@ -392,16 +395,15 @@ def _s3_initializer(ip, cli) -> StrDict:
     if container_list:
         PORT_BINDINGS = container_list[0].attrs['HostConfig']['PortBindings']
         SERVER_PORT = PORT_BINDINGS['9000/tcp'][0]['HostPort']
-        CONSOLE_PORT = PORT_BINDINGS['9001/tcp'][0]['HostPort']
         CONFIG_ENV = container_list[0].attrs['Config']['Env']
         ACCESS_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_ACCESS_KEY=')]
         SECRET_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_SECRET_KEY=')]
         endpoint = f'http://{ip}:{SERVER_PORT}'
         region = 'us-east-1'
-        access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=','') if len(ACCESS_KEY) else 'minioadmin'
-        secret_key = SECRET_KEY[0].replace('MINIO_SECRET_KEY=','') if len(SECRET_KEY) else 'minioadmin'
+        access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=', '') if len(ACCESS_KEY) else 'minioadmin'
+        secret_key = SECRET_KEY[0].replace('MINIO_SECRET_KEY=', '') if len(SECRET_KEY) else 'minioadmin'
     else:
-        endpoint = f'https://s3.amazonaws.com'
+        endpoint = 'https://s3.amazonaws.com'
         region = 'us-east-1'
         access_key = ''
         secret_key = ''
