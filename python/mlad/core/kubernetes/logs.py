@@ -54,12 +54,18 @@ class LogHandler:
         return timestamp, msg.encode()
 
     def get_stacked_logs(self, names: List):
-        logs_dict = {}
+        logs_dict = defaultdict(list)
         for name in names:
             resp = self.api.read_namespaced_pod_log(name=name, namespace=self.namespace,
-                                                    tail_lines=self.tail, timestamps=True)
-            logs = resp.split('\n')
-            logs_dict[name] = logs
+                                                    tail_lines=self.tail, timestamps=True,
+                                                    _preload_content=False)
+            for line in resp:
+                try:
+                    log = line.decode()
+                    logs_dict[name].append(log)
+                except UnicodeDecodeError as e:
+                    print(f"[Ignored] Log Decode Error : {e}")
+                    continue
 
         while True:
             if all([not logs_dict[name] for name in names]):
