@@ -32,7 +32,7 @@ App = Union[client.V1Job, client.V1Deployment]
 LogGenerator = Generator[Dict[str, str], None, None]
 LogTuple = Tuple[Dict[str, str]]
 
-def get_contexts(config_file: str = f'{Path.home()}/.kube/config') -> Tuple[List[Dict | List | Any], Any]:
+def get_contexts(config_file: str = f'{Path.home()}/.kube/config') -> Tuple[List[Union[Dict, List, Any]], Any]:
     return config.list_kube_config_contexts(config_file)
 
 def get_api_client(
