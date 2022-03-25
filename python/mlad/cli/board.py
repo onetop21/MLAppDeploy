@@ -7,7 +7,6 @@ from requests.exceptions import ConnectionError
 
 from docker.types import Mount
 from typing import List
-from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, ComponentImageNotExistError,
@@ -29,6 +28,7 @@ class ValueGenerator:
         for x in self:
             pass
         return self.value
+
 
 def activate(image_repository: str):
     cli = get_cli()
