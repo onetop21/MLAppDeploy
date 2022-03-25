@@ -13,6 +13,7 @@ from typing import Optional, Dict, Callable, List, Tuple, Any
 from pathlib import Path
 from urllib.parse import urlparse
 from getpass import getuser
+from mlad import __version__
 from mlad.core.docker import controller as dockerctlr
 from mlad.core.exceptions import DockerNotFoundError
 from mlad.cli.libs import utils
@@ -85,7 +86,7 @@ def add(name: str, address: Optional[str]) -> Dict:
             group = pattern.match(address)
             if group['SCHEME'] is None:
                 address = f"http://{address}"
-            if requests.get(f'{address}/docs', timeout=1):
+            if requests.get(f'{address}/docs', timeout=1, headers={'version': __version__}):
                 server_config = {
                     'apiserver': {
                         'address': address
@@ -114,7 +115,7 @@ def add(name: str, address: Optional[str]) -> Dict:
         if DOCKER_IP in ['localhost', '127.0.0.1']:
             DOCKER_IP = f'{ip}'
         elif not DOCKER_IP:
-            raise ValueError("Cannot extract IP address.")
+            raise ValueError('Cannot extract IP address.')
 
     session = _create_session_key()
 
