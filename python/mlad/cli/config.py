@@ -335,6 +335,8 @@ def obtain_server_address(config: Dict[str, object]) -> str:
     cli = get_admin_k8s_cli(ctlr, config=config)
     host = cli.configuration.host.rsplit(':', 1)[0]
     host = host.replace('https', 'http')
+    if host in ['http://127.0.0.1', 'http://localhost']:
+        host = f'http://{utils.obtain_my_ip()}'
     try:
         ctlr.get_k8s_deployment('mlad-api-server', 'mlad', cli=cli)
         service = ctlr.get_k8s_service('mlad-api-server', 'mlad', cli=cli)
