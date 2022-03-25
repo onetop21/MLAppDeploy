@@ -32,8 +32,10 @@ App = Union[client.V1Job, client.V1Deployment]
 LogGenerator = Generator[Dict[str, str], None, None]
 LogTuple = Tuple[Dict[str, str]]
 
+
 def get_contexts(config_file: str = f'{Path.home()}/.kube/config') -> Tuple[List[Union[Dict, List, Any]], Any]:
     return config.list_kube_config_contexts(config_file)
+
 
 def get_api_client(
     config_file: str = f'{Path.home()}/.kube/config', context: Optional[str] = None,
@@ -431,6 +433,9 @@ def _obtain_app_expose(service: Optional[client.V1Service], config_labels: Dict[
 
 
 def inspect_apps(apps: List[App], cli: ApiClient = DEFAULT_CLI) -> List[Dict]:
+    if not apps:
+        return []
+
     results = []
     with ThreadPool(len(apps)) as pool:
         for app in apps:
