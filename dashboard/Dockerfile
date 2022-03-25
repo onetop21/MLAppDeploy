@@ -1,7 +1,7 @@
 FROM node:14-slim
 
 WORKDIR /app
-COPY frontend /app
+COPY dashboard/frontend /app
 RUN yarn && yarn build
 
 
@@ -12,10 +12,10 @@ WORKDIR /app
 RUN mkdir ./static
 COPY --from=0 /app/build ./static
 
-COPY backend/requirements.txt ./requirements.txt
+COPY dashboard/backend/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
-COPY backend /app
+COPY dashboard/backend /app
 
 LABEL MLAD_BOARD=""
 

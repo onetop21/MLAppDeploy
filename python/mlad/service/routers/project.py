@@ -3,7 +3,6 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Query, HTTPException, Header
 
-from mlad.core import exceptions
 from mlad.core.exceptions import ProjectNotFoundError, InvalidAppError
 from mlad.core.kubernetes import controller as ctlr
 

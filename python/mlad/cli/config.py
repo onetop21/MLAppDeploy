@@ -67,7 +67,7 @@ def add(name: str, address: Optional[str]) -> Dict:
     if duplicated_index is not None:
         raise ConfigAlreadyExistError(name)
 
-    pattern = re.compile("(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(?P<PORT>:[0-9]+)?")
+    pattern = re.compile(r"(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(?P<PORT>:[0-9]+)?")
     ip = utils.obtain_my_ip()
     server_config = dict()
     if address is None:
@@ -132,7 +132,7 @@ def add(name: str, address: Optional[str]) -> Dict:
     except requests.exceptions.ConnectionError:
         ...
     registry_address = utils.prompt('Docker Registry Address', default_docker_registry)
-    
+
     parsed_url = _parse_url(registry_address)
     if parsed_url['scheme'] != 'https':
         warn_insecure = True
