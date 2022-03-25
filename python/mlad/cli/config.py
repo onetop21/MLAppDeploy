@@ -66,7 +66,7 @@ def add(name: str, address: Optional[str]) -> Dict:
     if duplicated_index is not None:
         raise ConfigAlreadyExistError(name)
 
-    pattern = re.compile("(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(?P<PORT>:[0-9]+)?")
+    pattern = re.compile(r"(?P<SCHEME>[a-z]+:\/\/\/?)?(?P<IP>[a-z0-9._-]+)(?P<PORT>:[0-9]+)?")
     ip = utils.obtain_my_ip()
     server_config = dict()
     if address is None:
@@ -114,7 +114,7 @@ def add(name: str, address: Optional[str]) -> Dict:
         if DOCKER_IP in ['localhost', '127.0.0.1']:
             DOCKER_IP = f'{ip}'
         elif not DOCKER_IP:
-            raise ValueError(f"Cannot extract IP address.")
+            raise ValueError("Cannot extract IP address.")
 
     session = _create_session_key()
 
@@ -131,7 +131,7 @@ def add(name: str, address: Optional[str]) -> Dict:
     except requests.exceptions.ConnectionError:
         ...
     registry_address = utils.prompt('Docker Registry Address', default_docker_registry)
-    
+
     parsed_url = _parse_url(registry_address)
     if parsed_url['scheme'] != 'https':
         warn_insecure = True
@@ -342,10 +342,12 @@ def obtain_server_address(config: Dict[str, object]) -> str:
     port = service.spec.ports[0].node_port
     return f'{host}:{port}'
 
+
 def get_admin_k8s_cli(ctlr, config: Optional[Dict] = None):
     if config is None:
         config = get()
     return ctlr.get_api_client(config_file=config['kubeconfig_path'], context=config['context_name'])
+
 
 def _create_session_key():
     user = getuser()
@@ -392,16 +394,15 @@ def _s3_initializer(ip, cli) -> StrDict:
     if container_list:
         PORT_BINDINGS = container_list[0].attrs['HostConfig']['PortBindings']
         SERVER_PORT = PORT_BINDINGS['9000/tcp'][0]['HostPort']
-        CONSOLE_PORT = PORT_BINDINGS['9001/tcp'][0]['HostPort']
         CONFIG_ENV = container_list[0].attrs['Config']['Env']
         ACCESS_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_ACCESS_KEY=')]
         SECRET_KEY = [_ for _ in CONFIG_ENV if _.startswith('MINIO_SECRET_KEY=')]
         endpoint = f'http://{ip}:{SERVER_PORT}'
         region = 'us-east-1'
-        access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=','') if len(ACCESS_KEY) else 'minioadmin'
-        secret_key = SECRET_KEY[0].replace('MINIO_SECRET_KEY=','') if len(SECRET_KEY) else 'minioadmin'
+        access_key = ACCESS_KEY[0].replace('MINIO_ACCESS_KEY=', '') if len(ACCESS_KEY) else 'minioadmin'
+        secret_key = SECRET_KEY[0].replace('MINIO_SECRET_KEY=', '') if len(SECRET_KEY) else 'minioadmin'
     else:
-        endpoint = f'https://s3.amazonaws.com'
+        endpoint = 'https://s3.amazonaws.com'
         region = 'us-east-1'
         access_key = ''
         secret_key = ''
