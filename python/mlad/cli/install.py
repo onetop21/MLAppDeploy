@@ -12,7 +12,9 @@ def version():
     try:
         server_version = API.check.check_version()['version']
     except Exception:
-        yield '  Cannot connect to the API Server, please add a new config and use it.'
+        yield '  Cannot connect to the API server, please add a new config and use it,'
+        yield '  or an address of the current cofig is wrong,'
+        yield '  or the version of the API server does not support to provider version information.'
     else:
         yield f'  API Server version {server_version}'
 
