@@ -1,8 +1,20 @@
+from mlad import __version__
 from mlad.core import exceptions as core_exceptions
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import APIServerNotInstalledError
 from mlad.cli import config as config_core
 from mlad.api import API
+
+
+def version():
+    yield 'MLAppDeploy: Machine Learning Application Deployment Tool'
+    yield f'  CLI version        {__version__}'
+    try:
+        server_version = API.check.check_version()['version']
+    except Exception:
+        yield '  Cannot connect to the API Server, please add a new config and use it.'
+    else:
+        yield f'  API Server version {server_version}'
 
 
 def check():
