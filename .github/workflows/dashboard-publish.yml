@@ -4,13 +4,15 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-    #inputs:
-    #  registry:
-    #    description: 'Target registry'
-    #    required: False
-    #    default: ghcr.io
-    #  ${{ github.event.inputs.registry }}
-
+    inputs:
+      #registry:
+      #  description: 'Target registry'
+      #  required: False
+      #  default: ghcr.io
+      #${{ github.event.inputs.registry }}
+      tag:
+        description: 'Container image tag'
+        required: False
 env:
   # TODO: Change variable to your image's name.
   REPOSITORY: ghcr.io/${{ github.repository }}
@@ -41,13 +43,18 @@ jobs:
         then
           # Strip git ref prefix from version
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-
           # Strip "v" prefix from tag name
           [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          WITH_LATEST=1
         elif [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]
         then
-          VERSION=$(git rev-parse --short "$GITHUB_SHA")
-          WITH_LATEST=1
+          if [[ -z "${{ github.event.inputs.tag }}" ]]
+          then
+            VERSION=$(git rev-parse --short "$GITHUB_SHA")
+          else
+            VERSION=${{ github.event.inputs.tag }}
+          fi
+          BRANCH=$(git rev-parse --abbrev-ref HEAD | tr '!@#$%^&*()_+=[]{}\\|/?,.<>~' '-')
         else
           ERROR=Not support ${{ github.event_name }} event.
         fi
@@ -55,14 +62,13 @@ jobs:
         if [ -z $ERROR ]
         then
           IMAGE_ID=${{ steps.build_image.outputs.id }}
-          echo IMAGE_ID=$IMAGE_ID
           echo IMAGE_NAME=$IMAGE_NAME
+          echo BRANCH=$BRANCH
           echo VERSION=$VERSION
-
           docker tag $IMAGE_ID $IMAGE_NAME:$VERSION
+          [ $BRANCH ] && docker tag $IMAGE_ID $IMAGE_NAME:$BRANCH
           [ $WITH_LATEST ] && docker tag $IMAGE_ID $IMAGE_NAME:latest
           docker push $IMAGE_NAME --all-tags
         else
           echo "::error title=Failed to build container image::$ERROR"
         fi
-        
