@@ -1,4 +1,5 @@
 from typing import Optional
+from mlad.api.exceptions import VersionCheckError
 
 from .base import APIBase
 
@@ -8,7 +9,10 @@ class Check(APIBase):
         super().__init__(address, session, 'check')
 
     def check_version(self):
-        return self._get('/version')
+        try:
+            return self._get('/version')
+        except Exception:
+            raise VersionCheckError
 
     def check_metrics_server(self):
         return self._get('/metrics-server')

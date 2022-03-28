@@ -9,14 +9,8 @@ from mlad.api import API
 def version():
     yield 'MLAppDeploy: Machine Learning Application Deployment Tool'
     yield f'  CLI version        {__version__}'
-    try:
-        server_version = API.check.check_version()['version']
-    except Exception:
-        yield '  Cannot connect to the API server, please add a new config and use it,'
-        yield '  or an address of the current cofig is wrong,'
-        yield '  or the version of the API server does not support to provider version information.'
-    else:
-        yield f'  API Server version {server_version}'
+    server_version = API.check.check_version()['version']
+    yield f'  API Server version {server_version}'
 
 
 def check():
@@ -119,6 +113,6 @@ def check():
                 yield f' · {line}'
 
         if plugin == 'MLAD API Server' and status:
+            yield f' · API Server Address : {api_server_address}'
             server_version = API.check.check_version()['version']
             yield f' · API Server Version : {server_version}'
-            yield f' · API Server Address : {api_server_address}'
