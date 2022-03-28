@@ -7,6 +7,9 @@ class Check(APIBase):
     def __init__(self, address: Optional[str], session: Optional[str]):
         super().__init__(address, session, 'check')
 
+    def check_version(self):
+        return self._get('/version')
+
     def check_metrics_server(self):
         return self._get('/metrics-server')
 
