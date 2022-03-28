@@ -35,9 +35,9 @@ class ConnectionRefusedError(MLADException):
 class VersionCheckError(MLADException):
 
     def __str__(self):
-        return ('  Cannot connect to the API server, please add a new config and use it,'
-                '  or an address of the current cofig is wrong,'
-                '  or the version of the API server does not support to provider version information.')
+        return ('Cannot connect to the API server, please add a new config and use it, '
+                'or an address of the current cofig is wrong, '
+                'or the version of the API server does not support to provider version information.')
 
 
 class NotFound(APIError):
