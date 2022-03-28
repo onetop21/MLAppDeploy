@@ -1,17 +1,13 @@
-import internal from "stream";
-
 export class Metric {
 	type: string;
 	capacity: number;
 	used: number | string;
 	free: number;
 
-	static MSG_COLLECTING = 'Collecting...';
-
 	constructor(raw: any) {
 		this.type = this.parseType(raw['type']);
 		this.capacity = raw['capacity'];
-		this.used = raw['used'] === null ? Metric.MSG_COLLECTING : raw['used'];
+		this.used = raw['used'];
 		this.free = raw['free'];
 	}
 
@@ -38,8 +34,8 @@ export class Metric {
 	}
 
 	get freeText() {
-		if (this.used === Metric.MSG_COLLECTING) {
-			return Metric.MSG_COLLECTING;
+		if (typeof this.used === 'string') {
+			return this.used;
 		} else {
 			const percent = ((1 - (this.used as number) / this.capacity) * 100).toFixed(1);
 			return `${percent}%`;
@@ -51,7 +47,7 @@ export class Metric {
 	}
 
 	get usedText() {
-		return this.used === Metric.MSG_COLLECTING
+		return typeof this.used === 'string'
 			? this.used
 			: (this.used as number).toFixed(2);
 	}

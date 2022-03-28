@@ -8,7 +8,7 @@ from . import echo_exception
 
 @click.command()
 @click.option('--image-repository', '-i', required=False,
-              default='ghcr.io/onetop21/mlappdeploy/dashboard:latest',
+              default='ghcr.io/onetop21/mlappdeploy/dashboard:0.4.1',
               help='The image repository for MLAD board.')
 @echo_exception
 def activate(image_repository):
