@@ -500,10 +500,9 @@ def update(file: Optional[str], project_key: Optional[str]):
     )
     image_tag = base_labels[MLAD_PROJECT_IMAGE]
     if cur_image_tag != image_tag:
-        yield (
-            f'Image tag [{cur_image_tag}] and [{image_tag}] are different, '
-            f'the base image will be updated to [{image_tag}].'
-        )
+        yield f'Image tag [{cur_image_tag}] and [{image_tag}] are different.'
+        yield f'The base image will be updated to [{image_tag}].'
+
     default_update_spec = {
         'image': image_tag,
         'command': None,
@@ -580,6 +579,7 @@ def update(file: Optional[str], project_key: Optional[str]):
             yield utils.info_msg(f"Warning: '{name}' env {env_ignored} "
                                  'will be ignored for MLAD preferences.')
 
+        # Add an update spec if there are any changes in the app spec or image tag
         if len(diff_keys[name]) > 0 or image_tag != cur_image_tag:
             update_specs.append(update_spec)
 
