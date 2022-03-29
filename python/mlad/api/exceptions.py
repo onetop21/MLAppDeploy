@@ -32,6 +32,14 @@ class ConnectionRefusedError(MLADException):
         return f'Cannot connect to [{self.url}]. Is that the right API server address?'
 
 
+class VersionCheckError(MLADException):
+
+    def __str__(self):
+        return ('Cannot connect to the API server, please add a new config and use it, '
+                'or an API server address of the current config is wrong, '
+                'or the version of the API server does not support to provider version information.')
+
+
 class NotFound(APIError):
     pass
 

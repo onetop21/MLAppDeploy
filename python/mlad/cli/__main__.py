@@ -46,6 +46,7 @@ def main():
 
 
 main.add_command(config.cli, 'config')
+main.add_command(install.version, 'version')
 
 try:
     check_config()
