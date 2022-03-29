@@ -580,7 +580,7 @@ def update(file: Optional[str], project_key: Optional[str]):
             yield utils.info_msg(f"Warning: '{name}' env {env_ignored} "
                                  'will be ignored for MLAD preferences.')
 
-        if len(diff_keys[name]) > 0:
+        if len(diff_keys[name]) > 0 or image_tag != cur_image_tag:
             update_specs.append(update_spec)
 
     for name, keys in diff_keys.items():
