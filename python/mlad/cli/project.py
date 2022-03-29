@@ -479,6 +479,7 @@ def scale(file: Optional[str], project_key: Optional[str], scales: List[Tuple[st
 
 def update(file: Optional[str], project_key: Optional[str]):
     utils.process_file(file)
+    config = config_core.get()
     if project_key is None:
         project_key = utils.workspace_key()
     project = API.project.inspect(project_key=project_key)
@@ -491,8 +492,14 @@ def update(file: Optional[str], project_key: Optional[str]):
     if not kind == 'Deployment':
         raise InvalidProjectKindError('Deployment', 'deploy')
 
+    base_labels = utils.base_labels(
+        utils.get_workspace(),
+        config['session'],
+        project,
+        config_core.get_registry_address(config)
+    )
     default_update_spec = {
-        'image': None,
+        'image': base_labels[MLAD_PROJECT_IMAGE],
         'command': None,
         'args': None,
         'scale': 1,
