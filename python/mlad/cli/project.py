@@ -484,7 +484,7 @@ def update(file: Optional[str], project_key: Optional[str]):
         project_key = utils.workspace_key()
     project = API.project.inspect(project_key=project_key)
     cur_project_yaml = json.loads(project['project_yaml'])
-    image_tag = project['image']
+    cur_image_tag = project['image']
 
     project = utils.get_project()
 
@@ -498,8 +498,14 @@ def update(file: Optional[str], project_key: Optional[str]):
         project,
         config_core.get_registry_address(config)
     )
+    image_tag = base_labels[MLAD_PROJECT_IMAGE]
+    if cur_image_tag != image_tag:
+        yield (
+            f'Image tag [{cur_image_tag}] and [{image_tag}] are different, '
+            f'the base image will be updated to [{image_tag}].'
+        )
     default_update_spec = {
-        'image': base_labels[MLAD_PROJECT_IMAGE],
+        'image': image_tag,
         'command': None,
         'args': None,
         'scale': 1,
