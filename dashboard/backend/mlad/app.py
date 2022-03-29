@@ -21,7 +21,7 @@ app = FastAPI()
 address = f'{os.environ["MLAD_ADDRESS"]}/api/v1'
 headers = {
     'session': os.environ['MLAD_SESSION'],
-    'version': '0.4.0'
+    'version': '0.4.1'
 }
 db_client = DBClient()
 

@@ -2,12 +2,18 @@ import traceback
 
 from fastapi import APIRouter, HTTPException
 
+from mlad import __version__
 from mlad.core import exceptions
 from mlad.core.kubernetes import controller as ctlr
 from mlad.service.exceptions import exception_detail
 
 
 router = APIRouter()
+
+
+@router.get('/check/version')
+def check_version():
+    return {'version': __version__}
 
 
 @router.get("/check/metrics-server")

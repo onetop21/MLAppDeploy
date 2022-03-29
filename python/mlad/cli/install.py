@@ -1,7 +1,16 @@
+from mlad import __version__
 from mlad.core import exceptions as core_exceptions
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import APIServerNotInstalledError
 from mlad.cli import config as config_core
+from mlad.api import API
+
+
+def version():
+    yield 'MLAppDeploy: Machine Learning Application Deployment Tool'
+    yield f'  CLI version        {__version__}'
+    server_version = API.check.check_version()['version']
+    yield f'  API Server version {server_version}'
 
 
 def check():
@@ -83,6 +92,7 @@ def check():
         checked['GPU Feature Discovery']['status'] = True
 
     # Check mlad api server
+    api_server_address = None
     try:
         api_server_address = config_core.obtain_server_address(config)
     except APIServerNotInstalledError:
@@ -104,3 +114,5 @@ def check():
 
         if plugin == 'MLAD API Server' and status:
             yield f' · API Server Address : {api_server_address}'
+            server_version = API.check.check_version()['version']
+            yield f' · API Server Version : {server_version}'
