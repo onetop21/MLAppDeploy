@@ -85,4 +85,4 @@ class Project(APIBase):
             'update_yaml': update_yaml,
             'update_specs': update_specs
         }
-        return self._post(f'/{project_key}', body=body)
+        return self._post(f'/{project_key}', body=body, timeout=60)
