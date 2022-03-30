@@ -46,7 +46,6 @@ def main():
 
 
 main.add_command(config.cli, 'config')
-main.add_command(install.version, 'version')
 
 try:
     check_config()
@@ -67,6 +66,7 @@ else:
     main.add_command(image.build, 'build')
     main.add_command(project.up, 'up')
     main.add_command(project.down, 'down')
+    main.add_command(project.run, 'run')
     main.add_command(project.update, 'update')
     main.add_command(project.ingress, 'ingress')
     main.add_command(project.logs, 'logs')
