@@ -1,5 +1,6 @@
 from mlad import __version__
 from mlad.core import exceptions as core_exceptions
+from mlad.api.exceptions import VersionCheckError
 from mlad.cli.libs import utils
 from mlad.cli.exceptions import APIServerNotInstalledError
 from mlad.cli import config as config_core
@@ -114,5 +115,10 @@ def check():
 
         if plugin == 'MLAD API Server' and status:
             yield f' · API Server Address : {api_server_address}'
-            server_version = API.check.check_version()['version']
+            try:
+                server_version = API.check.check_version()['version']
+            except VersionCheckError as e:
+                yield 'The API server version should be 0.4.1 or higher.'
+                yield 'Please use command \'helm upgrade mlad -n mlad ./charts/api-server\'.'
+                raise e
             yield f' · API Server Version : {server_version}'
