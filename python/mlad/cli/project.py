@@ -485,11 +485,6 @@ def run(file: Optional[str], env: Dict[str, str], quota: Dict[str, str], command
     if len(images) == 0:
         raise ImageNotFoundError(image_tag)
 
-    # check ingress controller
-    ingress_ctrl_running = API.check.check_ingress_controller()
-    if not ingress_ctrl_running:
-        yield f'{utils.info_msg("Warning: Ingress controller must be installed to use ingress path. Please contact the admin.")}'
-
     app_spec = {
         'kind': 'Job',
         'name': 'job-1',
@@ -532,7 +527,6 @@ def run(file: Optional[str], env: Dict[str, str], quota: Dict[str, str], command
         yield from logs(file, project_key, 'all', True, True, None)
 
         yield from down(file, project_key, False)
-        yield 'Done.'
     except KeyboardInterrupt as e:
         next(API.project.delete(project_key))
         raise e
