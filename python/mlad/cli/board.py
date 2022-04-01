@@ -112,7 +112,7 @@ def install(file_path: str, no_build: bool):
     from mlad.cli.validator import validators
     spec = validators.validate(spec)
     if not no_build and 'workspace' not in spec:
-        raise CannotBuildComponentError
+        no_build = True
 
     labels = {
         'MLAD_BOARD': '',
@@ -120,9 +120,10 @@ def install(file_path: str, no_build: bool):
     }
     if no_build:
         built_images = cli.images.list(filters={'label': labels})
-        if len(built_images) == 0:
-            raise ComponentImageNotExistError(spec['name'])
-        image = built_images[0]
+        if len(built_images) > 0:
+            image = built_images[0]
+        else:
+            image = None
     else:
         image = ValueGenerator(image_core.build(file_path, False, True, False)).get_value()
 
@@ -133,6 +134,8 @@ def install(file_path: str, no_build: bool):
             image_name = component['image']
             cli.images.pull(image_name)
             image = cli.images.get(image_name)
+        elif image is None:
+            raise ComponentImageNotExistError(spec['name'])
         env = {**component.get('env', dict()), **config_core.get_env(dict=True)}
         ports = [expose['port'] for expose in component.get('expose', [])]
         command = component.get('command', [])
@@ -148,11 +151,16 @@ def install(file_path: str, no_build: bool):
             'APP_NAME': app_name
         }
         yield f'Run the container [{app_name}]'
+        # patch env vars
+        env = {**env, **{k: (env.get(v[1:]) if v.startswith('$') else v) for k, v in env.items()}}
+        command = [env.get(_[1:]) if _.startswith('$') else _ for _ in command]
+        ################
         cli.containers.run(
             image.tags[-1],
             environment=env,
             name=f'{spec["name"]}-{app_name}',
-            ports={f'{p}/tcp': p for p in ports},
+            #ports={f'{p}/tcp': p for p in ports},
+            ports=dict([(f'{p.split(":")[1]}/tcp', f'{p.split(":")[0]}') if ':' in p else (f'{p}/tcp', p) for p in ports]),
             command=command + args,
             mounts=[Mount(source=mount['path'], target=mount['mountPath'], type='bind')
                     for mount in mounts],
@@ -162,7 +170,8 @@ def install(file_path: str, no_build: bool):
         component_specs.append({
             'name': spec['name'],
             'app_name': app_name,
-            'hosts': [f'{host_ip}:{p}' for p in ports]
+            #'hosts': [f'{host_ip}:{p}' for p in ports]
+            'hosts': [f'{host_ip}:{p.split(":")[0]}' for p in ports]
         })
 
         res = requests.post(f'{host_ip}:2021/mlad/component', json={

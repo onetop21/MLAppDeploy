@@ -131,7 +131,8 @@ x-definitions:
           type: dict
           schema:
             port: &port
-              type: integer
+              type: string
+              regex: "[0-9]+(:[0-9]+)?"
               required: true
               description: Expose ports to other apps.
       command:                    # Describe command to need overwrite.
