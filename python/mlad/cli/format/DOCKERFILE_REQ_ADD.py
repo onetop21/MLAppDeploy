@@ -1,5 +1,5 @@
 import sys
 
-FORMAT = '''ADD {SRC} {SRC}'''
+FORMAT = '''ADD {SRC}'''
 
 sys.modules[__name__] = FORMAT
