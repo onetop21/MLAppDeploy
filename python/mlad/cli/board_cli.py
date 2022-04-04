@@ -1,5 +1,6 @@
 import click
 
+from mlad import __version__
 from mlad.cli import board
 from mlad.cli.autocompletion import list_component_names
 
@@ -8,7 +9,7 @@ from . import echo_exception
 
 @click.command()
 @click.option('--image-repository', '-i', required=False,
-              default='ghcr.io/onetop21/mlappdeploy/dashboard:0.4.1',
+              default=f'ghcr.io/onetop21/mlappdeploy/dashboard:{__version__}',
               help='The image repository for MLAD board.')
 @echo_exception
 def activate(image_repository):
