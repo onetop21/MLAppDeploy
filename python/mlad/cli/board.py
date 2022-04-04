@@ -60,7 +60,9 @@ def activate(image_repository: str):
         name='mlad-board',
         ports={'2021/tcp': '2021'},
         labels=['MLAD_BOARD'],
-        detach=True)
+        detach=True,
+        restart_policy={'Name': 'always'}
+    )
 
     host_ip = _obtain_host()
     yield 'Successfully activate MLAD board.'
@@ -165,7 +167,9 @@ def install(file_path: str, no_build: bool):
             mounts=[Mount(source=mount['path'], target=mount['mountPath'], type='bind')
                     for mount in mounts],
             labels=labels,
-            detach=True)
+            detach=True,
+            restart_policy={'Name': 'always'}
+        )
 
         component_specs.append({
             'name': spec['name'],
