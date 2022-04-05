@@ -3,6 +3,7 @@ import sys
 import json
 import copy
 import socket
+import time
 
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple, Union
@@ -167,7 +168,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
 
 def logs(file: Optional[str], project_key: Optional[str],
-         tail: bool, follow: bool, timestamps: bool, filters: Optional[List[str]]):
+         tail: Union[str, int], follow: bool, timestamps: bool, filters: Optional[List[str]]):
     utils.process_file(file)
     if project_key is None:
         project_key = utils.workspace_key()
@@ -456,6 +457,82 @@ def _dump_logs(app_name: str, project_key: str, dirpath: Path):
         except InvalidLogRequest:
             return f'There is no log in [{app_name}].'
     return f'The log file of app [{app_name}] saved.'
+
+
+def run(file: Optional[str], env: Dict[str, str], quota: Dict[str, str], command: List[str]):
+    utils.process_file(file)
+    config = config_core.get()
+    project = utils.get_project()
+    origin_project = copy.deepcopy(project)
+
+    base_labels = utils.base_labels(
+        utils.get_workspace(),
+        config['session'],
+        project,
+        config_core.get_registry_address(config)
+    )
+    project_key = base_labels[MLAD_PROJECT]
+    try:
+        API.project.inspect(project_key=project_key)
+        raise ProjectAlreadyExistError(project_key)
+    except ProjectNotFound:
+        pass
+
+    # Find suitable image
+    image_tag = base_labels[MLAD_PROJECT_IMAGE]
+    images = [image for image in docker_ctlr.get_images(project_key=project_key)
+              if image_tag in image.tags]
+    if len(images) == 0:
+        raise ImageNotFoundError(image_tag)
+
+    app_spec = {
+        'kind': 'Job',
+        'name': 'job-1',
+        'env': env,
+        'quota': quota,
+        'command': command
+    }
+    check_nvidia_plugin_installed(app_spec)
+    warning_msg = _check_config_envs(app_spec['name'], app_spec)
+    if warning_msg:
+        yield warning_msg
+    yield 'Deploy job-1 to the cluster...'
+    try:
+        credential = docker_ctlr.obtain_credential()
+        extra_envs = config_core.get_env()
+        lines = API.project.create(base_labels, origin_project, extra_envs,
+                                   credential=credential)
+        for line in lines:
+            if 'stream' in line:
+                sys.stdout.write(line['stream'])
+            if 'result' in line and line['result'] == 'succeed':
+                break
+
+        API.app.create(project_key, [app_spec])
+
+        yield 'Wait for the app runs successfully'
+        while True:
+            task_dict = API.app.inspect(project_key, app_spec['name'])['task_dict']
+            pod_info = list(task_dict.values())[0]
+            phase = pod_info['phase']
+            reason = pod_info['status']
+            if phase == 'Pending':
+                time.sleep(1)
+            elif phase == 'Succeeded' or phase == 'Running':
+                break
+            else:
+                yield 'Error occurred in running the job..'
+                yield f'Reason: {reason}'
+                break
+        yield from logs(file, project_key, 'all', True, True, None)
+
+        yield from down(file, project_key, False)
+    except KeyboardInterrupt as e:
+        next(API.project.delete(project_key))
+        raise e
+    except Exception as e:
+        next(API.project.delete(project_key))
+        raise e
 
 
 def scale(file: Optional[str], project_key: Optional[str], scales: List[Tuple[str, int]]):
