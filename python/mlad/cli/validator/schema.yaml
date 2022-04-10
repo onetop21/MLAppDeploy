@@ -131,10 +131,13 @@ x-definitions:
           type: dict
           schema:
             port: &port
-              type: string
-              regex: "[0-9]+(:[0-9]+)?"
+              type: integer
               required: true
               description: Expose ports to other apps.
+            hidden:
+              type: boolean
+              default: false
+              description: Do not register to dashboard.
       command:                    # Describe command to need overwrite.
         type: [string, list]
         description: Commands to need overwrite.

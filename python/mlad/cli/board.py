@@ -1,5 +1,7 @@
 import os
 import errno
+import time
+import re
 import yaml
 import docker
 import requests
@@ -140,6 +142,7 @@ def install(file_path: str, no_build: bool):
             raise ComponentImageNotExistError(spec['name'])
         env = {**component.get('env', dict()), **config_core.get_env(dict=True)}
         ports = [expose['port'] for expose in component.get('expose', [])]
+        hidden = {expose['port']: expose['hidden'] for expose in component.get('expose', [])}
         command = component.get('command', [])
         if isinstance(command, str):
             command = command.split(' ')
@@ -154,15 +157,17 @@ def install(file_path: str, no_build: bool):
         }
         yield f'Run the container [{app_name}]'
         # patch env vars
-        env = {**env, **{k: (env.get(v[1:]) if v.startswith('$') else v) for k, v in env.items()}}
+        schema = re.match(r'http[s]?://([^/]+)', host_ip)
+        parsed = config_core._parse_url(host_ip)
+        env = {'HOST_IP': parsed['address'], **env, **{k: (env.get(v[1:]) if v.startswith('$') else v) for k, v in env.items()}}
         command = [env.get(_[1:]) if _.startswith('$') else _ for _ in command]
         ################
-        cli.containers.run(
+        container = cli.containers.run(
             image.tags[-1],
             environment=env,
             name=f'{spec["name"]}-{app_name}',
             #ports={f'{p}/tcp': p for p in ports},
-            ports=dict([(f'{p.split(":")[1]}/tcp', f'{p.split(":")[0]}') if ':' in p else (f'{p}/tcp', p) for p in ports]),
+            ports={f'{p}/tcp': None for p in ports},
             command=command + args,
             mounts=[Mount(source=mount['path'], target=mount['mountPath'], type='bind')
                     for mount in mounts],
@@ -170,18 +175,30 @@ def install(file_path: str, no_build: bool):
             detach=True,
             restart_policy={'Name': 'always'}
         )
+        # Wait for getting port
+        for _ in range(10):
+            container.reload()
+            port_bindings = container.attrs['NetworkSettings']['Ports']
+            should_wait = False
+            for p in ports:
+                target_ports = port_bindings[f'{p}/tcp']
+                should_wait |= len(target_ports) == 0 or 'HostPort' not in target_ports[0]
+            if not should_wait:
+                break
+            time.sleep(1)
+        #######################
+        if port_bindings:
+            component_specs.append({
+                'name': spec['name'],
+                'app_name': app_name,
+                #'hosts': [f'{host_ip}:{p}' for p in ports]
+                'hosts': [f'{host_ip}:{port_bindings[f"{p}/tcp"][0]["HostPort"]}' for p in ports if hidden[p] is not True]
+            })
 
-        component_specs.append({
-            'name': spec['name'],
-            'app_name': app_name,
-            #'hosts': [f'{host_ip}:{p}' for p in ports]
-            'hosts': [f'{host_ip}:{p.split(":")[0]}' for p in ports]
-        })
-
-        res = requests.post(f'{host_ip}:2021/mlad/component', json={
-            'components': component_specs
-        })
-        res.raise_for_status()
+            res = requests.post(f'{host_ip}:2021/mlad/component', json={
+                'components': component_specs
+            })
+            res.raise_for_status()
 
     yield 'The component installation is complete.'
 

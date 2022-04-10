@@ -92,7 +92,6 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
                 workspace['ignores'] = []
         else:
             payload = workspace['buildscript']
-
     tarbytes = io.BytesIO()
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(payload)
@@ -158,6 +157,7 @@ def _obtain_workspace_payload(workspace, maintainer):
         key = tuple(prep.keys())[0]
         template = PREP_KEY_TO_TEMPLATE[key]
         prep_docker_formats.append(template.format(SRC=prep[key]))
+    print(prep_docker_formats)
 
     commands = [f'"{item}"' for item in default['command'].split()] + \
                [f'"{item}"' for item in default['args'].split()]
