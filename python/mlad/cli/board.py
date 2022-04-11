@@ -53,6 +53,11 @@ def activate(image_repository: str):
 
     yield 'Activating MLAD board.'
 
+    # if image tag is dev version, change to latest
+    group = re.match(r'([a-z0-9.:-]+/[a-z0-9./-]+)(?P<OFFICIAL>:[0-9.]+$)?(?P<DEV>:[a-z0-9.]+$)?', image_repository)
+    if group.group('DEV'):
+        image_repository = f"{group.group(1)}:latest"
+
     cli.containers.run(
         image_repository,
         environment=[
