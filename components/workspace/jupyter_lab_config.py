@@ -787,7 +787,7 @@ c.ServerApp.disable_check_xsrf = True
 
 ## Supply overrides for the tornado.web.Application that the Jupyter server uses.
 #  Default: {}
-c.ServerApp.tornado_settings = {"headers": {"Content-Security-Policy": "frame-ancestors 'self' http://localhost:2021"}}
+c.ServerApp.tornado_settings = {"headers": {"Content-Security-Policy": "frame-ancestors 'self' *"}}
 
 ## Whether to trust or not X-Scheme/X-Forwarded-Proto and X-Real-Ip/X-Forwarded-
 #  For headerssent by the upstream reverse proxy. Necessary if the proxy handles
