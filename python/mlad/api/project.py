@@ -30,10 +30,9 @@ class Project(APIBase):
         params = {'extra_labels': ','.join(extra_labels)}
         return self._get('', params=params)
 
-    def create(self, base_labels, project_yaml, extra_envs=[], credential=None):
+    def create(self, base_labels, project_yaml, credential=None):
         body = {
             'base_labels': base_labels,
-            'extra_envs': extra_envs,
             'project_yaml': project_yaml,
             'credential': credential,
         }

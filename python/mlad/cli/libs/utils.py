@@ -11,7 +11,7 @@ import subprocess
 import jwt
 import yaml
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 from functools import lru_cache
 from datetime import datetime
 from dateutil import parser
@@ -22,8 +22,9 @@ from mlad.core.libs.constants import (
     MLAD_PROJECT, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_USERNAME,
     MLAD_PROJECT_API_VERSION, MLAD_PROJECT_NAME, MLAD_PROJECT_MAINTAINER,
     MLAD_PROJECT_VERSION, MLAD_PROJECT_BASE, MLAD_PROJECT_IMAGE, MLAD_PROJECT_SESSION,
-    MLAD_PROJECT_KIND
+    MLAD_PROJECT_KIND, MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_ENV
 )
+from mlad.core.libs import utils as core_utils
 
 PROJECT_FILE_ENV_KEY = 'MLAD_PRJFILE'
 DEFAULT_PROJECT_FILE = 'mlad-project.yml'
@@ -177,7 +178,7 @@ def get_username(session):
 
 
 # Manage Project and Namespace
-def base_labels(workspace: str, session: str, project: Dict,
+def base_labels(workspace: str, session: str, project: Dict, extra_envs: List[str],
                 registry_address: str, build: bool = False):
     # workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
@@ -199,6 +200,8 @@ def base_labels(workspace: str, session: str, project: Dict,
         MLAD_PROJECT_MAINTAINER: project['maintainer'],
         MLAD_PROJECT_VERSION: str(project['version']).lower(),
         MLAD_PROJECT_BASE: basename,
+        MLAD_PROJECT_NAMESPACE: f'{basename}-cluster',
+        MLAD_PROJECT_ENV: core_utils.encode_dict(extra_envs),
         MLAD_PROJECT_IMAGE: repository,
         MLAD_PROJECT_SESSION: session,
         MLAD_PROJECT_KIND: project['kind']
@@ -227,3 +230,34 @@ def created_to_age(created: str):
     else:
         uptime = f"{uptime:.0f} seconds"
     return uptime
+
+
+def _k8s_object_to_dict(obj: Any) -> Dict:
+    ret = {}
+    attribute_map = obj.attribute_map
+    for openapi_type in obj.openapi_types:
+        value = getattr(obj, openapi_type)
+        if value is None:
+            continue
+        if isinstance(value, list):
+            ret[attribute_map[openapi_type]] = list(map(
+                lambda x: _k8s_object_to_dict(x) if hasattr(x, 'to_dict') else x,
+                value
+            ))
+        elif hasattr(value, 'to_dict'):
+            ret[attribute_map[openapi_type]] = _k8s_object_to_dict(value)
+        elif isinstance(value, dict):
+            ret[attribute_map[openapi_type]] = dict(map(
+                lambda item: (item[0], _k8s_object_to_dict(item[1]))
+                if hasattr(item[1], 'to_dict') else item,
+                value.items()
+            ))
+        else:
+            ret[attribute_map[openapi_type]] = value
+    return ret
+
+
+def dump_k8s_object_to_yaml(path: str, objs: List[Any]):
+    dicts = [_k8s_object_to_dict(obj) for obj in objs]
+    with open(path, 'w') as yaml_file:
+        yaml.dump_all(dicts, yaml_file, default_flow_style=False, sort_keys=False)

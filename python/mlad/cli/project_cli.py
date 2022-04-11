@@ -27,6 +27,15 @@ def edit(file: Optional[str]):
 
 
 @click.command()
+@click.argument('file', required=False, type=click.Path(exists=True))
+@click.argument('target-directory', required=False, default='./resources')
+def export(file: Optional[str], target_directory: Optional[str]):
+    '''Export the project file to K8s resources.'''
+    for line in project.export(file, target_directory):
+        click.echo(line)
+
+
+@click.command()
 @click.option('--no-trunc', is_flag=True, help='Don\'t truncate output.')
 @echo_exception
 def ls(no_trunc: bool):
@@ -187,6 +196,7 @@ def cli():
 
 cli.add_command(init)
 cli.add_command(edit)
+cli.add_command(export)
 cli.add_command(ls)
 cli.add_command(ps)
 cli.add_command(logs)
