@@ -311,7 +311,7 @@ def get_pod_events(pod: client.V1Pod, cli: ApiClient = DEFAULT_CLI) -> List[Dict
             for e in events if e.involved_object.name == name]
 
 
-def get_pod_info(pod: client.V1Pod) -> Dict:
+def get_pod_info(pod: client.V1Pod, cli: ApiClient = DEFAULT_CLI) -> Dict:
     pod_info = {
         'name': pod.metadata.name,
         'namespace': pod.metadata.namespace,
@@ -321,7 +321,7 @@ def get_pod_info(pod: client.V1Pod) -> Dict:
         'node': pod.spec.node_name,
         # Pending, Running, Succeeded, Failed, Unknown
         'phase': pod.status.phase,
-        'events': get_pod_events(pod),
+        'events': get_pod_events(pod, cli),
         'restart': 0
     }
 
@@ -409,7 +409,7 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
         'id': app.metadata.uid,
         'name': config_labels.get(MLAD_PROJECT_APP),
         'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
-        'task_dict': {pod.metadata.name: get_pod_info(pod) for pod in pods},
+        'task_dict': {pod.metadata.name: get_pod_info(pod, cli) for pod in pods},
         'expose': _obtain_app_expose(service, config_labels),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get(MLAD_PROJECT_APP_KIND),
@@ -1191,7 +1191,7 @@ def _filter_app_and_pod_name_tuple_from_apps(
     filtered_tuples = []
     for app_name, pod_name in selected_tuples:
         pod = api.read_namespaced_pod(name=pod_name, namespace=namespace)
-        phase = get_pod_info(pod)['phase']
+        phase = get_pod_info(pod, cli)['phase']
         if not phase == 'Pending':
             filtered_tuples.append((app_name, pod_name))
 
