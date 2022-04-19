@@ -763,7 +763,8 @@ def _create_k8s_pvc(
             api_version='v1',
             kind='PersistentVolumeClaim',
             metadata=client.V1ObjectMeta(
-                name=pvc_name
+                name=pvc_name,
+                namespace=namespace
             ),
             spec=client.V1PersistentVolumeClaimSpec(
                 access_modes=['ReadWriteMany'],
@@ -793,7 +794,7 @@ def _create_k8s_env(
     )
 
 
-def _obtain_k8s_service_for_app(expose: List[Dict], app_name: str,
+def _obtain_k8s_service_for_app(expose: List[Dict], app_name: str, namespace: str,
                                 labels: Dict[str, str]) -> client.V1Service:
     ports = set([item['port'] for item in expose])
     return client.V1Service(
@@ -801,6 +802,7 @@ def _obtain_k8s_service_for_app(expose: List[Dict], app_name: str,
         kind='Service',
         metadata=client.V1ObjectMeta(
             name=app_name,
+            namespace=namespace,
             labels=labels
         ),
         spec=client.V1ServiceSpec(
@@ -890,7 +892,7 @@ def obtain_k8s_app_resources(namespace: client.V1Namespace, base_labels: Dict[st
 
     ingress_specs = []
     if app.get('expose') is not None:
-        resources['service'] = _obtain_k8s_service_for_app(app['expose'], name, labels)
+        resources['service'] = _obtain_k8s_service_for_app(app['expose'], name, namespace_name, labels)
         for expose in app['expose']:
             port = expose['port']
             ingress = expose.get('ingress')
