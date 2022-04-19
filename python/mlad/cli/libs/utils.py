@@ -260,4 +260,4 @@ def _k8s_object_to_dict(obj: Any) -> Dict:
 def dump_k8s_object_to_yaml(path: str, objs: List[Any]):
     dicts = [_k8s_object_to_dict(obj) for obj in objs]
     with open(path, 'w') as yaml_file:
-        yaml.dump_all(dicts, yaml_file, default_flow_style=False, sort_keys=False)
+        yaml.dump_all(dicts, yaml_file, sort_keys=False)
