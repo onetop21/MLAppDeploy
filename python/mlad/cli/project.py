@@ -46,6 +46,83 @@ def init(name, version, maintainer):
         ))
 
 
+def edit(file: Optional[str]):
+    utils.process_file(file)
+    file_path = utils.get_project_file()
+    from mlad.cli.editor import run_editor
+    run_editor(file_path)
+
+
+def export(file: Optional[str], target_directory: Optional[str]):
+    utils.process_file(file)
+    config = config_core.get()
+    project = utils.get_project()
+    project_yaml = copy.deepcopy(project)
+    project_name = project['name']
+    kind = project['kind']
+    if not kind == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'deploy')
+
+    base_labels = utils.base_labels(
+        utils.get_workspace(),
+        config['session'],
+        project,
+        config_core.get_env(),
+        config_core.get_registry_address(config)
+    )
+
+    image_tag = base_labels[MLAD_PROJECT_IMAGE]
+
+    app_specs = []
+    app_dict = project.get('app', dict())
+    for name, app_spec in app_dict.items():
+        check_nvidia_plugin_installed(app_spec)
+        warning_msg = _check_config_envs(name, app_spec)
+        if warning_msg:
+            yield warning_msg
+        app_spec['name'] = name
+        app_spec = _convert_tag_only_image_prop(app_spec, image_tag)
+        if 'mounts' in app_spec:
+            yield f'In app [{name}], mounts options are ignored.'
+            del app_spec['mounts']
+        app_specs.append(app_spec)
+
+    _validate_depends(app_specs)
+
+    # Create a project
+    credential = docker_ctlr.obtain_credential()
+
+    from mlad.core.kubernetes import controller as ctlr
+
+    Path(target_directory).mkdir(exist_ok=True, parents=True)
+    base_export_path = f'{target_directory}/{project_name}-base.yml'
+    yield f'Export project relevant resources in {base_export_path}'
+    namespace = ctlr.obtain_k8s_namespace(base_labels, project_yaml)
+    project_docker_secret = ctlr.obtain_docker_k8s_secret(base_labels, credential)
+    project_config_map = ctlr.obtain_k8s_config_map('project-labels', base_labels)
+    utils.dump_k8s_object_to_yaml(base_export_path, [
+        namespace,
+        project_docker_secret,
+        project_config_map
+    ])
+    for app_spec in app_specs:
+        app_name = app_spec['name']
+        resources = ctlr.obtain_k8s_app_resources(
+            namespace, base_labels, app_name, app_spec)
+        objs = [resources['configmap']]
+        if 'service' in resources:
+            objs.append(resources['service'])
+        if 'job' in resources:
+            objs.append(resources['job'])
+        if 'deployment' in resources:
+            objs.append(resources['deployment'])
+
+        objs = objs + resources['pv'] + resources['pvc'] + resources['ingress']
+        app_export_path = f'{target_directory}/{project_name}-{app_name}.yml'
+        yield f'Export app resources [{app_name}] in {app_export_path}.'
+        utils.dump_k8s_object_to_yaml(app_export_path, objs)
+
+
 def ls(no_trunc: bool):
     projects = {}
     project_specs = API.project.get()
@@ -210,13 +287,6 @@ def ingress():
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
 
-def edit(file: Optional[str]):
-    utils.process_file(file)
-    file_path = utils.get_project_file()
-    from mlad.cli.editor import run_editor
-    run_editor(file_path)
-
-
 def check_nvidia_plugin_installed(app_spec: dict):
     if 'quota' in app_spec and 'gpu' in app_spec['quota']:
         nvidia_running = API.check.check_nvidia_device_plugin()
@@ -240,6 +310,7 @@ def up(file: Optional[str]):
         utils.get_workspace(),
         config['session'],
         project,
+        config_core.get_env(),
         config_core.get_registry_address(config)
     )
 
@@ -281,9 +352,7 @@ def up(file: Optional[str]):
     # Create a project
     yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()
-    extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, origin_project, extra_envs,
-                               credential=credential)
+    lines = API.project.create(base_labels, origin_project, credential=credential)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])
@@ -469,6 +538,7 @@ def run(file: Optional[str], env: Dict[str, str], quota: Dict[str, str], command
         utils.get_workspace(),
         config['session'],
         project,
+        config_core.get_env(),
         config_core.get_registry_address(config)
     )
     project_key = base_labels[MLAD_PROJECT]
@@ -499,9 +569,7 @@ def run(file: Optional[str], env: Dict[str, str], quota: Dict[str, str], command
     yield 'Deploy job-1 to the cluster...'
     try:
         credential = docker_ctlr.obtain_credential()
-        extra_envs = config_core.get_env()
-        lines = API.project.create(base_labels, origin_project, extra_envs,
-                                   credential=credential)
+        lines = API.project.create(base_labels, origin_project, credential=credential)
         for line in lines:
             if 'stream' in line:
                 sys.stdout.write(line['stream'])
@@ -573,6 +641,7 @@ def update(file: Optional[str], project_key: Optional[str]):
         utils.get_workspace(),
         config['session'],
         project,
+        config_core.get_env(),
         config_core.get_registry_address(config)
     )
     image_tag = base_labels[MLAD_PROJECT_IMAGE]

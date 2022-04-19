@@ -27,12 +27,11 @@ def _check_session_key(namespace, session):
 @router.post("/project")
 def create_project(req: project.CreateRequest, session: str = Header(None)):
     base_labels = req.base_labels
-    extra_envs = req.extra_envs
     credential = req.credential
     project_yaml = req.project_yaml
 
     try:
-        res = ctlr.create_k8s_namespace_with_data(base_labels, extra_envs, project_yaml, credential)
+        res = ctlr.create_k8s_namespace_with_data(base_labels, project_yaml, credential)
         return DictStreamingResponse(res)
     except TypeError as e:
         raise HTTPException(status_code=500, detail=exception_detail(e))
