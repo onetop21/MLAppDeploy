@@ -14,14 +14,14 @@ from .model import ComponentDeleteRequestModel, ComponentPostRequestModel
 from .db import DBClient
 
 # os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:30547/beta'
-# os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:8441'
+# os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:8440'
 # os.environ['MLAD_SESSION'] = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiam9vb25ob2UiLCJob3N0bmFtZSI6Impvb29uaG9lLU1TLTdCMjMiLCJ1dWlkIjoiYzY3ZDAzYzUtODQ1Mi00ZTliLWI4ZGUtYTg2NmQ5ZTBlNWRjIn0.DWj8Y_xQO6167rRyBgYrNVVaHzq6xDIqCNp458HkKsc'
 
 app = FastAPI()
 address = f'{os.environ["MLAD_ADDRESS"]}/api/v1'
 headers = {
     'session': os.environ['MLAD_SESSION'],
-    'version': '0.4.1'
+    'version': '0.4.3'
 }
 db_client = DBClient()
 
@@ -44,18 +44,25 @@ async def request_nodes(_, session: aiohttp.ClientSession):
     async with session.get(f'{address}/node/resource', headers=headers) as resp:
         resp.raise_for_status()
         resource_dict = await resp.json()
+
+    resource_dict_by_session = defaultdict(lambda: {})
+    async with session.get(f'{address}/node/resource/session', headers=headers) as resp:
+        resp.raise_for_status()
+        resource_dict_by_session.update(await resp.json())
     for node in nodes:
         name = node['hostname']
         ret.append({
             **node,
             'metrics': [{
                 'type': k,
+                'request': v['request'],
                 'capacity': v['capacity'],
                 'used': v['used'],
                 'free': v['allocatable']
-            } for k, v in resource_dict[name].items()]
+            } for k, v in resource_dict[name].items()],
+            'requests_by_session': resource_dict_by_session[name]
         })
-    return ret
+    return sorted(ret, key=lambda x: x['hostname'])
 
 
 async def request_projects(_, session: aiohttp.ClientSession):

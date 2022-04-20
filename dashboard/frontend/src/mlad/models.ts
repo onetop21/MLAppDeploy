@@ -1,11 +1,13 @@
 export class Metric {
 	type: string;
+    request: number;
 	capacity: number;
 	used: number | string;
 	free: number;
 
 	constructor(raw: any) {
 		this.type = this.parseType(raw['type']);
+        this.request = raw['request'];
 		this.capacity = raw['capacity'];
 		this.used = raw['used'];
 		this.free = raw['free'];
@@ -43,7 +45,7 @@ export class Metric {
 	}
 
 	get capacityText() {
-		return this.capacity.toFixed(0);
+		return `${this.request.toFixed(1)}/${this.capacity.toFixed(1)}`;
 	}
 
 	get usedText() {
@@ -51,6 +53,26 @@ export class Metric {
 			? this.used
 			: (this.used as number).toFixed(2);
 	}
+}
+
+
+export class RequestBySession {
+    name: string;
+    cpu: number;
+    gpu: number;
+    mem: number;
+
+
+    constructor(name: string, raw: any) {
+        this.name = name;
+        this.cpu = raw['cpu'];
+        this.gpu = raw['gpu'];
+        this.mem = raw['mem']
+    }
+
+    get text(): string {
+        return `CPU: ${this.cpu}, GPU: ${this.gpu}, Memory: ${this.mem}`;
+    }
 }
 
 export class Node {
@@ -62,6 +84,7 @@ export class Node {
 	engine: string;
 	labels: string[];
 	metrics: Metric[];
+    requestsBySession: RequestBySession[];
 
 	constructor(raw: any)	{
 		this.id = raw['id'];
@@ -75,6 +98,9 @@ export class Node {
 		this.metrics = (raw['metrics'] as any[])
 			.map(m => new Metric(m))
 			.sort((a, b) => a.type.localeCompare(b.type));
+        console.log(raw);
+        this.requestsBySession = Object.entries(raw['requests_by_session'])
+            .map(([key, value]) => new RequestBySession(key, value));
 	}
 
 	static getColumns() {
