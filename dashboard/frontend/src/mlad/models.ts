@@ -98,7 +98,6 @@ export class Node {
 		this.metrics = (raw['metrics'] as any[])
 			.map(m => new Metric(m))
 			.sort((a, b) => a.type.localeCompare(b.type));
-        console.log(raw);
         this.requestsBySession = Object.entries(raw['requests_by_session'])
             .map(([key, value]) => new RequestBySession(key, value));
 	}
