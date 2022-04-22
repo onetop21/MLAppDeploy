@@ -25,6 +25,7 @@ class Mount(BaseModel):
     server: str
     serverPath: str
     options: Optional[List[str]]
+    readOnly: bool
 
 
 class Dependency(BaseModel):
