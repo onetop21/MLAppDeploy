@@ -1,0 +1,17 @@
+{{- $name := print (include "mlappdeploy.fullname" .) "-quota-config" -}}
+{{- $configmap := (lookup "v1" "ConfigMap" .Release.Namespace $name) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "mlappdeploy.labels" . | nindent 4 }}
+{{- if not $configmap }}
+data:
+  default.cpu: {{ quote .Values.sessionQuota.default.cpu }}
+  default.gpu: {{ quote .Values.sessionQuota.default.gpu }}
+  default.mem: {{ quote .Values.sessionQuota.default.mem }}
+{{ else }}
+data:
+  {{- toYaml $configmap.data | nindent 2 }}
+{{- end }}

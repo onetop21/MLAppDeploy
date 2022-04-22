@@ -126,3 +126,9 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+sessionQuota:
+  default:
+    cpu: 16
+    gpu: 4
+    mem: 64Gi
