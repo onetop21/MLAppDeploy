@@ -12,7 +12,8 @@ from typing import List
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, ComponentImageNotExistError,
-    MLADBoardAlreadyActivatedError, CannotBuildComponentError
+    MLADBoardAlreadyActivatedError, CannotBuildComponentError,
+    MLADBoardNoDatabaseError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
@@ -58,12 +59,17 @@ def activate(image_repository: str):
     if group.group('DEV'):
         image_repository = f"{group.group(1)}:latest"
 
+    # Check DB_DATABASE in config.
+    env = config_core.get_env()
+    if not dict([_.split('=') for _ in env]).get('DB_ADDRESS'):
+        raise MLADBoardNoDatabaseError
+
     cli.containers.run(
         image_repository,
         environment=[
             f'MLAD_ADDRESS={config_core.obtain_server_address(config)}',
             f'MLAD_SESSION={config["session"]}',
-        ] + config_core.get_env(),
+        ] + env,
         name='mlad-board',
         ports={'2021/tcp': '2021'},
         labels=['MLAD_BOARD'],
