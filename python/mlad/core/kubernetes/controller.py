@@ -7,6 +7,8 @@ from typing import Union, List, Dict, Optional, Tuple, Generator, Any
 from collections import defaultdict
 from pathlib import Path
 
+import jwt
+
 from kubernetes import client, config, watch
 from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
@@ -909,11 +911,11 @@ def obtain_k8s_app_resources(namespace: client.V1Namespace, base_labels: Dict[st
     return resources
 
 
-def create_apps(namespace: client.V1Namespace, apps: Dict, cli: ApiClient = DEFAULT_CLI) -> List[App]:
+def create_apps(namespace: client.V1Namespace, app_dict: Dict, cli: ApiClient = DEFAULT_CLI) -> List[App]:
     instances = []
     config_labels = _get_k8s_config_map_data(namespace, 'project-labels', cli)
     namespace_name = namespace.metadata.name
-    for name, app in apps.items():
+    for name, app in app_dict.items():
         resources = obtain_k8s_app_resources(namespace, config_labels, name, app)
         api = client.CoreV1Api(cli)
         api.create_namespaced_config_map(namespace_name, resources['configmap'])
@@ -1533,3 +1535,34 @@ def get_project_resources(
         return project_result
     elif group_by == 'app':
         return result
+
+
+def set_default_session_quota(cpu: float, gpu: int, mem: str, cli: ApiClient = DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    name = 'mlad-api-server-quota-config'
+    configmap: client.V1ConfigMap = api.read_namespaced_config_map(name, 'mlad')
+    configmap.data.update({
+        'default.cpu': str(cpu),
+        'default.gpu': str(gpu),
+        'default.mem': mem
+    })
+
+    api.patch_namespaced_config_map(name, 'mlad', configmap)
+
+
+def set_session_quota(session: str, cpu: float, gpu: int, mem: str, cli: ApiClient = DEFAULT_CLI):
+
+    payload = jwt.decode(session, 'mlad', algorithms=['HS256'])
+    username = payload['user']
+    hostname = payload['hostname']
+
+    api = client.CoreV1Api(cli)
+    name = 'mlad-api-server-quota-config'
+    configmap: client.V1ConfigMap = api.read_namespaced_config_map(name, 'mlad')
+    configmap.data.update({
+        f'{username}.{hostname}.cpu': str(cpu),
+        f'{username}.{hostname}.gpu': str(gpu),
+        f'{username}.{hostname}.mem': mem
+    })
+
+    api.patch_namespaced_config_map(name, 'mlad', configmap)
