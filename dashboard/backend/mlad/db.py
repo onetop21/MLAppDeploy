@@ -9,7 +9,9 @@ from .model import ComponentPostModel
 
 
 class DBClient:
-
+    '''
+    Component 설치에 관한 메타데이터를 관리하기 위한 client
+    '''
     def __init__(self):
         self.client = MongoClient(self._get_url())
 

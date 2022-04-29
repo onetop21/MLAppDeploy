@@ -33,6 +33,7 @@ async def _request_resources(key: str, session: aiohttp.ClientSession, group_by:
         return await resp.json()
 
 
+# dashbaord의 node tab에서 보여줄 정보 반환하는 함수
 async def request_nodes(_, session: aiohttp.ClientSession):
     ret = []
     nodes = []
@@ -58,6 +59,7 @@ async def request_nodes(_, session: aiohttp.ClientSession):
     return ret
 
 
+# dashboard에서 project tab에서 보여주는 project 목록 정보를 반환하는 함수
 async def request_projects(_, session: aiohttp.ClientSession):
     ret = []
     projects = []
@@ -108,6 +110,7 @@ def get_components(_):
     return db_client.get_components()
 
 
+# project tab에서 project detail 화면을 보여주기 위한 함수
 async def request_project_detail(data: str, session: aiohttp.ClientSession):
     data = json.loads(data)
     if len(data) == 0:
