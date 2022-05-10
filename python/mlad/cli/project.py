@@ -450,7 +450,7 @@ def _dump_logs(app_name: str, project_key: str, dirpath: Path):
     path = dirpath / f'{app_name}.log'
     with open(path, 'w') as log_file:
         try:
-            logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
+            logs = API.project.log(project_key, timestamps=True, filters=[app_name])
             for log in logs:
                 log = _format_log(log, pretty=False) + '\n'
                 log_file.write(log)
