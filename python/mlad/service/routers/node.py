@@ -42,3 +42,13 @@ def node_resource(names: List[str] = Query(None), no_trunc: bool = Query(True)):
         logger.error(e)
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))
+
+
+@router.get('/node/resource/session')
+def send_node_resource_by_session():
+    try:
+        return ctlr.obtain_resources_by_session()
+    except Exception as e:
+        logger.error(e)
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=exception_detail(e))
