@@ -1,5 +1,5 @@
 import React from 'react';
-import { Metric } from './models';
+import { Metric, RequestBySession } from './models';
 
 import { Table, Typography } from 'antd';
 import styles from './mlad.module.css';
@@ -9,9 +9,10 @@ const { Title } = Typography;
 interface ExpandedRowProps {
 	labels: string[];
 	metrics: Metric[];
+  requestsBySession: RequestBySession[];
 };
 
-export default function ExpandedRow({ labels, metrics }: ExpandedRowProps) {
+export default function ExpandedRow({ labels, metrics, requestsBySession }: ExpandedRowProps) {
 	return (
 		<div className={styles.expandedRow}>
 			<div>
@@ -27,6 +28,16 @@ export default function ExpandedRow({ labels, metrics }: ExpandedRowProps) {
 					rowKey='type'
 					columns={Metric.getColumns()}
 					pagination={false} />
+        {requestsBySession.length > 0 ?
+          <Title level={5} style={{marginTop: '1rem'}}>Requests by Session</Title> :
+          <></>
+        }
+        {requestsBySession.map(request =>
+          <div style={{display: 'flex', justifyContent: 'space-between'}}>
+            <div style={{color: '#555'}}><strong>{request.name}</strong></div>
+            <div>{request.text}</div>
+          </div>
+        )}
 			</div>
 		</div>
 	);
