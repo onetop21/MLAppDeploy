@@ -488,11 +488,13 @@ def _convert_mounts_to_k8s_volume(
     for pvc_spec in pvc_specs:
         name = pvc_spec['name']
         mount_path = pvc_spec['mountPath']
+        read_only = pvc_spec['readOnly']
         volume_name = f'{name}-vol'
         _mounts.append(
             client.V1VolumeMount(
                 name=volume_name,
-                mount_path=mount_path
+                mount_path=mount_path,
+                read_only=read_only
             )
         )
         _volumes.append(
@@ -823,7 +825,8 @@ def obtain_k8s_app_resources(namespace: client.V1Namespace, base_labels: Dict[st
         resources['pvc'].append(pvc)
         pvc_specs.append({
             'name': pvc.metadata.name,
-            'mountPath': pv_mount['mountPath']
+            'mountPath': pv_mount['mountPath'],
+            'readOnly': pv_mount['readOnly']
         })
 
     if kind == 'Job':
