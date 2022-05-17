@@ -6,7 +6,9 @@ import ProjectDetailListItem from './ProjectDetailListItem';
 interface ExposeItemProps {
   exposes: Expose[];
 }
-
+/**
+ * TaskView에서 expose 정보를 나타내기 위한 view
+ */
 export default function ExposeItem({ exposes }: ExposeItemProps) {
   return <>
     <ProjectDetailListItem name='Expose' value='' />

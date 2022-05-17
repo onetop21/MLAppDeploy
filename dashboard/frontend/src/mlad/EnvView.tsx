@@ -3,7 +3,9 @@ import React from 'react';
 interface EnvViewProps {
 	env: {name: string, value: string}[];
 };
-
+/**
+ * 환경 변수를 표기하는 view 
+ */
 export default function EnvView({ env }: EnvViewProps) {
 	return <div>
 		{env.map(e => {

@@ -12,6 +12,9 @@ interface ExpandedRowProps {
   requestsBySession: RequestBySession[];
 };
 
+/**
+ * Node 정보를 보여주는 table에서 collapse를 열었을 때 보여주는 view 
+ */
 export default function ExpandedRow({ labels, metrics, requestsBySession }: ExpandedRowProps) {
 	return (
 		<div className={styles.expandedRow}>
