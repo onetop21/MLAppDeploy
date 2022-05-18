@@ -201,6 +201,8 @@ def uninstall(name: str) -> None:
             'name': name
         })
         res.raise_for_status()
+    except requests.exceptions.HTTPError:
+        raise ComponentInstallError(res.json().get('detail', ''))
     except requests.ConnectionError:
         raise MLADBoardConnectionRefusedError
 
