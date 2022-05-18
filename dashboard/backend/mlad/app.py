@@ -33,7 +33,7 @@ async def _request_resources(key: str, session: aiohttp.ClientSession, group_by:
         return await resp.json()
 
 
-# dashbaord의 node tab에서 보여줄 정보 반환하는 함수
+# dashboard의 node tab에서 보여줄 정보 반환하는 함수
 async def request_nodes(_, session: aiohttp.ClientSession):
     ret = []
     nodes = []

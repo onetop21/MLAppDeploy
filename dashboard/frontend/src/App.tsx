@@ -37,6 +37,7 @@ class BoardComponent {
 	}
 };
 
+// baseurl 정보에 어디에서든 접근 할 수 있게 context 객체를 제공
 export const GlobalContext = React.createContext<{
 	baseurl: string
 }>({ baseurl: `ws://${window.location.host}/mlad`});
@@ -50,6 +51,7 @@ function App() {
   const [collapsed, setCollapsed] = useState(false);
 	const context = useContext(GlobalContext);
 	const url = `${context.baseurl}/components`;
+	// useFetchSocket이라는 hooks를 통하여 실시간으로 데이터를 계속 받아옴
 	const { data: components } = useFetchSocket<BoardComponent>(url, BoardComponent);
 
   return (
