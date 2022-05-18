@@ -96,7 +96,7 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
     tarbytes = io.BytesIO()
     dockerfile_info = tarfile.TarInfo('.dockerfile')
     dockerfile_info.size = len(payload)
-    with tarfile.open(fileobj=tarbytes, mode='w:gz') as tar:
+    with tarfile.open(fileobj=tarbytes, mode='w') as tar:
         for name, arcname in _get_arcfiles(project['workdir'], workspace['ignores']):
             tar.add(name, arcname)
         tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
