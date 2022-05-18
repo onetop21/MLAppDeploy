@@ -104,6 +104,12 @@ class MLADBoardNotActivatedError(MLADException):
         return 'The MLAD dashboard is not activated.'
 
 
+class MLADBoardConnectionRefusedError(MLADException):
+
+    def __str__(self):
+        return 'Cannot connect to the MLAD board.'
+
+
 class MLADBoardAlreadyActivatedError(MLADException):
 
     def __str__(self):

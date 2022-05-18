@@ -12,7 +12,8 @@ from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, ComponentImageNotExistError,
     MLADBoardAlreadyActivatedError, CannotBuildComponentError,
-    MLADBoardImageNotFoundError, ComponentInstallError
+    MLADBoardImageNotFoundError, ComponentInstallError,
+    MLADBoardConnectionRefusedError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
@@ -170,15 +171,19 @@ def install(file_path: str, no_build: bool):
             'hosts': [f'{host_ip}:{p}' for p in ports]
         })
 
-        res = requests.post(f'{host_ip}:2021/mlad/component', json={
-            'components': component_specs
-        })
         try:
+            res = requests.post(f'{host_ip}:2021/mlad/component', json={
+                'components': component_specs
+            })
             res.raise_for_status()
         except requests.exceptions.HTTPError:
             container.stop()
             container.remove()
             raise ComponentInstallError(res.json().get('detail', ''))
+        except requests.ConnectionError:
+            container.stop()
+            container.remove()
+            raise MLADBoardConnectionRefusedError
 
     yield 'The component installation is complete.'
 
@@ -191,10 +196,13 @@ def uninstall(name: str) -> None:
         raise MLADBoardNotActivatedError
 
     host_ip = _obtain_host()
-    res = requests.delete(f'{host_ip}:2021/mlad/component', json={
-        'name': name
-    })
-    res.raise_for_status()
+    try:
+        res = requests.delete(f'{host_ip}:2021/mlad/component', json={
+            'name': name
+        })
+        res.raise_for_status()
+    except requests.ConnectionError:
+        raise MLADBoardConnectionRefusedError
 
     containers = cli.containers.list(filters={
         'label': f'COMPONENT_NAME={name}'
