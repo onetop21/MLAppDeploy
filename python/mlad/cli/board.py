@@ -6,11 +6,13 @@ import requests
 from requests.exceptions import ConnectionError
 
 from docker.types import Mount
+from docker.errors import APIError
 from typing import List
 from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, ComponentImageNotExistError,
-    MLADBoardAlreadyActivatedError, CannotBuildComponentError
+    MLADBoardAlreadyActivatedError, CannotBuildComponentError,
+    MLADBoardImageNotFoundError, ComponentInstallError
 )
 from mlad.cli import image as image_core
 from mlad.cli.libs import utils
@@ -51,16 +53,19 @@ def activate(image_repository: str):
 
     yield 'Activating MLAD board.'
 
-    cli.containers.run(
-        image_repository,
-        environment=[
-            f'MLAD_ADDRESS={config_core.obtain_server_address(config)}',
-            f'MLAD_SESSION={config["session"]}',
-        ] + config_core.get_env(),
-        name='mlad-board',
-        ports={'2021/tcp': '2021'},
-        labels=['MLAD_BOARD'],
-        detach=True)
+    try:
+        cli.containers.run(
+            image_repository,
+            environment=[
+                f'MLAD_ADDRESS={config_core.obtain_server_address(config)}',
+                f'MLAD_SESSION={config["session"]}',
+            ] + config_core.get_env(),
+            name='mlad-board',
+            ports={'2021/tcp': '2021'},
+            labels=['MLAD_BOARD'],
+            detach=True)
+    except APIError:
+        raise MLADBoardImageNotFoundError(image_repository)
 
     host_ip = _obtain_host()
     yield 'Successfully activate MLAD board.'
@@ -105,7 +110,7 @@ def install(file_path: str, no_build: bool):
 
     try:
         with open(file_path, 'r') as component_file:
-            spec = yaml.load(component_file)
+            spec = yaml.load(component_file, Loader=yaml.FullLoader)
     except Exception:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
 
@@ -148,7 +153,7 @@ def install(file_path: str, no_build: bool):
             'APP_NAME': app_name
         }
         yield f'Run the container [{app_name}]'
-        cli.containers.run(
+        container = cli.containers.run(
             image.tags[-1],
             environment=env,
             name=f'{spec["name"]}-{app_name}',
@@ -168,7 +173,12 @@ def install(file_path: str, no_build: bool):
         res = requests.post(f'{host_ip}:2021/mlad/component', json={
             'components': component_specs
         })
-        res.raise_for_status()
+        try:
+            res.raise_for_status()
+        except requests.exceptions.HTTPError:
+            container.stop()
+            container.remove()
+            raise ComponentInstallError(res.json().get('detail', ''))
 
     yield 'The component installation is complete.'
 
@@ -200,14 +210,15 @@ def uninstall(name: str) -> None:
 
 def status(no_print: bool = False):
     cli = get_cli()
-    is_board_active = True
-
     try:
-        cli.containers.get('mlad-board')
-    except docker.errors.NotFound:
-        is_board_active = False
+        board_container = cli.containers.get('mlad-board')
+        yield 'MLAD board is ["active"].'
+        if board_container.status == 'exited':
+            yield 'But, the container is exited because of:'
+            yield board_container.logs()
 
-    yield f'MLAD board is [{"active" if is_board_active else "inactive"}].'
+    except docker.errors.NotFound:
+        yield 'MLAD board is ["inactive"].'
 
     containers = cli.containers.list(filters={
         'label': 'MLAD_BOARD'
