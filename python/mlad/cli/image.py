@@ -102,19 +102,19 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
                 tar.add(name, arcname)
             tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
 
-    # Build Image
-    with open(f'{tmpdir}/context.tar', 'rb') as tf:
-        build_output = ctlr.build_image(base_labels, tf, dockerfile_info.name,
-                                        no_cache, pull, stream=True)
+        # Build Image
+        with open(f'{tmpdir}/context.tar', 'rb') as tf:
+            build_output = ctlr.build_image(base_labels, tf, dockerfile_info.name,
+                                            no_cache, pull, stream=True)
 
-        # Print build output
-        for _ in build_output:
-            if 'error' in _:
-                sys.stderr.write(f"{_['error']}\n")
-                sys.exit(1)
-            elif 'stream' in _:
-                if not quiet:
-                    sys.stdout.write(_['stream'])
+            # Print build output
+            for _ in build_output:
+                if 'error' in _:
+                    sys.stderr.write(f"{_['error']}\n")
+                    sys.exit(1)
+                elif 'stream' in _:
+                    if not quiet:
+                        sys.stdout.write(_['stream'])
 
     image = ctlr.get_image(repository)
 
