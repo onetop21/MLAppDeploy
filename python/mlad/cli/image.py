@@ -1,6 +1,7 @@
 import sys
 import os
 import io
+import tempfile
 import fnmatch
 import tarfile
 
@@ -93,27 +94,27 @@ def build(file: Optional[str], quiet: bool, no_cache: bool, pull: bool, push: bo
         else:
             payload = workspace['buildscript']
 
-    tarbytes = io.BytesIO()
-    dockerfile_info = tarfile.TarInfo('.dockerfile')
-    dockerfile_info.size = len(payload)
-    with tarfile.open(fileobj=tarbytes, mode='w') as tar:
-        for name, arcname in _get_arcfiles(project['workdir'], workspace['ignores']):
-            tar.add(name, arcname)
-        tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
-    tarbytes.seek(0)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dockerfile_info = tarfile.TarInfo('.dockerfile')
+        dockerfile_info.size = len(payload)
+        with tarfile.open(f'{tmpdir}/context.tar', mode='w') as tar:
+            for name, arcname in _get_arcfiles(project['workdir'], workspace['ignores']):
+                tar.add(name, arcname)
+            tar.addfile(dockerfile_info, io.BytesIO(payload.encode()))
 
     # Build Image
-    build_output = ctlr.build_image(base_labels, tarbytes, dockerfile_info.name,
-                                    no_cache, pull, stream=True)
+    with open(f'{tmpdir}/context.tar', 'rb') as tf:
+        build_output = ctlr.build_image(base_labels, tf, dockerfile_info.name,
+                                        no_cache, pull, stream=True)
 
-    # Print build output
-    for _ in build_output:
-        if 'error' in _:
-            sys.stderr.write(f"{_['error']}\n")
-            sys.exit(1)
-        elif 'stream' in _:
-            if not quiet:
-                sys.stdout.write(_['stream'])
+        # Print build output
+        for _ in build_output:
+            if 'error' in _:
+                sys.stderr.write(f"{_['error']}\n")
+                sys.exit(1)
+            elif 'stream' in _:
+                if not quiet:
+                    sys.stdout.write(_['stream'])
 
     image = ctlr.get_image(repository)
 
