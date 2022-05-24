@@ -7,7 +7,7 @@ import aiohttp
 from typing import Callable
 from collections import defaultdict
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, HTTPException, WebSocket
 from starlette.websockets import WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 from .model import ComponentDeleteRequestModel, ComponentPostRequestModel
@@ -33,7 +33,7 @@ async def _request_resources(key: str, session: aiohttp.ClientSession, group_by:
         return await resp.json()
 
 
-# dashbaord의 node tab에서 보여줄 정보 반환하는 함수
+# dashboard의 node tab에서 보여줄 정보 반환하는 함수
 async def request_nodes(_, session: aiohttp.ClientSession):
     ret = []
     nodes = []
@@ -114,7 +114,10 @@ async def request_projects(_, session: aiohttp.ClientSession):
 
 
 def get_components(_):
-    return db_client.get_components()
+    try:
+        return db_client.get_components()
+    except Exception:
+        raise HTTPException(500, detail='DB Connection is refused')
 
 
 # project tab에서 project detail 화면을 보여주기 위한 함수
@@ -145,7 +148,10 @@ async def request_project_detail(data: str, session: aiohttp.ClientSession):
 
 @app.post('/component')
 def run_components(req: ComponentPostRequestModel):
-    db_client.run_component(req.components)
+    try:
+        db_client.run_component(req.components)
+    except Exception:
+        raise HTTPException(500, detail='DB connection is refused.')
     return {
         'message': 'Successfully run components'
     }
@@ -153,7 +159,10 @@ def run_components(req: ComponentPostRequestModel):
 
 @app.delete('/component')
 def delete_components(req: ComponentDeleteRequestModel):
-    db_client.delete_component(req.name)
+    try:
+        db_client.delete_component(req.name)
+    except Exception:
+        raise HTTPException(500, detail='DB connection is refused.')
     return {
         'message': f'Successfully delete component [{req.name}]'
     }

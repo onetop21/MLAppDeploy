@@ -1,6 +1,6 @@
 import os
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pymongo import MongoClient
 from .model import ComponentPostModel
 
@@ -12,8 +12,12 @@ class DBClient:
     '''
     Component 설치에 관한 메타데이터를 관리하기 위한 client
     '''
+    client: Optional[MongoClient]
+
     def __init__(self):
-        self.client = MongoClient(self._get_url())
+        self.client = MongoClient(
+            self._get_url(), connectTimeoutMS=2000, serverSelectionTimeoutMS=2000)
+        self.client.server_info()
 
     def _get_url(self):
         address = os.environ['DB_ADDRESS']
