@@ -104,10 +104,25 @@ class MLADBoardNotActivatedError(MLADException):
         return 'The MLAD dashboard is not activated.'
 
 
+class MLADBoardConnectionRefusedError(MLADException):
+
+    def __str__(self):
+        return 'Cannot connect to the MLAD board.'
+
+
 class MLADBoardAlreadyActivatedError(MLADException):
 
     def __str__(self):
         return 'The MLAD dashboard is already activated at localhost:2021.'
+
+
+class MLADBoardImageNotFoundError(MLADException):
+
+    def __init__(self, repository):
+        self.repository = repository
+
+    def __str__(self):
+        return f'No such image: {self.repository}.'
 
 
 class ComponentImageNotExistError(MLADException):
@@ -117,6 +132,15 @@ class ComponentImageNotExistError(MLADException):
 
     def __str__(self):
         return f'The component [{self.name}] image does not exist.'
+
+
+class ComponentInstallError(MLADException):
+
+    def __init__(self, detail):
+        self.detail = detail
+
+    def __str__(self):
+        return self.detail
 
 
 class CannotBuildComponentError(MLADException):

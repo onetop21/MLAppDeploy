@@ -10,6 +10,9 @@ interface ProjectListProps {
 	setRequestData: Function;
 }
 
+/**
+ * Projects 탭에서 project 목록을 보여주기 위한 view 
+ */
 export default function ProjectList({ projects, projectSpec, setRequestData }: ProjectListProps) {
 
 	const [detailVisible, setDetailVisible] = useState(false);

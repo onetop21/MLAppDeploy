@@ -19,7 +19,7 @@ from dateutil import parser
 from yaml.parser import ParserError
 from mlad.cli.exceptions import ProjectLoadError
 from mlad.core.libs.constants import (
-    MLAD_PROJECT, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_USERNAME,
+    MLAD_PROJECT, MLAD_PROJECT_HOSTNAME, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_USERNAME,
     MLAD_PROJECT_API_VERSION, MLAD_PROJECT_NAME, MLAD_PROJECT_MAINTAINER,
     MLAD_PROJECT_VERSION, MLAD_PROJECT_BASE, MLAD_PROJECT_IMAGE, MLAD_PROJECT_SESSION,
     MLAD_PROJECT_KIND, MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_ENV
@@ -177,12 +177,22 @@ def get_username(session):
         raise RuntimeError("Session key is invalid.")
 
 
+@lru_cache(maxsize=None)
+def get_hostname(session):
+    decoded = jwt.decode(session, "mlad", algorithms="HS256")
+    if decoded["hostname"]:
+        return decoded["hostname"]
+    else:
+        raise RuntimeError("Session key is invalid.")
+
+
 # Manage Project and Namespace
 def base_labels(workspace: str, session: str, project: Dict, extra_envs: List[str],
                 registry_address: str, build: bool = False):
     # workspace = f"{hostname}:{workspace}"
     # Server Side Config 에서 가져올 수 있는건 직접 가져온다.
     username = get_username(session)
+    hostname = get_hostname(session)
     key = workspace_key(workspace=workspace)
     kind = project['kind']
     version = str(project['version']).lower()
@@ -195,6 +205,7 @@ def base_labels(workspace: str, session: str, project: Dict, extra_envs: List[st
         MLAD_PROJECT: key,
         MLAD_PROJECT_WORKSPACE: workspace,
         MLAD_PROJECT_USERNAME: username,
+        MLAD_PROJECT_HOSTNAME: hostname,
         MLAD_PROJECT_API_VERSION: project['apiVersion'],
         MLAD_PROJECT_NAME: project['name'].lower(),
         MLAD_PROJECT_MAINTAINER: project['maintainer'],

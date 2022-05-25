@@ -18,6 +18,7 @@ export default function useFetchSocket<T>(url: string, schema: { new (args: any)
 			const raw = JSON.parse(data);
 			const code = raw['status_code'];
 			if (code === 200) {
+				// 데이터가 array인 경우 schema로 지정된 객체를 array로 생성
 				if (Array.isArray(raw['data'])) {
 					setData((raw['data'] as any[]).map((d: any) => new schema(d)));
 				} else {
@@ -30,7 +31,8 @@ export default function useFetchSocket<T>(url: string, schema: { new (args: any)
 
 		ws.onclose = () => { connected = false; }
 		ws.onerror = () => { connected = false; }
-
+		
+		// 연결이 끊키면 5초 마다 다시 connection을 요청함
 		const reconnectionInterval = setInterval(() => {
 			if (!connected) {
 				setConnCounter(c => c + 1);
@@ -39,6 +41,8 @@ export default function useFetchSocket<T>(url: string, schema: { new (args: any)
 
 		const messageInterval = setInterval(() => {
 			if (connected) {
+				// 대부분 빈 객체를 requestData로 보내지만 project detail인 경우에는
+				// project key를 담아서 보낸다. 
 				ws.send(JSON.stringify(requestData));
 			}
 		}, 1000);

@@ -20,8 +20,8 @@ from mlad.core.exceptions import (
 )
 from mlad.core.libs import utils
 from mlad.core.libs.constants import (
-    CONFIG_ENVS, MLAD_PROJECT, MLAD_PROJECT_APP, MLAD_PROJECT_APP_KIND, MLAD_PROJECT_BASE,
-    MLAD_PROJECT_ENV, MLAD_PROJECT_IMAGE, MLAD_PROJECT_INGRESS, MLAD_PROJECT_KIND,
+    CONFIG_ENVS, MLAD_PROJECT, MLAD_PROJECT_API_VERSION, MLAD_PROJECT_APP, MLAD_PROJECT_APP_KIND, MLAD_PROJECT_BASE,
+    MLAD_PROJECT_ENV, MLAD_PROJECT_HOSTNAME, MLAD_PROJECT_IMAGE, MLAD_PROJECT_INGRESS, MLAD_PROJECT_KIND,
     MLAD_PROJECT_NAME, MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_SESSION,
     MLAD_PROJECT_USERNAME, MLAD_PROJECT_VERSION, MLAD_PROJECT_YAML
 )
@@ -149,8 +149,11 @@ def obtain_k8s_namespace(base_labels: Dict[str, str], project_yaml: Dict) -> cli
     basename = base_labels[MLAD_PROJECT_BASE]
     namespace_name = f"{basename}-cluster"
     keys = {
+        MLAD_PROJECT_API_VERSION: base_labels[MLAD_PROJECT_API_VERSION],
         MLAD_PROJECT: base_labels[MLAD_PROJECT],
         MLAD_PROJECT_NAME: base_labels[MLAD_PROJECT_NAME],
+        MLAD_PROJECT_USERNAME: base_labels[MLAD_PROJECT_USERNAME],
+        MLAD_PROJECT_HOSTNAME: base_labels[MLAD_PROJECT_HOSTNAME]
     }
     annotations = {
         MLAD_PROJECT_YAML: json.dumps(project_yaml)
@@ -487,11 +490,13 @@ def _convert_mounts_to_k8s_volume(
     for pvc_spec in pvc_specs:
         name = pvc_spec['name']
         mount_path = pvc_spec['mountPath']
+        read_only = pvc_spec['readOnly']
         volume_name = f'{name}-vol'
         _mounts.append(
             client.V1VolumeMount(
                 name=volume_name,
-                mount_path=mount_path
+                mount_path=mount_path,
+                read_only=read_only
             )
         )
         _volumes.append(
@@ -696,34 +701,6 @@ def _obtain_k8s_pv(name: str, pv_index: int, pv_mount: Dict) -> client.V1Persist
     )
 
 
-def _create_k8s_pv(
-    name: str, pv_index: int, pv_mount: Dict, cli: ApiClient = DEFAULT_CLI
-) -> client.V1PersistentVolume:
-    api = client.CoreV1Api(cli)
-    return api.create_persistent_volume(
-        client.V1PersistentVolume(
-            api_version='v1',
-            kind='PersistentVolume',
-            metadata=client.V1ObjectMeta(
-                name=f'{name}-{pv_index}-pv',
-                labels={
-                    'mount': f'{name}-{pv_index}',
-                    MLAD_PROJECT_APP: name
-                }
-            ),
-            spec=client.V1PersistentVolumeSpec(
-                capacity={'storage': '10Gi'},
-                access_modes=['ReadWriteMany'],
-                mount_options=pv_mount['options'],
-                nfs=client.V1NFSVolumeSource(
-                    path=pv_mount['serverPath'],
-                    server=pv_mount['server']
-                )
-            )
-        )
-    )
-
-
 def _delete_k8s_pvs(name: str, cli: ApiClient = DEFAULT_CLI) -> None:
     api = client.CoreV1Api(cli)
     pvs = api.list_persistent_volume(label_selector=f'{MLAD_PROJECT_APP}={name}').items
@@ -739,7 +716,8 @@ def _obtain_k8s_pvc(
         api_version='v1',
         kind='PersistentVolumeClaim',
         metadata=client.V1ObjectMeta(
-            name=pvc_name
+            name=pvc_name,
+            namespace=namespace
         ),
         spec=client.V1PersistentVolumeClaimSpec(
             access_modes=['ReadWriteMany'],
@@ -750,34 +728,6 @@ def _obtain_k8s_pvc(
                 match_labels={'mount': f'{name}-{pv_index}'}
             ),
             storage_class_name=''
-        )
-    )
-
-
-def _create_k8s_pvc(
-    name: str, pv_index: int, namespace: str, cli: ApiClient = DEFAULT_CLI
-) -> client.V1PersistentVolumeClaim:
-    api = client.CoreV1Api(cli)
-    pvc_name = f'{name}-{pv_index}-pvc'
-    return api.create_namespaced_persistent_volume_claim(
-        namespace,
-        client.V1PersistentVolumeClaim(
-            api_version='v1',
-            kind='PersistentVolumeClaim',
-            metadata=client.V1ObjectMeta(
-                name=pvc_name,
-                namespace=namespace
-            ),
-            spec=client.V1PersistentVolumeClaimSpec(
-                access_modes=['ReadWriteMany'],
-                resources=client.V1ResourceRequirements(
-                    requests={'storage': '10Gi'}
-                ),
-                selector=client.V1LabelSelector(
-                    match_labels={'mount': f'{name}-{pv_index}'}
-                ),
-                storage_class_name=''
-            )
         )
     )
 
@@ -877,7 +827,8 @@ def obtain_k8s_app_resources(namespace: client.V1Namespace, base_labels: Dict[st
         resources['pvc'].append(pvc)
         pvc_specs.append({
             'name': pvc.metadata.name,
-            'mountPath': pv_mount['mountPath']
+            'mountPath': pv_mount['mountPath'],
+            'readOnly': pv_mount['readOnly']
         })
 
     if kind == 'Job':
@@ -1357,22 +1308,30 @@ def _obtain_k8s_ingress(
 def parse_mem(str_mem: str) -> float:
     if str_mem.endswith('Ki'):
         mem = float(str_mem[:-2]) / 1024
+    elif str_mem.endswith('K') or str_mem.endswith('k'):
+        mem = float(str_mem[:-1]) / 1000
     elif str_mem.endswith('Mi'):
         mem = float(str_mem[:-2])
+    elif str_mem.endswith('M'):
+        mem = float(str_mem[:-1])
     elif str_mem.endswith('Gi'):
         mem = float(str_mem[:-2]) * 1024
+    elif str_mem.endswith('G'):
+        mem = float(str_mem[:-1]) * 1000
     else:
         # TODO Other units may need to be considered
         try:
             mem = float(str_mem)
         except ValueError:
             raise InvalidMetricUnitError('mem', str_mem)
-    return mem
+    return float(round(mem, 1))
 
 
 def parse_cpu(str_cpu: str) -> float:
     if str_cpu.endswith('n'):
         cpu = float(str_cpu[:-1]) / 1e9
+    elif str_cpu.endswith('u'):
+        cpu = float(str_cpu[:-1]) / 1e6
     elif str_cpu.endswith('m'):
         cpu = float(str_cpu[:-1]) / 1e3
     else:
@@ -1382,6 +1341,15 @@ def parse_cpu(str_cpu: str) -> float:
         except ValueError:
             raise InvalidMetricUnitError('cpu', str_cpu)
     return cpu
+
+
+def parse_gpu(str_gpu: Optional[str]) -> int:
+    if str_gpu is None:
+        return 0
+    try:
+        return int(str_gpu)
+    except ValueError:
+        raise InvalidMetricUnitError('gpu', str_gpu)
 
 
 def get_k8s_node_resources(
@@ -1420,20 +1388,26 @@ def get_k8s_node_resources(
             used_mem = '-'
             used_cpu = '-'
 
-    used_gpu = 0
+    gpu_request = 0
+    cpu_request = 0
+    mem_request = 0
     selector = (f'spec.nodeName={name},status.phase!=Succeeded,status.phase!=Failed')
     pods = v1_api.list_pod_for_all_namespaces(field_selector=selector)
     for pod in pods.items:
         for container in pod.spec.containers:
             requests = defaultdict(lambda: '0', container.resources.requests or {})
-            used_gpu += int(requests['nvidia.com/gpu'])
+            gpu_request += parse_gpu(requests['nvidia.com/gpu'])
+            cpu_request += parse_cpu(requests['cpu'])
+            mem_request += parse_mem(requests['memory'])
+    used_gpu = gpu_request
 
     result = {
-        'mem': {'capacity': mem, 'used': used_mem,
+        'mem': {'capacity': mem, 'used': used_mem, 'request': mem_request,
                 'allocatable': mem - used_mem if not isinstance(used_mem, str) else '-'},
-        'cpu': {'capacity': cpu, 'used': used_cpu,
+        'cpu': {'capacity': cpu, 'used': used_cpu, 'request': cpu_request,
                 'allocatable': cpu - used_cpu if not isinstance(used_cpu, str) else '-'},
-        'gpu': {'capacity': gpu, 'used': used_gpu, 'allocatable': gpu - used_gpu},
+        'gpu': {'capacity': gpu, 'used': used_gpu, 'request': gpu_request,
+                'allocatable': gpu - used_gpu},
     }
 
     if not no_trunc:
@@ -1455,15 +1429,12 @@ def get_project_resources(
     project_result = {'cpu': 0, 'gpu': 0, 'mem': 0}
     apps = get_apps(project_key, cli=cli)
 
-    def parse_gpu(pod):
-        used = None
+    def aggregate_gpu_value(pod):
+        used = 0
         for container in pod.spec.containers:
-            requests = defaultdict(lambda: None, container.resources.requests or {})
-            gpu = requests['nvidia.com/gpu']
-            if gpu is not None:
-                if used is None:
-                    used = 0
-                used += int(gpu)
+            requests = defaultdict(lambda: '0', container.resources.requests or {})
+            gpu = parse_gpu(requests['nvidia.com/gpu'])
+            used += gpu
         return used
 
     cpu_unit_error = False
@@ -1495,7 +1466,7 @@ def get_project_resources(
                         resource['mem'] = 'UnitError'
                         mem_unit_error = True
 
-                pod_gpu_usage = parse_gpu(pod)
+                pod_gpu_usage = aggregate_gpu_value(pod)
                 if pod_gpu_usage is not None:
                     resource['gpu'] += pod_gpu_usage
 
@@ -1566,3 +1537,41 @@ def set_session_quota(session: str, cpu: float, gpu: int, mem: str, cli: ApiClie
     })
 
     api.patch_namespaced_config_map(name, 'mlad', configmap)
+
+
+def obtain_resources_by_session(cli=DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    resp: client.V1PodList = api.list_pod_for_all_namespaces(
+        label_selector=f'{MLAD_PROJECT_API_VERSION}=v1',
+        field_selector='status.phase=Running'
+    )
+
+    # Dict structure: {node_name: {user@hostname: {cpu: 0, gpu: 0, mem: 0}}}
+    ret = defaultdict(lambda: defaultdict(lambda: {'cpu': 0, 'gpu': 0, 'mem': 0}))
+
+    pod: client.V1Pod
+    for pod in resp.items:
+        labels = pod.metadata.labels
+        username = labels[MLAD_PROJECT_USERNAME]
+        hostname = labels[MLAD_PROJECT_HOSTNAME]
+        name = f'{username}@{hostname}'
+        node_name = pod.spec.node_name
+        container: client.V1Container
+        for container in pod.spec.containers:
+            requests = defaultdict(lambda: '0', container.resources.requests or {})
+            try:
+                cpu = parse_cpu(requests['cpu'])
+                gpu = parse_gpu(requests['nvidia.com/gpu'])
+                mem = parse_mem(requests['memory'])
+            except InvalidMetricUnitError as e:
+                print('InvalidMetricUnitError', e.metric, e.value)
+                if e.metric == 'cpu':
+                    cpu = 0
+                elif e.metric == 'gpu':
+                    gpu = 0
+                elif e.metric == 'mem':
+                    mem = 0
+            ret[node_name][name]['cpu'] += cpu
+            ret[node_name][name]['gpu'] += gpu
+            ret[node_name][name]['mem'] += mem
+    return ret

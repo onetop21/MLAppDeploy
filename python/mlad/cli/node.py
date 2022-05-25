@@ -43,12 +43,13 @@ def resource(names: list, no_trunc: bool):
         for i, type in enumerate(resources):
             status = resources[type]
             capacity = status['capacity']
+            request = status['request']
             used = status['used']
             allocatable = status['allocatable']
             percentage = int(allocatable / capacity * 100) \
                 if not isinstance(allocatable, str) and capacity else 0
             type = get_unit(type)
-            columns.append([name if not i else '', type, capacity, used,
+            columns.append([name if not i else '', type, f'{request}/{capacity}', used,
                             f'{allocatable} ({percentage}%)'])
         max_print_length = max([len(column[-1]) for column in columns])
     for column in columns[1:]:
