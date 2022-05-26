@@ -15,7 +15,8 @@ from kubernetes.client.rest import ApiException
 
 from mlad.core import exceptions
 from mlad.core.exceptions import (
-    NamespaceAlreadyExistError, DeprecatedError, InvalidAppError, InvalidMetricUnitError,
+    InsufficientSessionQuotaError, NamespaceAlreadyExistError,
+    DeprecatedError, InvalidAppError, InvalidMetricUnitError,
     ProjectNotFoundError, handle_k8s_exception
 )
 from mlad.core.libs import utils
@@ -1537,6 +1538,43 @@ def set_session_quota(session: str, cpu: float, gpu: int, mem: str, cli: ApiClie
     })
 
     api.patch_namespaced_config_map(name, 'mlad', configmap)
+
+
+def check_session_quota(
+    session: str, quotas: List[Union[None, Dict]], cli: ApiClient = DEFAULT_CLI
+):
+    req_cpu = 0
+    req_gpu = 0
+    req_mem = 0
+    for quota in quotas:
+        if quota is None:
+            continue
+        req_cpu += quota['cpu'] or 0
+        req_gpu += quota['gpu'] or 0
+        req_mem += parse_mem(quota['mem'] or '0')
+    payload = jwt.decode(session, 'mlad', algorithms=['HS256'])
+    username = payload['user']
+    hostname = payload['hostname']
+    name = 'mlad-api-server-quota-config'
+    api = client.CoreV1Api(cli)
+    quota_dict = api.read_namespaced_config_map(name, 'mlad').data
+    pod_list: client.V1PodList = api.list_pod_for_all_namespaces(
+        label_selector=f'{MLAD_PROJECT_HOSTNAME}={hostname},{MLAD_PROJECT_USERNAME}={username}',
+    )
+    cpu_key = f'{username}.{hostname}.cpu'
+    gpu_key = f'{username}.{hostname}.gpu'
+    mem_key = f'{username}.{hostname}.mem'
+    total_cpu = float(quota_dict[cpu_key] if cpu_key in quota_dict else quota_dict['default.cpu'])
+    total_gpu = int(quota_dict[gpu_key] if gpu_key in quota_dict else quota_dict['default.gpu'])
+    total_mem = parse_mem(quota_dict[mem_key] if mem_key in quota_dict else quota_dict['default.mem'])
+    for pod in pod_list.items:
+        for container in pod.spec.containers:
+            requests = defaultdict(lambda: '0', container.resources.requests or {})
+            total_cpu -= parse_cpu(requests['cpu'])
+            total_gpu -= parse_gpu(requests['nvidia.com/gpu'])
+            total_mem -= parse_mem(requests['memory'])
+    if total_cpu < req_cpu or total_gpu < req_gpu or total_mem < req_mem:
+        raise InsufficientSessionQuotaError(username, hostname)
 
 
 def obtain_resources_by_session(cli=DEFAULT_CLI):
