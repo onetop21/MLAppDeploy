@@ -10,21 +10,22 @@ class Quota(BaseModel):
 
 
 class Ingress(BaseModel):
-    path: Optional[str] = None
+    path: Optional[str]
     rewritePath: bool = True
 
 
 class Expose(BaseModel):
     port: int
-    ingress: Optional[Ingress] = None
+    ingress: Optional[Ingress]
 
 
 class Mount(BaseModel):
-    path: Optional[str] = None
+    path: Optional[str]
     mountPath: str
     server: str
     serverPath: str
     options: Optional[List[str]]
+    readOnly: bool
 
 
 class Dependency(BaseModel):
@@ -35,22 +36,22 @@ class Dependency(BaseModel):
 class Component(BaseModel):
     kind = 'Component'
     name: str
-    image: Optional[str] = None
-    env: Optional[dict] = None
-    command: Optional[Union[list, str]] = None
-    args: Optional[Union[list, str]] = None
-    mounts: Optional[List[Mount]] = None
-    expose: Optional[List[Expose]] = None
+    image: Optional[str]
+    env: Optional[dict]
+    command: Optional[Union[list, str]]
+    args: Optional[Union[list, str]]
+    mounts: Optional[List[Mount]]
+    expose: Optional[List[Expose]]
 
 
 class Constraint(BaseModel):
-    hostname: Optional[str] = None
-    label: Optional[dict] = None
+    hostname: Optional[str]
+    label: Optional[dict]
 
 
 class AppBase(Component):
     kind = 'App'
-    constraints: Optional[Constraint] = None
+    constraints: Optional[Constraint]
 
 
 class AdvancedBase(AppBase):
@@ -59,8 +60,8 @@ class AdvancedBase(AppBase):
 
 class App(AppBase):
     restartPolicy: Optional[str] = 'Never'
-    quota: Optional[Quota] = None
-    depends: Optional[List[Dependency]] = None
+    quota: Optional[Quota]
+    depends: Optional[List[Dependency]]
 
 
 class JobRunSpec(BaseModel):

@@ -7,21 +7,21 @@ import aiohttp
 from typing import Callable
 from collections import defaultdict
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, HTTPException, WebSocket
 from starlette.websockets import WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 from .model import ComponentDeleteRequestModel, ComponentPostRequestModel
 from .db import DBClient
 
 # os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:30547/beta'
-# os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:8441'
+# os.environ['MLAD_ADDRESS'] = 'http://172.20.41.35:8440'
 # os.environ['MLAD_SESSION'] = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiam9vb25ob2UiLCJob3N0bmFtZSI6Impvb29uaG9lLU1TLTdCMjMiLCJ1dWlkIjoiYzY3ZDAzYzUtODQ1Mi00ZTliLWI4ZGUtYTg2NmQ5ZTBlNWRjIn0.DWj8Y_xQO6167rRyBgYrNVVaHzq6xDIqCNp458HkKsc'
 
 app = FastAPI()
 address = f'{os.environ["MLAD_ADDRESS"]}/api/v1'
 headers = {
     'session': os.environ['MLAD_SESSION'],
-    'version': '0.4.1'
+    'version': '0.4.3'
 }
 db_client = DBClient()
 
@@ -33,6 +33,7 @@ async def _request_resources(key: str, session: aiohttp.ClientSession, group_by:
         return await resp.json()
 
 
+# dashboard의 node tab에서 보여줄 정보 반환하는 함수
 async def request_nodes(_, session: aiohttp.ClientSession):
     ret = []
     nodes = []
@@ -44,20 +45,28 @@ async def request_nodes(_, session: aiohttp.ClientSession):
     async with session.get(f'{address}/node/resource', headers=headers) as resp:
         resp.raise_for_status()
         resource_dict = await resp.json()
+
+    resource_dict_by_session = defaultdict(lambda: {})
+    async with session.get(f'{address}/node/resource/session', headers=headers) as resp:
+        resp.raise_for_status()
+        resource_dict_by_session.update(await resp.json())
     for node in nodes:
         name = node['hostname']
         ret.append({
             **node,
             'metrics': [{
                 'type': k,
+                'request': v['request'],
                 'capacity': v['capacity'],
                 'used': v['used'],
                 'free': v['allocatable']
-            } for k, v in resource_dict[name].items()]
+            } for k, v in resource_dict[name].items()],
+            'requests_by_session': resource_dict_by_session[name]
         })
-    return ret
+    return sorted(ret, key=lambda x: x['hostname'])
 
 
+# dashboard에서 project tab에서 보여주는 project 목록 정보를 반환하는 함수
 async def request_projects(_, session: aiohttp.ClientSession):
     ret = []
     projects = []
@@ -105,9 +114,13 @@ async def request_projects(_, session: aiohttp.ClientSession):
 
 
 def get_components(_):
-    return db_client.get_components()
+    try:
+        return db_client.get_components()
+    except Exception:
+        raise HTTPException(500, detail='DB Connection is refused')
 
 
+# project tab에서 project detail 화면을 보여주기 위한 함수
 async def request_project_detail(data: str, session: aiohttp.ClientSession):
     data = json.loads(data)
     if len(data) == 0:
@@ -135,7 +148,10 @@ async def request_project_detail(data: str, session: aiohttp.ClientSession):
 
 @app.post('/component')
 def run_components(req: ComponentPostRequestModel):
-    db_client.run_component(req.components)
+    try:
+        db_client.run_component(req.components)
+    except Exception:
+        raise HTTPException(500, detail='DB connection is refused.')
     return {
         'message': 'Successfully run components'
     }
@@ -143,7 +159,10 @@ def run_components(req: ComponentPostRequestModel):
 
 @app.delete('/component')
 def delete_components(req: ComponentDeleteRequestModel):
-    db_client.delete_component(req.name)
+    try:
+        db_client.delete_component(req.name)
+    except Exception:
+        raise HTTPException(500, detail='DB connection is refused.')
     return {
         'message': f'Successfully delete component [{req.name}]'
     }

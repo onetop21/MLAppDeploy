@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic import BaseModel
 
 from mlad.service.models.app import Quota
@@ -6,7 +6,6 @@ from mlad.service.models.app import Quota
 
 class CreateRequest(BaseModel):
     base_labels: dict
-    extra_envs: list
     project_yaml: dict
     credential: str
 
@@ -18,12 +17,12 @@ class EnvUpdateSpec(BaseModel):
 
 class AppUpdateSpec(BaseModel):
     name: str
-    image: str = None
-    command: Union[list, str] = None
-    args: Union[list, str] = None
+    image: Optional[str]
+    command: Optional[Union[List[str], str]]
+    args: Optional[Union[List[str], str]]
     scale: int = 1
-    env: EnvUpdateSpec = None
-    quota: Quota = None
+    env: Optional[EnvUpdateSpec]
+    quota: Optional[Quota]
 
 
 class UpdateRequest(BaseModel):
