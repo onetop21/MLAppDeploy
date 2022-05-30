@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class Quota(BaseModel):
-    cpu: Optional[int] = None
+    cpu: Optional[float] = None
     gpu: Optional[int] = None
     mem: Optional[str] = None
 
