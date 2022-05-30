@@ -1556,9 +1556,10 @@ def check_session_quota(
     username = payload['user']
     hostname = payload['hostname']
     name = 'mlad-api-server-quota-config'
-    api = client.CoreV1Api(cli)
-    quota_dict = api.read_namespaced_config_map(name, 'mlad').data
-    pod_list: client.V1PodList = api.list_pod_for_all_namespaces(
+    core_api = client.CoreV1Api(cli)
+    batch_api = client.BatchV1Api(cli)
+    quota_dict = core_api.read_namespaced_config_map(name, 'mlad').data
+    pod_list: client.V1PodList = core_api.list_pod_for_all_namespaces(
         label_selector=f'{MLAD_PROJECT_HOSTNAME}={hostname},{MLAD_PROJECT_USERNAME}={username}',
     )
     cpu_key = f'{username}.{hostname}.cpu'
@@ -1568,11 +1569,18 @@ def check_session_quota(
     total_gpu = int(quota_dict[gpu_key] if gpu_key in quota_dict else quota_dict['default.gpu'])
     total_mem = parse_mem(quota_dict[mem_key] if mem_key in quota_dict else quota_dict['default.mem'])
     for pod in pod_list.items:
+        if pod.metadata.owner_references[0].kind == 'Job':
+            app_name = pod.metadata.labels[MLAD_PROJECT_APP]
+            namespace = pod.metadata.namespace
+            job_status = batch_api.read_namespaced_job(app_name, namespace).status
+            if job_status.active is None:
+                continue
         for container in pod.spec.containers:
             requests = defaultdict(lambda: '0', container.resources.requests or {})
             total_cpu -= parse_cpu(requests['cpu'])
             total_gpu -= parse_gpu(requests['nvidia.com/gpu'])
             total_mem -= parse_mem(requests['memory'])
+
     if total_cpu < req_cpu or total_gpu < req_gpu or total_mem < req_mem:
         raise InsufficientSessionQuotaError(username, hostname)
 
