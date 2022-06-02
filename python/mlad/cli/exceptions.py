@@ -214,3 +214,9 @@ class ProjectDeletedError(MLADException):
 
     def __str__(self):
         return f'Project [{self.key}] is deleted.'
+
+
+class InvalidMemoryFormatError(MLADException):
+
+    def __str__(self):
+        return 'Memory quota should have one of [K, M, G, Ki, Mi, Gi] suffix.'

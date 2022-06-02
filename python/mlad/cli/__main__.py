@@ -8,6 +8,7 @@ from mlad.cli import image_cli as image
 from mlad.cli import project_cli as project
 from mlad.cli import node_cli as node
 from mlad.cli import board_cli as board
+from mlad.cli import quota_cli as quota
 from mlad.cli.exceptions import ConfigNotFoundError
 from mlad.cli.config import get as check_config
 from mlad.cli.config import is_admin
@@ -59,6 +60,7 @@ else:
     main.add_command(node.admin_cli if is_admin() else node.cli, 'node')
     if is_admin():
         main.add_command(install.check, 'install-check')
+    main.add_command(quota.cli, 'quota')
 
     main.add_dummy_command()
     main.add_dummy_command('\b\bPrefer:')
