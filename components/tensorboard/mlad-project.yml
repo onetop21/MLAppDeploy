@@ -1,0 +1,28 @@
+kind: Component
+apiVersion: v1
+name: tensorboard
+version: 0.0.1
+maintainer: kkkdeon41
+workdir: .
+workspace:
+  kind: Buildscript
+  buildscript: |
+    FROM python:3.8
+    MAINTAINER kkkdeon41
+    EXPOSE 6006
+    RUN pip install tensorboard
+    RUN pip install boto3
+    RUN pip install protobuf==3.18.0
+  ignores:
+  - '**/.*'
+app:
+  tensorboard:
+    kind: Component
+    env:
+      PYTHONUNBUFFERED: '1'
+      S3_ENABLED: 'True'
+      LOGDIR: s3://logs/temp
+    expose:
+    - hidden: false
+      port: 6006
+    command: tensorboard --logdir $LOGDIR --port=6006 --host=0.0.0.0
