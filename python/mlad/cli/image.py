@@ -28,10 +28,11 @@ PREP_KEY_TO_TEMPLATE = {
 }
 
 
-def list(all, tail):
+def list(file: Optional[str], all: bool, tail: int):
     if all:
         images = ctlr.get_images()
     else:
+        utils.process_file(file)
         project_key = utils.workspace_key()
         images = ctlr.get_images(project_key=project_key)
 
