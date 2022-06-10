@@ -15,6 +15,7 @@ export default function MLADContainer() {
 	const node_url = `${context.baseurl}/nodes`;
 	const project_url = `${context.baseurl}/projects`;
 	const detail_url = `${context.baseurl}/project`;
+	// 필요한 데이터들을 WebSocket으로 모두 받아서 UI를 업데이트
 	const { data: nodes } = useFetchSocket<Node>(node_url, Node);
 	const { data: projects } = useFetchSocket<Project>(project_url, Project);
 	const { data: projectSpec, setRequestData }

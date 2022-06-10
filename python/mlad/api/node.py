@@ -13,3 +13,6 @@ class Node(APIBase):
     def resource(self, names, no_trunc):
         params = {'names': names, 'no_trunc': no_trunc}
         return self._get('/resource', params=params)
+
+    def resource_by_session(self):
+        return self._get('/resource/session')

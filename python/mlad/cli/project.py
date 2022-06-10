@@ -3,6 +3,7 @@ import sys
 import json
 import copy
 import socket
+import time
 
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple, Union
@@ -43,6 +44,83 @@ def init(name, version, maintainer):
             VERSION=version,
             MAINTAINER=maintainer,
         ))
+
+
+def edit(file: Optional[str]):
+    utils.process_file(file)
+    file_path = utils.get_project_file()
+    from mlad.cli.editor import run_editor
+    run_editor(file_path)
+
+
+def export(file: Optional[str], target_directory: Optional[str]):
+    utils.process_file(file)
+    config = config_core.get()
+    project = utils.get_project()
+    project_yaml = copy.deepcopy(project)
+    project_name = project['name']
+    kind = project['kind']
+    if not kind == 'Deployment':
+        raise InvalidProjectKindError('Deployment', 'deploy')
+
+    base_labels = utils.base_labels(
+        utils.get_workspace(),
+        config['session'],
+        project,
+        config_core.get_env(),
+        config_core.get_registry_address(config)
+    )
+
+    image_tag = base_labels[MLAD_PROJECT_IMAGE]
+
+    app_specs = []
+    app_dict = project.get('app', dict())
+    for name, app_spec in app_dict.items():
+        check_nvidia_plugin_installed(app_spec)
+        warning_msg = _check_config_envs(name, app_spec)
+        if warning_msg:
+            yield warning_msg
+        app_spec['name'] = name
+        app_spec = _convert_tag_only_image_prop(app_spec, image_tag)
+        if 'mounts' in app_spec:
+            yield f'In app [{name}], mounts options are ignored.'
+            del app_spec['mounts']
+        app_specs.append(app_spec)
+
+    _validate_depends(app_specs)
+
+    # Create a project
+    credential = docker_ctlr.obtain_credential()
+
+    from mlad.core.kubernetes import controller as ctlr
+
+    Path(target_directory).mkdir(exist_ok=True, parents=True)
+    base_export_path = f'{target_directory}/{project_name}-base.yml'
+    yield f'Export project relevant resources in {base_export_path}'
+    namespace = ctlr.obtain_k8s_namespace(base_labels, project_yaml)
+    project_docker_secret = ctlr.obtain_docker_k8s_secret(base_labels, credential)
+    project_config_map = ctlr.obtain_k8s_config_map('project-labels', base_labels)
+    utils.dump_k8s_object_to_yaml(base_export_path, [
+        namespace,
+        project_docker_secret,
+        project_config_map
+    ])
+    for app_spec in app_specs:
+        app_name = app_spec['name']
+        resources = ctlr.obtain_k8s_app_resources(
+            namespace, base_labels, app_name, app_spec)
+        objs = [resources['configmap']]
+        if 'service' in resources:
+            objs.append(resources['service'])
+        if 'job' in resources:
+            objs.append(resources['job'])
+        if 'deployment' in resources:
+            objs.append(resources['deployment'])
+
+        objs = objs + resources['pv'] + resources['pvc'] + resources['ingress']
+        app_export_path = f'{target_directory}/{project_name}-{app_name}.yml'
+        yield f'Export app resources [{app_name}] in {app_export_path}.'
+        utils.dump_k8s_object_to_yaml(app_export_path, objs)
 
 
 def ls(no_trunc: bool):
@@ -167,7 +245,7 @@ def status(file: Optional[str], project_key: Optional[str], no_trunc: bool, even
 
 
 def logs(file: Optional[str], project_key: Optional[str],
-         tail: bool, follow: bool, timestamps: bool, filters: Optional[List[str]]):
+         tail: Union[str, int], follow: bool, timestamps: bool, filters: Optional[List[str]]):
     utils.process_file(file)
     if project_key is None:
         project_key = utils.workspace_key()
@@ -209,13 +287,6 @@ def ingress():
     utils.print_table(rows, 'Cannot find running deployments', 0, False)
 
 
-def edit(file: Optional[str]):
-    utils.process_file(file)
-    file_path = utils.get_project_file()
-    from mlad.cli.editor import run_editor
-    run_editor(file_path)
-
-
 def check_nvidia_plugin_installed(app_spec: dict):
     if 'quota' in app_spec and 'gpu' in app_spec['quota']:
         nvidia_running = API.check.check_nvidia_device_plugin()
@@ -239,6 +310,7 @@ def up(file: Optional[str]):
         utils.get_workspace(),
         config['session'],
         project,
+        config_core.get_env(),
         config_core.get_registry_address(config)
     )
 
@@ -280,9 +352,7 @@ def up(file: Optional[str]):
     # Create a project
     yield 'Deploy apps to the cluster...'
     credential = docker_ctlr.obtain_credential()
-    extra_envs = config_core.get_env()
-    lines = API.project.create(base_labels, origin_project, extra_envs,
-                               credential=credential)
+    lines = API.project.create(base_labels, origin_project, credential=credential)
     for line in lines:
         if 'stream' in line:
             sys.stdout.write(line['stream'])
@@ -449,13 +519,88 @@ def _dump_logs(app_name: str, project_key: str, dirpath: Path):
     path = dirpath / f'{app_name}.log'
     with open(path, 'w') as log_file:
         try:
-            logs = API.project.log(project_key, timestamps=True, names_or_ids=[app_name])
+            logs = API.project.log(project_key, timestamps=True, filters=[app_name])
             for log in logs:
                 log = _format_log(log, pretty=False) + '\n'
                 log_file.write(log)
         except InvalidLogRequest:
             return f'There is no log in [{app_name}].'
     return f'The log file of app [{app_name}] saved.'
+
+
+def run(file: Optional[str], env: Dict[str, str], quota: Dict[str, str], command: List[str]):
+    utils.process_file(file)
+    config = config_core.get()
+    project = utils.get_project()
+    origin_project = copy.deepcopy(project)
+
+    base_labels = utils.base_labels(
+        utils.get_workspace(),
+        config['session'],
+        project,
+        config_core.get_env(),
+        config_core.get_registry_address(config)
+    )
+    project_key = base_labels[MLAD_PROJECT]
+    try:
+        API.project.inspect(project_key=project_key)
+        raise ProjectAlreadyExistError(project_key)
+    except ProjectNotFound:
+        pass
+
+    # Find suitable image
+    image_tag = base_labels[MLAD_PROJECT_IMAGE]
+    images = [image for image in docker_ctlr.get_images(project_key=project_key)
+              if image_tag in image.tags]
+    if len(images) == 0:
+        raise ImageNotFoundError(image_tag)
+
+    app_spec = {
+        'kind': 'Job',
+        'name': 'job-1',
+        'env': env,
+        'quota': quota,
+        'command': command
+    }
+    check_nvidia_plugin_installed(app_spec)
+    warning_msg = _check_config_envs(app_spec['name'], app_spec)
+    if warning_msg:
+        yield warning_msg
+    yield 'Deploy job-1 to the cluster...'
+    try:
+        credential = docker_ctlr.obtain_credential()
+        lines = API.project.create(base_labels, origin_project, credential=credential)
+        for line in lines:
+            if 'stream' in line:
+                sys.stdout.write(line['stream'])
+            if 'result' in line and line['result'] == 'succeed':
+                break
+
+        API.app.create(project_key, [app_spec])
+
+        yield 'Wait for the app runs successfully'
+        while True:
+            task_dict = API.app.inspect(project_key, app_spec['name'])['task_dict']
+            pod_info = list(task_dict.values())[0]
+            phase = pod_info['phase']
+            reason = pod_info['status']
+            if phase == 'Pending':
+                time.sleep(1)
+            elif phase == 'Succeeded' or phase == 'Running':
+                break
+            else:
+                yield 'Error occurred in running the job..'
+                yield f'Reason: {reason}'
+                break
+        yield from logs(file, project_key, 'all', True, True, None)
+
+        yield from down(file, project_key, False)
+    except KeyboardInterrupt as e:
+        next(API.project.delete(project_key))
+        raise e
+    except Exception as e:
+        next(API.project.delete(project_key))
+        raise e
 
 
 def scale(file: Optional[str], project_key: Optional[str], scales: List[Tuple[str, int]]):
@@ -496,6 +641,7 @@ def update(file: Optional[str], project_key: Optional[str]):
         utils.get_workspace(),
         config['session'],
         project,
+        config_core.get_env(),
         config_core.get_registry_address(config)
     )
     image_tag = base_labels[MLAD_PROJECT_IMAGE]

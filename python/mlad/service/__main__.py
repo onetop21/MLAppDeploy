@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mlad.service.exceptions import VersionCompatabilityError
-from mlad.service.routers import app as app_router, project, node, check
+from mlad.service.routers import app as app_router, project, node, check, quota
 from mlad.core.default.config import service_config
 
 
@@ -36,6 +36,7 @@ def create_app():
     app.include_router(app_router.router, prefix=APIV1)
     app.include_router(project.router, prefix=APIV1)
     app.include_router(check.router, prefix=APIV1)
+    app.include_router(quota.router, prefix=APIV1)
 
     print("Orchestrator : 'Kubernetes'")
     print(f"Debug        : {'TRUE' if utils.is_debug_mode() else 'FALSE'}")

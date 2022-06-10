@@ -7,12 +7,16 @@ from . import echo_exception
 
 
 @click.command()
+@click.option('--file', '-f', default=None, type=click.Path(exists=True), help=(
+    'Specify an alternate project file\t\t\t\n'
+    f'Same as {utils.PROJECT_FILE_ENV_KEY} in environment variable.')
+)
 @click.option('--all', '-a', is_flag=True, help='Show all MLAD relevant images.')
 @click.option('--tail', '-t', default=10, help='Number of images to show from the latest (default "10").')
 @echo_exception
-def ls(all, tail):
+def ls(file, all, tail):
     '''Show built images.'''
-    image.list(all, tail)
+    image.list(file, all, tail)
 
 
 @click.command()

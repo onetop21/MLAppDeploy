@@ -26,7 +26,9 @@ const getTaskView = (task: TaskSpec) => {
 interface ServiceDetailProps {
 	spec: AppSpec;
 }
-
+/**
+ * Detail drawer에서 App의 자세한 상태를 나타내는 view
+ */
 export default function AppDetail({ spec }: ServiceDetailProps) {
 
 	return <>

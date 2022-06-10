@@ -8,7 +8,9 @@ import ExpandedRow from './ExpandedRow';
 interface NodeListProps {
 	nodes: Node[];
 }
-
+/**
+ * Nodes Tab에서 보여줄 view 
+ */
 export default function NodeList({ nodes }: NodeListProps) {
 
 	useEffect(() => {

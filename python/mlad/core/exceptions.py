@@ -43,7 +43,7 @@ def handle_k8s_api_error(e):
     return msg, status
 
 
-def handle_k8s_exception(obj: str, namespaced: bool=False):
+def handle_k8s_exception(obj: str, namespaced: bool = False):
     def decorator(func: Callable):
         def wrapper(*args, **kwargs):
             params = list(signature(func).parameters.keys())
@@ -129,3 +129,12 @@ class InvalidKubeConfigError(MLADException):
             f'Cannot load K8s API client from config file: \'{self.config_path}\' '
             f'and context name: \'{self.context_name}\''
         )
+
+
+class InsufficientSessionQuotaError(MLADException):
+    def __init__(self, username: str, hostname: str):
+        self.username = username
+        self.hostname = hostname
+
+    def __str__(self):
+        return f'Quota is insufficient, user: {self.username}, hostname: {self.hostname}'

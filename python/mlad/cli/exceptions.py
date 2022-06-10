@@ -104,6 +104,12 @@ class MLADBoardNotActivatedError(MLADException):
         return 'The MLAD dashboard is not activated.'
 
 
+class MLADBoardConnectionRefusedError(MLADException):
+
+    def __str__(self):
+        return 'Cannot connect to the MLAD board.'
+
+
 class MLADBoardAlreadyActivatedError(MLADException):
 
     def __str__(self):
@@ -114,6 +120,15 @@ class MLADBoardNoDatabaseError(MLADException):
     def __str__(self):
         return 'Cannot find database address from configuration.'
 
+class MLADBoardImageNotFoundError(MLADException):
+
+    def __init__(self, repository):
+        self.repository = repository
+
+    def __str__(self):
+        return f'No such image: {self.repository}.'
+
+
 class ComponentImageNotExistError(MLADException):
 
     def __init__(self, name):
@@ -121,6 +136,15 @@ class ComponentImageNotExistError(MLADException):
 
     def __str__(self):
         return f'The component [{self.name}] image does not exist.'
+
+
+class ComponentInstallError(MLADException):
+
+    def __init__(self, detail):
+        self.detail = detail
+
+    def __str__(self):
+        return self.detail
 
 
 class CannotBuildComponentError(MLADException):
@@ -194,3 +218,9 @@ class ProjectDeletedError(MLADException):
 
     def __str__(self):
         return f'Project [{self.key}] is deleted.'
+
+
+class InvalidMemoryFormatError(MLADException):
+
+    def __str__(self):
+        return 'Memory quota should have one of [K, M, G, Ki, Mi, Gi] suffix.'

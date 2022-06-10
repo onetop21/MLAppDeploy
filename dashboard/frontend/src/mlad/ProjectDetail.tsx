@@ -28,7 +28,9 @@ const obtainSummaryData = (projectSpec: ProjectSpec) => {
 interface ProjectDetailProps {
 	projectSpec: ProjectSpec;
 }
-
+/**
+ * Projects tab에서 임의의 item을 클릭했을 때 drawer 안에서 보여주는 view
+ */
 export default function ProjectDetail({ projectSpec }: ProjectDetailProps) {
 
 	const summaryData = useMemo(() => obtainSummaryData(projectSpec), [projectSpec]);

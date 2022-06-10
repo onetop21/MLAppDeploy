@@ -1,7 +1,7 @@
 import traceback
 from typing import List
 from fastapi import APIRouter, Query, Header, HTTPException
-from mlad.core.exceptions import APIError, InvalidAppError, ProjectNotFoundError
+from mlad.core.exceptions import APIError, InsufficientSessionQuotaError, InvalidAppError, ProjectNotFoundError
 from mlad.service.routers import DictStreamingResponse
 from mlad.service.models import app as app_models
 from mlad.service.exceptions import InvalidSessionError, exception_detail
@@ -59,15 +59,18 @@ def send_apps(project_key: str, labels: List[str] = Query(None), session: str = 
 @router.post('/project/{project_key}/app')
 def create_app(project_key: str, req: app_models.CreateRequest,
                session: str = Header(None)):
-    targets = req.json
+    app_dict = req.json
     try:
         namespace = ctlr.get_k8s_namespace(project_key)
-        apps = ctlr.create_apps(namespace, targets)
+        ctlr.check_session_quota(session, list(map(lambda x: x['quota'], app_dict.values())))
+        apps = ctlr.create_apps(namespace, app_dict)
         return ctlr.inspect_apps(apps)
     except ProjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=exception_detail(e))
     except APIError as e:
         raise HTTPException(status_code=e.status_code, detail=exception_detail(e))
+    except InsufficientSessionQuotaError as e:
+        raise HTTPException(status_code=400, detail=exception_detail(e))
     except Exception as e:
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=exception_detail(e))

@@ -6,6 +6,9 @@ interface ProjectDetailListItemProps {
 	value: JSX.Element | string;
 }
 
+/*
+* ProjectDetail view에서 각 항목을 보여주는 view
+*/
 export default function ProjectDetailListItem(props: ProjectDetailListItemProps) {
 	const { name, value } = props;
 

@@ -10,7 +10,9 @@ interface YAMLEditorProps {
 	data: any;
 }
 
-
+/**
+ * highlight.js의 문법을 통하여 project yaml을 그리는 view 
+ */
 export default function YAMLEditor({ data }: YAMLEditorProps) {
 
 	const content = useMemo(() => (yamlParser.stringify(data)), [data]);
