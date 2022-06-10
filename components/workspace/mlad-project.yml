@@ -1,0 +1,40 @@
+kind: Component
+apiVersion: v1
+name: workspace
+version: 0.0.1
+maintainer: onetop21
+workdir: .
+workspace:
+  kind: Buildscript
+  buildscript: |
+      FROM    jupyter/minimal-notebook:latest
+      USER    root
+      WORKDIR /root
+      ENV     HOME /root
+      ENV     PYTHONUNBUFFERED 1
+      RUN     apt update && apt install -y openssh-server awscli curl jq
+      RUN     ssh-keygen -A
+      RUN     mkdir /var/run/sshd
+      RUN     echo 'root:password' | chpasswd
+      RUN     sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+      RUN     sed -i 's/#PermitRootLogin/PermitRootLogin/' /etc/ssh/sshd_config
+      RUN     sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+      EXPOSE  22
+      ADD     jupyter_lab_config.py /root/.jupyter/
+      ADD     init.sh /root/.init/
+      CMD     bash /root/.init/init.sh
+  ignores:
+  - '**/.*'
+app:
+  workspace:
+    kind: Component
+    env:
+      JUPYTER_ENABLE_LAB: 'yes'
+      PYTHONUNBUFFERED: '1'
+    expose:
+    - port: 8888
+    - port: 22
+      hidden: true
+    mounts:
+    - mountPath: /var/run/docker.sock
+      path: /var/run/docker.sock

@@ -1,5 +1,7 @@
 import os
 import errno
+import time
+import re
 import yaml
 import docker
 import requests
@@ -12,7 +14,7 @@ from mlad.cli import config as config_core
 from mlad.cli.exceptions import (
     MLADBoardNotActivatedError, ComponentImageNotExistError,
     MLADBoardAlreadyActivatedError, CannotBuildComponentError,
-    MLADBoardImageNotFoundError, ComponentInstallError,
+    MLADBoardNoDatabaseError, MLADBoardImageNotFoundError, ComponentInstallError,
     MLADBoardConnectionRefusedError
 )
 from mlad.cli import image as image_core
@@ -53,6 +55,16 @@ def activate(image_repository: str):
         pass
 
     yield 'Activating MLAD board.'
+
+    # if image tag is dev version, change to latest
+    group = re.match(r'([a-z0-9.:/-]+)(?P<OFFICIAL>:[0-9.]+$)?(?P<DEV>:[a-z0-9.]+$)?', image_repository)
+    if group.group('DEV'):
+        image_repository = f"{group.group(1)}:latest"
+
+    # Check DB_DATABASE in config.
+    env = config_core.get_env()
+    if not dict([_.split('=') for _ in env]).get('DB_ADDRESS'):
+        raise MLADBoardNoDatabaseError
 
     try:
         cli.containers.run(
@@ -118,7 +130,7 @@ def install(file_path: str, no_build: bool):
     from mlad.cli.validator import validators
     spec = validators.validate(spec)
     if not no_build and 'workspace' not in spec:
-        raise CannotBuildComponentError
+        no_build = True
 
     labels = {
         'MLAD_BOARD': '',
@@ -126,9 +138,10 @@ def install(file_path: str, no_build: bool):
     }
     if no_build:
         built_images = cli.images.list(filters={'label': labels})
-        if len(built_images) == 0:
-            raise ComponentImageNotExistError(spec['name'])
-        image = built_images[0]
+        if len(built_images) > 0:
+            image = built_images[0]
+        else:
+            image = None
     else:
         image = ValueGenerator(image_core.build(file_path, False, True, False)).get_value()
 
@@ -139,8 +152,11 @@ def install(file_path: str, no_build: bool):
             image_name = component['image']
             cli.images.pull(image_name)
             image = cli.images.get(image_name)
+        elif image is None:
+            raise ComponentImageNotExistError(spec['name'])
         env = {**component.get('env', dict()), **config_core.get_env(dict=True)}
         ports = [expose['port'] for expose in component.get('expose', [])]
+        hidden = {expose['port']: expose['hidden'] for expose in component.get('expose', [])}
         command = component.get('command', [])
         if isinstance(command, str):
             command = command.split(' ')
@@ -154,36 +170,62 @@ def install(file_path: str, no_build: bool):
             'APP_NAME': app_name
         }
         yield f'Run the container [{app_name}]'
+
+        # patch env vars
+        schema = re.match(r'http[s]?://([^/]+)', host_ip)
+        parsed = config_core._parse_url(host_ip)
+        env = {'HOST_IP': parsed['address'], **env, **{k: (env.get(v[1:]) if v.startswith('$') else v) for k, v in env.items()}}
+        command = [env.get(_[1:]) if _.startswith('$') else _ for _ in command]
+        ################
+        
         container = cli.containers.run(
             image.tags[-1],
             environment=env,
             name=f'{spec["name"]}-{app_name}',
-            ports={f'{p}/tcp': p for p in ports},
+            #ports={f'{p}/tcp': p for p in ports},
+            ports={f'{p}/tcp': None for p in ports},
             command=command + args,
             mounts=[Mount(source=mount['path'], target=mount['mountPath'], type='bind')
                     for mount in mounts],
             labels=labels,
-            detach=True)
-
-        component_specs.append({
-            'name': spec['name'],
-            'app_name': app_name,
-            'hosts': [f'{host_ip}:{p}' for p in ports]
-        })
-
-        try:
-            res = requests.post(f'{host_ip}:2021/mlad/component', json={
-                'components': component_specs
+            detach=True,
+            restart_policy={'Name': 'always'}
+        )
+        
+        # Wait for getting port
+        for _ in range(10):
+            container.reload()
+            port_bindings = container.attrs['NetworkSettings']['Ports']
+            should_wait = False
+            for p in ports:
+                target_ports = port_bindings[f'{p}/tcp']
+                should_wait |= len(target_ports) == 0 or 'HostPort' not in target_ports[0]
+            if not should_wait:
+                break
+            time.sleep(1)
+        #######################
+        
+        if port_bindings:
+            component_specs.append({
+                'name': spec['name'],
+                'app_name': app_name,
+                #'hosts': [f'{host_ip}:{p}' for p in ports]
+                'hosts': [f'{host_ip}:{port_bindings[f"{p}/tcp"][0]["HostPort"]}' for p in ports if hidden[p] is not True]
             })
-            res.raise_for_status()
-        except requests.exceptions.HTTPError:
-            container.stop()
-            container.remove()
-            raise ComponentInstallError(res.json().get('detail', ''))
-        except requests.ConnectionError:
-            container.stop()
-            container.remove()
-            raise MLADBoardConnectionRefusedError
+
+            try:
+                res = requests.post(f'{host_ip}:2021/mlad/component', json={
+                    'components': component_specs
+                })
+                res.raise_for_status()
+            except requests.exceptions.HTTPError:
+                container.stop()
+                container.remove()
+                raise ComponentInstallError(res.json().get('detail', ''))
+            except requests.ConnectionError:
+                container.stop()
+                container.remove()
+                raise MLADBoardConnectionRefusedError
 
     yield 'The component installation is complete.'
 

@@ -115,6 +115,10 @@ class MLADBoardAlreadyActivatedError(MLADException):
     def __str__(self):
         return 'The MLAD dashboard is already activated at localhost:2021.'
 
+class MLADBoardNoDatabaseError(MLADException):
+
+    def __str__(self):
+        return 'Cannot find database address from configuration.'
 
 class MLADBoardImageNotFoundError(MLADException):
 

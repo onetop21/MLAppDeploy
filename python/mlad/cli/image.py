@@ -160,6 +160,7 @@ def _obtain_workspace_payload(workspace, maintainer):
         key = tuple(prep.keys())[0]
         template = PREP_KEY_TO_TEMPLATE[key]
         prep_docker_formats.append(template.format(SRC=prep[key]))
+    print(prep_docker_formats)
 
     commands = [f'"{item}"' for item in default['command'].split()] + \
                [f'"{item}"' for item in default['args'].split()]
