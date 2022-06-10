@@ -1,0 +1,27 @@
+kind: Component
+apiVersion: v1
+name: minio-gateway
+version: 0.0.1
+maintainer: onetop21
+workdir: .
+workspace:
+  kind: Buildscript
+  buildscript: |
+      FROM    ubuntu:20.04
+      ENV     PYTHONUNBUFFERED 1
+      RUN     apt update && apt install -y nginx wget
+      RUN     wget https://dl.min.io/server/minio/release/linux-amd64/minio && chmod +x minio
+      RUN     wget https://github.com/minio/console/releases/latest/download/console-linux-amd64 -O console && chmod +x console
+      ADD     sites-enabled-default /etc/nginx/sites-enabled/default
+      ADD     run.sh .
+  ignores:
+  - '**/.*'
+app:
+  minio-gateway:
+    kind: Component
+    expose:
+    - port: 80
+    env:
+      MINIO_ROOT_USER: $AWS_ACCESS_KEY_ID
+      MINIO_ROOT_PASSWORD: $AWS_SECRET_ACCESS_KEY
+    command: bash run.sh

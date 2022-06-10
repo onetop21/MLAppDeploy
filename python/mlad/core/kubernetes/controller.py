@@ -7,13 +7,16 @@ from typing import Union, List, Dict, Optional, Tuple, Generator, Any
 from collections import defaultdict
 from pathlib import Path
 
+import jwt
+
 from kubernetes import client, config, watch
 from kubernetes.client.api_client import ApiClient
 from kubernetes.client.rest import ApiException
 
 from mlad.core import exceptions
 from mlad.core.exceptions import (
-    NamespaceAlreadyExistError, DeprecatedError, InvalidAppError, InvalidMetricUnitError,
+    InsufficientSessionQuotaError, NamespaceAlreadyExistError,
+    DeprecatedError, InvalidAppError, InvalidMetricUnitError,
     ProjectNotFoundError, handle_k8s_exception
 )
 from mlad.core.libs import utils
@@ -860,11 +863,11 @@ def obtain_k8s_app_resources(namespace: client.V1Namespace, base_labels: Dict[st
     return resources
 
 
-def create_apps(namespace: client.V1Namespace, apps: Dict, cli: ApiClient = DEFAULT_CLI) -> List[App]:
+def create_apps(namespace: client.V1Namespace, app_dict: Dict, cli: ApiClient = DEFAULT_CLI) -> List[App]:
     instances = []
     config_labels = _get_k8s_config_map_data(namespace, 'project-labels', cli)
     namespace_name = namespace.metadata.name
-    for name, app in apps.items():
+    for name, app in app_dict.items():
         resources = obtain_k8s_app_resources(namespace, config_labels, name, app)
         api = client.CoreV1Api(cli)
         api.create_namespaced_config_map(namespace_name, resources['configmap'])
@@ -1504,6 +1507,82 @@ def get_project_resources(
         return project_result
     elif group_by == 'app':
         return result
+
+
+def set_default_session_quota(cpu: float, gpu: int, mem: str, cli: ApiClient = DEFAULT_CLI):
+    api = client.CoreV1Api(cli)
+    name = 'mlad-api-server-quota-config'
+    configmap: client.V1ConfigMap = api.read_namespaced_config_map(name, 'mlad')
+    configmap.data.update({
+        'default.cpu': str(cpu),
+        'default.gpu': str(gpu),
+        'default.mem': mem
+    })
+
+    api.patch_namespaced_config_map(name, 'mlad', configmap)
+
+
+def set_session_quota(session: str, cpu: float, gpu: int, mem: str, cli: ApiClient = DEFAULT_CLI):
+
+    payload = jwt.decode(session, 'mlad', algorithms=['HS256'])
+    username = payload['user']
+    hostname = payload['hostname']
+
+    api = client.CoreV1Api(cli)
+    name = 'mlad-api-server-quota-config'
+    configmap: client.V1ConfigMap = api.read_namespaced_config_map(name, 'mlad')
+    configmap.data.update({
+        f'{username}.{hostname}.cpu': str(cpu),
+        f'{username}.{hostname}.gpu': str(gpu),
+        f'{username}.{hostname}.mem': mem
+    })
+
+    api.patch_namespaced_config_map(name, 'mlad', configmap)
+
+
+def check_session_quota(
+    session: str, quotas: List[Union[None, Dict]], cli: ApiClient = DEFAULT_CLI
+):
+    req_cpu = 0
+    req_gpu = 0
+    req_mem = 0
+    for quota in quotas:
+        if quota is None:
+            continue
+        req_cpu += quota['cpu'] or 0
+        req_gpu += quota['gpu'] or 0
+        req_mem += parse_mem(quota['mem'] or '0')
+    payload = jwt.decode(session, 'mlad', algorithms=['HS256'])
+    username = payload['user']
+    hostname = payload['hostname']
+    name = 'mlad-api-server-quota-config'
+    core_api = client.CoreV1Api(cli)
+    batch_api = client.BatchV1Api(cli)
+    quota_dict = core_api.read_namespaced_config_map(name, 'mlad').data
+    pod_list: client.V1PodList = core_api.list_pod_for_all_namespaces(
+        label_selector=f'{MLAD_PROJECT_HOSTNAME}={hostname},{MLAD_PROJECT_USERNAME}={username}',
+    )
+    cpu_key = f'{username}.{hostname}.cpu'
+    gpu_key = f'{username}.{hostname}.gpu'
+    mem_key = f'{username}.{hostname}.mem'
+    total_cpu = float(quota_dict[cpu_key] if cpu_key in quota_dict else quota_dict['default.cpu'])
+    total_gpu = int(quota_dict[gpu_key] if gpu_key in quota_dict else quota_dict['default.gpu'])
+    total_mem = parse_mem(quota_dict[mem_key] if mem_key in quota_dict else quota_dict['default.mem'])
+    for pod in pod_list.items:
+        if pod.metadata.owner_references[0].kind == 'Job':
+            app_name = pod.metadata.labels[MLAD_PROJECT_APP]
+            namespace = pod.metadata.namespace
+            job_status = batch_api.read_namespaced_job(app_name, namespace).status
+            if job_status.active is None:
+                continue
+        for container in pod.spec.containers:
+            requests = defaultdict(lambda: '0', container.resources.requests or {})
+            total_cpu -= parse_cpu(requests['cpu'])
+            total_gpu -= parse_gpu(requests['nvidia.com/gpu'])
+            total_mem -= parse_mem(requests['memory'])
+
+    if total_cpu < req_cpu or total_gpu < req_gpu or total_mem < req_mem:
+        raise InsufficientSessionQuotaError(username, hostname)
 
 
 def obtain_resources_by_session(cli=DEFAULT_CLI):

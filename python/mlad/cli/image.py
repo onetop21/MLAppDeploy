@@ -28,10 +28,11 @@ PREP_KEY_TO_TEMPLATE = {
 }
 
 
-def list(all, tail):
+def list(file: Optional[str], all: bool, tail: int):
     if all:
         images = ctlr.get_images()
     else:
+        utils.process_file(file)
         project_key = utils.workspace_key()
         images = ctlr.get_images(project_key=project_key)
 
@@ -159,6 +160,7 @@ def _obtain_workspace_payload(workspace, maintainer):
         key = tuple(prep.keys())[0]
         template = PREP_KEY_TO_TEMPLATE[key]
         prep_docker_formats.append(template.format(SRC=prep[key]))
+    print(prep_docker_formats)
 
     commands = [f'"{item}"' for item in default['command'].split()] + \
                [f'"{item}"' for item in default['args'].split()]

@@ -1,15 +1,13 @@
-import os
-import sys
-
 from typing import Optional
 
 from .node import Node
 from .project import Project
 from .app import App
 from .check import Check
+from .quota import Quota
 
 from mlad.cli import config as config_core
-from mlad.cli.exceptions import APIServerNotInstalledError, ConfigNotFoundError
+from mlad.cli.exceptions import ConfigNotFoundError
 from functools import lru_cache
 
 
@@ -82,3 +80,8 @@ class API:
     @lru_cache(maxsize=None)
     def check(cls) -> Check:
         return Check(cls.address, cls.session)
+
+    @classproperty
+    @lru_cache(maxsize=None)
+    def quota(cls) -> Quota:
+        return Quota(cls.address, cls.session)

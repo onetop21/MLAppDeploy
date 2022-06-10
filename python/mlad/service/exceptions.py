@@ -36,6 +36,8 @@ def exception_detail(e):
         reason = 'ProjectNotFound'
     elif exception == 'InvalidLogRequest':
         reason = 'AppNotRunning'
+    elif exception == 'InsufficientSessionQuotaError':
+        reason = 'InsufficientSessionQuotaError'
     else:
         reason = 'InternalError'
         # reason = exception

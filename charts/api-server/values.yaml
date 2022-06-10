@@ -32,7 +32,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/onetop21/mlappdeploy/api-server
   pullPolicy: Always
-  tag: 0.4.2	# AUTO GENERATED
+  tag: 0.4.4	# AUTO GENERATED
 
 port: 8440
 
@@ -126,3 +126,9 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+sessionQuota:
+  default:
+    cpu: 16
+    gpu: 4
+    mem: 64Gi
