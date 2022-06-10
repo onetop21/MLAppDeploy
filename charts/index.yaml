@@ -2,10 +2,24 @@ apiVersion: v1
 entries:
   api-server:
   - apiVersion: v2
-    appVersion: 0.4.3
-    created: "2022-05-26T17:22:34.719417838Z"
+    appVersion: 0.4.4
+    created: "2022-06-10T08:08:28.487168444Z"
     description: Machine Learning Application Deployment Tool by Kubernetes
-    digest: 29d4ef12287432a3fc97731988a8508d1528795823260ba18859a05559bc02c7
+    digest: 0f968ed6e56e9028b9f8ecee02714f2395e0174634cd9f0651d51fbf00b27430
+    home: https://github.com/onetop21/MLAppDeploy
+    maintainers:
+    - email: onetop21@gmail.com
+      name: Hyoil LEE
+    name: api-server
+    type: application
+    urls:
+    - api-server-0.4.4.tgz
+    version: 0.4.4
+  - apiVersion: v2
+    appVersion: 0.4.3
+    created: "2022-06-10T08:08:28.486583235Z"
+    description: Machine Learning Application Deployment Tool by Kubernetes
+    digest: f81447057c8411009a3d87729239fc0f9d7338ee8b5f7fdb96b9c0c6e5e25b4d
     home: https://github.com/onetop21/MLAppDeploy
     maintainers:
     - email: onetop21@gmail.com
@@ -17,7 +31,7 @@ entries:
     version: 0.4.3
   - apiVersion: v2
     appVersion: 0.4.2
-    created: "2022-05-26T17:22:34.718855329Z"
+    created: "2022-06-10T08:08:28.485914626Z"
     description: Machine Learning Application Deployment Tool by Kubernetes
     digest: 399c447d4a0f5b4f1a50ac5386c023017b269457e4cd3785cbecd633dfcb1551
     home: https://github.com/onetop21/MLAppDeploy
@@ -31,7 +45,7 @@ entries:
     version: 0.4.2
   - apiVersion: v2
     appVersion: 0.4.1
-    created: "2022-05-26T17:22:34.71829692Z"
+    created: "2022-06-10T08:08:28.485384518Z"
     description: Machine Learning Application Deployment Tool by Kubernetes
     digest: 6e94b099549555a3f6e21847526f92f4bf0e006f0dbc76ef4b77c9ebb24887c7
     home: https://github.com/onetop21/MLAppDeploy
@@ -45,7 +59,7 @@ entries:
     version: 0.4.1
   - apiVersion: v2
     appVersion: 0.4.0
-    created: "2022-05-26T17:22:34.717751612Z"
+    created: "2022-06-10T08:08:28.484844811Z"
     description: Machine Learning Application Deployment Tool by Kubernetes
     digest: 6c0ea30f5d6daa1b9e4c4bd292ec181c5db8356312599a790b767ab7b3c9011d
     home: https://github.com/onetop21/MLAppDeploy
@@ -59,7 +73,7 @@ entries:
     version: 0.4.0
   - apiVersion: v2
     appVersion: 0.3.0
-    created: "2022-05-26T17:22:34.717197003Z"
+    created: "2022-06-10T08:08:28.484210002Z"
     description: Machine Learning Application Deployment Tool by Kubernetes
     digest: 0c2e62fb188c88ceaa4bace74cdc0bb147e4bd772adae72629cac98a2c354305
     home: https://github.com/onetop21/MLAppDeploy
@@ -73,7 +87,7 @@ entries:
     version: 0.3.0
   - apiVersion: v2
     appVersion: 0.2.0
-    created: "2022-05-26T17:22:34.716601993Z"
+    created: "2022-06-10T08:08:28.482435977Z"
     description: Machine Learning Application Deployment Tool by Kubernetes
     digest: 2167f4a29976a3ee29589a153bda98c23e316ef640d02ff30afc6ee991dea5f7
     home: https://github.com/onetop21/MLAppDeploy
@@ -85,4 +99,4 @@ entries:
     urls:
     - api-server-0.2.0.tgz
     version: 0.2.0
-generated: "2022-05-26T17:22:34.715814181Z"
+generated: "2022-06-10T08:08:28.481387562Z"
