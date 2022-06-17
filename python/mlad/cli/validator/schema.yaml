@@ -224,6 +224,9 @@ x-definitions:
         allowed: [Never, OnFailure]
         default: Never
         description: Restart policy for job. (Never, OnFailure)
+      schedule:
+        type: string
+        description: The scheduling info for cron job. Please refer to linux crontab.
   - definition: &service
       <<: *app
       scale:                  # Describe number of replicas or parallelism
