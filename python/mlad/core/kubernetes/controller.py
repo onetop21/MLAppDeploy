@@ -17,13 +17,14 @@ from mlad.core import exceptions
 from mlad.core.exceptions import (
     InsufficientSessionQuotaError, NamespaceAlreadyExistError,
     DeprecatedError, InvalidAppError, InvalidMetricUnitError,
-    ProjectNotFoundError, handle_k8s_exception
+    ProjectNotFoundError, handle_k8s_exception, InvalidCronJobScheduleError
 )
 from mlad.core.libs import utils
 from mlad.core.libs.constants import (
-    CONFIG_ENVS, MLAD_PROJECT, MLAD_PROJECT_API_VERSION, MLAD_PROJECT_APP, MLAD_PROJECT_APP_KIND, MLAD_PROJECT_BASE,
-    MLAD_PROJECT_ENV, MLAD_PROJECT_HOSTNAME, MLAD_PROJECT_IMAGE, MLAD_PROJECT_INGRESS, MLAD_PROJECT_KIND,
-    MLAD_PROJECT_NAME, MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_SESSION,
+    CONFIG_ENVS, MLAD_PROJECT, MLAD_PROJECT_API_VERSION, MLAD_PROJECT_APP, MLAD_PROJECT_APP_KIND,
+    MLAD_PROJECT_APP_CONTROLLER, MLAD_PROJECT_BASE, MLAD_PROJECT_ENV, MLAD_PROJECT_HOSTNAME,
+    MLAD_PROJECT_IMAGE, MLAD_PROJECT_INGRESS, MLAD_PROJECT_KIND, MLAD_PROJECT_NAME,
+    MLAD_PROJECT_NAMESPACE, MLAD_PROJECT_WORKSPACE, MLAD_PROJECT_SESSION,
     MLAD_PROJECT_USERNAME, MLAD_PROJECT_VERSION, MLAD_PROJECT_YAML
 )
 from mlad.core.kubernetes.monitor import DelMonitor, Collector
@@ -271,9 +272,9 @@ def get_k8s_daemonset(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -
 def get_app(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> App:
     key = f'app-{name}-labels'
     config_labels = _get_k8s_config_map_data(namespace, key, cli)
-    kind = config_labels[MLAD_PROJECT_APP_KIND]
     name = config_labels[MLAD_PROJECT_APP]
-    app = get_app_from_kind(name, namespace, kind, cli=cli)
+    controller = config_labels[MLAD_PROJECT_APP_CONTROLLER]
+    app = get_app_from_controller(name, namespace, controller, cli=cli)
     return app
 
 
@@ -281,12 +282,17 @@ def get_apps(project_key: Optional[str] = None,
              extra_filters: Dict[str, str] = {},
              cli: ApiClient = DEFAULT_CLI) -> List[App]:
     batch_api = client.BatchV1Api(cli)
+    batch_beta_api = client.BatchV1beta1Api(cli)
     apps_api = client.AppsV1Api(cli)
     filters = [f'{MLAD_PROJECT}={project_key}' if project_key else MLAD_PROJECT]
     filters += [f'{key}={value}' for key, value in extra_filters.items()]
 
     apps = []
-    apps += batch_api.list_job_for_all_namespaces(label_selector=','.join(filters)).items
+    apps += batch_beta_api.list_cron_job_for_all_namespaces(label_selector=','.join(filters)).items
+    jobs = batch_api.list_job_for_all_namespaces(label_selector=','.join(filters)).items
+    for job in jobs:
+        if job.metadata.owner_references is None:
+            apps.append(job)
     apps += apps_api.list_deployment_for_all_namespaces(label_selector=','.join(filters)).items
     return apps
 
@@ -305,6 +311,27 @@ def get_k8s_service_of_app(namespace: str, app_name: str, cli: ApiClient = DEFAU
         return None
     elif len(service.items) == 1:
         return service.items[0]
+
+
+def get_app_from_controller(app_name: str, namespace: str, controller: str, cli: ApiClient = DEFAULT_CLI) -> Optional[App]:
+    if controller == 'Job':
+        batch_api = client.BatchV1Api(cli)
+        resp = batch_api.list_namespaced_job(
+            namespace, label_selector=f"{MLAD_PROJECT_APP}={app_name}")
+    elif controller == 'CronJob':
+        batch_beta_api = client.BatchV1beta1Api(cli)
+        resp = batch_beta_api.list_namespaced_cron_job(
+            namespace, label_selector=f"{MLAD_PROJECT_APP}={app_name}")
+    elif controller == 'Deployment':
+        apps_api = client.AppsV1Api(cli)
+        resp = apps_api.list_namespaced_deployment(
+            namespace, label_selector=f"{MLAD_PROJECT_APP}={app_name}")
+    if len(resp.items) == 0:
+        return None
+    elif len(resp.items) == 1:
+        return resp.items[0]
+    else:
+        raise exceptions.Duplicated(f"Duplicated app exists in namespace {namespace}")
 
 
 def get_app_from_kind(app_name: str, namespace: str, kind: str, cli: ApiClient = DEFAULT_CLI) -> Optional[App]:
@@ -398,20 +425,36 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
         kind = 'Service'
     elif isinstance(app, client.V1Job):
         kind = 'Job'
+    elif isinstance(app, client.V1beta1CronJob):
+        app = app.spec.job_template
+        kind = 'CronJob'
     else:
         raise TypeError('Parameter is not a valid type.')
 
-    api = client.CoreV1Api(cli)
+    core_api = client.CoreV1Api(cli)
+    batch_beta_api = client.BatchV1beta1Api(cli)
 
-    name = app.metadata.name
     namespace = app.metadata.namespace
-    config_labels = _get_k8s_config_map_data(namespace, f'app-{name}-labels', cli)
+    name = app.metadata.name
 
-    pods = api.list_namespaced_pod(namespace, label_selector=f'{MLAD_PROJECT_APP}={name}').items
+    if app.metadata.owner_references is not None:
+        # Job by CronJob
+        cron_job_name = app.metadata.owner_references[0].name
+        pods = core_api.list_namespaced_pod(namespace,
+                                       label_selector=f'{MLAD_PROJECT_APP}={cron_job_name},'
+                                                      f'job-name={name}').items
+        config_labels = _get_k8s_config_map_data(namespace, f'app-{cron_job_name}-labels', cli)
+        service = get_k8s_service_of_app(namespace, cron_job_name, cli=cli)
+        cron_job = batch_beta_api.read_namespaced_cron_job(cron_job_name, namespace)
+        schedule = cron_job.spec.schedule
+    else:
+        pods = core_api.list_namespaced_pod(namespace,
+                                       label_selector=f'{MLAD_PROJECT_APP}={name}').items
+        config_labels = _get_k8s_config_map_data(namespace, f'app-{name}-labels', cli)
+        service = get_k8s_service_of_app(namespace, name, cli=cli)
 
     hostname, path = config_labels.get(MLAD_PROJECT_WORKSPACE, ':').split(':')
     pod_spec = app.spec.template.spec
-    service = get_k8s_service_of_app(namespace, name, cli=cli)
 
     spec = {
         'key': config_labels[MLAD_PROJECT] if config_labels.get(
@@ -430,11 +473,12 @@ def inspect_app(app: App, cli: ApiClient = DEFAULT_CLI) -> Dict:
         'env': [{'name': e.name, 'value': e.value} for e in pod_spec.containers[0].env],
         'id': app.metadata.uid,
         'name': config_labels.get(MLAD_PROJECT_APP),
-        'replicas': app.spec.parallelism if kind == 'Job' else app.spec.replicas,
+        'replicas': app.spec.replicas if kind == 'Service' else app.spec.parallelism,
         'task_dict': {pod.metadata.name: get_pod_info(pod, cli) for pod in pods},
         'expose': _obtain_app_expose(service, config_labels),
         'created': app.metadata.creation_timestamp,
         'kind': config_labels.get(MLAD_PROJECT_APP_KIND),
+        'schedule': schedule if app.metadata.owner_references else None
     }
     return spec
 
@@ -573,14 +617,13 @@ def _convert_depends_to_k8s_init_container(
     )
 
 
-def _obtain_k8s_job(
-    name: str, image: str, command: List[str], namespace: str = 'default',
-    restart_policy: str = 'Never', envs: List[client.V1EnvVar] = [], mounts: List[str] = [],
-    pvc_specs: List[Dict] = [], parallelism: int = 1, completions: int = 1,
-    quota: Optional[Dict[str, str]] = None, resources: Optional[Dict] = None,
-    init_containers: List[client.V1Container] = [], labels: Optional[Dict[str, str]] = None,
-    constraints: Optional[Dict] = None, secrets: str = ''
-) -> client.V1Job:
+def _obtain_k8s_job_spec(
+    name: str, image: str, command: List[str], restart_policy: str = 'Never',
+    envs: List[client.V1EnvVar] = [], mounts: List[str] = [], pvc_specs: List[Dict] = [],
+    parallelism: int = 1, completions: int = 1, quota: Optional[Dict[str, str]] = None,
+    resources: Optional[Dict] = None, init_containers: List[client.V1Container] = [],
+    labels: Optional[Dict[str, str]] = None, constraints: Optional[Dict] = None, secrets: str = ''
+) -> client.V1JobSpec:
 
     _resources = _convert_quota_to_k8s_resource(type='Resources', resources=resources) if resources \
         else _convert_quota_to_k8s_resource(resources=quota)
@@ -589,11 +632,7 @@ def _obtain_k8s_job(
 
     _mounts, _volumes = _convert_mounts_to_k8s_volume(name, mounts, pvc_specs)
 
-    return client.V1Job(
-        api_version='batch/v1',
-        kind='Job',
-        metadata=client.V1ObjectMeta(name=name, labels=labels, namespace=namespace),
-        spec=client.V1JobSpec(
+    return client.V1JobSpec(
             backoff_limit=0,
             parallelism=parallelism,
             completions=completions,
@@ -620,6 +659,49 @@ def _obtain_k8s_job(
                     if secrets else None
                 )
             )
+        )
+
+
+def _obtain_k8s_job(
+    name: str, image: str, command: List[str], namespace: str = 'default',
+    restart_policy: str = 'Never', envs: List[client.V1EnvVar] = [], mounts: List[str] = [],
+    pvc_specs: List[Dict] = [], parallelism: int = 1, completions: int = 1,
+    quota: Optional[Dict[str, str]] = None, resources: Optional[Dict] = None,
+    init_containers: List[client.V1Container] = [], labels: Optional[Dict[str, str]] = None,
+    constraints: Optional[Dict] = None, secrets: str = ''
+) -> client.V1Job:
+
+    return client.V1Job(
+        api_version='batch/v1',
+        kind='Job',
+        metadata=client.V1ObjectMeta(name=name, labels=labels, namespace=namespace),
+        spec=_obtain_k8s_job_spec(
+            name, image, command, restart_policy, envs, mounts, pvc_specs, parallelism,
+            completions, quota, resources, init_containers, labels, constraints, secrets)
+    )
+
+
+def _obtain_k8s_cron_job(
+    name: str, image: str, command: List[str], namespace: str = 'default',
+    restart_policy: str = 'Never', envs: List[client.V1EnvVar] = [], mounts: List[str] = [],
+    pvc_specs: List[Dict] = [], parallelism: int = 1, completions: int = 1,
+    quota: Optional[Dict[str, str]] = None, resources: Optional[Dict] = None,
+    init_containers: List[client.V1Container] = [], labels: Optional[Dict[str, str]] = None,
+    constraints: Optional[Dict] = None, schedule: str = '* * * * *', secrets: str = ''
+) -> client.V1beta1CronJob:
+
+    return client.V1beta1CronJob(
+        api_version='batch/v1beta1',
+        kind='CronJob',
+        metadata=client.V1ObjectMeta(name=name, labels=labels, namespace=namespace),
+        spec=client.V1beta1CronJobSpec(
+            job_template=client.V1beta1JobTemplateSpec(
+                metadata=client.V1ObjectMeta(name=name, labels=labels, namespace=namespace),
+                spec=_obtain_k8s_job_spec(
+                    name, image, command, restart_policy, envs, mounts, pvc_specs, parallelism,
+                    completions, quota, resources, init_containers, labels, constraints, secrets)
+            ),
+            schedule=schedule,
         )
     )
 
@@ -810,6 +892,8 @@ def obtain_k8s_app_resources(namespace: client.V1Namespace, base_labels: Dict[st
     pv_mounts = app.get('mounts') or []
     v_mounts = ['/etc/timezone:/etc/timezone:ro', '/etc/localtime:/etc/localtime:ro']
 
+    schedule = app.get('schedule')
+
     config_labels[MLAD_PROJECT_APP] = name
     config_labels[MLAD_PROJECT_APP_KIND] = kind
 
@@ -833,10 +917,18 @@ def obtain_k8s_app_resources(namespace: client.V1Namespace, base_labels: Dict[st
         })
 
     if kind == 'Job':
-        resources['job'] = _obtain_k8s_job(
-            name, image, command, namespace_name, restart_policy, envs, v_mounts, pvc_specs,
-            1, None, quota, None, init_containers, labels, constraints, secrets)
+        if schedule is not None:
+            config_labels[MLAD_PROJECT_APP_CONTROLLER] = 'CronJob'
+            resources['cron_job'] = _obtain_k8s_cron_job(
+                name, image, command, namespace_name, restart_policy, envs, v_mounts, pvc_specs, 1,
+                None, quota, None, init_containers, labels, constraints, schedule, secrets)
+        else:
+            config_labels[MLAD_PROJECT_APP_CONTROLLER] = 'Job'
+            resources['job'] = _obtain_k8s_job(
+                name, image, command, namespace_name, restart_policy, envs, v_mounts, pvc_specs,
+                1, None, quota, None, init_containers, labels, constraints, secrets)
     elif kind == 'Service':
+        config_labels[MLAD_PROJECT_APP_CONTROLLER] = 'Deployment'
         scale = app['scale']
         resources['deployment'] = _obtain_k8s_deployment(
             name, image, command, namespace_name, envs, v_mounts, pvc_specs, scale,
@@ -884,6 +976,14 @@ def create_apps(namespace: client.V1Namespace, app_dict: Dict, cli: ApiClient = 
             api = client.BatchV1Api(cli)
             job = api.create_namespaced_job(namespace_name, resources['job'])
             instances.append(job)
+        if 'cron_job' in resources:
+            api = client.BatchV1beta1Api(cli)
+            try:
+                cron_job = api.create_namespaced_cron_job(namespace_name, resources['cron_job'])
+            except ApiException as e:
+                msg, _ = exceptions.handle_k8s_api_error(e)
+                raise InvalidCronJobScheduleError(msg)
+            instances.append(cron_job)
         if 'deployment' in resources:
             api = client.AppsV1Api(cli)
             deployment = api.create_namespaced_deployment(namespace_name, resources['deployment'])
@@ -900,7 +1000,10 @@ def update_apps(
         if update_yaml['app'][app_name]['kind'] == 'Service':
             results.append(_update_k8s_deployment(namespace, update_spec, cli=cli))
         else:
-            results.append(_update_k8s_job(namespace, update_spec, cli=cli))
+            if 'schedule' in update_yaml['app'][app_name]:  # cron job
+                results.append(_update_k8s_cron_job(namespace, update_spec, cli=cli))
+            else:
+                results.append(_update_k8s_job(namespace, update_spec, cli=cli))
     return results
 
 
@@ -992,7 +1095,8 @@ def _update_k8s_job(
         args = args.split()
     command += args
 
-    k8s_job = get_app_from_kind(app_name, namespace_name, 'Job', cli=cli)
+    k8s_job = get_app_from_controller(app_name, namespace_name, 'Job', cli=cli)
+
     # remove invalid properties to re-run the job
     k8s_job.metadata = client.V1ObjectMeta(name=k8s_job.metadata.name, labels=k8s_job.metadata.labels)
     k8s_job.spec.selector = None
@@ -1040,9 +1144,73 @@ def _update_k8s_job(
         raise exceptions.APIError(err_msg, status)
 
 
+def _update_k8s_cron_job(
+    namespace: client.V1Namespace, update_spec: Dict, cli: ApiClient = DEFAULT_CLI
+) -> client.V1Job:
+    app_name = update_spec['name']
+    image = update_spec['image']
+    command = update_spec['command'] or []
+    args = update_spec['args'] or []
+    quota = update_spec['quota'] or {}
+    namespace_name = namespace.metadata.name
+
+    resources = _convert_quota_to_k8s_resource(resources=quota)
+
+    if isinstance(command, str):
+        command = command.split()
+    if isinstance(args, str):
+        args = args.split()
+    command += args
+
+    k8s_cron_job = get_app_from_controller(app_name, namespace_name, 'CronJob', cli=cli)
+    # remove invalid properties to re-run the cron job
+    k8s_cron_job.metadata = client.V1ObjectMeta(name=k8s_cron_job.metadata.name,
+                                                labels=k8s_cron_job.metadata.labels)
+    k8s_job = k8s_cron_job.spec.job_template
+    k8s_job.spec.selector = None
+
+    container_spec = k8s_job.spec.template.spec.containers[0]
+    current = {env.name: env.value for env in container_spec.env}
+    for key in list(update_spec['env']['current'].keys()):
+        if key not in CONFIG_ENVS:
+            current.pop(key)
+    for key in list(update_spec['env']['update'].keys()):
+        if key in CONFIG_ENVS:
+            update_spec['env']['update'].pop(key)
+    current.update(update_spec['env']['update'])
+    if 'gpu' in quota and quota['gpu'] == 0:
+        current.update({'NVIDIA_VISIBLE_DEVICES': 'none'})
+    elif 'NVIDIA_VISIBLE_DEVICES' in current:
+        del current['NVIDIA_VISIBLE_DEVICES']
+    env = [client.V1EnvVar(name=k, value=v).to_dict() for k, v in current.items()]
+
+    container_spec.command = command
+    container_spec.resources = resources
+    if image is not None:
+        container_spec.image = image
+    else:
+        namespace_spec = inspect_k8s_namespace(namespace, cli)
+        container_spec.image = namespace_spec['image']
+
+    container_spec.env = env
+    try:
+        api = client.BatchV1beta1Api(cli)
+        return api.patch_namespaced_cron_job(app_name, namespace_name, body=k8s_cron_job)
+    except ApiException as e:
+        msg, status = exceptions.handle_k8s_api_error(e)
+        err_msg = f'Failed to update apps: {msg}'
+        raise exceptions.APIError(err_msg, status)
+
+
 def _delete_k8s_job(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI) -> client.V1Job:
     api = client.BatchV1Api(cli)
     return api.delete_namespaced_job(name, namespace, propagation_policy='Foreground')
+
+
+def _delete_k8s_cron_job(name: str, namespace: str, cli: ApiClient = DEFAULT_CLI
+) -> client.V1beta1CronJob:
+    api = client.BatchV1beta1Api(cli)
+    return api.delete_namespaced_cron_job(name, namespace, propagation_policy='Foreground')
 
 
 def _delete_k8s_deployment(
@@ -1066,7 +1234,8 @@ def remove_apps(
 
         config_labels = _get_k8s_config_map_data(namespace, f'app-{app_name}-labels', cli)
         kind = config_labels[MLAD_PROJECT_APP_KIND]
-        return app_name, kind, task_keys
+        controller = config_labels[MLAD_PROJECT_APP_CONTROLLER]
+        return app_name, kind, controller, task_keys
 
     app_specs = [_get_app_spec(app) for app in apps]
     # For check app deleted
@@ -1078,11 +1247,14 @@ def remove_apps(
         disconnect_handler.add_callback(lambda: monitor.stop())
 
     for spec in app_specs:
-        app_name, kind, _ = spec
+        app_name, kind, controller, _ = spec
         try:
             _delete_k8s_pvs(app_name)
             if kind == 'Job':
-                _delete_k8s_job(app_name, namespace, cli=cli)
+                if controller == 'Job':
+                    _delete_k8s_job(app_name, namespace, cli=cli)
+                elif controller == 'CronJob':
+                    _delete_k8s_cron_job(app_name, namespace, cli=cli)
             elif kind == 'Service':
                 _delete_k8s_deployment(app_name, namespace, cli=cli)
 
@@ -1569,10 +1741,12 @@ def check_session_quota(
     total_gpu = int(quota_dict[gpu_key] if gpu_key in quota_dict else quota_dict['default.gpu'])
     total_mem = parse_mem(quota_dict[mem_key] if mem_key in quota_dict else quota_dict['default.mem'])
     for pod in pod_list.items:
-        if pod.metadata.owner_references[0].kind == 'Job':
+        owner_reference = pod.metadata.owner_references[0]
+        if owner_reference.kind == 'Job':
+            job_name = owner_reference.name
             app_name = pod.metadata.labels[MLAD_PROJECT_APP]
             namespace = pod.metadata.namespace
-            job_status = batch_api.read_namespaced_job(app_name, namespace).status
+            job_status = batch_api.read_namespaced_job(job_name, namespace).status
             if job_status.active is None:
                 continue
         for container in pod.spec.containers:
