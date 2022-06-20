@@ -33,7 +33,7 @@ class DelMonitor(Thread):
         target_task_keys = []
         app_name_to_task_keys = {}
         for spec in self.app_specs:
-            name, _, task_keys = spec
+            name, _, _, task_keys = spec
             app_name_to_task_keys[name] = task_keys
             target_task_keys.extend(task_keys)
         w = watch.Watch()
