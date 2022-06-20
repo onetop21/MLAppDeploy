@@ -90,6 +90,7 @@ class AppJob(App):
     kind = 'Job'
     # Never | onFailure
     restartPolicy: Optional[str] = 'Never'
+    schedule: Optional[str]
 
 
 class AppService(App):

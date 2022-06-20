@@ -138,3 +138,11 @@ class InsufficientSessionQuotaError(MLADException):
 
     def __str__(self):
         return f'Quota is insufficient, user: {self.username}, hostname: {self.hostname}'
+
+
+class InvalidCronJobScheduleError(MLADException):
+    def __init__(self, msg: str):
+        self.msg = msg
+
+    def __str__(self):
+        return f'Job schedule format is invalid:\n\t{self.msg}'
