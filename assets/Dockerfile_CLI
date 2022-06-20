@@ -17,10 +17,12 @@ RUN apt update && apt install -y binutils
 RUN pip install pyinstaller staticx patchelf
 
 WORKDIR /build
+ADD python /build/python
 
 RUN echo "pip install /build/python &&" >> build.sh
-RUN echo "pyinstaller -F -n mlad-dynamic --add-data /build/python/mlad/cli/validator/schema.yaml:mlad/cli/validator --clean /build/python/mlad/cli/__main__.py &&" >> build.sh
-RUN echo "staticx /build/dist/mlad-dynamic /build/dist/mlad-static" >> build.sh
+RUN echo "pyinstaller -F -n mlad --add-data /build/python/mlad/cli/validator/schema.yaml:mlad/cli/validator --clean /build/python/mlad/cli/__main__.py &&" >> build.sh
+RUN echo "cp /build/dist/mlad /build/dist/mlad-dynamic" >> build.sh
+RUN echo "staticx /build/dist/mlad /build/dist/mlad-static" >> build.sh
 
 CMD bash build.sh
 

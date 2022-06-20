@@ -18,7 +18,7 @@ build-cli:
 
 cli: build-cli
 	@mkdir -p bin
-	@docker run -it --name mlad-build-env -v ${PWD}/python:/build/python:ro mlappdeploy-build-env:latest
+	@docker run -it --name mlad-build-env mlappdeploy-build-env:latest
 	@docker cp mlad-build-env:/build/dist/mlad-static bin/$(TARGET)
 	@docker stop mlad-build-env | xargs docker rm
 
@@ -28,7 +28,7 @@ install:
 
 debug: build-cli
 	@mkdir -p dist.tmp
-	@docker run -it --rm -v ${PWD}/python:/build/python -v ${PWD}/dist.tmp:/build/dist mlappdeploy-build-env:latest /bin/bash
+	@docker run -it --rm -v ${PWD}/dist.tmp:/build/dist mlappdeploy-build-env:latest /bin/bash
 
 api-server:
 	@$(eval CONTEXT := $(shell mlad config ls | grep "*" | awk '{print $$2}'))
