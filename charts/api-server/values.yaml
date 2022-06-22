@@ -50,10 +50,10 @@ env:
 clusterRole:
   enabled: true
   rules:
-    - apiGroups: ["", "apps", "batch", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io", "metrics.k8s.io"]
+    - apiGroups: ["", "apps", "batch", "batch/v1beta1", "extensions", "rbac.authorization.k8s.io", "networking.k8s.io", "metrics.k8s.io"]
       resources: [
         "nodes", "namespaces", "services", "pods", "pods/log", "replicationcontrollers",
-        "deployments", "deployments/scale", "daemonsets", "replicasets", "jobs",
+        "deployments", "deployments/scale", "daemonsets", "replicasets", "jobs", "cronjobs",
         "configmaps", "secrets", "events", "rolebindings",
         "ingresses", "podmetrics", "persistentvolumeclaims", "persistentvolumes"]
       verbs: ["get", "watch", "list", "create", "update", "delete", "patch", "deletecollection"]
