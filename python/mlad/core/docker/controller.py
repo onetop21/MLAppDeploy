@@ -100,7 +100,7 @@ def build_image(base_labels, tar, dockerfile, no_cache=False, pull=False, stream
         import requests_unixsocket
         with requests_unixsocket.post(f"{host}/v1.24/build", headers=headers, params=params, data=tar, stream=True) as resp:
             for _ in resp.iter_lines(decode_unicode=True):
-                line = json.loads(_)
+                line = json.loads(_ or '{}')
                 yield line
     if stream:
         return _request_build(headers, params, tar)
