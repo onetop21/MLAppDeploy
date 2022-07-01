@@ -844,7 +844,10 @@ def _format_log(log, colorkey=None, max_name_width=32, pretty=True):
     else:
         colorkey = defaultdict(lambda: '')
     if '\r' in msg:
-        msg = msg.split('\r')[-1] + '\n'
+        if msg.endswith('\r\n'):
+            msg = msg.split('\r')[-2] + '\n'
+        else:
+            msg = msg.split('\r')[-1] + '\n'
     if msg.endswith('\n'):
         msg = msg[:-1]
     if timestamp is not None:
