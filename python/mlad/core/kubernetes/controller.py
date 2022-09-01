@@ -656,7 +656,8 @@ def _obtain_k8s_job_spec(
                     volumes=_volumes,
                     node_selector=node_selector,
                     image_pull_secrets=[client.V1LocalObjectReference(name=secrets)]
-                    if secrets else None
+                    if secrets else None,
+                    host_ipc=True
                 )
             )
         )
@@ -754,7 +755,8 @@ def _obtain_k8s_deployment(
                     volumes=_volumes,
                     node_selector=node_selector,
                     image_pull_secrets=[client.V1LocalObjectReference(name=secrets)]
-                    if secrets else None
+                    if secrets else None,
+                    host_ipc=True
                 )
             )
         )
