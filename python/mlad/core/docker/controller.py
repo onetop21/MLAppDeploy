@@ -17,17 +17,21 @@ from mlad.core.exceptions import (
 )
 
 
+DOCKER_API_TIMEOUT = None
+
+
 def get_cli(host=None) -> docker.client.DockerClient:
     from mlad.cli.config import get as get_config
     try:
         if host:
-            return docker.DockerClient(base_url=host)
+            return docker.DockerClient(base_url=host, timeout=DOCKER_API_TIMEOUT)
         else:
             config = get_config()
             if 'docker_host' in config:
-                return docker.DockerClient(base_url=config['docker_host'])
+                return docker.DockerClient(base_url=config['docker_host'],
+                                           timeout=DOCKER_API_TIMEOUT)
             else:
-                return docker.from_env()
+                return docker.from_env(timeout=DOCKER_API_TIMEOUT)
     except Exception:
         raise DockerNotFoundError
 
